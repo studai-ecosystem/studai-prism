@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Google Fonts are loaded in index.html ── */
+
+:root {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F5FA;
+  --bg-tertiary: #EEEEF4;
+  --gold: #C9A84C;
+  --gold-light: #E8C96A;
+  --text-primary: #1A1A2E;
+  --text-secondary: #64687A;
+  --border: #E0E0E8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #F5F5FA; }
+::-webkit-scrollbar-thumb { background: #D0D0DC; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+/* ── Noise texture ── */
+.noise-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.045;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Gold shimmer animation ── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.shimmer-btn {
+  background: linear-gradient(
+    90deg,
+    #C9A84C 0%,
+    #E8C96A 30%,
+    #C9A84C 60%,
+    #E8C96A 100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 2.8s linear infinite;
+}
+
+/* ── Glow pulse for primary CTA ── */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 168, 76, 0); }
+  50%       { box-shadow: 0 0 24px 4px rgba(201, 168, 76, 0.25); }
+}
+
+.glow-pulse {
+  animation: glow-pulse 2.4s ease-in-out infinite;
+}
+
+/* ── Hero grid background ── */
+.hero-grid {
+  background-image:
+    linear-gradient(rgba(201,168,76,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201,168,76,0.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ── Tabular numbers ── */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Score dimension bar animation ── */
+@keyframes bar-fill {
+  from { width: 0%; }
+}
+
+.bar-fill {
+  animation: bar-fill 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Backdrop blur nav ── */
+.nav-blur {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
