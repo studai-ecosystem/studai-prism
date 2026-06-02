@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
 import { stagger, fadeUp } from '../hooks/motionVariants.js'
+import HeroAvatars from './HeroAvatars.jsx'
 
 const trustStats = [
   { value: '30 min', label: 'One conversation' },
@@ -54,6 +55,11 @@ export default function Hero({ onGetAssessed }) {
           Not a multiple-choice test. A live 30-minute AI scenario that surfaces
           how you actually think — then certifies it with a score employers trust.
         </motion.p>
+
+        {/* Animated avatar characters + chat preview */}
+        <motion.div variants={fadeUp} className="w-full mt-4 mb-2">
+          <HeroAvatars />
+        </motion.div>
 
         {/* CTAs */}
         <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center gap-4 mt-2">
