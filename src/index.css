@@ -5,14 +5,15 @@
 /* ── Google Fonts are loaded in index.html ── */
 
 :root {
-  --bg-primary: #FFFFFF;
-  --bg-secondary: #F5F5FA;
-  --bg-tertiary: #EEEEF4;
+  --bg-primary: #FDF8F0;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F6EFE2;
+  --card: #FFFFFF;
   --gold: #C9A84C;
   --gold-light: #E8C96A;
-  --text-primary: #1A1A2E;
-  --text-secondary: #64687A;
-  --border: #E0E0E8;
+  --text-primary: #0A0D14;
+  --text-secondary: #5A5F6E;
+  --border: #E8E0D0;
 }
 
 * {
@@ -34,8 +35,8 @@ body {
 
 /* ── Custom scrollbar ── */
 ::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: #F5F5FA; }
-::-webkit-scrollbar-thumb { background: #D0D0DC; border-radius: 3px; }
+::-webkit-scrollbar-track { background: #FDF8F0; }
+::-webkit-scrollbar-thumb { background: #E8E0D0; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 
 /* ── Noise texture ── */

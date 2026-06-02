@@ -291,7 +291,17 @@ router.post('/start', async (req, res) => {
       ],
     })
 
-    res.json(parsed)
+    // Expose non-sensitive scenario meta so the client can render the
+    // Scenario Card overlay during the staged flow.
+    res.json({
+      ...parsed,
+      scenario: {
+        title: scenario.title,
+        domain: scenario.domain,
+        context: scenario.context,
+        participants: scenario.participants.map((p) => ({ name: p.name, role: p.role })),
+      },
+    })
   } catch (err) {
     console.error('[assessment/start]', err)
     res.status(500).json({ error: 'Failed to start assessment' })

@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, AlertTriangle, Clock, CheckCircle, ShieldCheck, Video, VideoOff } from 'lucide-react'
-
-const DURATION_SECONDS = 30 * 60 // 30 minutes
+import { DURATION_SECONDS, currentStage, overlayStagesDue } from '../lib/assessmentFlow.js'
+import ScenarioCard from '../components/assessment/ScenarioCard.jsx'
 
 const INSTRUCTIONS = [
   { icon: '🎯', text: 'You will be placed in a realistic business scenario with AI participants who play different roles.' },
@@ -177,6 +177,9 @@ export default function Assessment() {
   const [mediaAllowed, setMediaAllowed] = useState(null) // null | true | false
   const [tabViolations, setTabViolations] = useState(0)
   const [showTabWarning, setShowTabWarning] = useState(false)
+  const [scenario, setScenario] = useState(null)
+  const [activeOverlay, setActiveOverlay] = useState(null) // stage overlay key | null
+  const firedStagesRef = useRef(new Set())
   const timerRef = useRef(null)
   const streamRef = useRef(null)
   const videoRef = useRef(null)
@@ -257,6 +260,18 @@ export default function Assessment() {
     }
   }, [mediaAllowed])
 
+  // Staged flow — fire each stage's overlay once, as elapsed time crosses it
+  useEffect(() => {
+    if (phase !== 'chat') return
+    const elapsed = DURATION_SECONDS - timeLeft
+    for (const stage of overlayStagesDue(elapsed)) {
+      if (!firedStagesRef.current.has(stage.id)) {
+        firedStagesRef.current.add(stage.id)
+        setActiveOverlay(stage.overlay)
+      }
+    }
+  }, [timeLeft, phase])
+
   // Start countdown only once chat begins
   const startTimer = useCallback(() => {
     if (timerRef.current) return
@@ -295,6 +310,7 @@ export default function Assessment() {
       if (!res.ok) throw new Error('Failed to start assessment session')
       const data = await res.json()
       setMessages([{ type: 'ai', messages: data.messages, isNew: true }])
+      setScenario(data.scenario || null)
       setInitialising(false)
     } catch (e) {
       setError(e.message)
@@ -363,6 +379,7 @@ export default function Assessment() {
 
   const warningThreshold = 5 * 60 // 5 minutes
   const isWarning = timeLeft <= warningThreshold && timeLeft > 0
+  const stage = currentStage(DURATION_SECONDS - timeLeft)
 
   if (!sessionId) return null
 
@@ -377,7 +394,7 @@ export default function Assessment() {
         <div className="flex items-center gap-3">
           <span className="font-serif text-lg text-[#1A1A2E]">Prism</span>
           <span className="hidden sm:inline font-sans text-xs text-[#64687A] bg-[#EEEEF4] px-2 py-0.5 rounded-full">
-            Assessment in progress
+            {stage.label}
           </span>
         </div>
 
@@ -477,6 +494,13 @@ export default function Assessment() {
           Press Enter to send · Shift+Enter for new line · Your conversation is private and processed for scoring only.
         </p>
       </div>
+
+      {/* Staged-flow overlays */}
+      <AnimatePresence>
+        {activeOverlay === 'scenario_card' && scenario && (
+          <ScenarioCard scenario={scenario} onDismiss={() => setActiveOverlay(null)} />
+        )}
+      </AnimatePresence>
 
       {/* Tab-switch / screenshot warning overlay */}
       <AnimatePresence>
