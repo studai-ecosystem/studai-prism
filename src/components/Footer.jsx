@@ -80,7 +80,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Company */}}
+          {/* Company */}
           <div>
             <p className="font-sans text-xs font-semibold tracking-[0.15em] text-[#C9A84C] uppercase mb-4">
               Company
@@ -101,7 +101,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Legal */}}
+          {/* Legal */}
           <div>
             <p className="font-sans text-xs font-semibold tracking-[0.15em] text-[#C9A84C] uppercase mb-4">
               Legal

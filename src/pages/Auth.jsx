@@ -1,0 +1,184 @@
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ShieldCheck, Loader2 } from 'lucide-react'
+import { setUser } from '../lib/session.js'
+
+const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional']
+
+function Field({ label, type = 'text', value, onChange, placeholder, required = true, autoComplete }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="font-sans text-xs font-semibold text-[#3A3A4A] tracking-wide">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        autoComplete={autoComplete}
+        className="w-full px-4 py-3 rounded-xl bg-[#F5F5FA] border border-[#E0E0E8] font-sans text-sm text-[#1A1A2E] placeholder:text-[#A0A4B0] focus:outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/20 transition-all"
+      />
+    </label>
+  )
+}
+
+export default function Auth() {
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const isRegister = pathname !== '/login'
+
+  const [form, setForm] = useState({ name: '', email: '', college: '', year: '', password: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  // Reset error when switching tabs
+  useEffect(() => setError(null), [pathname])
+
+  const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    setError(null)
+
+    if (!form.email.trim() || !form.password.trim()) {
+      setError('Email and password are required.')
+      return
+    }
+    if (isRegister && (!form.name.trim() || !form.college.trim() || !form.year)) {
+      setError('Please fill in all fields to register.')
+      return
+    }
+
+    setSubmitting(true)
+    // Front-end mock: store the profile (never the password) and continue the funnel.
+    setTimeout(() => {
+      setUser({
+        name: form.name || form.email.split('@')[0],
+        email: form.email,
+        college: form.college,
+        year: form.year,
+      })
+      navigate('/payment')
+    }, 600)
+  }
+
+  return (
+    <div className="min-h-screen bg-white text-[#1A1A2E] flex flex-col">
+      {/* Minimal header */}
+      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[#E0E0E8]">
+        <Link to="/" className="flex flex-col leading-none" aria-label="Prism home">
+          <span className="font-serif text-xl text-[#1A1A2E] tracking-tight">Prism</span>
+          <span className="font-sans text-[10px] text-[#64687A] tracking-wider mt-0.5">by StudAI One</span>
+        </Link>
+      </header>
+
+      <div className="flex-1 flex items-center justify-center px-6 py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#C9A84C]/10 mb-4">
+              <ShieldCheck size={22} className="text-[#C9A84C]" />
+            </div>
+            <h1 className="font-serif text-3xl text-[#1A1A2E] mb-1">
+              {isRegister ? 'Create your account' : 'Welcome back'}
+            </h1>
+            <p className="font-sans text-sm text-[#64687A]">
+              {isRegister ? 'Start your certified Prism assessment' : 'Sign in to continue'}
+            </p>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex p-1 rounded-xl bg-[#F5F5FA] border border-[#E8E8F0] mb-6">
+            <Link
+              to="/login"
+              className={`flex-1 text-center py-2 rounded-lg font-sans text-sm font-semibold transition-colors ${
+                !isRegister ? 'bg-white text-[#1A1A2E] shadow-sm' : 'text-[#64687A]'
+              }`}
+            >
+              Login
+            </Link>
+            <Link
+              to="/register"
+              className={`flex-1 text-center py-2 rounded-lg font-sans text-sm font-semibold transition-colors ${
+                isRegister ? 'bg-white text-[#1A1A2E] shadow-sm' : 'text-[#64687A]'
+              }`}
+            >
+              Register
+            </Link>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <AnimatePresence mode="popLayout">
+              {isRegister && (
+                <motion.div
+                  key="name"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <Field label="Full Name" value={form.name} onChange={update('name')} placeholder="Aditi Sharma" autoComplete="name" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <Field label="Email" type="email" value={form.email} onChange={update('email')} placeholder="you@college.edu" autoComplete="email" />
+
+            <AnimatePresence mode="popLayout">
+              {isRegister && (
+                <motion.div
+                  key="reg-extra"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex flex-col gap-4"
+                >
+                  <Field label="College" value={form.college} onChange={update('college')} placeholder="IIT Madras" autoComplete="organization" />
+                  <label className="flex flex-col gap-1.5">
+                    <span className="font-sans text-xs font-semibold text-[#3A3A4A] tracking-wide">Year of Study</span>
+                    <select
+                      value={form.year}
+                      onChange={update('year')}
+                      className="w-full px-4 py-3 rounded-xl bg-[#F5F5FA] border border-[#E0E0E8] font-sans text-sm text-[#1A1A2E] focus:outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/20 transition-all"
+                    >
+                      <option value="" disabled>Select year</option>
+                      {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </label>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <Field label="Password" type="password" value={form.password} onChange={update('password')} placeholder="••••••••" autoComplete={isRegister ? 'new-password' : 'current-password'} />
+
+            {error && (
+              <p className="font-sans text-sm text-[#E05252] text-center">{error}</p>
+            )}
+
+            <motion.button
+              type="submit"
+              disabled={submitting}
+              className="mt-2 w-full py-3.5 rounded-xl bg-[#1A1A2E] font-sans font-semibold text-sm text-[#C9A84C] tracking-wide hover:bg-[#252A3A] transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+              whileHover={submitting ? {} : { scale: 1.01 }}
+              whileTap={submitting ? {} : { scale: 0.98 }}
+            >
+              {submitting && <Loader2 size={16} className="animate-spin" />}
+              {isRegister ? 'Create account → ' : 'Sign in → '}
+            </motion.button>
+          </form>
+
+          <p className="text-center font-sans text-xs text-[#A0A4B0] mt-6">
+            {isRegister ? 'Already have an account? ' : "Don't have an account? "}
+            <Link to={isRegister ? '/login' : '/register'} className="text-[#C9A84C] font-semibold hover:underline">
+              {isRegister ? 'Login' : 'Register'}
+            </Link>
+          </p>
+        </motion.div>
+      </div>
+    </div>
+  )
+}

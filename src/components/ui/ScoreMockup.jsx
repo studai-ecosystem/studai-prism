@@ -54,7 +54,7 @@ export default function ScoreMockup({ scores = {} }) {
       <div className="text-center">
         <p className="font-sans text-xs font-semibold tracking-[0.2em] text-[#C9A84C] uppercase mb-2">Prism Score</p>
         <div className="flex items-end justify-center gap-1">
-          <span className="font-sans text-7xl font-bold text-[#1A1A2E] tabular-nums leading-none">>
+          <span className="font-sans text-7xl font-bold text-[#1A1A2E] tabular-nums leading-none">
             <AnimatedNumber target={overall} />
           </span>
           <span className="font-sans text-2xl text-[#64687A] mb-2 tabular-nums">/100</span>
