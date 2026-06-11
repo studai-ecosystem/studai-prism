@@ -37,7 +37,7 @@ export default function CTABanner({ onGetAssessed }) {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
           >
-            Get Assessed — ₹499
+            Get Assessed — $10
           </motion.button>
 
           <motion.a

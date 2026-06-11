@@ -52,7 +52,7 @@ export default function Pricing({ onGetAssessed, onContactSales }) {
         >
           <PricingCard
             plan="Individual"
-            price="₹499"
+            price="$10"
             period="per assessment"
             subtitle="For students booking directly"
             features={individualFeatures}
@@ -62,7 +62,7 @@ export default function Pricing({ onGetAssessed, onContactSales }) {
           />
           <PricingCard
             plan="Institutional"
-            price="₹50,000"
+            price="Custom"
             period="per year"
             subtitle="For colleges and universities"
             badge="Most popular"

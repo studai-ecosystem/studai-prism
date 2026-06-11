@@ -65,6 +65,7 @@ export default function FAQ() {
 
         {/* Accordion */}
         <motion.div
+          className="space-y-3"
           variants={stagger}
           initial="hidden"
           whileInView="visible"

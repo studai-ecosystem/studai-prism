@@ -36,6 +36,14 @@ export default function ScenarioCard({ scenario, onDismiss }) {
         <div className="px-6 py-5">
           <p className="font-sans text-sm text-[#3A3A4A] leading-relaxed">{context}</p>
 
+          <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-[#C9A84C]/10 border border-[#C9A84C]/25">
+            <span className="text-base leading-none mt-0.5">💡</span>
+            <p className="font-sans text-xs text-[#5A4A1A] leading-relaxed">
+              There is no right or wrong answer, and you don't need to know this field.
+              Just talk through how you'd handle it — we're listening to how you think.
+            </p>
+          </div>
+
           {participants.length > 0 && (
             <div className="mt-5">
               <div className="flex items-center gap-2 mb-3">

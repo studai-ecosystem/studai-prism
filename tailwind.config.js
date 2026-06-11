@@ -4,16 +4,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        'bg-primary': '#0A0D14',
-        'bg-secondary': '#111520',
-        'bg-tertiary': '#1A1F2E',
+        'bg-primary': '#EDE4D3',
+        'bg-secondary': '#FFFFFF',
+        'bg-tertiary': '#F6EFE2',
+        card: '#FFFFFF',
         gold: {
           DEFAULT: '#C9A84C',
           light: '#E8C96A',
         },
-        'text-primary': '#F0EDE6',
-        'text-secondary': '#8A8FA0',
-        'border-subtle': '#252A3A',
+        'text-primary': '#0A0D14',
+        'text-secondary': '#5A5F6E',
+        'border-subtle': '#E8E0D0',
         danger: '#E05252',
         success: '#3CB97A',
       },

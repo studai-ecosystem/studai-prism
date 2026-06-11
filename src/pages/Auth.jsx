@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShieldCheck, Loader2 } from 'lucide-react'
-import { setUser } from '../lib/session.js'
+import { login, register } from '../lib/session.js'
+import PrismLogo from '../components/ui/PrismLogo.jsx'
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional']
 
@@ -51,25 +52,33 @@ export default function Auth() {
     }
 
     setSubmitting(true)
-    // Front-end mock: store the profile (never the password) and continue the funnel.
-    setTimeout(() => {
-      setUser({
-        name: form.name || form.email.split('@')[0],
-        email: form.email,
-        college: form.college,
-        year: form.year,
+    const action = isRegister
+      ? register({
+          name: form.name || form.email.split('@')[0],
+          email: form.email,
+          college: form.college,
+          year: form.year,
+          password: form.password,
+        })
+      : login({ email: form.email, password: form.password })
+
+    action
+      .then(() => {
+        // TEMP: payment is bypassed for testing the chat. Restore `navigate('/payment')`
+        // before deploying so users go through Razorpay checkout first.
+        const sessionId = crypto.randomUUID()
+        navigate(`/verify-identity?session=${sessionId}`)
       })
-      navigate('/payment')
-    }, 600)
+      .catch((err) => setError(err.message || 'Something went wrong. Please try again.'))
+      .finally(() => setSubmitting(false))
   }
 
   return (
     <div className="min-h-screen bg-white text-[#1A1A2E] flex flex-col">
       {/* Minimal header */}
       <header className="shrink-0 flex items-center px-6 h-16 border-b border-[#E0E0E8]">
-        <Link to="/" className="flex flex-col leading-none" aria-label="Prism home">
-          <span className="font-serif text-xl text-[#1A1A2E] tracking-tight">Prism</span>
-          <span className="font-sans text-[10px] text-[#64687A] tracking-wider mt-0.5">by StudAI One</span>
+        <Link to="/" aria-label="Prism home">
+          <PrismLogo size={32} />
         </Link>
       </header>
 

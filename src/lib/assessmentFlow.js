@@ -7,11 +7,24 @@
 // added "one by one": set `overlay` to the component key once it is built.
 // Stages without an overlay simply drive the conversation + the progress label.
 
-export const DURATION_SECONDS = 30 * 60 // 30 minutes
+export const DURATION_SECONDS = 10 * 60 // 10 minutes (temporary — revert to 30 * 60 later)
+
+// Spoken question types for the voice-only test. The candidate hears the avatar
+// ask the question (TTS) and answers by speaking into the mic; the audio is
+// transcribed server-side (Whisper) and fed into the AI loop. `answerSeconds`
+// is the suggested speaking window the UI can enforce per type (null = open).
+export const SPOKEN_QUESTION_TYPES = {
+  speaking:  { id: 'speaking',  label: 'Speaking',  answerSeconds: null, hint: 'Speak your answer naturally.' },
+  listening: { id: 'listening', label: 'Listening', answerSeconds: null, hint: 'Listen to the passage, then answer aloud.' },
+  repeat:    { id: 'repeat',    label: 'Repeat',    answerSeconds: 30,   hint: 'Repeat the sentence exactly as you heard it.' },
+  describe:  { id: 'describe',  label: 'Describe',  answerSeconds: 60,   hint: 'Describe the image on screen for 60 seconds.' },
+  opinion:   { id: 'opinion',   label: 'Opinion',   answerSeconds: 90,   hint: 'Give your opinion on the topic for 90 seconds.' },
+  decision:  { id: 'decision',  label: 'Decision',  answerSeconds: 90,   hint: 'Pick one option and defend it aloud.' },
+}
 
 export const ASSESSMENT_FLOW = [
-  { id: 'intro',     atSecond: 0,    label: 'Conversation',      overlay: null },
-  { id: 'scenario',  atSecond: 7 * 60,  label: 'Scenario Briefing', overlay: 'scenario_card' }, // ✅ built
+  { id: 'scenario',  atSecond: 0,       label: 'Scenario Briefing', overlay: 'scenario_card' }, // ✅ shown up front
+  { id: 'intro',     atSecond: 1,       label: 'Conversation',      overlay: null },
   { id: 'timed',     atSecond: 10 * 60, label: 'Timed Question',    overlay: null },             // ⏳ next
   { id: 'decision',  atSecond: 13 * 60, label: 'Decision Moment',   overlay: null },             // ⏳ next
   { id: 'pushback',  atSecond: 17 * 60, label: 'Challenge',         overlay: null },

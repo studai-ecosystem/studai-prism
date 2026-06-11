@@ -11,6 +11,11 @@ dist/
 .env.production
 server/.env
 
+# Runtime data (user accounts, assessment sessions) — never commit.
+# content.json is seed content (blog/careers) and IS committed.
+server/data/users.json
+server/data/assessments.json
+
 # Logs
 *.log
 npm-debug.log*

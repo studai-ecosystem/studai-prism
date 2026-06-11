@@ -1,0 +1,103 @@
+{
+  "posts": [
+    {
+      "slug": "why-soft-skills-are-the-hardest-to-prove",
+      "title": "Why soft skills are the hardest to prove",
+      "date": "May 2026",
+      "desc": "Everyone claims communication and teamwork on a resume. Almost no one can show it.",
+      "body": "Every resume lists communication, teamwork, and leadership. Recruiters have learned to ignore these claims entirely, because a bullet point is not evidence. The hardest problem in hiring is not finding people who say they have soft skills, it is finding a way to observe them. Prism exists because the only honest way to measure how someone thinks, listens, and decides under pressure is to watch them do it in a realistic situation, not to ask them to rate themselves on a five point scale.",
+      "published": true
+    },
+    {
+      "slug": "what-employers-actually-look-for-in-campus-hires",
+      "title": "What employers actually look for in campus hires",
+      "date": "May 2026",
+      "desc": "We asked hiring managers what moves the needle. The answers had little to do with grades.",
+      "body": "We interviewed hiring managers across technology, finance, and operations about what separates a strong campus hire from an average one. Grades came up rarely. What came up again and again was judgement: the ability to ask a clarifying question, to weigh a trade off, to disagree without being difficult, and to communicate a decision clearly. These are exactly the dimensions Prism is built to measure.",
+      "published": true
+    },
+    {
+      "slug": "the-problem-with-multiple-choice-skill-tests",
+      "title": "The problem with multiple choice skill tests",
+      "date": "April 2026",
+      "desc": "A multiple choice test measures recall, not capability. Real work has no answer key.",
+      "body": "Multiple choice tests are easy to grade, which is precisely why they are so widely used and so misleading. Real work has no answer key. The interesting part of a decision is the reasoning that leads to it, not the option you eventually circle. A conversation reveals that reasoning; a bubble sheet hides it.",
+      "published": true
+    },
+    {
+      "slug": "how-ai-is-changing-the-campus-placement-process",
+      "title": "How AI is changing the campus placement process",
+      "date": "April 2026",
+      "desc": "From screening to scoring, AI is reshaping how students get matched to roles.",
+      "body": "AI is changing every stage of campus placement, from sourcing to screening to scoring. Used badly, it amplifies bias and reduces people to keywords. Used well, it can give every candidate a fair, consistent, and realistic chance to demonstrate capability. The difference comes down to whether the system measures the right thing.",
+      "published": true
+    },
+    {
+      "slug": "5-skills-every-employer-is-hiring-for-in-2026",
+      "title": "5 skills every employer is hiring for in 2026",
+      "date": "March 2026",
+      "desc": "The skills that consistently top hiring wishlists this year — and how to prove them.",
+      "body": "Across our conversations with employers, five capabilities top almost every wishlist: critical thinking, communication, collaboration, problem solving, and digital and AI fluency. These are the five dimensions Prism measures, because they are the ones that predict on the job performance better than any line on a transcript.",
+      "published": true
+    },
+    {
+      "slug": "why-prism-uses-conversation-not-questions",
+      "title": "Why Prism uses conversation not questions",
+      "date": "March 2026",
+      "desc": "A conversation surfaces how someone thinks under pressure. A questionnaire never will.",
+      "body": "A questionnaire asks you to predict your own behaviour. A conversation makes you enact it. When a scenario pushes back, adds a constraint, or asks you to defend a choice, it surfaces how you actually think under pressure. That is information no self report can ever provide, and it is the reason Prism is built around a live conversation.",
+      "published": true
+    }
+  ],
+  "jobs": [
+    {
+      "id": "full-stack-engineer",
+      "title": "Full Stack Engineer",
+      "location": "Chennai",
+      "type": "Full time",
+      "stack": "React + Laravel",
+      "description": "Build and ship features across the Prism stack, from the React assessment experience to the Node and Laravel services behind it.",
+      "open": true
+    },
+    {
+      "id": "ai-prompt-engineer",
+      "title": "AI Prompt Engineer",
+      "location": "Remote",
+      "type": "Full time",
+      "stack": "Claude API + LLMs",
+      "description": "Design, evaluate, and harden the prompts and scoring rubrics that power Prism's conversational assessments.",
+      "open": true
+    },
+    {
+      "id": "campus-partnerships-manager",
+      "title": "Campus Partnerships Manager",
+      "location": "Chennai",
+      "type": "Full time",
+      "stack": "B2B Sales",
+      "description": "Own relationships with colleges and placement cells, bringing Prism to students across India.",
+      "open": true
+    },
+    {
+      "id": "product-designer",
+      "title": "Product Designer",
+      "location": "Chennai",
+      "type": "Full time",
+      "stack": "Figma + Design Systems",
+      "description": "Shape the look and feel of Prism, from the assessment flow to the score report and certificate.",
+      "open": true
+    }
+  ],
+  "applications": [
+    {
+      "id": "d07e3f21-a48e-45da-9554-f194b58feb89",
+      "jobId": "product-designer",
+      "jobTitle": "Product Designer",
+      "name": "Tharini",
+      "email": "tharini@example.com",
+      "message": "Excited about this",
+      "resumeUrl": "https://example.com/cv",
+      "status": "received",
+      "createdAt": "2026-06-04T08:14:17.299Z"
+    }
+  ]
+}

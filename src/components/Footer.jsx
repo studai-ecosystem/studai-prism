@@ -1,4 +1,5 @@
 import { Linkedin, Twitter } from 'lucide-react'
+import PrismLogo from './ui/PrismLogo.jsx'
 
 const productLinks = [
   { label: 'How it works', href: '#how-it-works' },
@@ -28,12 +29,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
           {/* Brand */}
           <div className="flex flex-col gap-4">
-            <div>
-              <span className="font-serif text-xl text-[#1A1A2E]">Prism</span>
-              <span className="font-sans text-[10px] text-[#8A8FA0] block tracking-wider mt-0.5">
-                by StudAI One
-              </span>
-            </div>
+            <PrismLogo size={34} />
             <p className="font-sans text-sm text-[#64687A] leading-relaxed max-w-[220px]">
               Building the skills layer for India's workforce.
             </p>

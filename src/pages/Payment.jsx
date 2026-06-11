@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ShieldCheck, Clock, Layers, BadgeCheck, Lock, Loader2 } from 'lucide-react'
 import { getUser } from '../lib/session.js'
+import PrismLogo from '../components/ui/PrismLogo.jsx'
 
 const INCLUDES = [
   { icon: Clock, text: '30-minute live AI scenario assessment' },
@@ -37,9 +38,8 @@ export default function Payment() {
   return (
     <div className="min-h-screen bg-white text-[#1A1A2E] flex flex-col">
       <header className="shrink-0 flex items-center px-6 h-16 border-b border-[#E0E0E8]">
-        <Link to="/" className="flex flex-col leading-none" aria-label="Prism home">
-          <span className="font-serif text-xl text-[#1A1A2E] tracking-tight">Prism</span>
-          <span className="font-sans text-[10px] text-[#64687A] tracking-wider mt-0.5">by StudAI One</span>
+        <Link to="/" aria-label="Prism home">
+          <PrismLogo size={32} />
         </Link>
       </header>
 
@@ -67,7 +67,7 @@ export default function Payment() {
                 <p className="font-sans font-semibold text-sm text-[#1A1A2E]">30-minute Prism Assessment</p>
                 <p className="font-sans text-xs text-[#64687A] mt-0.5">One-time · Score valid 12 months</p>
               </div>
-              <p className="font-serif text-2xl text-[#1A1A2E]">₹499</p>
+              <p className="font-serif text-2xl text-[#1A1A2E]">$10</p>
             </div>
 
             <ul className="px-6 py-5 flex flex-col gap-3">
@@ -81,7 +81,7 @@ export default function Payment() {
 
             <div className="px-6 py-4 border-t border-[#E8E8F0] flex items-center justify-between bg-white">
               <span className="font-sans text-sm font-semibold text-[#1A1A2E]">Total</span>
-              <span className="font-sans text-sm font-semibold text-[#1A1A2E]">₹499</span>
+              <span className="font-sans text-sm font-semibold text-[#1A1A2E]">$10</span>
             </div>
           </div>
 
@@ -97,7 +97,7 @@ export default function Payment() {
             whileTap={loading ? {} : { scale: 0.98 }}
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={15} />}
-            {loading ? 'Starting…' : 'Pay ₹499 & Continue'}
+            {loading ? 'Starting…' : 'Pay $10 & Continue'}
           </motion.button>
 
           <p className="text-center font-sans text-xs text-[#A0A4B0] mt-4">

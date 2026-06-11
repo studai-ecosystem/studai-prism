@@ -1,7 +1,7 @@
-import { useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import Nav from '../components/Nav.jsx'
-import Hero from '../components/Hero.jsx'
+import Landing from './Landing.jsx'
 import HowItWorks from '../components/HowItWorks.jsx'
 import Dimensions from '../components/Dimensions.jsx'
 import ScoreSection from '../components/ScoreSection.jsx'
@@ -13,6 +13,18 @@ import Footer from '../components/Footer.jsx'
 
 export default function LandingPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // When we arrive with a hash (e.g. /#pricing from another page), scroll to
+  // that section. The delay lets sections mount and beats ScrollToTop's reset.
+  useEffect(() => {
+    if (!location.hash) return
+    const id = location.hash.replace(/^#/, '')
+    const timer = setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [location.hash])
 
   const handleGetAssessed = useCallback(() => {
     // Enter the funnel: account → payment → briefing → assessment.
@@ -26,7 +38,7 @@ export default function LandingPage() {
   return (
     <main className="bg-white min-h-screen overflow-x-hidden">
       <Nav onGetAssessed={handleGetAssessed} />
-      <Hero onGetAssessed={handleGetAssessed} />
+      <Landing onGetAssessed={handleGetAssessed} onSeeHow={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} />
       <HowItWorks />
       <Dimensions />
       <ScoreSection />

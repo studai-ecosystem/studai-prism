@@ -4,26 +4,38 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"node server/index.js\"",
+    "dev": "node scripts/dev.js",
+    "dev:phone": "cross-env HTTPS=1 node scripts/dev.js",
+    "dev:concurrently": "concurrently --kill-others-on-fail --names \"web,api\" --prefix-colors \"magenta,cyan\" \"vite\" \"node server/index.js\"",
     "dev:frontend": "vite",
     "dev:backend": "node server/index.js",
     "build": "vite build",
+    "postinstall": "cd server && npm install --omit=dev",
+    "start": "node server/index.js",
     "preview": "vite preview",
     "setup": "npm install && cd server && npm install"
   },
   "dependencies": {
+    "concurrently": "^8.2.2",
+    "face-api.js": "^0.22.2",
+    "framer-motion": "^11.3.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^0.446.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
-    "framer-motion": "^11.3.0",
-    "lucide-react": "^0.446.0",
-    "concurrently": "^8.2.2"
+    "socket.io-client": "^4.8.3",
+    "tesseract.js": "^5.1.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "tailwindcss": "^3.4.10",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^7.0.3",
     "postcss": "^8.4.44",
+    "tailwindcss": "^3.4.10",
     "vite": "^5.4.2"
   }
 }

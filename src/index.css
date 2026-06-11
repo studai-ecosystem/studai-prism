@@ -5,7 +5,7 @@
 /* ── Google Fonts are loaded in index.html ── */
 
 :root {
-  --bg-primary: #FDF8F0;
+  --bg-primary: #EDE4D3;
   --bg-secondary: #FFFFFF;
   --bg-tertiary: #F6EFE2;
   --card: #FFFFFF;
@@ -35,7 +35,7 @@ body {
 
 /* ── Custom scrollbar ── */
 ::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: #FDF8F0; }
+::-webkit-scrollbar-track { background: #EDE4D3; }
 ::-webkit-scrollbar-thumb { background: #E8E0D0; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 

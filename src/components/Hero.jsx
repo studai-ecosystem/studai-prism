@@ -11,7 +11,7 @@ const trustStats = [
 
 export default function Hero({ onGetAssessed }) {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-white noise-bg pt-16">
+    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-white noise-bg pt-28 pb-16">
       {/* Background gradients */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-32 right-1/4 w-[700px] h-[700px] rounded-full bg-[#C9A84C] opacity-[0.07] blur-[120px]" />
@@ -69,7 +69,7 @@ export default function Hero({ onGetAssessed }) {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
           >
-            Get Assessed — ₹499
+            Get Assessed — $10
           </motion.button>
 
           <motion.a
