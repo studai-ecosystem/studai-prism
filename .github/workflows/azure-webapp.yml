@@ -1,0 +1,44 @@
+# Continuous deployment to Azure App Service.
+#
+# On every push to main, this deploys the source to the Azure Web App, where
+# Oryx builds it (npm install -> root postinstall installs server deps ->
+# npm run build -> dist/) and `npm start` serves the API + SPA + socket.io.
+#
+# One-time setup before this works:
+#   1. Create the Web App (run scripts/deploy-azure.ps1 once, or the Azure portal).
+#   2. Get its publish profile:
+#        az webapp deployment list-publishing-profiles -n studai-prism \
+#          -g studai-prism-rg --xml
+#   3. Add it as a GitHub repo secret named AZURE_WEBAPP_PUBLISH_PROFILE
+#      (Settings -> Secrets and variables -> Actions -> New repository secret).
+#   4. If you used a different app name, change AZURE_WEBAPP_NAME below.
+
+name: Deploy to Azure Web App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: studai-prism
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Deploy the source tree (no node_modules / dist). Azure's Oryx builder
+      # runs the install + build on the server, matching scripts/deploy-azure.ps1.
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .
