@@ -39,17 +39,43 @@ export async function runDualScorer(ctx, turns, refScores) {
     turns.map((t) => ({ text: t.text, responseMs: t.latencyMs })),
   )
 
-  const overall = weightedOverall(channelA)
+  let activeChannelA = channelA
+  let activeOverall = weightedOverall(channelA)
+  let activeUnstable = unstable
+  let activeScoredCount = scoredTurns.length
   const conformalTable = await loadConformalTable()
-  const ci = intervalFor(overall, conformalTable)
+  let ci = intervalFor(activeOverall, conformalTable)
 
-  // Reconcile Channel A against the v1 shadow score (until Channel B is trained).
-  const decision = reconcile(channelA, refScores || channelB, ci, { unstableTurns: unstable })
+  // First reconciliation of Channel A against the reference (v1 shadow until
+  // Channel B is trained).
+  let decision = reconcile(activeChannelA, refScores || channelB, ci, { unstableTurns: activeUnstable })
+
+  // Re-evaluation pass: a big first-pass disagreement gets ONE fresh k-vote
+  // panel re-score before we either release the resolved score or escalate to
+  // human review. This is the spec's "re-evaluate once, then queue" rule.
+  let reevaluated = false
+  if (decision.action === 'reevaluate') {
+    reevaluated = true
+    const reScored = await scoreAllTurns(ctx, turns)
+    if (reScored.length) {
+      const reUnstable = reScored.filter((t) => t.stable === false).length
+      const { scores: reChannelA } = aggregateDimensionScores(reScored)
+      activeChannelA = reChannelA
+      activeUnstable = reUnstable
+      activeScoredCount = reScored.length
+      activeOverall = weightedOverall(reChannelA)
+      ci = intervalFor(activeOverall, conformalTable)
+    }
+    decision = reconcile(activeChannelA, refScores || channelB, ci, {
+      unstableTurns: activeUnstable,
+      reevaluated: true,
+    })
+  }
 
   return {
-    scores: channelA, // authoritative dimension scores (w_A = 1, w_B = 0)
-    overall,
-    channelA,
+    scores: activeChannelA, // authoritative dimension scores (w_A = 1, w_B = 0)
+    overall: activeOverall,
+    channelA: activeChannelA,
     channelB,
     features,
     evidenceCounts,
@@ -58,10 +84,11 @@ export async function runDualScorer(ctx, turns, refScores) {
     reconcile: decision,
     ci,
     meta: {
-      scoredTurns: scoredTurns.length,
-      unstableTurns: unstable,
+      scoredTurns: activeScoredCount,
+      unstableTurns: activeUnstable,
       votesPerTurn: SCORER.K_A + SCORER.K_B,
       conformalProvisional: ci.provisional,
+      reevaluated,
     },
   }
 }

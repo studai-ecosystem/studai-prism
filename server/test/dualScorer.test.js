@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { modalLevel, modalLevelsForTurn, recencyWeight, aggregateDimensionScores } from '../scoring/aggregate.js'
 import { quantile, buildConformal, intervalFor, ciNeedsReview } from '../scoring/conformal.js'
 import { maxDimensionGap, reconcile } from '../scoring/reconciler.js'
-import { SCORER } from '../scoring/dualScorerConfig.js'
+import { SCORER, DIMENSIONS } from '../scoring/dualScorerConfig.js'
+import { runDualScorer } from '../scoring/dualScorer.js'
 
 // ── modal level + NA rule ─────────────────────────────────────────────────────
 
@@ -116,3 +117,61 @@ test('reconcile: provisional CI downgrades Strong → Standard', () => {
   const d = reconcile({ criticalThinking: 80 }, { criticalThinking: 82 }, intervalFor(80, { halfWidth: 6, provisional: true }), { unstableTurns: 0 })
   assert.equal(d.reliability, 'Standard')
 })
+
+// ── orchestrator: re-evaluation pass ─────────────────────────────────────────
+// A mock judge that returns a fixed level for every dimension. We disable the
+// random consistency sample so call counts are deterministic.
+function mockCtx(level, counter) {
+  const content = JSON.stringify(Object.fromEntries(DIMENSIONS.map((d) => [d, level])))
+  return {
+    modelA: 'mock-a',
+    modelB: 'mock-b',
+    createCompletion: async () => {
+      counter.calls += 1
+      return { choices: [{ message: { content } }] }
+    },
+  }
+}
+
+const TURNS = [
+  { text: 'turn one substance', exchangeNo: 1, responseId: null, asrConfidence: 1 },
+  { text: 'turn two substance', exchangeNo: 2, responseId: null, asrConfidence: 1 },
+]
+
+test('runDualScorer: agreement → release in a single pass (no re-eval)', async () => {
+  const origRandom = Math.random
+  Math.random = () => 0.99 // never trigger the consistency sample
+  try {
+    const counter = { calls: 0 }
+    // panel returns level 2 → score 50 for every dim; reference agrees at 50.
+    const ref = Object.fromEntries(DIMENSIONS.map((d) => [d, 50]))
+    const res = await runDualScorer(mockCtx(2, counter), TURNS, ref)
+    assert.equal(res.action, 'release')
+    assert.equal(res.meta.reevaluated, false)
+    assert.equal(res.scores.criticalThinking, 50)
+    counter.singlePassCalls = counter.calls
+    globalThis.__singlePassCalls = counter.calls
+  } finally {
+    Math.random = origRandom
+  }
+})
+
+test('runDualScorer: big disagreement runs ONE re-eval pass then queues review', async () => {
+  const origRandom = Math.random
+  Math.random = () => 0.99
+  try {
+    const counter = { calls: 0 }
+    // panel insists on level 2 (score 50); reference says 100 → gap 50 > τ.
+    // Re-eval re-scores (still 50) → persistent disagreement → human_review.
+    const ref = Object.fromEntries(DIMENSIONS.map((d) => [d, 100]))
+    const res = await runDualScorer(mockCtx(2, counter), TURNS, ref)
+    assert.equal(res.meta.reevaluated, true)
+    assert.equal(res.action, 'human_review')
+    assert.equal(res.reconcile.reason, 'persistent_disagreement')
+    // The re-evaluation pass means the panel was actually run a second time.
+    assert.ok(counter.calls > (globalThis.__singlePassCalls || 0))
+  } finally {
+    Math.random = origRandom
+  }
+})
+
