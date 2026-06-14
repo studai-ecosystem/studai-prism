@@ -14,6 +14,7 @@ import assessmentRouter from './routes/assessment.js'
 import authRouter from './routes/auth.js'
 import deviceRouter from './routes/device.js'
 import contentRouter from './routes/content.js'
+import psychometricsRouter from './routes/psychometrics.js'
 import { attachProctorSocket } from './lib/proctorSocket.js'
 
 const app = express()
@@ -51,6 +52,8 @@ app.use('/api/payment', paymentRouter)
 app.use('/api/assessment', assessmentRouter)
 app.use('/api/device', deviceRouter)
 app.use('/api/content', contentRouter)
+// Prism v2 (MASA-2) Phase 3: read-only psychometrics dashboard (admin-guarded).
+app.use('/api/psychometrics', psychometricsRouter)
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
