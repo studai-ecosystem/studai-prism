@@ -15,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.DATA_DIR || join(__dirname, '..', 'data')
 const DB_FILE = join(DATA_DIR, 'assessments.json')
 
-const EMPTY = { sessions: {}, payments: {}, reports: {}, events: [], calibrations: {}, consents: {}, disputes: {}, verifications: {}, deviceLinks: {} }
+const EMPTY = { sessions: {}, payments: {}, reports: {}, events: [], calibrations: {}, consents: {}, disputes: {}, verifications: {}, deviceLinks: {}, items: [] }
 
 // Serialize writes so concurrent calls don't clobber each other.
 let writeChain = Promise.resolve()
@@ -43,6 +43,7 @@ async function readDB() {
       disputes: parsed.disputes || {},
       verifications: parsed.verifications || {},
       deviceLinks: parsed.deviceLinks || {},
+      items: Array.isArray(parsed.items) ? parsed.items : [],
     }
   } catch {
     return { ...EMPTY }
@@ -165,6 +166,29 @@ export async function getEvents(sessionId) {
   return db.events.filter((e) => e.sessionId === sessionId)
 }
 
+// ── Item telemetry (Prism v2 — IRT/Rasch calibration foundation) ─────────────
+// Every conversational turn is logged as an "item": the probe the Executive
+// director posed (scenario + target dimension + whether the challenger fired)
+// and the interpretable behavioral features of the candidate's response. This
+// is the response-data corpus that later powers item-difficulty/discrimination
+// calibration, cross-scenario equating, and DIF/fairness audits. No transcript
+// text beyond short feature summaries is stored here.
+export async function recordItem(item) {
+  const db = await readDB()
+  db.items.push({ ...item, at: new Date().toISOString() })
+  await writeDB(db)
+}
+
+export async function getItemsBySession(sessionId) {
+  const db = await readDB()
+  return db.items.filter((it) => it.sessionId === sessionId)
+}
+
+export async function getAllItems() {
+  const db = await readDB()
+  return db.items
+}
+
 // ── Calibration ────────────────────────────────────────────────────────
 // Stores the difficulty tier derived from the pre-assessment calibration task.
 export async function setCalibration(sessionId, data) {
@@ -284,6 +308,9 @@ export async function eraseSession(sessionId) {
   const before = db.events.length
   db.events = db.events.filter((e) => e.sessionId !== sessionId)
   if (db.events.length !== before) removed = true
+  const itemsBefore = db.items.length
+  db.items = db.items.filter((it) => it.sessionId !== sessionId)
+  if (db.items.length !== itemsBefore) removed = true
   await writeDB(db)
   return removed
 }

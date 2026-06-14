@@ -27,8 +27,14 @@ import {
   getDispute,
   recordVerification,
   getVerification,
+  recordItem,
   eraseSession,
 } from '../lib/store.js'
+import { extractTurnFeatures } from '../lib/behavioralFeatures.js'
+import { emptyEvidence, accumulateEvidence, decideDirector } from '../lib/director.js'
+import { buildPanelPlan } from '../lib/judgePanel.js'
+import { aggregateSamples } from '../lib/scoreAggregator.js'
+import { auditLog, recordItemResponse } from '../lib/telemetry.js'
 
 const router = Router()
 
@@ -114,6 +120,7 @@ function sanitizeReport(report) {
     evidence: report?.evidence || {},
     highlights: Array.isArray(report?.highlights) ? report.highlights : [],
     growthAreas: Array.isArray(report?.growthAreas) ? report.growthAreas : [],
+    reliability: report?.reliability || null,
   }
 }
 
@@ -147,7 +154,9 @@ const MODEL = () => process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.4'
 const sessions = sessionCache
 
 // ── Scenario library ──────────────────────────────────────────────────────────
-const SCENARIOS = [
+// Exported (read-only) so the Prism v2 Phase 0 item seeder can backfill one
+// 'scenario' item + per-dimension 'probe' items per scenario. No behavior change.
+export const SCENARIOS = [
   // ── Student-relatable scenarios (foundational) ──────────────────────────────
   // These are set in everyday college / student life so a candidate never needs
   // any industry or business knowledge — only common sense, clear thinking, and
@@ -365,17 +374,11 @@ function pickScenario(tier, excludeIds = []) {
   return choices[Math.floor(Math.random() * choices.length)]
 }
 
-// ── Avatar system (Phase 1: exchange-count-based rotation) ───────────────────
-// Avatar 1: Curious & probing        → Critical Thinking, Communication
-// Avatar 2: Challenging & constraint  → Collaboration, Problem Solving
-// Avatar 3: Confused & guidance-seeking → Communication, AI & Digital Fluency
-
-function getAvatarStyle(exchangeCount) {
-  const cycle = exchangeCount % 12
-  if (cycle < 4) return 1
-  if (cycle < 8) return 2
-  return 3
-}
+// ── Avatar "questioning approach" styles ─────────────────────────────────────
+// The PRISM-Director (server/lib/director.js) now selects the style per turn,
+// steered by which dimension has the thinnest evidence (replacing the old fixed
+// exchange-count rotation). Style 1: curious & probing · Style 2: gently
+// challenging · Style 3: guidance-seeking (clarity).
 
 const AVATAR_INSTRUCTIONS = {
   1: `AVATAR STYLE — Curious and Encouraging.
@@ -456,9 +459,63 @@ Each item's "speaker" and "role" must be one of the characters above.
 }`.trim()
 }
 
-function buildScoringPrompt(scenario, transcript) {
-  return `You are an expert behavioral skills evaluator for Prism by StudAI One. Evaluate a candidate's performance across 5 workplace skill dimensions based on their conversation in a simulated professional scenario.
+const DIMENSION_RUBRIC = {
+  criticalThinking: `CRITICAL THINKING
+Behavioral anchors:
+- Did they identify what information was missing before deciding?
+- Did they state their assumptions, or act as if their frame was certain?
+- Did they reason from specific scenario facts, or from generic platitudes?
+- Did they hold their position under weak pressure but update it under a strong counter-argument?`,
+  collaboration: `COLLABORATION
+Behavioral anchors:
+- Did they acknowledge the other party's perspective before countering?
+- Did they update their view when given a genuinely good counter-argument?
+- What was their conflict style? (shutdown / full capitulation / finding a third path)
+- Did they build on others' ideas or only defend their own?`,
+  communication: `COMMUNICATION
+Behavioral anchors:
+- Did responses have a clear point, supporting reasoning, and implication — or were they streams of related thoughts?
+- Did they use specific language or vague filler?
+- Did they adjust tone when the scenario called for it?
+- When their explanation didn't land, could they rephrase clearly?`,
+  problemSolving: `PROBLEM SOLVING
+Behavioral anchors:
+- Did they acknowledge what cannot be changed, or try to solve past given limits?
+- Did they produce more than one possible approach before committing?
+- Did they articulate what they give up for what they gain?
+- When a new constraint was introduced, did they integrate it or start from scratch?`,
+  aiDigitalFluency: `AI & DIGITAL FLUENCY
+Behavioral anchors:
+- Did they reference AI tools, data systems, or digital approaches where relevant?
+- Did they think in terms of automation, data analysis, or AI-assisted decision-making?
+- Did they question whether information could be biased or algorithmically generated?
+- Did they show awareness of tasks AI should do vs tasks requiring human judgment?`,
+}
 
+const DEFAULT_DIMENSION_ORDER = [
+  'criticalThinking',
+  'collaboration',
+  'communication',
+  'problemSolving',
+  'aiDigitalFluency',
+]
+
+// Build the scoring prompt. `opts.dimensionOrder` position-swaps how the rubric
+// dimensions are presented (to neutralise ordering/position bias across the
+// panel); `opts.personaInstruction` gives a single panel member its stance.
+function buildScoringPrompt(scenario, transcript, opts = {}) {
+  const order = Array.isArray(opts.dimensionOrder) && opts.dimensionOrder.length === 5
+    ? opts.dimensionOrder
+    : DEFAULT_DIMENSION_ORDER
+  const personaBlock = opts.personaInstruction
+    ? `\nPANEL MEMBER STANCE: ${opts.personaInstruction}\n`
+    : ''
+  const rubricBlocks = order
+    .map((dim, i) => `${i + 1}. ${DIMENSION_RUBRIC[dim]}`)
+    .join('\n\n')
+
+  return `You are an expert behavioral skills evaluator for Prism by StudAI One. Evaluate a candidate's performance across 5 workplace skill dimensions based on their conversation in a simulated professional scenario.
+${personaBlock}
 SCENARIO: "${scenario.title}" (${scenario.domain})
 ${scenario.context}
 
@@ -469,40 +526,7 @@ ${transcript}
 EVALUATION FRAMEWORK — 5 DIMENSIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. CRITICAL THINKING
-Behavioral anchors:
-- Did they identify what information was missing before deciding?
-- Did they state their assumptions, or act as if their frame was certain?
-- Did they reason from specific scenario facts, or from generic platitudes?
-- Did they hold their position under weak pressure but update it under a strong counter-argument?
-
-2. COLLABORATION
-Behavioral anchors:
-- Did they acknowledge the other party's perspective before countering?
-- Did they update their view when given a genuinely good counter-argument?
-- What was their conflict style? (shutdown / full capitulation / finding a third path)
-- Did they build on others' ideas or only defend their own?
-
-3. COMMUNICATION
-Behavioral anchors:
-- Did responses have a clear point, supporting reasoning, and implication — or were they streams of related thoughts?
-- Did they use specific language or vague filler?
-- Did they adjust tone when the scenario called for it?
-- When their explanation didn't land, could they rephrase clearly?
-
-4. PROBLEM SOLVING
-Behavioral anchors:
-- Did they acknowledge what cannot be changed, or try to solve past given limits?
-- Did they produce more than one possible approach before committing?
-- Did they articulate what they give up for what they gain?
-- When a new constraint was introduced, did they integrate it or start from scratch?
-
-5. AI & DIGITAL FLUENCY
-Behavioral anchors:
-- Did they reference AI tools, data systems, or digital approaches where relevant?
-- Did they think in terms of automation, data analysis, or AI-assisted decision-making?
-- Did they question whether information could be biased or algorithmically generated?
-- Did they show awareness of tasks AI should do vs tasks requiring human judgment?
+${rubricBlocks}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCORING GUIDE
@@ -515,6 +539,7 @@ IMPORTANT — THIS IS A STUDENT, NOT A PROFESSIONAL. Grade with encouragement an
 - Only give scores below 40 when the candidate barely engaged, gave one-word or empty answers, or refused to participate.
 - Judge them against a capable student their age — not against an expert. Give the benefit of the doubt when intent is good but wording is imperfect.
 - For AI & Digital Fluency especially: most everyday scenarios give little chance to show this. If the topic never came up, score it around 55-65 as "limited opportunity" rather than punishing them.
+- Do not reward an answer simply for being long or confident; score the substance, not the length.
 - Keep all feedback warm, specific, and constructive. Lead with what they did well, then one clear thing to improve.
 
 For "evidence": cite a SPECIFIC moment from the transcript — quote the candidate or describe the exact exchange. The candidate will read this — it must be recognisable and specific.
@@ -605,16 +630,22 @@ router.post('/start', async (req, res) => {
     ]
 
     // Fast cache for live turns…
-    await sessions.set(sessionId, { scenario, exchangeCount: 0, history })
+    await sessions.set(sessionId, { scenario, exchangeCount: 0, history, evidence: emptyEvidence() })
     // …plus durable persistence so a restart/disconnect doesn't lose the session.
     await createSession(sessionId, {
       scenarioId: scenario.id,
       exchangeCount: 0,
       history,
+      evidence: emptyEvidence(),
       tokensUsed: response.usage?.total_tokens || 0,
       userId: authUser?.id || null,
       userEmail: authUser?.email || null,
     })
+
+    // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): record the
+    // scenario-selection decision and the opening AI turn in the audit trail.
+    auditLog('scenario_selected', sessionId, { scenarioId: scenario.id, tier })
+    auditLog('ai_turn', sessionId, { exchange: 0, opening: true, scenarioId: scenario.id })
 
     // Expose non-sensitive scenario meta so the client can render the
     // Scenario Card overlay during the staged flow.
@@ -650,6 +681,7 @@ async function loadSession(sessionId) {
     scenario,
     exchangeCount: persisted.exchangeCount || 0,
     history: persisted.history,
+    evidence: persisted.evidence || emptyEvidence(),
   }
   await sessions.set(sessionId, revived)
   return { ...revived, _persisted: persisted }
@@ -657,7 +689,7 @@ async function loadSession(sessionId) {
 
 // ── POST /api/assessment/message ─────────────────────────────────────────────
 router.post('/message', async (req, res) => {
-  const { sessionId, message } = req.body
+  const { sessionId, message, telemetry } = req.body
   if (!sessionId || !message) return res.status(400).json({ error: 'sessionId and message required' })
   if (typeof message !== 'string' || message.length > 4000) {
     return res.status(400).json({ error: 'Invalid message' })
@@ -673,10 +705,23 @@ router.post('/message', async (req, res) => {
   }
 
   const { scenario, history, exchangeCount } = session
-
-  // Rotate avatar style based on exchange count
   const nextExchangeCount = exchangeCount + 1
-  const avatarStyle = getAvatarStyle(nextExchangeCount)
+
+  // 1) Interpretable behavioral features of the candidate's turn (no LLM call) —
+  //    these estimate which dimensions this answer gave evidence for and feed
+  //    both the Executive director and the per-turn item telemetry.
+  const { features, signals } = extractTurnFeatures(message, {
+    responseMs: telemetry && typeof telemetry.responseMs === 'number' ? telemetry.responseMs : undefined,
+  })
+  const evidence = accumulateEvidence(session.evidence, signals)
+
+  // 2) PRISM-Director (Executive engine) decides how to steer THIS turn: which
+  //    thinly-evidenced dimension to target and whether to deploy the challenger.
+  const { targetDimension, deployChallenger, avatarStyle, directive } = decideDirector({
+    evidence,
+    nextExchange: nextExchangeCount,
+    lastSignals: signals,
+  })
   const avatarSystem = buildAvatarSystemPrompt(scenario, avatarStyle)
 
   // Append candidate's message
@@ -686,15 +731,17 @@ router.post('/message', async (req, res) => {
   ]
 
   try {
+    const promptMessages = [
+      { role: 'system', content: avatarSystem },
+      ...(directive ? [{ role: 'system', content: directive }] : []),
+      ...updatedHistory,
+    ]
     const response = await createCompletion({
       model: MODEL(),
       max_completion_tokens: 350,
       temperature: 0.85,
       response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: avatarSystem },
-        ...updatedHistory,
-      ],
+      messages: promptMessages,
     })
 
     const raw = response.choices[0].message.content
@@ -707,13 +754,50 @@ router.post('/message', async (req, res) => {
       scenario,
       history: newHistory,
       exchangeCount: nextExchangeCount,
+      evidence,
     })
     // …and persist every exchange so a disconnect can't lose progress.
     const prevTokens = session._persisted?.tokensUsed || 0
     await updateSession(sessionId, {
       history: newHistory,
       exchangeCount: nextExchangeCount,
+      evidence,
       tokensUsed: prevTokens + (response.usage?.total_tokens || 0),
+    })
+
+    // 3) Log this turn as a calibratable "item" (probe + behavioral features).
+    //    Fire-and-forget: telemetry must never block or fail the conversation.
+    recordItem({
+      sessionId,
+      scenarioId: scenario.id,
+      turnIndex: nextExchangeCount,
+      targetDimension,
+      challengerDeployed: deployChallenger,
+      avatarStyle,
+      features,
+      signals,
+      evidenceAfter: evidence,
+      userId: session._persisted?.userId || null,
+    }).catch((err) =>
+      logger.captureException(err, { msg: 'item_log_failed', sessionId, requestId: req.requestId }),
+    )
+
+    // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): persist this
+    // exchange as an item_response (latency + ASR confidence, linked to the
+    // probe item the director targeted) and log the AI turn to the audit trail.
+    recordItemResponse({
+      sessionId,
+      scenarioKey: scenario.id,
+      dimension: targetDimension,
+      exchangeNo: nextExchangeCount,
+      candidateText: message,
+      latencyMs: telemetry && typeof telemetry.responseMs === 'number' ? telemetry.responseMs : undefined,
+      asrConfidence: telemetry && typeof telemetry.asrConfidence === 'number' ? telemetry.asrConfidence : undefined,
+    })
+    auditLog('ai_turn', sessionId, {
+      exchange: nextExchangeCount,
+      targetDimension,
+      challengerDeployed: deployChallenger,
     })
 
     res.json(parsed)
@@ -737,6 +821,9 @@ router.post('/evaluate', async (req, res) => {
 
   const { scenario, history } = session
 
+  // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): mark submission.
+  auditLog('submission', sessionId, { scenarioId: scenario?.id, turns: Array.isArray(history) ? history.length : null })
+
   // Build plain-text transcript from history
   const transcript = history
     .map((m) => {
@@ -753,22 +840,68 @@ router.post('/evaluate', async (req, res) => {
     .join('\n\n')
 
   try {
-    const response = await createCompletion({
-      model: MODEL(),
-      max_completion_tokens: 2000,
-      temperature: 0.2,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: buildScoringPrompt(scenario, transcript) },
-        { role: 'user', content: 'Evaluate the candidate now. Return only valid JSON.' },
-      ],
-    })
+    // ── Panel of LLM Evaluators (PoLL) + position-swap + multi-sample vote ────
+    // Replaces the old single low-temperature scoring call. We draw N samples
+    // across judge personas / temperatures / position-swapped rubric orderings
+    // (and across extra model families when PRISM_JUDGE_MODELS is set), then the
+    // aggregator takes the median per dimension and measures judge disagreement
+    // to produce an uncertainty band + a "flag for human review" signal.
+    const plan = buildPanelPlan(MODEL())
+    const settled = await Promise.allSettled(
+      plan.map((spec) =>
+        createCompletion({
+          model: spec.model,
+          max_completion_tokens: 2000,
+          temperature: spec.temperature,
+          response_format: { type: 'json_object' },
+          messages: [
+            {
+              role: 'system',
+              content: buildScoringPrompt(scenario, transcript, {
+                personaInstruction: spec.personaInstruction,
+                dimensionOrder: spec.dimensionOrder,
+              }),
+            },
+            { role: 'user', content: 'Evaluate the candidate now. Return only valid JSON.' },
+          ],
+        }).then((r) => ({ spec, raw: r.choices[0].message.content })),
+      ),
+    )
 
-    const raw = response.choices[0].message.content
-    const rawReport = JSON.parse(raw)
+    const samples = []
+    for (const result of settled) {
+      if (result.status !== 'fulfilled') continue
+      try {
+        const parsed = JSON.parse(result.value.raw)
+        const { spec } = result.value
+        samples.push({
+          scores: parsed.scores || {},
+          feedback: parsed.feedback || {},
+          evidence: parsed.evidence || {},
+          highlights: parsed.highlights,
+          growthAreas: parsed.growthAreas,
+          _meta: {
+            id: spec.id,
+            persona: spec.persona,
+            model: spec.model,
+            swapped: spec.swapped,
+            dimensionOrder: spec.dimensionOrder,
+          },
+        })
+      } catch {
+        /* skip a malformed judge sample — the panel tolerates dropouts */
+      }
+    }
 
-    // Clamp + recompute server-side so the client can't be handed bad numbers.
-    const report = sanitizeReport(rawReport)
+    if (!samples.length) {
+      throw new Error('All panel judges failed to return a usable score')
+    }
+
+    const aggregated = aggregateSamples(samples)
+
+    // Clamp + recompute overall server-side so the client can't be handed bad
+    // numbers. The aggregated medians + reliability flow through sanitizeReport.
+    const report = sanitizeReport(aggregated)
     report.percentile = await computePercentile(report.scores.overall)
     report.scenario = { title: scenario.title, domain: scenario.domain }
     report.validityMonths = 18
@@ -782,6 +915,12 @@ router.post('/evaluate', async (req, res) => {
     // Persist the report (durable, verifiable) and free the live cache.
     const saved = await saveReport(sessionId, report)
     await sessions.delete(sessionId)
+
+    // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): scoring done.
+    auditLog('scoring_complete', sessionId, {
+      overall: report.scores?.overall ?? null,
+      reliability: report.reliability?.label ?? null,
+    })
 
     res.json(saved)
   } catch (err) {
@@ -1051,7 +1190,7 @@ router.post('/consent', async (req, res) => {
   if (!Array.isArray(scopes) || scopes.length === 0) {
     return res.status(400).json({ error: 'scopes (non-empty array) required' })
   }
-  const required = ['data_processing', 'ai_disclosure', 'proctoring', 'own_work']
+  const required = ['data_processing', 'ai_disclosure', 'proctoring', 'own_work', 'ai_scoring_oversight']
   const missing = required.filter((s) => !scopes.includes(s))
   if (missing.length) {
     return res.status(400).json({ error: 'All consent items must be accepted.', missing })

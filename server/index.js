@@ -86,6 +86,20 @@ attachProctorSocket(server)
   .then((io) => { if (io) logger.info('proctor_socket_ready', { path: '/proctor-socket' }) })
   .catch((err) => logger.captureException(err, { msg: 'proctor_socket_failed' }))
 
+// Prism v2 (MASA-2) Phase 0: when telemetry is enabled (PRISM_V2_TELEMETRY +
+// DATABASE_URL), idempotently backfill the item bank so per-turn item_responses
+// can link to a probe item. No-op otherwise — v1 boots unchanged. Never fatal.
+import('./lib/telemetry.js')
+  .then(({ isTelemetryEnabled }) => {
+    if (!isTelemetryEnabled()) return
+    return import('./db/seedItems.js').then(({ seedItems }) =>
+      seedItems().then(({ inserted, total }) =>
+        logger.info('v2_items_seeded', { inserted, total }),
+      ),
+    )
+  })
+  .catch((err) => logger.captureException(err, { msg: 'v2_seed_items_failed' }))
+
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     logger.error('port_in_use', {
