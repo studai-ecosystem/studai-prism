@@ -64,10 +64,10 @@ export default function Auth() {
 
     action
       .then(() => {
-        // TEMP: payment is bypassed for testing the chat. Restore `navigate('/payment')`
-        // before deploying so users go through Razorpay checkout first.
-        const sessionId = crypto.randomUUID()
-        navigate(`/verify-identity?session=${sessionId}`)
+        // Paid flow: send the user to checkout. Payment mints the sessionId
+        // (via Razorpay verify or the dev-session endpoint) and then continues
+        // into identity verification + proctoring.
+        navigate('/payment')
       })
       .catch((err) => setError(err.message || 'Something went wrong. Please try again.'))
       .finally(() => setSubmitting(false))

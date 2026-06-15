@@ -27,6 +27,21 @@ function getRazorpay() {
   return razorpay
 }
 
+// ── GET /api/payment/config ──────────────────────────────────────────────────
+// Public, non-secret config the checkout page needs to decide which flow to use.
+// Exposes ONLY the publishable key id (never the secret) and whether live
+// Razorpay checkout is available. When disabled, the client falls back to the
+// dev-session flow (non-production only).
+router.get('/config', (_req, res) => {
+  res.json({
+    enabled: Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
+    keyId: RAZORPAY_KEY_ID || null,
+    amount: PRICE_PAISE,
+    currency: 'USD',
+    devSessionAvailable: process.env.NODE_ENV !== 'production',
+  })
+})
+
 // ── POST /api/payment/create-order ───────────────────────────────────────────
 router.post('/create-order', async (req, res) => {
   try {
