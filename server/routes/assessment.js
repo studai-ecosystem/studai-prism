@@ -146,6 +146,16 @@ const sessions = sessionCache
 // ── Scenario library ──────────────────────────────────────────────────────────
 // Exported (read-only) so the Prism v2 Phase 0 item seeder can backfill one
 // 'scenario' item + per-dimension 'probe' items per scenario. No behavior change.
+//
+// CALIBRATION FREEZE (audit C11 / build rule "≤ 8 scenarios until first IRT
+// calibration run"): the bank froze at 8 ACTIVE scenarios on 2026-07-04.
+// Retired scenarios stay in this array with `retired: true` — NEVER delete them
+// (historical sessions and item_responses reference their ids) and never
+// un-retire or add scenarios until a frozen calibration run succeeds.
+// Kept (3 foundational / 3 intermediate / 2 advanced, one archetype each):
+//   group-project, fest-budget, clinic-triage · delayed-launch,
+//   supplier-failure, brand-crisis · ethical-ai, team-restructure.
+// Each retired id duplicated an archetype the kept set already covers.
 export const SCENARIOS = [
   // ── Student-relatable scenarios (foundational) ──────────────────────────────
   // These are set in everyday college / student life so a candidate never needs
@@ -178,6 +188,7 @@ export const SCENARIOS = [
   {
     id: 'internship-clash',
     difficulty: 'foundational',
+    retired: true, // C11 freeze: single-stakeholder personal choice — weakest collaboration probe
     domain: 'Student Career',
     title: 'The Internship Clash',
     context: `You are a student who just got two offers in the same week. One is a paid internship at a big company that looks great on your resume but is boring admin work. The other is an unpaid role at a small startup where you would actually build things and learn a lot. Your final exams are also in 4 weeks. You can only take one, and you must reply tomorrow.`,
@@ -190,6 +201,7 @@ export const SCENARIOS = [
   {
     id: 'roommate-conflict',
     difficulty: 'foundational',
+    retired: true, // C11 freeze: same peer-conflict archetype as group-project (kept)
     domain: 'College Life',
     title: 'The Hostel Room Problem',
     context: `You share a hostel room with two others. One roommate stays up late, plays loud music, and has friends over till midnight. You have an important test series starting next week and cannot study. The third roommate does not want to take sides. You have to keep living together for the rest of the year, so you cannot just blow up the relationship.`,
@@ -250,6 +262,7 @@ export const SCENARIOS = [
   {
     id: 'loan-dispute',
     difficulty: 'intermediate',
+    retired: true, // C11 freeze: rule-override/ethics archetype covered by ethical-ai (kept)
     domain: 'Finance & Banking',
     title: 'The Loan Dispute',
     context: `You are a Branch Manager at a private bank in Chennai. A long-standing business customer, Meena Chandrasekaran, is disputing a loan rejection on her working-capital application. Your credit team followed the algorithm — her CIBIL score dropped due to a delayed payment during the COVID period that she says was a bank error. She runs a 15-year-old textile export business with consistent revenues. She needs a decision today or she misses a major export order.`,
@@ -262,6 +275,7 @@ export const SCENARIOS = [
   {
     id: 'campus-placement',
     difficulty: 'foundational',
+    retired: true, // C11 freeze: niche administrator persona for the student cohort
     domain: 'Education & EdTech',
     title: 'The Placement Strategy',
     context: `You are the Head of Career Services at a Tier-2 engineering college in Coimbatore. Placement season starts in 6 weeks. Three major IT firms have pulled out of your campus citing "talent mismatch." Your top 40 students are strong, but the bottom 200 are struggling with communication and problem-solving skills. The Dean wants placement numbers to hold. You have ₹8 lakh in the career development budget.`,
@@ -274,6 +288,7 @@ export const SCENARIOS = [
   {
     id: 'startup-pivot',
     difficulty: 'advanced',
+    retired: true, // C11 freeze: decision-under-uncertainty archetype covered by team-restructure/ethical-ai
     domain: 'Startup & Entrepreneurship',
     title: 'The Pivot Decision',
     context: `You are a co-founder of an EdTech startup with 3 months of runway left. Your current product — a live tutoring app — has 2,000 users but low retention and high CAC. You have two pivot options: a B2B play (sell to schools as a teacher-training tool, lower margin but faster enterprise contracts) or double down on B2C with an AI-personalised study plan feature your CTO says can be built in 6 weeks. Your seed investor is on a call with you tomorrow.`,
@@ -310,6 +325,7 @@ export const SCENARIOS = [
   {
     id: 'hospital-staffing',
     difficulty: 'advanced',
+    retired: true, // C11 freeze: healthcare triage archetype covered by clinic-triage (kept)
     domain: 'Healthcare',
     title: 'The ICU Staffing Call',
     context: `You are the Hospital Operations Director at a private hospital in Hyderabad. A sudden viral outbreak has filled the ICU to 95% capacity. You can either pull experienced nurses from the general ward (risking care quality there), authorise expensive overtime that breaches the monthly budget, or divert new critical patients to a rival hospital 40 minutes away. The medical board reviews your decision next week.`,
@@ -322,6 +338,7 @@ export const SCENARIOS = [
   {
     id: 'last-mile',
     difficulty: 'foundational',
+    retired: true, // C11 freeze: ops-surge archetype covered by supplier-failure (kept)
     domain: 'Logistics & Delivery',
     title: 'The Festival Rush',
     context: `You run city operations for a last-mile delivery company in Jaipur. It is the festival season and order volume has tripled overnight. 20% of your delivery riders are on leave, customers are complaining about late parcels, and a major e-commerce client is threatening penalties for missed SLAs. You have budget to hire temporary riders but they need a day of training first.`,
@@ -334,6 +351,7 @@ export const SCENARIOS = [
   {
     id: 'warehouse-automation',
     difficulty: 'intermediate',
+    retired: true, // C11 freeze: people-vs-efficiency archetype covered by team-restructure (kept)
     domain: 'Logistics & Delivery',
     title: 'The Automation Trade-off',
     context: `You are the Warehouse Head at a large distribution centre near Gurugram. Management wants to install an automated sorting system that would cut errors and speed up dispatch, but it would make 25 of your 120 floor workers redundant within 4 months. The workers' union has heard about it. Peak season is approaching and any disruption now risks missing dispatch targets for your biggest retail partner.`,
@@ -347,15 +365,20 @@ export const SCENARIOS = [
 
 const DIFFICULTY_TIERS = ['foundational', 'intermediate', 'advanced']
 
+// The frozen calibration bank (audit C11): only ACTIVE scenarios are ever
+// served to new sessions. findScenario still resolves retired ids so
+// historical sessions/reports keep working.
+export const ACTIVE_SCENARIOS = SCENARIOS.filter((s) => !s.retired)
+
 // Tier-aware scenario selection. Falls back gracefully when a tier has no
 // scenarios (returns any random scenario) so the flow never breaks.
 // `excludeIds` are scenarios the candidate has already been served — they are
 // skipped so a repeat attempt gets a fresh problem. If every scenario in the
 // pool has been seen, the exclusion is dropped (so the flow never breaks).
-function pickScenario(tier, excludeIds = []) {
-  let pool = SCENARIOS
+export function pickScenario(tier, excludeIds = []) {
+  let pool = ACTIVE_SCENARIOS
   if (tier && DIFFICULTY_TIERS.includes(tier)) {
-    const tiered = SCENARIOS.filter((s) => s.difficulty === tier)
+    const tiered = ACTIVE_SCENARIOS.filter((s) => s.difficulty === tier)
     if (tiered.length) pool = tiered
   }
   const exclude = new Set(excludeIds)

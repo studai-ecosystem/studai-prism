@@ -29,10 +29,11 @@ test('buildItemRows: scenario items have null dimension; probes carry a dimensio
   }
 })
 
-test('buildItemRows: every row is provisional with a tier_label preserved', () => {
+test('buildItemRows: active rows are provisional, retired scenarios seed as retired (C11)', () => {
   const rows = buildItemRows()
+  const retiredIds = new Set(SCENARIOS.filter((s) => s.retired).map((s) => s.id))
   for (const r of rows) {
-    assert.equal(r.status, 'provisional')
+    assert.equal(r.status, retiredIds.has(r.scenario_key) ? 'retired' : 'provisional')
     // tier_label mirrors the scenario difficulty (may be null if a scenario
     // lacks one, but our bank sets it on every scenario).
     assert.ok(r.tier_label === null || typeof r.tier_label === 'string')

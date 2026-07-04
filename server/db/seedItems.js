@@ -22,10 +22,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 config({ path: join(__dirname, '..', '.env') })
 
 // Build the full row set (scenario items + probe items) for the current bank.
+// Retired scenarios (audit C11 calibration freeze) seed/flip to status='retired'
+// — rows are never deleted, so historical item_responses keep resolving.
 export function buildItemRows() {
   const rows = []
   for (const s of SCENARIOS) {
     const sid = scenarioUuid(s.id)
+    const status = s.retired ? 'retired' : 'provisional'
     rows.push({
       item_id: scenarioItemId(s.id),
       scenario_id: sid,
@@ -34,7 +37,7 @@ export function buildItemRows() {
       dimension: null,
       facet: null,
       tier_label: s.difficulty || null,
-      status: 'provisional',
+      status,
     })
     for (const dim of DIMENSION_KEYS) {
       rows.push({
@@ -45,7 +48,7 @@ export function buildItemRows() {
         dimension: dim,
         facet: dim, // v1 probes are dimension-targeted; richer facets arrive in Phase 1+
         tier_label: s.difficulty || null,
-        status: 'provisional',
+        status,
       })
     }
   }
@@ -58,11 +61,15 @@ export async function seedItems() {
   const rows = buildItemRows()
   let inserted = 0
   for (const r of rows) {
+    // Insert new rows; for existing rows the ONLY allowed transition is
+    // provisional → retired (the C11 freeze). A certified item is never
+    // touched, and retirement is never silently reverted from code.
     const res = await pool.query(
       `INSERT INTO items
          (item_id, scenario_id, scenario_key, kind, dimension, facet, tier_label, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-       ON CONFLICT (item_id) DO NOTHING`,
+       ON CONFLICT (item_id) DO UPDATE SET status = EXCLUDED.status
+         WHERE items.status = 'provisional' AND EXCLUDED.status = 'retired'`,
       [r.item_id, r.scenario_id, r.scenario_key, r.kind, r.dimension, r.facet, r.tier_label, r.status],
     )
     inserted += res.rowCount
