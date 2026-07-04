@@ -34,7 +34,7 @@ import { extractTurnFeatures } from '../lib/behavioralFeatures.js'
 import { emptyEvidence, accumulateEvidence, decideDirector } from '../lib/director.js'
 import { buildPanelPlan } from '../lib/judgePanel.js'
 import { aggregateSamples } from '../lib/scoreAggregator.js'
-import { auditLog, recordItemResponse, recordAbilityEstimate } from '../lib/telemetry.js'
+import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession } from '../lib/telemetry.js'
 import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS } from '../lib/sharedConstants.js'
 import { getJwtSecret } from '../lib/security.js'
 import { isExecutiveEnabled, isEarlyStopEnabled } from '../engine/executiveConfig.js'
@@ -43,6 +43,7 @@ import { microRateTurn, normalizeLevels } from '../engine/microRater.js'
 import { selectProbe, stopDecision } from '../engine/probeSelector.js'
 import { anchorsToTheta, heuristicTheta, thetaToTier } from '../engine/entryEstimator.js'
 import { loadPrompt } from '../engine/prompts.js'
+import { isDualScorerEnabled, runDualScorer } from '../scoring/dualScorer.js'
 
 const router = Router()
 
@@ -1020,6 +1021,58 @@ router.post('/evaluate', async (req, res) => {
       auditLog('stop_decision', sessionId, decision)
     }
 
+    // ── Phase 2 Dual-Channel Scorer (PRISM_V2_DUAL_SCORER) ───────────────────
+    // The v1 panel above stays as the SHADOW / reference. When the flag is on,
+    // the turn-level k-vote dual scorer becomes authoritative: its dimension
+    // scores replace v1's, with a real conformal CI + reliability + review gate.
+    // Failures fall back silently to the v1 report (never block scoring).
+    if (isDualScorerEnabled()) {
+      try {
+        const candidateTurns = []
+        history.forEach((m) => {
+          if (m.role === 'user') {
+            candidateTurns.push({ text: String(m.content).replace('[Candidate]: ', '') })
+          }
+        })
+        // exchange_no is 1-based over candidate turns; link to persisted responses.
+        const respIds = await getResponseIdsBySession(sessionId)
+        const turns = candidateTurns.map((t, i) => ({
+          text: t.text,
+          exchangeNo: i + 1,
+          responseId: respIds[i + 1] || null,
+          asrConfidence: 1,
+        }))
+        const dual = await runDualScorer(
+          { createCompletion, modelA: MODEL(), modelB: process.env.PRISM_JUDGE_MODEL_B || MODEL() },
+          turns,
+          report.scores, // v1 shadow scores → reconciliation reference
+        )
+        // Dual-channel scores become authoritative; clamp/recompute below.
+        const reDual = sanitizeReport({ ...aggregated, scores: dual.scores })
+        report.scores = reDual.scores
+        report.percentile = await computePercentile(report.scores.overall)
+        report.confidenceInterval = dual.ci
+        report.reliability = { ...(report.reliability || {}), label: dual.reliability }
+        report.channelB_shadow = dual.channelB
+        report.scoringMeta = dual.meta
+        if (dual.action === 'human_review') {
+          report.reviewStatus = 'in_review'
+          auditLog('human_review', sessionId, { reason: dual.reconcile.reason, gap: dual.reconcile.gap, dimension: dual.reconcile.dimension })
+        }
+        auditLog('dual_scoring_complete', sessionId, {
+          overall: report.scores.overall,
+          reliability: dual.reliability,
+          action: dual.action,
+          ciLow: dual.ci.low,
+          ciHigh: dual.ci.high,
+          provisional: dual.ci.provisional,
+          unstableTurns: dual.meta.unstableTurns,
+        })
+      } catch (err) {
+        logger.warn('dual_scorer_failed', { error: err?.message, detail: 'falling back to v1 panel report' })
+      }
+    }
+
     // Link the report to the signed-in user so it appears in their profile
     // history. Falls back to the durable session record (survives restarts).
     const persisted = await getSession(sessionId)
@@ -1443,6 +1496,31 @@ router.delete('/data/:sessionId', async (req, res) => {
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_data_delete_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to erase data' })
+  }
+})
+
+// ── POST /api/assessment/human-rating ────────────────────────────────────────
+// Records a human double-rating into human_ratings (the gold anchor set that
+// feeds conformal calibration + Channel B training). Admin/rater use only —
+// guarded by the X-Admin-Token header matching ADMIN_TOKEN. Requires the v2
+// telemetry DB. Body: { sessionId, raterId, scores:{dim:0-100}, rubricVersion }.
+router.post('/human-rating', async (req, res) => {
+  if (!process.env.ADMIN_TOKEN || req.get('x-admin-token') !== process.env.ADMIN_TOKEN) {
+    return res.status(403).json({ error: 'Forbidden' })
+  }
+  const { sessionId, raterId, scores, rubricVersion } = req.body || {}
+  if (!sessionId || !raterId || !scores || typeof scores !== 'object') {
+    return res.status(400).json({ error: 'sessionId, raterId, scores required' })
+  }
+  try {
+    const { recordHumanRatings } = await import('../scoring/humanRatings.js')
+    const n = await recordHumanRatings({ sessionId, raterId, scores, rubricVersion: rubricVersion || 'v1' })
+    if (n === null) return res.status(503).json({ error: 'Telemetry DB not configured.' })
+    auditLog('human_rating_recorded', sessionId, { raterId, dims: Object.keys(scores).length })
+    res.json({ ok: true, recorded: n })
+  } catch (err) {
+    logger.captureException(err, { msg: 'human_rating_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Failed to record human rating' })
   }
 })
 

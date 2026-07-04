@@ -114,3 +114,22 @@ export function recordAbilityEstimate({ sessionId, exchangeNo, thetaMean, thetaV
     )
     .catch((err) => logger.captureException(err, { msg: 'ability_estimate_log_failed', sessionId }))
 }
+
+// ── readers (Phase 2) ────────────────────────────────────────────────────────
+// Map exchange_no → response_id for a session, so the dual scorer can link a
+// candidate turn to its persisted item_response (for judge_votes FK). Returns
+// {} when telemetry is off or the DB is unavailable.
+export async function getResponseIdsBySession(sessionId) {
+  if (!isTelemetryEnabled() || !isUuid(sessionId)) return {}
+  try {
+    const res = await query(
+      'SELECT exchange_no, response_id FROM item_responses WHERE session_id=$1 ORDER BY exchange_no',
+      [sessionId],
+    )
+    const map = {}
+    for (const row of res?.rows || []) map[row.exchange_no] = row.response_id
+    return map
+  } catch {
+    return {}
+  }
+}
