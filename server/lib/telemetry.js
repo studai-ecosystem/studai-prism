@@ -87,3 +87,30 @@ export function recordItemResponse({
 }
 
 export { isDbConfigured }
+
+// ── ability_estimates ────────────────────────────────────────────────────────
+// Phase 1: persist the running θ + per-dimension coverage snapshot after each
+// exchange. Fire-and-forget; never throws. Upserts on (session_id, exchange_no).
+export function recordAbilityEstimate({ sessionId, exchangeNo, thetaMean, thetaVar, coverage }) {
+  if (!isTelemetryEnabled()) return
+  if (!isUuid(sessionId)) return
+  Promise.resolve()
+    .then(() =>
+      query(
+        `INSERT INTO ability_estimates (session_id, exchange_no, theta_mean, theta_var, coverage)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (session_id, exchange_no)
+         DO UPDATE SET theta_mean = EXCLUDED.theta_mean,
+                       theta_var  = EXCLUDED.theta_var,
+                       coverage   = EXCLUDED.coverage`,
+        [
+          sessionId,
+          Number.isFinite(exchangeNo) ? exchangeNo : 0,
+          Number.isFinite(thetaMean) ? thetaMean : null,
+          Number.isFinite(thetaVar) ? thetaVar : null,
+          coverage ? JSON.stringify(coverage) : null,
+        ],
+      ),
+    )
+    .catch((err) => logger.captureException(err, { msg: 'ability_estimate_log_failed', sessionId }))
+}

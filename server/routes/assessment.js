@@ -34,9 +34,15 @@ import { extractTurnFeatures } from '../lib/behavioralFeatures.js'
 import { emptyEvidence, accumulateEvidence, decideDirector } from '../lib/director.js'
 import { buildPanelPlan } from '../lib/judgePanel.js'
 import { aggregateSamples } from '../lib/scoreAggregator.js'
-import { auditLog, recordItemResponse } from '../lib/telemetry.js'
+import { auditLog, recordItemResponse, recordAbilityEstimate } from '../lib/telemetry.js'
 import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS } from '../lib/sharedConstants.js'
 import { getJwtSecret } from '../lib/security.js'
+import { isExecutiveEnabled, isEarlyStopEnabled } from '../engine/executiveConfig.js'
+import { EvidenceLedger } from '../engine/evidenceLedger.js'
+import { microRateTurn, normalizeLevels } from '../engine/microRater.js'
+import { selectProbe, stopDecision } from '../engine/probeSelector.js'
+import { anchorsToTheta, heuristicTheta, thetaToTier } from '../engine/entryEstimator.js'
+import { loadPrompt } from '../engine/prompts.js'
 
 const router = Router()
 
@@ -612,6 +618,10 @@ router.post('/start', async (req, res) => {
   // intermediate when no calibration has been run.
   const calibration = await getCalibration(sessionId)
   const tier = calibration?.tier || 'foundational'
+  // Phase 1 (PRISM_V2_EXECUTIVE): seed the EvidenceLedger from the entry
+  // estimator's prior θ₀ (falls back to a neutral prior when none was stored).
+  const executive = isExecutiveEnabled()
+  const ledgerPrior = executive ? (calibration?.theta0 || {}) : null
   // Avoid serving a scenario this signed-in user has already seen, so repeat
   // attempts get a fresh problem statement.
   const authUser = getAuthUser(req)
@@ -653,6 +663,10 @@ router.post('/start', async (req, res) => {
       exchangeCount: 0,
       history,
       evidence: emptyEvidence(),
+      ledger: executive ? new EvidenceLedger(ledgerPrior).snapshot() : null,
+      usedFacets: executive ? [] : null,
+      challengerTurns: executive ? [] : null,
+      extensionsUsed: executive ? 0 : null,
       tokensUsed: response.usage?.total_tokens || 0,
       userId: authUser?.id || null,
       userEmail: authUser?.email || null,
@@ -706,6 +720,19 @@ async function loadSession(sessionId) {
 }
 
 // ── POST /api/assessment/message ─────────────────────────────────────────────
+// Fallback micro-levels when the LLM micro-rater is unavailable: map the
+// interpretable behavioral signals (0-1 per dimension) onto coarse 0-4 levels,
+// or "NA" when a dimension showed essentially no signal this turn. Keeps the
+// EvidenceLedger advancing so the Executive engine never stalls.
+function levelsFromSignals(signals) {
+  const out = {}
+  for (const dim of DIMENSION_KEYS) {
+    const s = Number(signals?.[dim]) || 0
+    out[dim] = s < 0.1 ? 'NA' : Math.max(0, Math.min(4, Math.round(s * 4)))
+  }
+  return out
+}
+
 router.post('/message', async (req, res) => {
   const { sessionId, message, telemetry } = req.body
   if (!sessionId || !message) return res.status(400).json({ error: 'sessionId and message required' })
@@ -724,22 +751,55 @@ router.post('/message', async (req, res) => {
 
   const { scenario, history, exchangeCount } = session
   const nextExchangeCount = exchangeCount + 1
+  const executive = isExecutiveEnabled()
 
   // 1) Interpretable behavioral features of the candidate's turn (no LLM call) —
   //    these estimate which dimensions this answer gave evidence for and feed
-  //    both the Executive director and the per-turn item telemetry.
+  //    both the director and the per-turn item telemetry. Always computed.
   const { features, signals } = extractTurnFeatures(message, {
     responseMs: telemetry && typeof telemetry.responseMs === 'number' ? telemetry.responseMs : undefined,
   })
   const evidence = accumulateEvidence(session.evidence, signals)
 
-  // 2) PRISM-Director (Executive engine) decides how to steer THIS turn: which
-  //    thinly-evidenced dimension to target and whether to deploy the challenger.
-  const { targetDimension, deployChallenger, avatarStyle, directive } = decideDirector({
-    evidence,
-    nextExchange: nextExchangeCount,
-    lastSignals: signals,
-  })
+  // 2) Steering decision. The Executive Engine (Phase 1) replaces the v1
+  //    director when PRISM_V2_EXECUTIVE is on; otherwise the v1 path is byte-
+  //    identical to before.
+  let targetDimension
+  let deployChallenger
+  let avatarStyle
+  let directive
+  let microLevels = null
+  let ledger = null
+  let usedFacets = Array.isArray(session._persisted?.usedFacets) ? [...session._persisted.usedFacets] : []
+  let challengerTurns = Array.isArray(session._persisted?.challengerTurns) ? [...session._persisted.challengerTurns] : []
+
+  if (executive) {
+    // Rehydrate the ledger, micro-rate this turn, fold it in, pick the probe.
+    ledger = EvidenceLedger.from(session._persisted?.ledger)
+    const rated = await microRateTurn(message, { createCompletion, model: MODEL() })
+    // Fallback when the rater is unavailable: derive coarse levels from the
+    // interpretable signals so the ledger still advances (never blocks).
+    microLevels = rated || levelsFromSignals(signals)
+    ledger.applyLevels(microLevels)
+
+    const probe = selectProbe(ledger, {
+      nextExchange: nextExchangeCount,
+      usedFacets,
+      challengerTurns,
+    })
+    targetDimension = probe.targetDimension
+    deployChallenger = probe.deployChallenger
+    avatarStyle = probe.avatarStyle
+    directive = probe.directive
+    if (!usedFacets.includes(probe.facet)) usedFacets.push(probe.facet)
+    if (deployChallenger) challengerTurns.push(nextExchangeCount)
+  } else {
+    const d = decideDirector({ evidence, nextExchange: nextExchangeCount, lastSignals: signals })
+    targetDimension = d.targetDimension
+    deployChallenger = d.deployChallenger
+    avatarStyle = d.avatarStyle
+    directive = d.directive
+  }
   const avatarSystem = buildAvatarSystemPrompt(scenario, avatarStyle)
 
   // Append candidate's message
@@ -780,6 +840,13 @@ router.post('/message', async (req, res) => {
       history: newHistory,
       exchangeCount: nextExchangeCount,
       evidence,
+      ...(executive
+        ? {
+            ledger: ledger.snapshot(),
+            usedFacets,
+            challengerTurns,
+          }
+        : {}),
       tokensUsed: prevTokens + (response.usage?.total_tokens || 0),
     })
 
@@ -801,8 +868,8 @@ router.post('/message', async (req, res) => {
     )
 
     // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): persist this
-    // exchange as an item_response (latency + ASR confidence, linked to the
-    // probe item the director targeted) and log the AI turn to the audit trail.
+    // exchange as an item_response (latency + ASR confidence + micro-levels,
+    // linked to the probe item the director targeted) and log the AI turn.
     recordItemResponse({
       sessionId,
       scenarioKey: scenario.id,
@@ -811,12 +878,25 @@ router.post('/message', async (req, res) => {
       candidateText: message,
       latencyMs: telemetry && typeof telemetry.responseMs === 'number' ? telemetry.responseMs : undefined,
       asrConfidence: telemetry && typeof telemetry.asrConfidence === 'number' ? telemetry.asrConfidence : undefined,
+      microLevels,
     })
-    auditLog('ai_turn', sessionId, {
+    auditLog('probe_selected', sessionId, {
       exchange: nextExchangeCount,
       targetDimension,
       challengerDeployed: deployChallenger,
+      ...(executive ? { facet: usedFacets[usedFacets.length - 1], thetaMean: ledger.theta.mean, thetaVar: ledger.theta.var } : {}),
     })
+
+    // Phase 1: persist the θ + coverage snapshot for this exchange.
+    if (executive && ledger) {
+      recordAbilityEstimate({
+        sessionId,
+        exchangeNo: nextExchangeCount,
+        thetaMean: ledger.theta.mean,
+        thetaVar: ledger.theta.var,
+        coverage: ledger.coverageMap(),
+      })
+    }
 
     res.json(parsed)
   } catch (err) {
@@ -923,6 +1003,22 @@ router.post('/evaluate', async (req, res) => {
     report.percentile = await computePercentile(report.scores.overall)
     report.scenario = { title: scenario.title, domain: scenario.domain }
     report.validityMonths = SCORE_VALIDITY_MONTHS
+
+    // Phase 1 (PRISM_V2_EXECUTIVE): surface evidence coverage + whether the
+    // session would have extended for thin evidence. Extend/stop math is logged;
+    // early-stop stays OFF unless PRISM_V2_EARLY_STOP is set.
+    if (isExecutiveEnabled() && session._persisted?.ledger) {
+      const ledger = EvidenceLedger.from(session._persisted.ledger)
+      const decision = stopDecision(ledger, {
+        earlyStopEnabled: isEarlyStopEnabled(),
+        extensionsUsed: session._persisted?.extensionsUsed || 0,
+        atLimit: true,
+      })
+      report.evidenceCoverage = ledger.coverageMap()
+      report.theta = { mean: ledger.theta.mean, var: ledger.theta.var }
+      report.extended_for_evidence = decision.action === 'extend'
+      auditLog('stop_decision', sessionId, decision)
+    }
 
     // Link the report to the signed-in user so it appears in their profile
     // history. Falls back to the durable session record (survives restarts).
@@ -1188,40 +1284,75 @@ router.post('/calibrate', async (req, res) => {
 
   let tier = heuristicTier(answer)
   let gradedBy = 'heuristic'
+  // Phase 1 (PRISM_V2_EXECUTIVE): also derive a continuous Bayesian prior θ₀.
+  // The v1 tier above is still computed so flag-off behavior is untouched.
+  let theta0 = null
 
   // Try to refine the tier with the model when keys are configured; on any
   // failure we silently keep the heuristic result.
   if (answer && String(answer).trim().length > 0) {
     try {
-      const completion = await createCompletion(
-        {
-          model: MODEL(),
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You calibrate assessment difficulty. Read the candidate\'s reflective answer and judge their reasoning maturity. Respond with ONLY one word: foundational, intermediate, or advanced.',
-            },
-            { role: 'user', content: String(answer).slice(0, 2000) },
-          ],
-          temperature: 0.2,
-          max_completion_tokens: 8,
-        },
-        { retries: 1 },
-      )
-      const raw = (completion?.choices?.[0]?.message?.content || '').toLowerCase()
-      const match = DIFFICULTY_TIERS.find((t) => raw.includes(t))
-      if (match) {
-        tier = match
-        gradedBy = 'ai'
+      if (isExecutiveEnabled()) {
+        // Score the writing sample on the 4 micro-anchors → θ₀ (and tier from θ).
+        const completion = await createCompletion(
+          {
+            model: MODEL(),
+            messages: [
+              { role: 'system', content: loadPrompt('entry_estimator.v1') },
+              { role: 'user', content: String(answer).slice(0, 2000) },
+            ],
+            temperature: 0,
+            max_completion_tokens: 60,
+            response_format: { type: 'json_object' },
+          },
+          { retries: 1 },
+        )
+        const parsed = JSON.parse(completion?.choices?.[0]?.message?.content || '{}')
+        const est = anchorsToTheta(parsed)
+        theta0 = { theta0_mean: est.theta0_mean, theta0_var: est.theta0_var }
+        tier = thetaToTier(est.theta0_mean)
+        gradedBy = 'ai_theta'
+      } else {
+        const completion = await createCompletion(
+          {
+            model: MODEL(),
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'You calibrate assessment difficulty. Read the candidate\'s reflective answer and judge their reasoning maturity. Respond with ONLY one word: foundational, intermediate, or advanced.',
+              },
+              { role: 'user', content: String(answer).slice(0, 2000) },
+            ],
+            temperature: 0.2,
+            max_completion_tokens: 8,
+          },
+          { retries: 1 },
+        )
+        const raw = (completion?.choices?.[0]?.message?.content || '').toLowerCase()
+        const match = DIFFICULTY_TIERS.find((t) => raw.includes(t))
+        if (match) {
+          tier = match
+          gradedBy = 'ai'
+        }
       }
     } catch (err) {
       logger.warn('calibrate_ai_unavailable', { error: err?.message, detail: 'using heuristic tier' })
+      if (isExecutiveEnabled()) {
+        theta0 = heuristicTheta(answer) // {theta0_mean, theta0_var}
+        tier = thetaToTier(theta0.theta0_mean)
+      }
     }
+  } else if (isExecutiveEnabled()) {
+    theta0 = heuristicTheta(answer)
+    tier = thetaToTier(theta0.theta0_mean)
   }
 
   try {
-    await setCalibration(sessionId, { tier, gradedBy, prompt: CALIBRATION_PROMPT })
+    await setCalibration(sessionId, { tier, gradedBy, prompt: CALIBRATION_PROMPT, theta0 })
+    if (isExecutiveEnabled() && theta0) {
+      auditLog('entry_estimate', sessionId, { theta0_mean: theta0.theta0_mean, theta0_var: theta0.theta0_var, tier, gradedBy })
+    }
     res.json({ ok: true, tier, prompt: CALIBRATION_PROMPT })
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_calibrate_failed', requestId: req.requestId })
