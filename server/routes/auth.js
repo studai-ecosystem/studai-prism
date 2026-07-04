@@ -2,20 +2,13 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import logger from '../lib/logger.js'
+import { getJwtSecret } from '../lib/security.js'
 import { findUserByEmail, findUserById, createUser, updateUser, publicUser } from '../lib/db.js'
 
 const router = Router()
 
-// Read lazily at call time: with ESM, route modules are imported before
-// dotenv's config() runs in index.js, so process.env isn't populated yet here.
-function getJwtSecret() {
-  const secret = process.env.JWT_SECRET
-  if (!secret) {
-    logger.warn('jwt_secret_missing', { detail: 'Using an insecure default. Set JWT_SECRET in server/.env for production.' })
-    return 'dev-insecure-secret-change-me'
-  }
-  return secret
-}
+// JWT secret policy lives in lib/security.js (audit C8): hard-fails in
+// production when JWT_SECRET is unset — no silent insecure fallback.
 const JWT_EXPIRES_IN = '30d'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

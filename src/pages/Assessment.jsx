@@ -15,7 +15,7 @@ const INSTRUCTIONS = [
   { icon: '💡', text: 'This is NOT a knowledge test. You do not need to know any industry or job. There is no single right answer — we only want to see how you think and talk things through.' },
   { icon: '🎙️', text: 'This is a spoken assessment. Listen to each question, then tap the mic and speak your answer — it is transcribed automatically. You can also type if you prefer.' },
   { icon: '🧠', text: 'You are assessed on Critical Thinking, Communication, Collaboration, Problem Solving, and AI & Digital Fluency — not on facts you have memorised.' },
-  { icon: '⏱️', text: 'You have 10 minutes. Your timer starts once you have read the scenario briefing — it cannot be paused.' },
+  { icon: '⏱️', text: 'You have 30 minutes. Your timer starts once you have read the scenario briefing — it cannot be paused.' },
   { icon: '🚫', text: 'Do not switch tabs or use external tools. This is your performance — not a research exercise.' },
 ]
 
@@ -38,7 +38,7 @@ function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
               <ShieldCheck size={22} className="text-[#C9A84C]" />
             </div>
             <h1 className="font-serif text-3xl text-[#1A1A2E] mb-2">Before you begin</h1>
-            <p className="font-sans text-sm text-[#64687A]">10-minute assessment · 5 skill dimensions · Certified result</p>
+            <p className="font-sans text-sm text-[#64687A]">30-minute assessment · 5 skill dimensions · Certified result</p>
           </div>
 
           <ul className="flex flex-col gap-4">
@@ -381,7 +381,10 @@ export default function Assessment() {
     if (!sessionId) return
     fetch('/api/assessment/event', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+      },
       body: JSON.stringify({ sessionId, type, meta: meta && typeof meta === 'object' ? meta : {} }),
     }).catch(() => {})
   }, [sessionId])
@@ -508,7 +511,10 @@ export default function Assessment() {
       if (!sessionId) return
       fetch('/api/assessment/event', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+        },
         body: JSON.stringify({ sessionId, type }),
       }).catch(() => {})
     }

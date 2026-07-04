@@ -1,0 +1,160 @@
+// Phase 2 security-hardening gate tests (audit C7/C8/C9/C10/C21).
+//
+// Boots the real app (all middleware + routes) on an ephemeral port with a
+// throwaway DATA_DIR, and verifies each hardening behaves — not just that the
+// code exists.
+
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import jwt from 'jsonwebtoken'
+
+// Isolate the JSON store + set a known signing secret BEFORE app modules load.
+process.env.DATA_DIR = mkdtempSync(join(tmpdir(), 'prism-sec-test-'))
+process.env.JWT_SECRET = 'test-secret-for-security-suite'
+delete process.env.PRISM_PG_STORE
+
+const { buildApp } = await import('../app.js')
+const { assertProductionSecrets, getJwtSecret } = await import('../lib/security.js')
+const { createSession, saveReport } = await import('../lib/store.js')
+
+const app = buildApp()
+const server = app.listen(0)
+await new Promise((r) => server.once('listening', r))
+const base = `http://127.0.0.1:${server.address().port}`
+test.after(() => server.close())
+
+const post = (path, body, headers = {}) =>
+  fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  })
+
+const tokenFor = (id, email) => jwt.sign({ sub: id, email }, process.env.JWT_SECRET)
+
+// ── C8: JWT hard-fail in production ──────────────────────────────────────────
+test('C8: startup check throws in production without JWT_SECRET', () => {
+  const oldEnv = process.env.NODE_ENV
+  const oldSecret = process.env.JWT_SECRET
+  try {
+    process.env.NODE_ENV = 'production'
+    delete process.env.JWT_SECRET
+    assert.throws(() => assertProductionSecrets(), /JWT_SECRET/)
+    assert.throws(() => getJwtSecret(), /JWT_SECRET/)
+    process.env.JWT_SECRET = 'a-real-secret'
+    assert.doesNotThrow(() => assertProductionSecrets())
+    assert.equal(getJwtSecret(), 'a-real-secret')
+  } finally {
+    process.env.NODE_ENV = oldEnv
+    process.env.JWT_SECRET = oldSecret
+  }
+})
+
+// ── C7: rate limiting on auth ────────────────────────────────────────────────
+test('C7: 6th rapid login attempt from one IP is rate-limited (429)', async () => {
+  let last
+  for (let i = 0; i < 6; i++) {
+    last = await post('/api/auth/login', { email: `probe@example.com` })
+  }
+  assert.equal(last.status, 429)
+  const body = await last.json()
+  assert.match(body.error, /Too many requests/)
+})
+
+// ── C9: proctor-event endpoint auth ──────────────────────────────────────────
+test('C9: /event rejects unknown sessions (404)', async () => {
+  const res = await post('/api/assessment/event', { sessionId: 'no-such-session', type: 'face_absent' })
+  assert.equal(res.status, 404)
+})
+
+test('C9: /event rejects a user-owned session without that user\u2019s token (403), accepts with it', async () => {
+  await createSession('sec-test-owned', { scenarioId: 's1', userId: 'user-1', userEmail: 'owner@example.com', history: [] })
+
+  const anon = await post('/api/assessment/event', { sessionId: 'sec-test-owned', type: 'face_absent' })
+  assert.equal(anon.status, 403)
+
+  const wrongUser = await post(
+    '/api/assessment/event',
+    { sessionId: 'sec-test-owned', type: 'face_absent' },
+    { Authorization: `Bearer ${tokenFor('user-2', 'other@example.com')}` },
+  )
+  assert.equal(wrongUser.status, 403)
+
+  const owner = await post(
+    '/api/assessment/event',
+    { sessionId: 'sec-test-owned', type: 'face_absent' },
+    { Authorization: `Bearer ${tokenFor('user-1', 'owner@example.com')}` },
+  )
+  assert.equal(owner.status, 200)
+})
+
+// ── C10: send-report auth + destination restriction ─────────────────────────
+test('C10: send-report requires auth and an account-linked destination', async () => {
+  // Enable the mailer's config check (no email is actually sent — every case
+  // below is rejected before the SMTP transport would be used).
+  process.env.SMTP_HOST = 'smtp.test.invalid'
+  process.env.SMTP_USER = 'x'
+  process.env.SMTP_PASS = 'y'
+  try {
+    await createSession('sec-test-report', { scenarioId: 's1', userId: 'user-9', userEmail: 'cand@example.com', history: [] })
+    await saveReport('sec-test-report', {
+      scores: { overall: 70 }, userId: 'user-9', userEmail: 'cand@example.com',
+    })
+    const pdfBase64 = Buffer.alloc(2000, 1).toString('base64')
+
+    const unauth = await post('/api/assessment/send-report', {
+      sessionId: 'sec-test-report', email: 'attacker@evil.example', pdfBase64,
+    })
+    assert.equal(unauth.status, 401)
+
+    const wrongOwner = await post(
+      '/api/assessment/send-report',
+      { sessionId: 'sec-test-report', email: 'cand@example.com', pdfBase64 },
+      { Authorization: `Bearer ${tokenFor('user-2', 'other@example.com')}` },
+    )
+    assert.equal(wrongOwner.status, 403)
+
+    const arbitraryDest = await post(
+      '/api/assessment/send-report',
+      { sessionId: 'sec-test-report', email: 'attacker@evil.example', pdfBase64 },
+      { Authorization: `Bearer ${tokenFor('user-9', 'cand@example.com')}` },
+    )
+    assert.equal(arbitraryDest.status, 403)
+  } finally {
+    delete process.env.SMTP_HOST
+    delete process.env.SMTP_USER
+    delete process.env.SMTP_PASS
+  }
+})
+
+// ── C21: security headers + CORS ─────────────────────────────────────────────
+test('C21: responses carry CSP / HSTS / X-Content-Type-Options headers', async () => {
+  const res = await fetch(`${base}/api/health`)
+  assert.equal(res.status, 200)
+  assert.ok(res.headers.get('content-security-policy'), 'CSP header missing')
+  assert.ok(res.headers.get('strict-transport-security'), 'HSTS header missing')
+  assert.equal(res.headers.get('x-content-type-options'), 'nosniff')
+})
+
+test('C21: production app does not reflect arbitrary Origins (no CORS wildcard)', async () => {
+  const oldEnv = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  try {
+    const prodApp = buildApp()
+    const prodServer = prodApp.listen(0)
+    await new Promise((r) => prodServer.once('listening', r))
+    try {
+      const res = await fetch(`http://127.0.0.1:${prodServer.address().port}/api/health`, {
+        headers: { Origin: 'https://evil.example' },
+      })
+      assert.equal(res.headers.get('access-control-allow-origin'), null)
+    } finally {
+      prodServer.close()
+    }
+  } finally {
+    process.env.NODE_ENV = oldEnv
+  }
+})

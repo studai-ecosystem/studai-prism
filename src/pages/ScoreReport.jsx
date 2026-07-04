@@ -6,7 +6,8 @@ import {
   Sparkles, ArrowUpRight, ArrowRight, Linkedin, Download, Mail, Link as LinkIcon,
   ShieldCheck, Briefcase, Share2, Scale, Trash2,
 } from 'lucide-react'
-import { getUser } from '../lib/session.js'
+import { getUser, getToken } from '../lib/session.js'
+import { DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, REASSESSMENT_DAYS } from '../../server/lib/sharedConstants.js'
 
 // ── Dimension config (order + colours mirror the reference report) ────────────
 const DIMENSIONS = [
@@ -62,16 +63,10 @@ const DIMENSIONS = [
   },
 ]
 
-// Weight of each dimension in the overall Prism Score (must match the server's
-// DIMENSION_WEIGHTS in server/routes/assessment.js). Used to show candidates
-// exactly how their overall percentage is built up.
-const DIMENSION_WEIGHTS = {
-  criticalThinking: 0.25,
-  communication: 0.25,
-  collaboration: 0.2,
-  problemSolving: 0.2,
-  aiDigitalFluency: 0.1,
-}
+// Weight of each dimension in the overall Prism Score — imported from the SAME
+// shared module the server's scoring route uses (audit C2), so the breakdown
+// shown to candidates can never drift from the arithmetic that produced the
+// score.
 
 // ── Performance bands ─────────────────────────────────────────────────────────
 const BANDS = [
@@ -257,9 +252,21 @@ export default function ScoreReport() {
   const { scores, feedback, highlights, growthAreas } = report
   const band = getBand(scores.overall)
 
+  // Honest reliability display (audit C4): the server measures judge-panel
+  // agreement and returns a reliability label — show THAT. Never render a
+  // numeric confidence interval until a calibrated one exists in the report.
+  const reliabilityText = {
+    high: 'High reliability',
+    moderate: 'Moderate reliability',
+    low: 'Low judge agreement — eligible for human review',
+  }[report.reliability?.label] || 'Provisional score'
+
+  const validityMonths = report.validityMonths || SCORE_VALIDITY_MONTHS
   const now = new Date()
   const issuedDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  const validUntil = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate())
+  const validUntilDate = new Date(now)
+  validUntilDate.setMonth(validUntilDate.getMonth() + validityMonths)
+  const validUntil = validUntilDate
     .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   const testDateTime = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) +
     ' · ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
@@ -441,7 +448,10 @@ export default function ScoreReport() {
       const pdfBase64 = pdf.output('datauristring') // data:application/pdf;base64,...
       const res = await fetch('/api/assessment/send-report', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+        },
         body: JSON.stringify({ sessionId, email: target, pdfBase64, filename }),
       })
       const data = await res.json().catch(() => ({}))
@@ -671,7 +681,7 @@ export default function ScoreReport() {
                   <div className="cert-score-num">{scores.overall}</div>
                   <div className="cert-score-denom">%</div>
                 </div>
-                <div className="cert-score-tier"><Star size={14} fill="#FCD34D" color="#FCD34D" />{band.label} · ±3 confidence</div>
+                <div className="cert-score-tier"><Star size={14} fill="#FCD34D" color="#FCD34D" />{band.label} · {reliabilityText}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '14px 20px', flexDirection: 'column' }}>
@@ -748,7 +758,9 @@ export default function ScoreReport() {
                 ))}
               </div>
               <div style={{ background: 'var(--s1)', border: '1px solid var(--bd)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
-                <span style={{ fontWeight: 600, color: 'var(--t2)' }}>Score confidence interval:</span> {scores.overall} ± 3 points. Based on scored exchanges across the 30-minute session. Score is valid for 18 months from the date of assessment.
+                <span style={{ fontWeight: 600, color: 'var(--t2)' }}>Score reliability:</span> {reliabilityText}
+                {typeof report.reliability?.agreement === 'number' && <> · judge-panel agreement {Math.round(report.reliability.agreement * 100)}%</>}
+                . Provisional — calibrated confidence intervals will be published after our first calibration study. Score is valid for {validityMonths} months from the date of assessment.
               </div>
             </div>
           </div>
@@ -1065,7 +1077,7 @@ export default function ScoreReport() {
         <div className="rpt-footer">
           <div className="footer-left">
             © 2026 StudAI One · Studai Edutech Pvt. Ltd. · CIN U85500TN2024PTC168744<br />
-            Score valid for 18 months · Reassessment available after 90 days
+            Score valid for {SCORE_VALIDITY_MONTHS} months · Reassessment available after {REASSESSMENT_DAYS} days
           </div>
           <div className="footer-right">
             <a>Privacy policy</a>

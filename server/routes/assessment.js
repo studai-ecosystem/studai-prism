@@ -35,6 +35,8 @@ import { emptyEvidence, accumulateEvidence, decideDirector } from '../lib/direct
 import { buildPanelPlan } from '../lib/judgePanel.js'
 import { aggregateSamples } from '../lib/scoreAggregator.js'
 import { auditLog, recordItemResponse } from '../lib/telemetry.js'
+import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS } from '../lib/sharedConstants.js'
+import { getJwtSecret } from '../lib/security.js'
 
 const router = Router()
 
@@ -53,8 +55,7 @@ function getAuthUser(req) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
   if (!token) return null
   try {
-    const secret = process.env.JWT_SECRET || 'dev-insecure-secret-change-me'
-    const payload = jwt.verify(token, secret)
+    const payload = jwt.verify(token, getJwtSecret())
     return { id: payload.sub, email: payload.email }
   } catch {
     return null
@@ -89,20 +90,9 @@ function clampScore(n) {
   return Math.max(0, Math.min(100, v))
 }
 
-const DIMENSION_KEYS = [
-  'criticalThinking',
-  'collaboration',
-  'communication',
-  'problemSolving',
-  'aiDigitalFluency',
-]
-const DIMENSION_WEIGHTS = {
-  criticalThinking: 0.25,
-  communication: 0.25,
-  collaboration: 0.2,
-  problemSolving: 0.2,
-  aiDigitalFluency: 0.1,
-}
+// DIMENSION_KEYS / DIMENSION_WEIGHTS come from lib/sharedConstants.js — the
+// single source of truth also bundled into the client, so public claims about
+// the weighting can never drift from the arithmetic below (audit C2).
 
 // Normalise, clamp and re-derive the overall score server-side so the client
 // can never receive an out-of-range or model-miscalculated figure.
@@ -632,6 +622,9 @@ router.post('/start', async (req, res) => {
     // Fast cache for live turns…
     await sessions.set(sessionId, { scenario, exchangeCount: 0, history, evidence: emptyEvidence() })
     // …plus durable persistence so a restart/disconnect doesn't lose the session.
+    // The session record carries the consent version the candidate accepted
+    // (audit C5) so every issued score is traceable to exact consent wording.
+    const consentRecord = await getConsent(sessionId)
     await createSession(sessionId, {
       scenarioId: scenario.id,
       exchangeCount: 0,
@@ -640,6 +633,8 @@ router.post('/start', async (req, res) => {
       tokensUsed: response.usage?.total_tokens || 0,
       userId: authUser?.id || null,
       userEmail: authUser?.email || null,
+      consentVersion: consentRecord?.meta?.consentVersion || null,
+      consentScopes: consentRecord?.scopes || null,
     })
 
     // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): record the
@@ -904,7 +899,7 @@ router.post('/evaluate', async (req, res) => {
     const report = sanitizeReport(aggregated)
     report.percentile = await computePercentile(report.scores.overall)
     report.scenario = { title: scenario.title, domain: scenario.domain }
-    report.validityMonths = 18
+    report.validityMonths = SCORE_VALIDITY_MONTHS
 
     // Link the report to the signed-in user so it appears in their profile
     // history. Falls back to the durable session record (survives restarts).
@@ -1018,7 +1013,19 @@ router.post('/event', async (req, res) => {
   const allowed = ['tab_switch', 'screenshot_attempt', 'fullscreen_exit', 'paste', 'room_scan_complete', 'face_absent', 'multiple_faces', 'looking_away']
   if (!allowed.includes(type)) return res.status(400).json({ error: 'Unknown event type' })
   try {
-    await recordEvent(sessionId, type, meta && typeof meta === 'object' ? meta : {})
+    // Auth (audit C9): proctor integrity events are score-adjacent evidence —
+    // they must not be injectable for arbitrary sessions. The session must
+    // exist, and when it belongs to a signed-in user the caller must present
+    // that user's token. (Anonymous dev sessions have no owner to verify;
+    // the existence check + rate limit still applies.)
+    const session = await getSession(sessionId)
+    if (!session) return res.status(404).json({ error: 'Session not found' })
+    const authUser = getAuthUser(req)
+    if (session.userId && (!authUser || authUser.id !== session.userId)) {
+      return res.status(403).json({ error: 'Not authorized for this session' })
+    }
+    const cleanMeta = meta && typeof meta === 'object' ? meta : {}
+    await recordEvent(sessionId, type, { ...cleanMeta, _authenticated: !!authUser })
     res.json({ ok: true })
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_event_failed', requestId: req.requestId })
@@ -1053,6 +1060,14 @@ router.post('/send-report', reportJsonParser, async (req, res) => {
     return res.status(503).json({ error: 'Email delivery is not configured.', fallback: 'download' })
   }
   const { sessionId, email, pdfBase64, filename } = req.body || {}
+  // Auth (audit C10): only the signed-in owner of a finished report may email
+  // it, and ONLY to addresses tied to that report/account — never to an
+  // arbitrary destination from the request body (open-relay/phishing vector).
+  const authUser = getAuthUser(req)
+  if (!authUser) {
+    return res.status(401).json({ error: 'Sign in to email your report.', fallback: 'download' })
+  }
+  if (!sessionId) return res.status(400).json({ error: 'sessionId required' })
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'A valid email address is required.' })
   }
@@ -1060,13 +1075,23 @@ router.post('/send-report', reportJsonParser, async (req, res) => {
     return res.status(400).json({ error: 'Report PDF is missing.' })
   }
   try {
+    const report = await getReport(sessionId)
+    if (!report) return res.status(404).json({ error: 'No completed report found for this session.' })
+    if (report.userId && report.userId !== authUser.id) {
+      return res.status(403).json({ error: 'This report belongs to a different account.' })
+    }
+    const allowedTargets = new Set(
+      [report.userEmail, authUser.email].filter(Boolean).map((e) => String(e).toLowerCase()),
+    )
+    if (!allowedTargets.has(String(email).toLowerCase())) {
+      return res.status(403).json({ error: 'Reports can only be emailed to the address on your Prism account.' })
+    }
     // Accept either a raw base64 string or a data: URL.
     const base64 = pdfBase64.includes(',') ? pdfBase64.split(',').pop() : pdfBase64
     const pdfBuffer = Buffer.from(base64, 'base64')
     if (pdfBuffer.length < 1000 || pdfBuffer.length > 12 * 1024 * 1024) {
       return res.status(400).json({ error: 'Report PDF is invalid.' })
     }
-    const report = sessionId ? await getReport(sessionId) : null
     await sendReportEmail({
       to: email,
       pdfBuffer,
@@ -1183,15 +1208,29 @@ router.post('/calibrate', async (req, res) => {
 
 // ── POST /api/assessment/consent ─────────────────────────────────────────────
 // Records affirmative consent (DPDP / EU AI Act). Required before /start in the
-// UI flow; scopes cover data processing, AI disclosure, proctoring, own-work.
+// UI flow. Scopes now cover EVERYTHING the code actually does (audit C5/C6):
+// data processing, AI disclosure, AI-scoring oversight, tab/paste proctoring,
+// webcam face analysis, phone-camera frame relay, and pseudonymized
+// research/calibration use. The consent copy version is recorded alongside the
+// scopes so we can always prove WHICH wording a candidate accepted.
+const REQUIRED_CONSENT_SCOPES = [
+  'data_processing',
+  'ai_disclosure',
+  'ai_scoring_oversight',
+  'proctoring',
+  'face_analysis',
+  'phone_camera_relay',
+  'research_calibration',
+  'own_work',
+]
+
 router.post('/consent', async (req, res) => {
-  const { sessionId, scopes } = req.body || {}
+  const { sessionId, scopes, consentVersion } = req.body || {}
   if (!sessionId) return res.status(400).json({ error: 'sessionId required' })
   if (!Array.isArray(scopes) || scopes.length === 0) {
     return res.status(400).json({ error: 'scopes (non-empty array) required' })
   }
-  const required = ['data_processing', 'ai_disclosure', 'proctoring', 'own_work', 'ai_scoring_oversight']
-  const missing = required.filter((s) => !scopes.includes(s))
+  const missing = REQUIRED_CONSENT_SCOPES.filter((s) => !scopes.includes(s))
   if (missing.length) {
     return res.status(400).json({ error: 'All consent items must be accepted.', missing })
   }
@@ -1199,9 +1238,10 @@ router.post('/consent', async (req, res) => {
     const meta = {
       ip: req.ip,
       userAgent: req.get('user-agent') || null,
+      consentVersion: typeof consentVersion === 'string' ? consentVersion.slice(0, 64) : null,
     }
     const consent = await recordConsent(sessionId, scopes, meta)
-    res.json({ ok: true, consent: { sessionId, scopes: consent.scopes, at: consent.at } })
+    res.json({ ok: true, consent: { sessionId, scopes: consent.scopes, consentVersion: meta.consentVersion, at: consent.at } })
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_consent_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to record consent' })
