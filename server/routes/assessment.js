@@ -500,7 +500,8 @@ router.post('/start', async (req, res) => {
   const seenScenarioIds = await getRecentScenarioIdsByUser(authUser?.id)
   const scenario = pickScenario(tier, seenScenarioIds)
 
-  const openingPrompt = `Begin the scenario now. ONLY the FIRST character speaks to open the conversation. They say who they are, then clearly explain the problem in plain words — what happened, what is at stake, and why a decision is needed now. Do not assume the candidate already knows the situation; spell it out simply, like you are explaining it to a student for the first time. Then ask one short, friendly question that invites the candidate to share how they would start. Make it clear there is no single right answer — you just want to hear their thinking. The second character stays silent for now and will join in later when needed. Use simple everyday English a student can read easily — short words, short sentences, no jargon. Keep it to about 3-4 short sentences from this one character only, and return just this single character's message in the messages array.`
+  // Versioned prompt file (audit C15).
+  const openingPrompt = loadPrompt('opening_turn.v1').trim()
 
   try {
     const avatarSystem = buildAvatarSystemPrompt(scenario, 1) // Avatar 1 for opening

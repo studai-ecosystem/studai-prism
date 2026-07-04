@@ -157,6 +157,19 @@ function Radar({ dims }) {
 }
 
 function PercentileRow({ label, value }) {
+  // Honest cold-start (audit C19): no cohort history → no invented rank.
+  if (typeof value !== 'number') {
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>{label}</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--t3)' }}>Pending cohort data</span>
+        </div>
+        <div className="pct-bar-track" />
+        <div className="pct-labels"><span>0</span><span>25th</span><span>50th</span><span>75th</span><span>100th</span></div>
+      </div>
+    )
+  }
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
@@ -276,17 +289,21 @@ export default function ScoreReport() {
   const dims = DIMENSIONS.map((d) => ({ ...d, score: scores[d.key] ?? 0 }))
   const radarDims = dims.map((d) => ({ label: d.label, score: d.score, color: d.color }))
 
+  // Honest percentiles (audit C19): show ONLY server-computed values. Until a
+  // real comparison pool exists the server returns null/0 — render an explicit
+  // "pending cohort data" state, never an approximation of a rank.
   const pctAll = (() => {
     const stored = report.percentile ?? report.percentiles?.all
-    // A stored percentile of 0 means there wasn't a meaningful comparison pool
-    // yet (this was the lowest/only score on record). Rather than show a
-    // broken-looking "0th percentile · Top 100% nationally", approximate a
-    // sensible rank from the candidate's own overall score.
-    if (typeof stored === 'number' && stored > 0) return stored
-    return Math.max(1, Math.min(99, Math.round(scores.overall * 0.95)))
+    return typeof stored === 'number' && stored > 0 ? stored : null
   })()
-  const pctTrack = report.percentiles?.track ?? Math.max(1, pctAll - 7)
-  const pctCohort = report.percentiles?.cohort ?? Math.min(99, pctAll + 6)
+  const pctTrack = typeof report.percentiles?.track === 'number' ? report.percentiles.track : null
+  const pctCohort = typeof report.percentiles?.cohort === 'number' ? report.percentiles.cohort : null
+
+  // Real conformal CI (Phase 2 scorer) when the report carries one — otherwise
+  // the agreement-based reliability label. Never a fabricated interval (C4).
+  const ci = report.confidenceInterval && Number.isFinite(report.confidenceInterval.low) && Number.isFinite(report.confidenceInterval.high)
+    ? report.confidenceInterval
+    : null
   // `report.scenario` may be a plain string (legacy/mock) or an object
   // ({ title, domain }) returned by the scoring endpoint. Normalise to text.
   const scenarioText =
@@ -686,8 +703,14 @@ export default function ScoreReport() {
               <div style={{ textAlign: 'right' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '14px 20px', flexDirection: 'column' }}>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>National Percentile</div>
-                  <div className="cert-pct-num">{pctAll}<span style={{ fontSize: 18, opacity: 0.6 }}>{ordinalSuffix(pctAll)}</span></div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Top {Math.max(1, 100 - pctAll)}% nationally</div>
+                  {pctAll != null ? (
+                    <>
+                      <div className="cert-pct-num">{pctAll}<span style={{ fontSize: 18, opacity: 0.6 }}>{ordinalSuffix(pctAll)}</span></div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Top {Math.max(1, 100 - pctAll)}% nationally</div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', maxWidth: 140, lineHeight: 1.5 }}>Available once enough candidates have tested</div>
+                  )}
                 </div>
                 <div className="cert-validity" style={{ textAlign: 'right' }}>Valid until {validUntil} · {verifyId}</div>
               </div>
@@ -758,9 +781,18 @@ export default function ScoreReport() {
                 ))}
               </div>
               <div style={{ background: 'var(--s1)', border: '1px solid var(--bd)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
-                <span style={{ fontWeight: 600, color: 'var(--t2)' }}>Score reliability:</span> {reliabilityText}
-                {typeof report.reliability?.agreement === 'number' && <> · judge-panel agreement {Math.round(report.reliability.agreement * 100)}%</>}
-                . Provisional — calibrated confidence intervals will be published after our first calibration study. Score is valid for {validityMonths} months from the date of assessment.
+                {ci ? (
+                  <>
+                    <span style={{ fontWeight: 600, color: 'var(--t2)' }}>Score confidence interval:</span> {ci.low}–{ci.high} points (90% coverage target{ci.provisional ? ', provisional until first calibration study' : ''}).
+                    {' '}Score is valid for {validityMonths} months from the date of assessment.
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontWeight: 600, color: 'var(--t2)' }}>Score reliability:</span> {reliabilityText}
+                    {typeof report.reliability?.agreement === 'number' && <> · judge-panel agreement {Math.round(report.reliability.agreement * 100)}%</>}
+                    . Provisional — calibrated confidence intervals will be published after our first calibration study. Score is valid for {validityMonths} months from the date of assessment.
+                  </>
+                )}
               </div>
             </div>
           </div>
