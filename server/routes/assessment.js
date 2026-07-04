@@ -44,6 +44,7 @@ import { selectProbe, stopDecision } from '../engine/probeSelector.js'
 import { anchorsToTheta, heuristicTheta, thetaToTier } from '../engine/entryEstimator.js'
 import { loadPrompt } from '../engine/prompts.js'
 import { isDualScorerEnabled, runDualScorer } from '../scoring/dualScorer.js'
+import { equateScore, isEquatingEnabled } from '../scoring/equating.js'
 
 const router = Router()
 
@@ -1001,6 +1002,25 @@ router.post('/evaluate', async (req, res) => {
     // Clamp + recompute overall server-side so the client can't be handed bad
     // numbers. The aggregated medians + reliability flow through sanitizeReport.
     const report = sanitizeReport(aggregated)
+
+    // Prism v2 (MASA-2) Phase 3: per-scenario equating (flag PRISM_V2_EQUATING,
+    // default off). Shifts the overall onto a common scale so the scenario a
+    // candidate drew doesn't advantage/penalise them. Re-clamped 0–100; audited
+    // only when it actually moves the score. v1 reproducible when off.
+    if (isEquatingEnabled()) {
+      const rawOverall = report.scores.overall
+      const equated = await equateScore(scenario.id, rawOverall)
+      if (equated !== rawOverall) {
+        report.scores.overall = equated
+        report.equating = { scenarioKey: scenario.id, rawOverall, delta: equated - rawOverall }
+        auditLog('equating_applied', sessionId, {
+          scenarioKey: scenario.id,
+          rawOverall,
+          equatedOverall: equated,
+        })
+      }
+    }
+
     report.percentile = await computePercentile(report.scores.overall)
     report.scenario = { title: scenario.title, domain: scenario.domain }
     report.validityMonths = SCORE_VALIDITY_MONTHS
