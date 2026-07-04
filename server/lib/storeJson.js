@@ -28,6 +28,20 @@ async function ensureFile() {
   }
 }
 
+// Atomic write (audit C13): write to a temp file then rename over the target,
+// so a crash mid-write can never leave a torn/corrupted assessments.json.
+// NOTE: this protects single-instance durability only — it does NOT make the
+// JSON store safe for scale-out (2+ instances still race read-modify-write).
+// Multi-instance deployments must run PRISM_PG_STORE=true.
+function writeDB(db) {
+  writeChain = writeChain.then(async () => {
+    const tmp = `${DB_FILE}.${process.pid}.tmp`
+    await fs.writeFile(tmp, JSON.stringify(db, null, 2))
+    await fs.rename(tmp, DB_FILE)
+  })
+  return writeChain
+}
+
 async function readDB() {
   await ensureFile()
   try {
@@ -47,11 +61,6 @@ async function readDB() {
   } catch {
     return { ...EMPTY }
   }
-}
-
-function writeDB(db) {
-  writeChain = writeChain.then(() => fs.writeFile(DB_FILE, JSON.stringify(db, null, 2)))
-  return writeChain
 }
 
 // ── Payments ────────────────────────────────────────────────────────────────
