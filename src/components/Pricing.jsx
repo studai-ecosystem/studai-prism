@@ -2,13 +2,14 @@ import { motion } from 'framer-motion'
 import SectionLabel from './ui/SectionLabel.jsx'
 import PricingCard from './ui/PricingCard.jsx'
 import { stagger, fadeUp } from '../hooks/motionVariants.js'
+import { SCORE_VALIDITY_MONTHS } from '../../server/lib/sharedConstants.js'
 
 const individualFeatures = [
   'One 30-minute AI assessment',
   'Certified Prism Score',
   'Full 5-dimension skill map report',
   'Shareable score link',
-  'Valid for 18 months',
+  `Valid for ${SCORE_VALIDITY_MONTHS} months`,
 ]
 
 const institutionalFeatures = [

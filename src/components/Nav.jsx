@@ -12,8 +12,8 @@ const navLinks = [
 
 const researchLinks = [
   { icon: '📄', label: 'The Science Behind Prism', desc: 'How we measure 5 skill dimensions', to: '/research/science' },
-  { icon: '📊', label: 'Validity Study',           desc: 'Assessment accuracy and scoring methodology', to: '/research/validity' },
-  { icon: '🧠', label: 'AI Evaluation',            desc: 'How Claude API scores your responses', to: '/research/ai-evaluation' },
+  { icon: '📊', label: 'Scoring Methodology',      desc: 'How scores are produced — validation in progress', to: '/research/validity' },
+  { icon: '🧠', label: 'AI Evaluation',            desc: 'How our AI evaluation panel scores your responses', to: '/research/ai-evaluation' },
   { icon: '📰', label: 'Blog',                     desc: 'Insights on skills, hiring and AI', to: '/research/blog' },
 ]
 

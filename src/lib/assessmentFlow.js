@@ -7,7 +7,12 @@
 // added "one by one": set `overlay` to the component key once it is built.
 // Stages without an overlay simply drive the conversation + the progress label.
 
-export const DURATION_SECONDS = 10 * 60 // 10 minutes (temporary — revert to 30 * 60 later)
+import { ASSESSMENT_MINUTES } from '../../server/lib/sharedConstants.js'
+
+// 30 minutes — matches the server's enforced SESSION_LIMIT_MS and every public
+// duration claim (audit C22). Change ASSESSMENT_MINUTES in sharedConstants.js,
+// never here.
+export const DURATION_SECONDS = ASSESSMENT_MINUTES * 60
 
 // Spoken question types for the voice-only test. The candidate hears the avatar
 // ask the question (TTS) and answers by speaking into the mic; the audio is

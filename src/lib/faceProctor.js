@@ -1,7 +1,14 @@
 // Lightweight in-browser face proctoring (Phase 5).
 //
-// Uses face-api.js (TensorFlow.js under the hood) entirely on the candidate's
-// device — no video ever leaves the browser. We run the tiny face detector plus
+// Uses face-api.js (TensorFlow.js under the hood) to ANALYSE the webcam video
+// on the candidate's device — raw webcam video is not uploaded, but the DERIVED
+// integrity events (face_absent, multiple_faces, looking_away) ARE sent to the
+// server and recorded with the session. Note: this covers the LAPTOP webcam
+// only — when the optional phone-proctor is linked, phone-camera frames are
+// relayed THROUGH the server in memory (see server/lib/proctorSocket.js), so
+// never describe that channel as "video stays in the browser". Both channels
+// are covered by explicit consent scopes in Briefing.jsx (audit C5/C6).
+// We run the tiny face detector plus
 // the 68-point landmark model on the existing webcam stream a few times a second
 // and derive three signals used by the proctor:
 //   • faces       — how many faces are visible (0 = absent, >1 = someone else)

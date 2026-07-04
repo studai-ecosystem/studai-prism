@@ -34,7 +34,7 @@ const dimensions = [
   },
   {
     num: '05',
-    name: 'AI Readiness',
+    name: 'AI & Digital Fluency',
     measures:
       'How fluently you work alongside AI — prompting, verifying, deciding.',
     inConversation:
@@ -49,7 +49,7 @@ const steps = [
   },
   {
     num: '2',
-    text: 'Claude API analyses reasoning, tone, structure, and adaptability',
+    text: 'A panel of AI evaluators (Azure OpenAI) analyses reasoning, tone, structure, and adaptability',
   },
   {
     num: '3',

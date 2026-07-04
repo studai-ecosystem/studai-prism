@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import SectionLabel from './ui/SectionLabel.jsx'
 import FAQItem from './ui/FAQItem.jsx'
 import { stagger, fadeUp } from '../hooks/motionVariants.js'
+import { SCORE_VALIDITY_MONTHS, REASSESSMENT_DAYS } from '../../server/lib/sharedConstants.js'
 
 const faqs = [
   {
@@ -12,16 +13,16 @@ const faqs = [
   {
     question: 'What does a Prism Score look like?',
     answer:
-      'You receive a score between 0–100 with a breakdown across five dimensions: Critical Thinking, Collaboration, Communication, Problem Solving, and AI Readiness. You also get a detailed skill map report.',
+      'You receive a score between 0–100 with a breakdown across five dimensions: Critical Thinking, Collaboration, Communication, Problem Solving, and AI & Digital Fluency. You also get a detailed skill map report.',
   },
   {
     question: 'How long is my score valid?',
-    answer: 'Your Prism Score is valid for 12 months from the date of assessment.',
+    answer: `Your Prism Score is valid for ${SCORE_VALIDITY_MONTHS} months from the date of assessment.`,
   },
   {
     question: 'Can I retake the assessment?',
     answer:
-      'Yes. You can purchase a new assessment at any time. Each assessment uses a different scenario to ensure a fresh evaluation.',
+      `Yes. You can take a new assessment ${REASSESSMENT_DAYS} days after your last attempt. Each assessment uses a different scenario to ensure a fresh evaluation, and your most recent score is the one that counts.`,
   },
   {
     question: 'How does an employer verify my score?',

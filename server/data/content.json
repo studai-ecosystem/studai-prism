@@ -64,7 +64,7 @@
       "title": "AI Prompt Engineer",
       "location": "Remote",
       "type": "Full time",
-      "stack": "Claude API + LLMs",
+      "stack": "Azure OpenAI + LLMs",
       "description": "Design, evaluate, and harden the prompts and scoring rubrics that power Prism's conversational assessments.",
       "open": true
     },

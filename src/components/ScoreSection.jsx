@@ -3,11 +3,12 @@ import { Check } from 'lucide-react'
 import SectionLabel from './ui/SectionLabel.jsx'
 import ScoreMockup from './ui/ScoreMockup.jsx'
 import { stagger, fadeUp } from '../hooks/motionVariants.js'
+import { SCORE_VALIDITY_MONTHS } from '../../server/lib/sharedConstants.js'
 
 const bullets = [
   'Shareable link — one click to LinkedIn or résumé',
   'Employer-verified — trusted by hiring teams on the Hire marketplace',
-  'Valid for 12 months from assessment date',
+  `Valid for ${SCORE_VALIDITY_MONTHS} months from assessment date`,
 ]
 
 export default function ScoreSection() {

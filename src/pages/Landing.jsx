@@ -67,7 +67,7 @@ const ROBOTS = [
       subtitle: 'Needs you to lead',
       description:
         'I do not understand things easily. You have to guide me, explain clearly, and show patience. How you handle confusion shows your real communication skill.',
-      badge: 'Tests → Communication · AI Readiness',
+      badge: 'Tests → Communication · AI & Digital Fluency',
     },
   },
 ]

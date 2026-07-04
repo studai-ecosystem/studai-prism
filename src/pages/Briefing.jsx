@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { ShieldCheck, MonitorX, Clock, Copy, Eye, Camera, Check } from 'lucide-react'
 import { CHARACTERS, CharacterAvatar } from '../lib/characters.jsx'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
+import { CONSENT_VERSION } from '../../server/lib/sharedConstants.js'
 
 const RULES = [
   { icon: MonitorX, text: 'Do not switch tabs or close this window' },
@@ -14,11 +15,18 @@ const RULES = [
 ]
 
 // Affirmative consent items (DPDP / EU AI Act). All must be accepted before
-// the candidate can enter the assessment.
+// the candidate can enter the assessment. Each item describes something the
+// system ACTUALLY does — keep this list in sync with the server behaviour it
+// names (faceProctor.js, proctorSocket.js, telemetry) and bump CONSENT_VERSION
+// in server/lib/sharedConstants.js whenever the wording or scope set changes.
 const CONSENT_ITEMS = [
   { scope: 'data_processing', label: 'I consent to my responses being processed to generate my skills report.' },
   { scope: 'ai_disclosure', label: 'I understand the interviewers are AI-generated characters, not real people.' },
+  { scope: 'ai_scoring_oversight', label: 'I understand my responses are scored by an AI system, and that I can request human review of my result.' },
   { scope: 'proctoring', label: 'I consent to proctoring (tab-switch, paste and fullscreen-exit monitoring) during the session.' },
+  { scope: 'face_analysis', label: 'I consent to my webcam feed being analysed on my device during the session — including face detection, facial-landmark and gaze estimation, and detection of additional people — with the resulting integrity events (e.g. face absent, multiple faces, looking away) recorded with my session.' },
+  { scope: 'phone_camera_relay', label: 'If I link my phone as a second proctoring camera, I consent to its camera frames being relayed through Prism\u2019s server to my desktop in real time. Frames are relayed in memory only and are not stored.' },
+  { scope: 'research_calibration', label: 'I consent to my assessment responses and scores being used, in pseudonymised form, for research and for calibrating and improving the scoring system.' },
   { scope: 'own_work', label: 'I confirm this will be my own unaided work.' },
 ]
 
@@ -106,7 +114,11 @@ export default function Briefing() {
       const consentRes = await fetch('/api/assessment/consent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, scopes: CONSENT_ITEMS.map((c) => c.scope) }),
+        body: JSON.stringify({
+          sessionId,
+          scopes: CONSENT_ITEMS.map((c) => c.scope),
+          consentVersion: CONSENT_VERSION,
+        }),
       })
       if (!consentRes.ok) {
         const data = await consentRes.json().catch(() => ({}))

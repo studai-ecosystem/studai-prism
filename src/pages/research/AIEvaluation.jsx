@@ -21,6 +21,7 @@ const analyses = [
 
 const doesNot = [
   'Does not score based on accent or speaking style',
+  'Does not analyse facial expressions, voice tone or emotion — the webcam is used for proctoring only, and voice is converted to text before scoring',
   'Does not penalise for typing speed',
   'Does not compare against a single correct answer',
   'Does not factor in gender, name, or college name',
@@ -32,7 +33,7 @@ export default function AIEvaluation() {
       <section className="py-20 px-6 max-w-6xl mx-auto">
         <PageHeading
           title="AI Evaluation"
-          subtitle="How Claude API scores your responses"
+          subtitle="How our AI evaluation panel scores your responses"
         />
       </section>
 
@@ -43,18 +44,23 @@ export default function AIEvaluation() {
             The evaluator
           </h2>
           <p className="text-[#5A5F6E] leading-relaxed text-lg">
-            Prism uses Anthropic's Claude API as its evaluation engine. Claude
-            analyses every response in the conversation — not just what was said
-            but how it was said, in what order, and how it responded to pressure
-            from the other avatars.
+            Prism scores are produced by a panel of large-language-model
+            evaluators running on Microsoft Azure OpenAI Service. Your full
+            conversation is scored several times by independent judge passes
+            with different judging personas and rubric orderings; your score on
+            each dimension is the median of the panel, and the level of
+            agreement between judges is measured and shown on your report as a
+            reliability label. The model deployment used is configured per
+            environment and recorded with your report — every result can be
+            traced to the models that produced it.
           </p>
         </div>
       </section>
 
-      {/* Section 2 — What Claude analyses */}
+      {/* Section 2 — What the AI panel analyses */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
         <h2 className="text-3xl font-bold text-[#0A0D14] text-center mb-12">
-          What Claude analyses
+          What the AI panel analyses
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {analyses.map((a) => (
@@ -71,10 +77,10 @@ export default function AIEvaluation() {
         </div>
       </section>
 
-      {/* Section 3 — What Claude does NOT do */}
+      {/* Section 3 — What the AI panel does NOT do */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
         <h2 className="text-3xl font-bold text-[#0A0D14] text-center mb-12">
-          What Claude does not do
+          What the AI panel does not do
         </h2>
         <div className="bg-white rounded-2xl shadow-sm p-8 md:p-10 max-w-3xl mx-auto">
           <ul className="flex flex-col gap-4">
@@ -97,9 +103,14 @@ export default function AIEvaluation() {
         <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-gold">
           <h2 className="text-2xl font-bold text-[#0A0D14] mb-4">Privacy</h2>
           <p className="text-[#5A5F6E] leading-relaxed text-lg">
-            Your assessment conversation is processed for scoring only. It is
-            not stored permanently, not shared with employers, and not used to
-            train AI models. You own your data.
+            Your assessment conversation is processed to generate your score
+            and stored so your result can be verified and, if you ask, reviewed
+            by a human. With your explicit consent, your responses and scores
+            may also be used in pseudonymised form for research and to
+            calibrate and improve the scoring system. Your audio is transcribed
+            and never stored, your report is never shared with employers
+            without your action, and you can request deletion of your
+            assessment data at any time.
           </p>
         </div>
       </section>

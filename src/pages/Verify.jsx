@@ -123,7 +123,7 @@ export default function Verify() {
               </div>
               <div>
                 <p className="font-bold uppercase tracking-wider text-[#B4A8D8] mb-0.5">Validity</p>
-                <p className="text-[#2D2556]">{report.validityMonths || 18} months</p>
+                <p className="text-[#2D2556]">{report.validityMonths || 12} months</p>
               </div>
             </div>
           </div>

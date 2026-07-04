@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { ShieldCheck, Clock, Layers, BadgeCheck, Lock, Loader2 } from 'lucide-react'
 import { getUser } from '../lib/session.js'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
+import { SCORE_VALIDITY_MONTHS } from '../../server/lib/sharedConstants.js'
 
 const INCLUDES = [
   { icon: Clock, text: '30-minute live AI scenario assessment' },
@@ -136,7 +137,7 @@ export default function Payment() {
             <div className="px-6 py-5 border-b border-[#E8E8F0] flex items-center justify-between">
               <div>
                 <p className="font-sans font-semibold text-sm text-[#1A1A2E]">30-minute Prism Assessment</p>
-                <p className="font-sans text-xs text-[#64687A] mt-0.5">One-time · Score valid 12 months</p>
+                <p className="font-sans text-xs text-[#64687A] mt-0.5">One-time · Score valid {SCORE_VALIDITY_MONTHS} months</p>
               </div>
               <p className="font-serif text-2xl text-[#1A1A2E]">$10</p>
             </div>
