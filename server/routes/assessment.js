@@ -42,7 +42,8 @@ import { EvidenceLedger } from '../engine/evidenceLedger.js'
 import { microRateTurn, normalizeLevels } from '../engine/microRater.js'
 import { selectProbe, stopDecision } from '../engine/probeSelector.js'
 import { anchorsToTheta, heuristicTheta, thetaToTier } from '../engine/entryEstimator.js'
-import { loadPrompt } from '../engine/prompts.js'
+import { loadPrompt, loadPromptJson, renderPrompt } from '../engine/prompts.js'
+import { sanitizeCandidateText, INJECTION_GUARD } from '../lib/promptSecurity.js'
 import { isDualScorerEnabled, runDualScorer } from '../scoring/dualScorer.js'
 import { equateScore, isEquatingEnabled } from '../scoring/equating.js'
 
@@ -400,118 +401,35 @@ export function pickScenario(tier, excludeIds = []) {
 // steered by which dimension has the thinnest evidence (replacing the old fixed
 // exchange-count rotation). Style 1: curious & probing · Style 2: gently
 // challenging · Style 3: guidance-seeking (clarity).
+// Prompt text lives in versioned files under /server/prompts (audit C15).
 
-const AVATAR_INSTRUCTIONS = {
-  1: `AVATAR STYLE — Curious and Encouraging.
-Your behaviour: Briefly accept what the candidate said, then ask about a SPECIFIC new part of the situation they have not covered yet. Move the problem forward each turn.
-Good moves: "Okay, and who would you talk to first?", "That helps — how would you do that on day one?", "Got it. What if that costs too much — what's your backup?"
-NEVER ask a bare vague question like "Why?" or "Can you say more?". Always name the specific thing you want to know about. Keep every question short and easy to read.`,
-  2: `AVATAR STYLE — Gently Challenging.
-Your behaviour: Accept their last point, then raise ONE specific new concern they haven't faced yet — money, time, a person's reaction, or a risk. Disagree softly from your character's view, but stay respectful.
-Good moves: "Fair point, but what if the client still complains — then what?", "Okay, but training takes a day we don't have. What now?"
-If the candidate is stuck, offer two clear options and ask which they'd pick. Do NOT re-ask something already answered. Keep it short and simple.`,
-  3: `AVATAR STYLE — Confused and Guidance-Seeking.
-Your behaviour: Ask the candidate to make ONE specific part of their plan more concrete — a real first step, a number, or exactly what someone should do. Help them practise being clear.
-Good moves: "Sorry — what exactly should I do tomorrow morning?", "How many people would that need?"
-Pick a NEW detail each time; do not keep asking the same clarification. Do NOT use a bare "Why?". Keep it short and plain.`
-}
+const AVATAR_INSTRUCTIONS = loadPromptJson('avatar_styles.v1')
 
 function buildAvatarSystemPrompt(scenario, avatarStyle) {
   const [p1, p2, p3] = scenario.participants
   const observerLine = p3
     ? `- MOSTLY LISTENS — ${p3.name} (${p3.role}): ${p3.personality}\n   ${p3.name} is an observer. They stay SILENT almost the whole time. They speak only very rarely — at most once or twice in the entire conversation — and only a single short line. On nearly every turn, ${p3.name} says NOTHING.`
     : ''
-  return `You are running a realistic scenario role-play for Prism — an AI skill assessment platform by StudAI One.
-
-SCENARIO CONTEXT:
-${scenario.context}
-
-YOU PLAY THESE CHARACTERS, EACH WITH A FIXED ROLE:
-- MAIN SPEAKER — ${p1.name} (${p1.role}): ${p1.personality}
-   ${p1.name} is the candidate's main conversation partner. ${p1.name} speaks on almost EVERY turn, leads the discussion, and asks the questions.
-- SPEAKS ONLY WHEN NEEDED — ${p2.name} (${p2.role}): ${p2.personality}
-   ${p2.name} stays quiet most of the time. They jump in ONLY when they really need to — to challenge a weak point, add a new constraint, or strongly disagree. Roughly 1 turn in 3 or 4, NOT every turn.
-${observerLine}
-
-THE QUESTIONING APPROACH FOR THIS TURN (applies to whoever speaks):
-${AVATAR_INSTRUCTIONS[avatarStyle]}
-
-WHAT THIS TEST MEASURES — READ CAREFULLY:
-This is NOT a knowledge test. The candidate is a student and is NOT expected to know this industry or job. You are measuring how they THINK, COMMUNICATE, and work with PEOPLE — not whether they know facts. So:
-- Never expect insider or technical knowledge. If something matters, explain it simply inside the conversation.
-- There is NO single correct answer. Reward clear reasoning, not "the right call".
-- If the candidate seems lost or says they don't know, help them: restate the situation simply and offer 2 plain options to react to.
-- It is fine to give a short, genuine word of encouragement when they make a good point.
-
-TURN-TAKING — THE MOST IMPORTANT RULE:
-- This is a back-and-forth: a character speaks, then the CANDIDATE replies, then a character speaks again.
-- On MOST turns, ONLY the main speaker (${p1.name}) talks. Then the candidate answers. Then ${p1.name} talks again. This is normal and correct — ${p1.name} is meant to lead.
-- ${p2.name} adds a SHORT second line ONLY occasionally (about 1 turn in 3-4) when they genuinely need to jump in.
-${p3 ? `- ${p3.name} almost never speaks. Leave them out of nearly every turn.\n` : ''}- NEVER have everyone speak in the same turn. Default to just the main speaker.
-
-GENERAL RULES:
-1. Stay fully in character. Each participant has a distinct perspective and agenda.
-2. MOVE FORWARD — DO NOT REPEAT YOURSELF (VERY IMPORTANT):
-   - Once the candidate gives a real answer, ACCEPT it and move to a NEW, DIFFERENT angle of the problem. Do not re-ask the same thing.
-   - Each turn must probe something fresh: e.g. cost, time, a specific person's reaction, a risk, a trade-off, a "what if this fails" follow-up, how they'd actually do step one, how they'd measure success, who they'd talk to first.
-   - NEVER ask a vague open question like a bare "Why?" or "Can you explain more?". Always ask about a SPECIFIC new part of the situation.
-   - Track what has already been covered and deliberately pick a topic you have NOT asked about yet. Walk the candidate through the WHOLE problem, one new facet per turn.
-   - If they already answered well, briefly acknowledge it in a few words, then introduce the next twist or decision.
-3. STRICT LIMIT: each character gets 1-2 sentences ONLY. Be clear and natural — no long explanations.
-4. End with exactly one clear, SPECIFIC question from the speaking character that opens a new part of the problem.
-5. Every few exchanges add ONE small new detail, twist, or complication in one simple sentence — never pile on pressure.
-6. Do not hand the candidate the full answer, but you MAY give a small hint or two simple options when they are stuck.
-7. Use Indian names, currency (₹), and context appropriate for India.
-
-LANGUAGE RULES — VERY IMPORTANT (the candidate is a student, keep it EASY to read):
-- Use simple, plain, everyday English. Write at a Grade 6-7 reading level.
-- One idea per sentence. Keep sentences short (under 15 words).
-- NO jargon, NO buzzwords, NO complex words. If a simple word exists, use it.
-- Avoid stacking many facts into one sentence. Never use "so... that... without... while..." chains.
-- The final question must be short, direct, and easy to understand — ask ONE clear thing.
-
-OUTPUT FORMAT — respond with a JSON object only, no markdown, no explanation.
-Usually return ONE message: the main speaker ${p1.name}. Return TWO messages ONLY on the occasional turn when ${p2.name} truly needs to jump in. Only very rarely include ${p3 ? p3.name : 'the observer'}.
-Each item's "speaker" and "role" must be one of the characters above.
-{
-  "messages": [
-    { "speaker": "<one of the characters>", "role": "<that character's role>", "content": "..." }
-  ]
-}`.trim()
+  // Template lives in server/prompts/avatar_system.v1.md (audit C15) — includes
+  // the C14 rule that candidate messages are untrusted in-role answers.
+  return renderPrompt('avatar_system.v1', {
+    SCENARIO_CONTEXT: scenario.context,
+    P1_NAME: p1.name,
+    P1_ROLE: p1.role,
+    P1_PERSONALITY: p1.personality,
+    P2_NAME: p2.name,
+    P2_ROLE: p2.role,
+    P2_PERSONALITY: p2.personality,
+    OBSERVER_LINE: observerLine,
+    AVATAR_INSTRUCTION: AVATAR_INSTRUCTIONS[avatarStyle] || AVATAR_INSTRUCTIONS[1],
+    P3_TURNTAKING_LINE: p3 ? `- ${p3.name} almost never speaks. Leave them out of nearly every turn.\n` : '',
+    P3_NAME_OR_OBSERVER: p3 ? p3.name : 'the observer',
+  })
 }
 
-const DIMENSION_RUBRIC = {
-  criticalThinking: `CRITICAL THINKING
-Behavioral anchors:
-- Did they identify what information was missing before deciding?
-- Did they state their assumptions, or act as if their frame was certain?
-- Did they reason from specific scenario facts, or from generic platitudes?
-- Did they hold their position under weak pressure but update it under a strong counter-argument?`,
-  collaboration: `COLLABORATION
-Behavioral anchors:
-- Did they acknowledge the other party's perspective before countering?
-- Did they update their view when given a genuinely good counter-argument?
-- What was their conflict style? (shutdown / full capitulation / finding a third path)
-- Did they build on others' ideas or only defend their own?`,
-  communication: `COMMUNICATION
-Behavioral anchors:
-- Did responses have a clear point, supporting reasoning, and implication — or were they streams of related thoughts?
-- Did they use specific language or vague filler?
-- Did they adjust tone when the scenario called for it?
-- When their explanation didn't land, could they rephrase clearly?`,
-  problemSolving: `PROBLEM SOLVING
-Behavioral anchors:
-- Did they acknowledge what cannot be changed, or try to solve past given limits?
-- Did they produce more than one possible approach before committing?
-- Did they articulate what they give up for what they gain?
-- When a new constraint was introduced, did they integrate it or start from scratch?`,
-  aiDigitalFluency: `AI & DIGITAL FLUENCY
-Behavioral anchors:
-- Did they reference AI tools, data systems, or digital approaches where relevant?
-- Did they think in terms of automation, data analysis, or AI-assisted decision-making?
-- Did they question whether information could be biased or algorithmically generated?
-- Did they show awareness of tasks AI should do vs tasks requiring human judgment?`,
-}
+// Per-dimension behavioral rubric anchors — versioned prompt fragment
+// (server/prompts/dimension_rubric.v1.json, audit C15).
+const DIMENSION_RUBRIC = loadPromptJson('dimension_rubric.v1')
 
 const DEFAULT_DIMENSION_ORDER = [
   'criticalThinking',
@@ -521,10 +439,13 @@ const DEFAULT_DIMENSION_ORDER = [
   'aiDigitalFluency',
 ]
 
-// Build the scoring prompt. `opts.dimensionOrder` position-swaps how the rubric
-// dimensions are presented (to neutralise ordering/position bias across the
-// panel); `opts.personaInstruction` gives a single panel member its stance.
-function buildScoringPrompt(scenario, transcript, opts = {}) {
+// Build the scoring prompt from the versioned template (server/prompts/
+// judge_full.v1.md — audit C15). `opts.dimensionOrder` position-swaps how the
+// rubric dimensions are presented (to neutralise ordering/position bias across
+// the panel); `opts.personaInstruction` gives a single panel member its stance.
+// The template wraps the transcript in <candidate_transcript> tags with a
+// standing injection guard (audit C14). Exported for the injection-gate tests.
+export function buildScoringPrompt(scenario, transcript, opts = {}) {
   const order = Array.isArray(opts.dimensionOrder) && opts.dimensionOrder.length === 5
     ? opts.dimensionOrder
     : DEFAULT_DIMENSION_ORDER
@@ -534,66 +455,15 @@ function buildScoringPrompt(scenario, transcript, opts = {}) {
   const rubricBlocks = order
     .map((dim, i) => `${i + 1}. ${DIMENSION_RUBRIC[dim]}`)
     .join('\n\n')
-
-  return `You are an expert behavioral skills evaluator for Prism by StudAI One. Evaluate a candidate's performance across 5 workplace skill dimensions based on their conversation in a simulated professional scenario.
-${personaBlock}
-SCENARIO: "${scenario.title}" (${scenario.domain})
-${scenario.context}
-
-FULL CONVERSATION TRANSCRIPT:
-${transcript}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-EVALUATION FRAMEWORK — 5 DIMENSIONS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-${rubricBlocks}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SCORING GUIDE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-90-100: Exceptional | 75-89: Strong | 60-74: Competent | 40-59: Developing | 0-39: Early stage
-
-IMPORTANT — THIS IS A STUDENT, NOT A PROFESSIONAL. Grade with encouragement and fairness:
-- This is NOT a knowledge test. NEVER penalise the candidate for not knowing the industry, job, technical terms, or "the right business answer". There is no single correct answer.
-- Reward effort, common sense, and clear everyday reasoning. A thoughtful student-level answer expressed in simple words deserves a Competent-to-Strong score (60-85), not a low one.
-- Only give scores below 40 when the candidate barely engaged, gave one-word or empty answers, or refused to participate.
-- Judge them against a capable student their age — not against an expert. Give the benefit of the doubt when intent is good but wording is imperfect.
-- For AI & Digital Fluency especially: most everyday scenarios give little chance to show this. If the topic never came up, score it around 55-65 as "limited opportunity" rather than punishing them.
-- Do not reward an answer simply for being long or confident; score the substance, not the length.
-- Keep all feedback warm, specific, and constructive. Lead with what they did well, then one clear thing to improve.
-
-For "evidence": cite a SPECIFIC moment from the transcript — quote the candidate or describe the exact exchange. The candidate will read this — it must be recognisable and specific.
-For "overall": weighted average — Critical Thinking 25%, Communication 25%, Collaboration 20%, Problem Solving 20%, AI & Digital Fluency 10%.
-
-Return ONLY valid JSON — no preamble, no markdown:
-{
-  "scores": {
-    "criticalThinking": <integer 0-100>,
-    "collaboration": <integer 0-100>,
-    "communication": <integer 0-100>,
-    "problemSolving": <integer 0-100>,
-    "aiDigitalFluency": <integer 0-100>,
-    "overall": <integer 0-100>
-  },
-  "feedback": {
-    "criticalThinking": "<2-sentence behavioral insight referencing what they actually did>",
-    "collaboration": "<2-sentence behavioral insight>",
-    "communication": "<2-sentence behavioral insight>",
-    "problemSolving": "<2-sentence behavioral insight>",
-    "aiDigitalFluency": "<2-sentence behavioral insight>",
-    "summary": "<3-sentence overall assessment — specific, honest, useful for the candidate>"
-  },
-  "evidence": {
-    "criticalThinking": "<specific moment from the conversation that drove this score>",
-    "collaboration": "<specific moment>",
-    "communication": "<specific moment>",
-    "problemSolving": "<specific moment>",
-    "aiDigitalFluency": "<specific moment or note that this dimension had limited opportunity to be demonstrated>"
-  },
-  "highlights": ["<specific strength with example>", "<specific strength>", "<specific strength>"],
-  "growthAreas": ["<actionable development area>", "<actionable development area>"]
-}`.trim()
+  return renderPrompt('judge_full.v1', {
+    PERSONA_BLOCK: personaBlock,
+    SCENARIO_TITLE: scenario.title,
+    SCENARIO_DOMAIN: scenario.domain,
+    SCENARIO_CONTEXT: scenario.context,
+    INJECTION_GUARD,
+    TRANSCRIPT: transcript,
+    RUBRIC_BLOCKS: rubricBlocks,
+  })
 }
 
 // ── POST /api/assessment/start ────────────────────────────────────────────────
@@ -736,11 +606,15 @@ function levelsFromSignals(signals) {
 }
 
 router.post('/message', async (req, res) => {
-  const { sessionId, message, telemetry } = req.body
-  if (!sessionId || !message) return res.status(400).json({ error: 'sessionId and message required' })
-  if (typeof message !== 'string' || message.length > 4000) {
+  const { sessionId, message: rawMessage, telemetry } = req.body
+  if (!sessionId || !rawMessage) return res.status(400).json({ error: 'sessionId and message required' })
+  if (typeof rawMessage !== 'string' || rawMessage.length > 4000) {
     return res.status(400).json({ error: 'Invalid message' })
   }
+  // Prompt-injection mitigation (audit C14): strip control chars, spoofed
+  // delimiter tags and quote-fence breakouts BEFORE the text enters history,
+  // prompts or telemetry. The candidate's words are otherwise preserved.
+  const message = sanitizeCandidateText(rawMessage, 4000)
 
   const session = await loadSession(sessionId)
   if (!session) return res.status(404).json({ error: 'Session not found or expired' })
@@ -872,6 +746,12 @@ router.post('/message', async (req, res) => {
     // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): persist this
     // exchange as an item_response (latency + ASR confidence + micro-levels,
     // linked to the probe item the director targeted) and log the AI turn.
+    // Server-side ASR validation (audit C17): the client-reported confidence
+    // is untrusted — coerce to a finite number and clamp to [0,1] so a
+    // manipulated client can never up-weight (or NaN-poison) a turn.
+    const asrConfidence = telemetry && Number.isFinite(Number(telemetry.asrConfidence))
+      ? Math.max(0, Math.min(1, Number(telemetry.asrConfidence)))
+      : undefined
     recordItemResponse({
       sessionId,
       scenarioKey: scenario.id,
@@ -879,7 +759,7 @@ router.post('/message', async (req, res) => {
       exchangeNo: nextExchangeCount,
       candidateText: message,
       latencyMs: telemetry && typeof telemetry.responseMs === 'number' ? telemetry.responseMs : undefined,
-      asrConfidence: telemetry && typeof telemetry.asrConfidence === 'number' ? telemetry.asrConfidence : undefined,
+      asrConfidence,
       microLevels,
     })
     auditLog('probe_selected', sessionId, {
@@ -924,10 +804,12 @@ router.post('/evaluate', async (req, res) => {
   // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): mark submission.
   auditLog('submission', sessionId, { scenarioId: scenario?.id, turns: Array.isArray(history) ? history.length : null })
 
-  // Build plain-text transcript from history
+  // Build plain-text transcript from history. Candidate lines are sanitized
+  // (audit C14) — the judge prompt wraps this whole block in
+  // <candidate_transcript> tags with a standing injection guard.
   const transcript = history
     .map((m) => {
-      if (m.role === 'user') return `CANDIDATE: ${m.content.replace('[Candidate]: ', '')}`
+      if (m.role === 'user') return `CANDIDATE: ${sanitizeCandidateText(String(m.content).replace('[Candidate]: ', ''))}`
       try {
         const parsed = JSON.parse(m.content)
         return parsed.messages
@@ -994,14 +876,55 @@ router.post('/evaluate', async (req, res) => {
     }
 
     if (!samples.length) {
+      auditLog('judge_panel_failures', sessionId, { planned: plan.length, surviving: 0, fatal: true })
       throw new Error('All panel judges failed to return a usable score')
+    }
+
+    // Audit every score-affecting panel event (audit C16): call failures and
+    // malformed samples change the effective panel size, so they are logged
+    // even though the flow tolerates them.
+    const failedCalls = settled.filter((r) => r.status !== 'fulfilled').length
+    const malformed = settled.length - failedCalls - samples.length
+    if (failedCalls || malformed) {
+      auditLog('judge_panel_failures', sessionId, {
+        planned: plan.length, failedCalls, malformed, surviving: samples.length,
+      })
     }
 
     const aggregated = aggregateSamples(samples)
 
+    // Minimum surviving-judges floor (audit C20): a median over 1-2 samples is
+    // not a defensible panel vote. The score still issues (retry-safe UX), but
+    // it is forced to low reliability + flagged for human review, and audited.
+    const MIN_SURVIVING_JUDGES = 3
+    if (samples.length < Math.min(MIN_SURVIVING_JUDGES, plan.length) && aggregated?.reliability) {
+      aggregated.reliability.label = 'low'
+      aggregated.reliability.flaggedForReview = true
+      aggregated.reliability.panelBelowMinimum = true
+      auditLog('panel_below_minimum', sessionId, { surviving: samples.length, planned: plan.length })
+    }
+
+    // Aggregation decision record (audit C16): agreement, dispersion,
+    // position-swap delta and the review flag — the full "why this score".
+    auditLog('aggregation', sessionId, {
+      samples: samples.length,
+      agreement: aggregated?.reliability?.agreement ?? null,
+      positionSwapDelta: aggregated?.reliability?.positionSwapDelta ?? null,
+      perDimensionBand: aggregated?.reliability?.perDimensionBand ?? null,
+      flaggedForReview: aggregated?.reliability?.flaggedForReview ?? null,
+    })
+
     // Clamp + recompute overall server-side so the client can't be handed bad
     // numbers. The aggregated medians + reliability flow through sanitizeReport.
     const report = sanitizeReport(aggregated)
+
+    // Clamp/recompute audit (audit C16): record which dimensions the clamp
+    // actually moved and the recomputed overall — every issued score has a
+    // traceable arithmetic trail.
+    auditLog('clamp_recompute', sessionId, {
+      clampedDims: DIMENSION_KEYS.filter((k) => Number(aggregated?.scores?.[k]) !== report.scores[k]),
+      overall: report.scores.overall,
+    })
 
     // Prism v2 (MASA-2) Phase 3: per-scenario equating (flag PRISM_V2_EQUATING,
     // default off). Shifts the overall onto a common scale so the scenario a
@@ -1372,7 +1295,7 @@ router.post('/calibrate', async (req, res) => {
             model: MODEL(),
             messages: [
               { role: 'system', content: loadPrompt('entry_estimator.v1') },
-              { role: 'user', content: String(answer).slice(0, 2000) },
+              { role: 'user', content: sanitizeCandidateText(answer, 2000) },
             ],
             temperature: 0,
             max_completion_tokens: 60,
@@ -1392,10 +1315,11 @@ router.post('/calibrate', async (req, res) => {
             messages: [
               {
                 role: 'system',
-                content:
-                  'You calibrate assessment difficulty. Read the candidate\'s reflective answer and judge their reasoning maturity. Respond with ONLY one word: foundational, intermediate, or advanced.',
+                // Versioned prompt file (audit C15) — includes the C14 note
+                // that the candidate's answer is untrusted data.
+                content: loadPrompt('calibration_tier.v1'),
               },
-              { role: 'user', content: String(answer).slice(0, 2000) },
+              { role: 'user', content: sanitizeCandidateText(answer, 2000) },
             ],
             temperature: 0.2,
             max_completion_tokens: 8,

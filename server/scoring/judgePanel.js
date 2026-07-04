@@ -18,6 +18,7 @@ import { DIMENSIONS, SCORER } from './dualScorerConfig.js'
 import { modalLevelsForTurn } from './aggregate.js'
 import { query } from '../db/pool.js'
 import { isTelemetryEnabled } from '../lib/telemetry.js'
+import { wrapCandidateTurn, INJECTION_GUARD } from '../lib/promptSecurity.js'
 import logger from '../lib/logger.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -58,11 +59,12 @@ async function mapLimit(items, limit, fn) {
 
 // One judge vote on a single turn. Returns {dim:0-4|"NA"} or null on failure.
 async function oneVote(ctx, turnText, model, { swapped = false, paraphrased = false } = {}) {
-  const sys = loadPrompt('judge_turn.v1')
+  const sys = `${loadPrompt('judge_turn.v1')}\n\n${INJECTION_GUARD}`
   const text = paraphrased ? `(paraphrased) ${turnText}` : turnText
+  const wrapped = wrapCandidateTurn(text, 2000)
   const userMsg = swapped
-    ? `Context note: speaker labels may be swapped — judge only the candidate's substance.\nCandidate turn:\n"""${text.slice(0, 2000)}"""`
-    : `Candidate turn:\n"""${text.slice(0, 2000)}"""`
+    ? `Context note: speaker labels may be swapped — judge only the candidate's substance.\n${wrapped}`
+    : wrapped
   try {
     const completion = await ctx.createCompletion(
       {

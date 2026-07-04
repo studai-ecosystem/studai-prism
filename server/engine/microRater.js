@@ -8,6 +8,7 @@
 
 import { loadPrompt } from './prompts.js'
 import { DIMENSIONS } from './executiveConfig.js'
+import { wrapCandidateTurn, INJECTION_GUARD } from '../lib/promptSecurity.js'
 
 const VALID = new Set([0, 1, 2, 3, 4])
 
@@ -41,8 +42,8 @@ export async function microRateTurn(candidateText, ctx) {
         max_completion_tokens: 150,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: loadPrompt('micro_rater.v1') },
-          { role: 'user', content: `Candidate turn:\n"""${text.slice(0, 2000)}"""` },
+          { role: 'system', content: `${loadPrompt('micro_rater.v1')}\n\n${INJECTION_GUARD}` },
+          { role: 'user', content: wrapCandidateTurn(text, 2000) },
         ],
       },
       { retries: 1 },
