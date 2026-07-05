@@ -177,6 +177,24 @@ export function activeFlagSnapshot(env = process.env) {
   return out
 }
 
+// ── session_transcripts (Track 6.3) ──────────────────────────────────────────
+// Blinded rating material for the human-rating workbench: the conversation
+// turns WITHOUT any AI scores. Pseudonymous; erasure-cascaded. Fire-and-forget.
+export function recordSessionTranscript({ sessionId, turns, scenarioKey, isSynthetic = false }) {
+  if (!isTelemetryEnabled()) return
+  if (!isUuid(sessionId) || !Array.isArray(turns) || !turns.length) return
+  Promise.resolve()
+    .then(() =>
+      query(
+        `INSERT INTO session_transcripts (session_id, turns, scenario_key, is_synthetic)
+         VALUES ($1,$2,$3,$4)
+         ON CONFLICT (session_id) DO NOTHING`,
+        [sessionId, JSON.stringify(turns), scenarioKey || null, Boolean(isSynthetic)],
+      ),
+    )
+    .catch((err) => logger.captureException(err, { msg: 'transcript_log_failed', sessionId }))
+}
+
 // ── erasure cascade (Track 0.4 / audit C23) ────────────────────────────────
 // AWAITED (not fire-and-forget): right-to-erasure must be reliable. Deletes
 // every telemetry/research row tied to a session, child tables first.
@@ -195,9 +213,12 @@ export async function eraseTelemetry(sessionId) {
     ['ability_estimates', 'session_id'],
     ['behavioral_features', 'session_id'],
     ['assessment_timeline', 'session_id'],
+    ['human_ratings', 'session_id'],
+    ['session_transcripts', 'session_id'],
+    ['study_sessions', 'session_id'],
     ['audit_log', 'session_id'],
   ]) {
-    const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId])
+    const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId]).catch(() => null)
     counts[table] = r?.rowCount ?? 0
   }
   return counts

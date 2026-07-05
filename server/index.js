@@ -39,11 +39,18 @@ attachProctorSocket(server)
 import('./lib/telemetry.js')
   .then(({ isTelemetryEnabled }) => {
     if (!isTelemetryEnabled()) return
-    return import('./db/seedItems.js').then(({ seedItems }) =>
-      seedItems().then(({ inserted, total }) =>
-        logger.info('v2_items_seeded', { inserted, total }),
-      ),
-    )
+    return import('./db/seedItems.js')
+      .then(({ seedItems }) =>
+        seedItems().then(({ inserted, total }) =>
+          logger.info('v2_items_seeded', { inserted, total }),
+        ),
+      )
+      .then(() => import('./lib/studies.js'))
+      .then(({ seedStudies, seedTrainingRefs }) =>
+        Promise.all([seedStudies(), seedTrainingRefs()]).then(([st, tr]) =>
+          logger.info('studies_seeded', { studies: st, trainingRefs: tr }),
+        ),
+      )
   })
   .catch((err) => logger.captureException(err, { msg: 'v2_seed_items_failed' }))
 

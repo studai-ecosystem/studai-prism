@@ -36,11 +36,12 @@ import { extractTurnFeatures } from '../lib/behavioralFeatures.js'
 import { emptyEvidence, accumulateEvidence, decideDirector } from '../lib/director.js'
 import { buildPanelPlan } from '../lib/judgePanel.js'
 import { aggregateSamples } from '../lib/scoreAggregator.js'
-import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession, recordTimelineEntry, activeFlagSnapshot, eraseTelemetry } from '../lib/telemetry.js'
+import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession, recordTimelineEntry, activeFlagSnapshot, eraseTelemetry, recordSessionTranscript } from '../lib/telemetry.js'
 import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, SCALE_VERSION } from '../lib/sharedConstants.js'
 import { getJwtSecret } from '../lib/security.js'
 import { ensureCandidateId } from '../lib/identity.js'
 import { configuredGapDays, reassessmentBlock } from '../lib/eligibility.js'
+import { assignSteeringArm } from '../lib/studies.js'
 import { isExecutiveEnabled, isEarlyStopEnabled } from '../engine/executiveConfig.js'
 import { EvidenceLedger } from '../engine/evidenceLedger.js'
 import { microRateTurn, normalizeLevels } from '../engine/microRater.js'
@@ -502,9 +503,16 @@ router.post('/start', async (req, res) => {
   // intermediate when no calibration has been run.
   const calibration = await getCalibration(sessionId)
   const tier = calibration?.tier || 'foundational'
+  // Track 6.2: steering A/B (study 1). Assignment is random-but-deterministic,
+  // immutable, and overrides the global executive flag for THIS session only.
+  const entForArm = await getEntitlement(sessionId)
+  const studyArm = await assignSteeringArm(sessionId, {
+    isSynthetic: (entForArm?.mode || 'paid') !== 'paid',
+  })
+  if (studyArm) auditLog('study_arm_assigned', sessionId, { study: 'steering_ab', arm: studyArm })
   // Phase 1 (PRISM_V2_EXECUTIVE): seed the EvidenceLedger from the entry
   // estimator's prior θ₀ (falls back to a neutral prior when none was stored).
-  const executive = isExecutiveEnabled()
+  const executive = studyArm ? studyArm === 'executive' : isExecutiveEnabled()
   const ledgerPrior = executive ? (calibration?.theta0 || {}) : null
   // Avoid serving a scenario this signed-in user has already seen, so repeat
   // attempts get a fresh problem statement.
@@ -588,6 +596,7 @@ router.post('/start', async (req, res) => {
       userId: authUser?.id || null,
       userEmail: authUser?.email || null,
       candidateId: candidateId || null,
+      studyArm: studyArm || null,
       consentVersion: consentRecord?.meta?.consentVersion || null,
       consentScopes: consentRecord?.scopes || null,
     })
@@ -673,7 +682,9 @@ router.post('/message', async (req, res) => {
 
   const { scenario, history, exchangeCount } = session
   const nextExchangeCount = exchangeCount + 1
-  const executive = isExecutiveEnabled()
+  // Track 6.2: a study arm on the session overrides the global executive flag.
+  const sessionArm = session._persisted?.studyArm || null
+  const executive = sessionArm ? sessionArm === 'executive' : isExecutiveEnabled()
 
   // 1) Interpretable behavioral features of the candidate's turn (no LLM call) —
   //    these estimate which dimensions this answer gave evidence for and feed
@@ -1085,6 +1096,25 @@ router.post('/evaluate', async (req, res) => {
       consentVersion: persisted?.consentVersion || null,
       flagsActive: activeFlagSnapshot(),
       isSynthetic: (entitlementRec?.mode || 'paid') !== 'paid',
+    })
+
+    // Track 6.3: persist the blinded transcript (turns only, never scores) as
+    // double-rating material for the human-rating workbench.
+    recordSessionTranscript({
+      sessionId,
+      scenarioKey: scenario.id,
+      isSynthetic: (entitlementRec?.mode || 'paid') !== 'paid',
+      turns: history.map((m) => {
+        if (m.role === 'user') {
+          return { speaker: 'candidate', text: String(m.content).replace('[Candidate]: ', '') }
+        }
+        try {
+          const parsed = JSON.parse(m.content)
+          return (parsed.messages || []).map((msg) => ({ speaker: 'avatar', name: msg.speaker, text: msg.content }))
+        } catch {
+          return null
+        }
+      }).flat().filter(Boolean),
     })
 
     // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): scoring done.

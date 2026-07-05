@@ -12,6 +12,7 @@ import Assessment from './pages/Assessment.jsx'
 import ScoreReport from './pages/ScoreReport.jsx'
 import Verify from './pages/Verify.jsx'
 import Profile from './pages/Profile.jsx'
+import RaterWorkbench from './pages/RaterWorkbench.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
 import AIEvaluation from './pages/research/AIEvaluation.jsx'
@@ -62,6 +63,7 @@ export default function App() {
       <Route path="/assessment" element={<Assessment />} />
       <Route path="/score" element={<ScoreReport />} />
       <Route path="/verify/:id" element={<Verify />} />
+      <Route path="/rater" element={<RaterWorkbench />} />
       <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

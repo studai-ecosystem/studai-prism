@@ -16,6 +16,7 @@ import authRouter from './routes/auth.js'
 import deviceRouter from './routes/device.js'
 import contentRouter from './routes/content.js'
 import psychometricsRouter from './routes/psychometrics.js'
+import studiesRouter from './routes/studies.js'
 import {
   isProduction,
   apiLimiter,
@@ -118,6 +119,8 @@ export function buildApp() {
   // Prism v2 (MASA-2) Phase 3: read-only psychometrics dashboard (admin-guarded
   // via ADMIN_TOKEN header check inside the router; 503 when unset).
   app.use('/api/psychometrics', psychometricsRouter)
+  // Track 6: study runner (admin + rater planes, both guarded in-router).
+  app.use('/api/studies', studiesRouter)
 
   // ── Health check ─────────────────────────────────────────────────────────
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
