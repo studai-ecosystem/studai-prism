@@ -11,6 +11,16 @@ import PrismLogo from '../components/ui/PrismLogo.jsx'
 // never uploaded. We compare the name read from each document against the
 // candidate's registered name and only send the MATCH RESULT (plus the last 4
 // Aadhaar digits, typed manually) to the server.
+//
+// The OCR engine is SELF-HOSTED under /public/ocr (worker, wasm cores and the
+// English traineddata). tesseract.js's default CDN paths (jsDelivr +
+// tessdata.projectnaptha.com) are blocked by our CSP — and vendoring them is
+// what makes the "nothing leaves the browser" claim true for the engine too.
+const OCR_OPTIONS = {
+  workerPath: '/ocr/worker.min.js',
+  corePath: '/ocr',
+  langPath: '/ocr/tessdata',
+}
 
 const MATCH_THRESHOLD = 0.6
 
@@ -64,7 +74,7 @@ function DocUpload({ title, hint, declaredName, onResult }) {
     setScore(null)
     onResult({ matched: false, score: null, scanning: true })
     try {
-      const { data } = await Tesseract.recognize(file, 'eng')
+      const { data } = await Tesseract.recognize(file, 'eng', OCR_OPTIONS)
       const text = data?.text || ''
       const s = matchScore(declaredName, text)
       const matched = s >= MATCH_THRESHOLD

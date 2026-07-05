@@ -52,7 +52,10 @@ export function buildApp() {
           : {
               useDefaults: true,
               directives: {
-                'script-src': ["'self'", 'https://checkout.razorpay.com'],
+                // 'wasm-unsafe-eval' is required for the self-hosted tesseract
+                // OCR (identity verification) — WebAssembly.compile is blocked
+                // without it. It does NOT allow JS eval().
+                'script-src': ["'self'", "'wasm-unsafe-eval'", 'https://checkout.razorpay.com'],
                 'frame-src': ['https://api.razorpay.com', 'https://checkout.razorpay.com'],
                 'connect-src': ["'self'", 'https://api.razorpay.com', 'https://lumberjack.razorpay.com', 'ws:', 'wss:'],
                 'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
