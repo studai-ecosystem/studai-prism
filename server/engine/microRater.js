@@ -30,6 +30,8 @@ export function normalizeLevels(raw) {
 //   candidateText — the candidate's message
 //   ctx.createCompletion — the resilient chat fn from the route (injected)
 //   ctx.model — model id
+//   ctx.language — session language (Track 4.1: resolves the prompt variant;
+//                  substance-only anchors are identical across languages)
 // Returns {dim: 0-4|"NA"} or null on failure. Never throws.
 export async function microRateTurn(candidateText, ctx) {
   const text = String(candidateText || '').trim()
@@ -42,7 +44,7 @@ export async function microRateTurn(candidateText, ctx) {
         max_completion_tokens: 150,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: `${loadPrompt('micro_rater.v1')}\n\n${INJECTION_GUARD}` },
+          { role: 'system', content: `${loadPrompt('micro_rater.v1', ctx.language || 'en')}\n\n${INJECTION_GUARD}` },
           { role: 'user', content: wrapCandidateTurn(text, 2000) },
         ],
       },

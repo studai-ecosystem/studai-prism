@@ -1,10 +1,10 @@
 # Study 6 — Multilingual Fairness (DIF Across Language Groups)
 
-**Study key:** `multilingual_dif` · **Status:** preregistered · **Blocked on Track 4 language engineering + human language selection.**
+**Study key:** `multilingual_dif` · **Status:** preregistered · **Track 4 language engineering shipped (PRISM_LANG, dark); data collection awaits pilot.**
 
 ## Hypothesis
 
-Item difficulty does not differ materially across language groups (English / Hinglish / two Indian languages — **languages to be fixed by human decision before data collection**) after matching on ability.
+Item difficulty does not differ materially across language groups (English / Hinglish / Hindi / Tamil — **languages fixed by human decision 2026-07-05: Hindi + Tamil**) after matching on ability.
 
 ## Design
 

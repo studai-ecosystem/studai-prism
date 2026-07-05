@@ -52,6 +52,7 @@ import { loadPrompt, loadPromptJson, renderPrompt } from '../engine/prompts.js'
 import { sanitizeCandidateText, INJECTION_GUARD } from '../lib/promptSecurity.js'
 import { isDualScorerEnabled, runDualScorer } from '../scoring/dualScorer.js'
 import { equateScore, isEquatingEnabled } from '../scoring/equating.js'
+import { isLangEnabled, resolveLanguage, scoringStatusFor, asrHintFor, languageOptions } from '../lib/lang.js'
 
 const router = Router()
 
@@ -411,13 +412,15 @@ export function pickScenario(tier, excludeIds = []) {
 
 const AVATAR_INSTRUCTIONS = loadPromptJson('avatar_styles.v1')
 
-function buildAvatarSystemPrompt(scenario, avatarStyle) {
+function buildAvatarSystemPrompt(scenario, avatarStyle, language = 'en') {
   const [p1, p2, p3] = scenario.participants
   const observerLine = p3
     ? `- MOSTLY LISTENS — ${p3.name} (${p3.role}): ${p3.personality}\n   ${p3.name} is an observer. They stay SILENT almost the whole time. They speak only very rarely — at most once or twice in the entire conversation — and only a single short line. On nearly every turn, ${p3.name} says NOTHING.`
     : ''
   // Template lives in server/prompts/avatar_system.v1.md (audit C15) — includes
   // the C14 rule that candidate messages are untrusted in-role answers.
+  // Track 4.1: a language variant (avatar_system.{lang}.v1.md) prepends the
+  // language-of-session directive; scenario content stays canonical English.
   return renderPrompt('avatar_system.v1', {
     SCENARIO_CONTEXT: scenario.context,
     P1_NAME: p1.name,
@@ -430,7 +433,7 @@ function buildAvatarSystemPrompt(scenario, avatarStyle) {
     AVATAR_INSTRUCTION: AVATAR_INSTRUCTIONS[avatarStyle] || AVATAR_INSTRUCTIONS[1],
     P3_TURNTAKING_LINE: p3 ? `- ${p3.name} almost never speaks. Leave them out of nearly every turn.\n` : '',
     P3_NAME_OR_OBSERVER: p3 ? p3.name : 'the observer',
-  })
+  }, language)
 }
 
 // Per-dimension behavioral rubric anchors — versioned prompt fragment
@@ -469,7 +472,7 @@ export function buildScoringPrompt(scenario, transcript, opts = {}) {
     INJECTION_GUARD,
     TRANSCRIPT: transcript,
     RUBRIC_BLOCKS: rubricBlocks,
-  })
+  }, opts.language || 'en')
 }
 
 // ── POST /api/assessment/start ────────────────────────────────────────────────
@@ -553,11 +556,20 @@ router.post('/start', async (req, res) => {
   const seenScenarioIds = await getRecentScenarioIdsByUser(authUser?.id)
   const scenario = pickScenario(tier, seenScenarioIds)
 
-  // Versioned prompt file (audit C15).
-  const openingPrompt = loadPrompt('opening_turn.v1').trim()
+  // Track 4.1 (PRISM_LANG, default OFF): assessment language. Untrusted —
+  // resolves to 'en' unless the flag is on and the code is supported. Scoring
+  // in any non-English language is PROVISIONAL/UNCALIBRATED (DIF study pending)
+  // and every artifact carries that marking.
+  const language = resolveLanguage(req.body.language)
+  if (language !== 'en') {
+    auditLog('language_selected', sessionId, { language, scoringStatus: scoringStatusFor(language) })
+  }
+
+  // Versioned prompt file (audit C15); language variant when applicable.
+  const openingPrompt = loadPrompt('opening_turn.v1', language).trim()
 
   try {
-    const avatarSystem = buildAvatarSystemPrompt(scenario, 1) // Avatar 1 for opening
+    const avatarSystem = buildAvatarSystemPrompt(scenario, 1, language) // Avatar 1 for opening
 
     const response = await createCompletion({
       model: MODEL(),
@@ -598,6 +610,7 @@ router.post('/start', async (req, res) => {
       userEmail: authUser?.email || null,
       candidateId: candidateId || null,
       studyArm: studyArm || null,
+      language,
       consentVersion: consentRecord?.meta?.consentVersion || null,
       consentScopes: consentRecord?.scopes || null,
     })
@@ -611,6 +624,8 @@ router.post('/start', async (req, res) => {
     // Scenario Card overlay during the staged flow.
     res.json({
       ...parsed,
+      language,
+      scoringStatus: scoringStatusFor(language),
       scenario: {
         title: scenario.title,
         domain: scenario.domain,
@@ -686,6 +701,8 @@ router.post('/message', async (req, res) => {
   // Track 6.2: a study arm on the session overrides the global executive flag.
   const sessionArm = session._persisted?.studyArm || null
   const executive = sessionArm ? sessionArm === 'executive' : isExecutiveEnabled()
+  // Track 4.1: the language this session was started in (immutable thereafter).
+  const language = resolveLanguage(session._persisted?.language)
 
   // 1) Interpretable behavioral features of the candidate's turn (no LLM call) —
   //    these estimate which dimensions this answer gave evidence for and feed
@@ -712,7 +729,7 @@ router.post('/message', async (req, res) => {
   if (executive) {
     // Rehydrate the ledger, micro-rate this turn, fold it in, pick the probe.
     ledger = EvidenceLedger.from(session._persisted?.ledger)
-    const rated = await microRateTurn(message, { createCompletion, model: MODEL() })
+    const rated = await microRateTurn(message, { createCompletion, model: MODEL(), language })
     // Fallback when the rater is unavailable: derive coarse levels from the
     // interpretable signals so the ledger still advances (never blocks).
     microLevels = rated || levelsFromSignals(signals)
@@ -757,7 +774,7 @@ router.post('/message', async (req, res) => {
     avatarStyle = d.avatarStyle
     directive = d.directive
   }
-  const avatarSystem = buildAvatarSystemPrompt(scenario, avatarStyle)
+  const avatarSystem = buildAvatarSystemPrompt(scenario, avatarStyle, language)
 
   // Append candidate's message
   const updatedHistory = [
@@ -855,6 +872,7 @@ router.post('/message', async (req, res) => {
       return {
         ...(clamped || {}),
         ...(promptWordCount !== null ? { promptWordCount } : {}),
+        ...(language !== 'en' ? { language } : {}),
         pressure: answeredPressure ? { kind: answeredPressure.kind, dimension: answeredPressure.dimension } : null,
       }
     })()
@@ -936,6 +954,9 @@ router.post('/evaluate', async (req, res) => {
     // aggregator takes the median per dimension and measures judge disagreement
     // to produce an uncertainty band + a "flag for human review" signal.
     const plan = buildPanelPlan(MODEL())
+    // Track 4.1: judge prompt language variant — same rubric semantics, with
+    // language-fairness rules + feedback in the candidate's language.
+    const evalLanguage = resolveLanguage(session._persisted?.language)
     const settled = await Promise.allSettled(
       plan.map((spec) =>
         createCompletion({
@@ -949,6 +970,7 @@ router.post('/evaluate', async (req, res) => {
               content: buildScoringPrompt(scenario, transcript, {
                 personaInstruction: spec.personaInstruction,
                 dimensionOrder: spec.dimensionOrder,
+                language: evalLanguage,
               }),
             },
             { role: 'user', content: 'Evaluate the candidate now. Return only valid JSON.' },
@@ -1054,6 +1076,15 @@ router.post('/evaluate', async (req, res) => {
     report.percentile = await computePercentile(report.scores.overall)
     report.scenario = { title: scenario.title, domain: scenario.domain }
     report.validityMonths = SCORE_VALIDITY_MONTHS
+    // Track 4.1 (CRITICAL): rubric translation is not rubric equivalence —
+    // every non-English report is marked provisional/uncalibrated until the
+    // multilingual DIF study reports on real data. English percentile norms do
+    // not apply to uncalibrated languages.
+    report.scoring = { language: evalLanguage, status: scoringStatusFor(evalLanguage) }
+    if (evalLanguage !== 'en') {
+      report.percentile = null
+      auditLog('provisional_scoring', sessionId, { language: evalLanguage, status: report.scoring.status })
+    }
 
     // Phase 1 (PRISM_V2_EXECUTIVE): surface evidence coverage + whether the
     // session would have extended for thin evidence. Extend/stop math is logged;
@@ -1146,6 +1177,7 @@ router.post('/evaluate', async (req, res) => {
       consentVersion: persisted?.consentVersion || null,
       flagsActive: activeFlagSnapshot(),
       isSynthetic: (entitlementRec?.mode || 'paid') !== 'paid',
+      language: evalLanguage,
     })
 
     // Track 6.3: persist the blinded transcript (turns only, never scores) as
@@ -1261,6 +1293,13 @@ router.get('/stt-status', (_req, res) => {
   res.json({ enabled: isWhisperEnabled() })
 })
 
+// ── GET /api/assessment/languages ──────────────────────────────────────
+// Track 4.1: the language selector's source of truth. Only meaningful when
+// PRISM_LANG is on; the client hides the selector otherwise.
+router.get('/languages', (_req, res) => {
+  res.json({ enabled: isLangEnabled(), languages: isLangEnabled() ? languageOptions() : [] })
+})
+
 // ── POST /api/assessment/transcribe ──────────────────────────────────────────
 // Speech-to-text for the voice-only test. Accepts a single audio file (field
 // name "audio"), transcribes it via OpenAI Whisper, and returns the text. The
@@ -1278,11 +1317,17 @@ router.post('/transcribe', audioUpload.single('audio'), async (req, res) => {
   }
   try {
     const filename = req.file.originalname || 'answer.webm'
-    const transcript = await transcribeAudio(req.file.buffer, filename)
+    // Track 4.1: pass the session's language as the ASR hint (null = Whisper
+    // auto-detect, used for code-switched Hinglish). Language + per-turn ASR
+    // confidence are recorded with the turn via /message telemetry.
+    const asrSession = req.body?.sessionId ? await getSession(req.body.sessionId) : null
+    const langCode = resolveLanguage(asrSession?.language)
+    const hint = asrHintFor(langCode)
+    const transcript = await transcribeAudio(req.file.buffer, filename, hint)
     if (!transcript) {
       return res.status(422).json({ error: 'Could not understand the audio. Please try again.' })
     }
-    res.json({ transcript })
+    res.json({ transcript, language: langCode })
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_transcribe_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Transcription failed. Please try again.' })

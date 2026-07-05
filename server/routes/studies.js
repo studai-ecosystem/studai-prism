@@ -265,4 +265,49 @@ router.post('/rater/rate/:sessionId', requireRater, async (req, res) => {
   }
 })
 
+// ── Track 4.3: transferability study — external live-exercise ratings ────────
+// A partner college links a Prism session to an independent HUMAN-rated live
+// exercise for the same candidate (the sim-to-reality anchor). Admin-gated;
+// append-only (corrections supersede, never edit); role only — no rater PII.
+router.post('/transfer/:sessionId/rating', requireAdmin, async (req, res) => {
+  const { sourceOrg, exerciseType, raterRole, score, notes, ratedAt, supersedes } = req.body || {}
+  if (!sourceOrg || !exerciseType) return res.status(400).json({ error: 'sourceOrg and exerciseType required' })
+  const n = Number(score)
+  if (!Number.isFinite(n) || n < 0 || n > 100) return res.status(400).json({ error: 'score must be 0-100' })
+  try {
+    const ratingId = randomUUID()
+    await query(
+      `INSERT INTO external_ratings (rating_id, session_id, source_org, exercise_type, rater_role, score, notes, rated_at, supersedes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [
+        ratingId,
+        req.params.sessionId,
+        String(sourceOrg).slice(0, 200),
+        String(exerciseType).slice(0, 100),
+        raterRole ? String(raterRole).slice(0, 100) : null,
+        n,
+        notes ? String(notes).slice(0, 2000) : null,
+        ratedAt || null,
+        supersedes || null,
+      ],
+    )
+    res.status(201).json({ ok: true, ratingId })
+  } catch (err) {
+    logger.captureException(err, { msg: 'external_rating_failed' })
+    res.status(500).json({ error: 'failed to record external rating' })
+  }
+})
+
+router.get('/transfer/ratings', requireAdmin, async (_req, res) => {
+  try {
+    const r = await query(
+      'SELECT rating_id, session_id, source_org, exercise_type, rater_role, score, rated_at, supersedes, created_at FROM external_ratings ORDER BY created_at DESC LIMIT 500',
+    )
+    res.json({ ratings: r?.rows || [] })
+  } catch (err) {
+    logger.captureException(err, { msg: 'external_ratings_list_failed' })
+    res.status(500).json({ error: 'failed to list external ratings' })
+  }
+})
+
 export default router

@@ -116,6 +116,11 @@ export async function assembleEvidenceBundle(sessionId) {
       validityMonths: report.validityMonths || SCORE_VALIDITY_MONTHS,
       attemptNo: timeline?.attempt_no ?? null,
       isSynthetic: timeline?.is_synthetic ?? null,
+      // Track 4.1: assessment language + calibration status. Non-English
+      // scoring is provisional/uncalibrated until the DIF study reports —
+      // the credential must say so (rubric translation ≠ rubric equivalence).
+      language: report.scoring?.language || 'en',
+      scoringStatus: report.scoring?.status || 'calibrated',
     },
     scenario: report.scenario || null,
     scores: {

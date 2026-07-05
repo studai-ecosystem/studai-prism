@@ -1,8 +1,15 @@
 """Mantel-Haenszel DIF audit.
 
 Flags items that function differently for a focal vs. reference group after
-matching on overall ability. Runs independently for each grouping variable
-(gender, language_medium, college_tier) read from ``candidate_demographics``.
+matching on overall ability. Grouping variables:
+
+* ``language`` (Track 4.2) — the assessment language recorded on
+  ``assessment_timeline`` (multilingual DIF study, study key ``multilingual_dif``).
+  Synthetic sessions are excluded.
+* ``gender`` / ``language_medium`` / ``college_tier`` — read from
+  ``candidate_demographics``. Those fields are OPTIONAL and DEFAULT-OFF in the
+  app (nothing populates them until market-specific legal approval exists —
+  LL144-style analysis is a human/legal decision, not an engineering one).
 
 Per item × dimension we dichotomise the micro-level at its median, stratify
 candidates into ability bins, and compute the MH common odds ratio + chi-square.
@@ -18,7 +25,7 @@ import numpy as np
 
 from ._base import connect, fetch_all, insufficient, seed_everything, summarize, write_run
 
-GROUPS = ["gender", "language_medium", "college_tier"]
+GROUPS = ["language", "gender", "language_medium", "college_tier"]
 MIN_PER_CELL = 5
 N_ABILITY_BINS = 4
 LEVEL_MAX = 4.0
@@ -26,14 +33,23 @@ LEVEL_MAX = 4.0
 
 def mh_odds_ratio(strata: list[tuple]) -> tuple[float, float]:
     """strata: list of (a, b, c, d, n) 2x2 cells (focal-correct, focal-wrong,
-    ref-correct, ref-wrong, total). Returns (common OR, MH chi-square)."""
+    ref-correct, ref-wrong, total). Returns (common OR, MH chi-square).
+
+    Degenerate tables (a zero cell — e.g. an item NO focal candidate passes,
+    which is maximal DIF, not negligible DIF) get the standard
+    Haldane-Anscombe 0.5 continuity correction for the OR; the chi-square is
+    always computed on the uncorrected counts."""
+    zero_cell = any(n > 0 and (a == 0 or b == 0 or c == 0 or d == 0) for a, b, c, d, n in strata)
+    k = 0.5 if zero_cell else 0.0
     num = den = 0.0
     chi_num = chi_den = 0.0
     for a, b, c, d, n in strata:
         if n == 0:
             continue
-        num += (a * d) / n
-        den += (b * c) / n
+        aa, bb, cc, dd = a + k, b + k, c + k, d + k
+        nn = aa + bb + cc + dd
+        num += (aa * dd) / nn
+        den += (bb * cc) / nn
         row1 = a + b
         row2 = c + d
         col1 = a + c
@@ -41,17 +57,19 @@ def mh_odds_ratio(strata: list[tuple]) -> tuple[float, float]:
         var_a = (row1 * row2 * col1 * (n - col1)) / (n * n * (n - 1)) if n > 1 else 0.0
         chi_num += a - exp_a
         chi_den += var_a
-    if den == 0:
-        return float("inf"), 0.0
-    or_mh = num / den
     chi = (abs(chi_num) - 0.5) ** 2 / chi_den if chi_den > 0 else 0.0
+    or_mh = num / den if den > 0 else float("inf")
     return or_mh, chi
 
 
 def ets_class(or_mh: float, chi: float) -> str:
-    """ETS DIF classification A (negligible) / B (moderate) / C (large)."""
-    if or_mh <= 0 or math.isinf(or_mh):
+    """ETS DIF classification A (negligible) / B (moderate) / C (large).
+    An infinite common OR is perfect separation — maximal DIF when
+    statistically significant, never negligible."""
+    if or_mh <= 0:
         return "A"
+    if math.isinf(or_mh):
+        return "C" if chi > 3.84 else "A"
     delta = -2.35 * math.log(or_mh)
     sig = chi > 3.84  # chi-square crit, df=1, p<0.05
     if abs(delta) < 1.0 or not sig:
@@ -73,7 +91,7 @@ def run(conn=None, seed: int = 42) -> dict:
     own = conn is None
     if own:
         conn = connect()
-    rows = demo = []
+    rows = demo = langs = []
     if conn is not None:
         rows = fetch_all(
             conn,
@@ -84,15 +102,33 @@ def run(conn=None, seed: int = 42) -> dict:
             """,
         )
         demo = fetch_all(conn, "SELECT session_id, gender, language_medium, college_tier FROM candidate_demographics")
+        # Track 4.2: language group membership from the timeline (never synthetic).
+        langs = fetch_all(conn, "SELECT session_id, language FROM assessment_timeline WHERE is_synthetic = false AND language IS NOT NULL")
 
-    demo_by_session = {str(d["session_id"]): d for d in demo}
-    inputs = {"responses": len(rows), "demographics": len(demo)}
-    if len(rows) < 30 or not demo:
-        res = insufficient("dif", conn, inputs, "need rated responses with demographics")
+    demo_by_session = {str(d["session_id"]): dict(d) for d in demo}
+    for l in langs:
+        demo_by_session.setdefault(str(l["session_id"]), {})["language"] = l["language"]
+
+    inputs = {"responses": len(rows), "demographics": len(demo), "language_sessions": len(langs)}
+    if len(rows) < 30 or not demo_by_session:
+        res = insufficient("dif", conn, inputs, "need rated responses with group membership")
         if own and conn:
             conn.close()
         return res
 
+    findings = compute_dif(rows, demo_by_session)
+
+    outputs = {"flags": findings, "n_flags": len(findings),
+               "groups_audited": GROUPS}
+    run_id = write_run(conn, "dif", inputs, outputs)
+    res = summarize("dif", run_id, "ok", n_flags=len(findings))
+    if own and conn:
+        conn.close()
+    return res
+
+
+def compute_dif(rows: list[dict], demo_by_session: dict[str, dict]) -> list[dict]:
+    """Pure DIF core — testable on synthetic data without a database."""
     # session ability = mean numeric micro-level.
     sess_vals: dict[str, list[float]] = defaultdict(list)
     item_dim_levels: dict[tuple, list[tuple]] = defaultdict(list)
@@ -150,13 +186,7 @@ def run(conn=None, seed: int = 42) -> dict:
                     "chi_square": round(chi, 4), "ets_class": cls,
                 })
 
-    outputs = {"flags": findings, "n_flags": len(findings),
-               "groups_audited": GROUPS}
-    run_id = write_run(conn, "dif", inputs, outputs)
-    res = summarize("dif", run_id, "ok", n_flags=len(findings))
-    if own and conn:
-        conn.close()
-    return res
+    return findings
 
 
 if __name__ == "__main__":

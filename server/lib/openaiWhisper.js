@@ -57,14 +57,15 @@ const WHISPER_MODEL = () =>
 // Transcribe a raw audio buffer to text.
 //   buffer   — Node Buffer of the recorded audio
 //   filename — original name (used to infer container/codec, e.g. answer.webm)
-//   language — optional ISO-639-1 hint (default 'en')
+//   language — ISO-639-1 hint ('en', 'hi', 'ta' …). Pass null for Whisper
+//              auto-detect (used for code-switched Hinglish — Track 4.1).
 // Returns the transcript string (trimmed). Throws on API failure.
 export async function transcribeAudio(buffer, filename = 'answer.webm', language = 'en') {
   const file = await toFile(buffer, filename)
   const result = await getClient().audio.transcriptions.create({
     file,
     model: WHISPER_MODEL(),
-    language,
+    ...(language ? { language } : {}),
     response_format: 'json',
   })
   return (result.text || '').trim()

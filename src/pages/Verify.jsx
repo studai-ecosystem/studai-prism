@@ -86,6 +86,11 @@ export default function Verify() {
             <ShieldCheck size={14} /> Evidence chain cryptographically verified
             </span>
           )}
+          {(report.scoring?.status === 'provisional_uncalibrated' || credential?.view?.issued?.scoringStatus === 'provisional_uncalibrated') && (
+            <span className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold rounded-full px-3 py-1.5">
+              Provisional — non-English scoring not yet calibrated
+            </span>
+          )}
           {credential && credential.status === 'revoked' && (
             <span className="inline-flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-full px-3 py-1.5">
               <AlertTriangle size={14} /> Credential revoked{credential.revokedReason ? ` — ${credential.revokedReason}` : ''}

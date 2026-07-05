@@ -21,6 +21,8 @@ from jobs import (
     rasch_facets,
     relay_detect,
     reliability,
+    tech_manual,
+    transfer_corr,
 )
 from jobs._base import connect
 
@@ -35,6 +37,10 @@ ORDER = [
     # Track 3.3 (dark): exits insufficient_data until the preregistered
     # adversarial study supplies labeled arms. Never deploys anything.
     ("relay_detect", relay_detect),
+    # Track 4.3: prism-vs-external-rating correlation (sim-to-reality).
+    ("transfer_corr", transfer_corr),
+    # Track 4.4: render the Technical Manual from whatever the DB now holds.
+    ("tech_manual", tech_manual),
 ]
 
 

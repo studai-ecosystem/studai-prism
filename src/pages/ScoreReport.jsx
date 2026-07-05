@@ -274,6 +274,12 @@ export default function ScoreReport() {
     low: 'Low judge agreement — eligible for human review',
   }[report.reliability?.label] || 'Provisional score'
 
+  // Track 4.1: non-English sessions are provisional until the multilingual
+  // DIF study calibrates them — the report must say so, always.
+  const provisionalLanguage = report.scoring && report.scoring.status === 'provisional_uncalibrated'
+    ? report.scoring.language
+    : null
+
   const validityMonths = report.validityMonths || SCORE_VALIDITY_MONTHS
   const now = new Date()
   const issuedDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -699,6 +705,11 @@ export default function ScoreReport() {
                   <div className="cert-score-denom">%</div>
                 </div>
                 <div className="cert-score-tier"><Star size={14} fill="#FCD34D" color="#FCD34D" />{band.label} · {reliabilityText}</div>
+                {provisionalLanguage && (
+                  <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: '#FCD34D', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Provisional — {provisionalLanguage} scoring not yet calibrated
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '14px 20px', flexDirection: 'column' }}>

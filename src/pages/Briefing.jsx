@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ShieldCheck, MonitorX, Clock, Copy, Eye, Camera, Check } from 'lucide-react'
@@ -48,6 +48,23 @@ export default function Briefing() {
   const [submitError, setSubmitError] = useState('')
   const [filter, setFilter] = useState('all') // 'all' | 'male' | 'female'
   const [shaking, setShaking] = useState(false)
+  // Track 4.1 — assessment language (selector shows only when PRISM_LANG on).
+  const [languages, setLanguages] = useState([])
+  const [language, setLanguage] = useState(() => localStorage.getItem('prismLanguage') || 'en')
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/assessment/languages')
+      .then((r) => (r.ok ? r.json() : { enabled: false, languages: [] }))
+      .then((d) => { if (!cancelled && d.enabled) setLanguages(d.languages) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  const pickLanguage = (code) => {
+    setLanguage(code)
+    localStorage.setItem('prismLanguage', code)
+  }
 
   const visibleChars = filter === 'all' ? CHARACTERS : CHARACTERS.filter((c) => c.gender === filter)
 
@@ -391,6 +408,36 @@ export default function Briefing() {
           {/* Calibration + consent (only for an active paid session) */}
           {sessionId && (
             <>
+              {languages.length > 1 && (
+                <div className="rounded-xl border border-[#252A3A] bg-[#111520] p-5">
+                  <span className="font-sans text-xs font-semibold tracking-[0.18em] text-[#C9A84C] uppercase">
+                    Assessment language
+                  </span>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {languages.map((l) => (
+                      <button
+                        key={l.code}
+                        type="button"
+                        onClick={() => pickLanguage(l.code)}
+                        className="px-4 py-2 rounded-lg font-sans text-sm border transition-colors"
+                        style={{
+                          borderColor: language === l.code ? '#C9A84C' : '#252A3A',
+                          background: language === l.code ? '#C9A84C22' : 'transparent',
+                          color: language === l.code ? '#C9A84C' : '#C9CDD8',
+                        }}
+                      >
+                        {l.nativeLabel}
+                      </button>
+                    ))}
+                  </div>
+                  {language !== 'en' && (
+                    <p className="font-sans text-[12px] text-[#8A8FA0] leading-relaxed mt-3">
+                      Scoring in this language is provisional — it has not yet been calibrated against the
+                      English scale. Your report and credential will say so until our fairness study completes.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="rounded-xl border border-[#252A3A] bg-[#111520] p-5">
                 <span className="font-sans text-xs font-semibold tracking-[0.18em] text-[#C9A84C] uppercase">
                   Quick calibration (optional)

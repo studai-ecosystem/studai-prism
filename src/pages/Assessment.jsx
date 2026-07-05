@@ -619,7 +619,7 @@ export default function Assessment() {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ sessionId, language: localStorage.getItem('prismLanguage') || 'en' }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to start assessment session')
@@ -765,6 +765,7 @@ export default function Assessment() {
       const form = new FormData()
       const ext = blob.type.includes('ogg') ? 'ogg' : 'webm'
       form.append('audio', blob, `answer.${ext}`)
+      form.append('sessionId', sessionId) // Track 4.1: server applies the session's ASR language hint
       const res = await fetch('/api/assessment/transcribe', { method: 'POST', body: form })
       if (res.status === 503) {
         // Server-side transcription not configured — fall back to dictation.
@@ -781,7 +782,7 @@ export default function Assessment() {
     } finally {
       setTranscribing(false)
     }
-  }, [sendText])
+  }, [sendText, sessionId])
 
   const startRecording = useCallback(async () => {
     if (recording || loading || submitting || transcribing) return

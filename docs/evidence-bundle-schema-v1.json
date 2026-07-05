@@ -18,7 +18,9 @@
         "calibrationRunId": { "type": ["string", "null"], "description": "Frozen calibration run applied; null until the first equating run exists." },
         "validityMonths": { "type": "integer" },
         "attemptNo": { "type": ["integer", "null"] },
-        "isSynthetic": { "type": ["boolean", "null"], "description": "true for dummy/dev/test sessions — such credentials are demos, never certificates." }
+        "isSynthetic": { "type": ["boolean", "null"], "description": "true for dummy/dev/test sessions — such credentials are demos, never certificates." },
+        "language": { "type": "string", "description": "Assessment language code (en, hi-en, hi, ta)." },
+        "scoringStatus": { "enum": ["calibrated", "provisional_uncalibrated"], "description": "Non-English scoring stays provisional until the multilingual DIF study reports — rubric translation is not rubric equivalence." }
       }
     },
     "scenario": { "type": ["object", "null"], "properties": { "title": { "type": "string" }, "domain": { "type": "string" } } },

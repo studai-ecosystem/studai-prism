@@ -221,6 +221,7 @@ export function recordTimelineEntry({
   consentVersion = null,
   flagsActive = null,
   isSynthetic = false,
+  language = 'en', // Track 4.1 — DIF group variable
 }) {
   if (!isTelemetryEnabled()) return
   if (!isUuid(sessionId)) return
@@ -238,8 +239,8 @@ export function recordTimelineEntry({
       await query(
         `INSERT INTO assessment_timeline
            (timeline_id, candidate_id, session_id, attempt_no, scenario_key,
-            scale_version, calibration_run_id, consent_version, flags_active, is_synthetic)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+            scale_version, calibration_run_id, consent_version, flags_active, is_synthetic, language)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          ON CONFLICT (session_id) DO NOTHING`,
         [
           randomUUID(),
@@ -252,6 +253,7 @@ export function recordTimelineEntry({
           consentVersion,
           flagsActive ? JSON.stringify(flagsActive) : null,
           Boolean(isSynthetic),
+          typeof language === 'string' ? language : 'en',
         ],
       )
     })
