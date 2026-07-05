@@ -82,7 +82,9 @@ function getAuthUser(req) {
 const SESSION_LIMIT_MS = 35 * 60 * 1000 // 30 min + 5 min grace for network/scoring
 
 // ── Resilient chat completion — retry transient failures with backoff ─────────
-async function createCompletion(params, { retries = 2 } = {}) {
+// Exported for the Track 5 practice/teamfit surfaces — same client, same
+// retry discipline, zero scoring authority.
+export async function createCompletion(params, { retries = 2 } = {}) {
   let lastErr
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -153,6 +155,7 @@ function getClient() {
   return _openai
 }
 const MODEL = () => process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.4'
+export { MODEL }
 
 // ── Live session cache (pluggable: in-memory by default, Redis when REDIS_URL set) ─
 // Stores { scenario, exchangeCount, history } for the active chat; every turn is
@@ -435,6 +438,7 @@ function buildAvatarSystemPrompt(scenario, avatarStyle, language = 'en') {
     P3_NAME_OR_OBSERVER: p3 ? p3.name : 'the observer',
   }, language)
 }
+export { buildAvatarSystemPrompt }
 
 // Per-dimension behavioral rubric anchors — versioned prompt fragment
 // (server/prompts/dimension_rubric.v1.json, audit C15).

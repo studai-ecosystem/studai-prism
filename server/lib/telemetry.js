@@ -318,6 +318,11 @@ export async function eraseTelemetry(sessionId) {
     // Track 4.3: external live-exercise ratings are evaluative data about
     // the same candidate — erased with the session (append-only otherwise).
     ['external_ratings', 'session_id'],
+    // Track 5: practice replays + teamfit sessions + team memberships are all
+    // candidate data keyed to a source session.
+    ['practice_replays', 'source_session_id'],
+    ['teamfit_sessions', 'candidate_session_id'],
+    ['team_members', 'member_session_id'],
     ['audit_log', 'session_id'],
   ]) {
     const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId]).catch(() => null)

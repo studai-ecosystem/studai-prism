@@ -18,6 +18,8 @@ import contentRouter from './routes/content.js'
 import psychometricsRouter from './routes/psychometrics.js'
 import studiesRouter from './routes/studies.js'
 import credentialsRouter from './routes/credentials.js'
+import replayRouter from './routes/replay.js'
+import teamfitRouter from './routes/teamfit.js'
 import {
   isProduction,
   apiLimiter,
@@ -124,6 +126,9 @@ export function buildApp() {
   app.use('/api/studies', studiesRouter)
   // Track 2: glass-box credentials (public verify plane + admin lifecycle).
   app.use('/api/credentials', credentialsRouter)
+  // Track 5 (both dark; 404 without their flags): practice replay + team-fit.
+  app.use('/api/replay', replayRouter)
+  app.use('/api/teamfit', teamfitRouter)
 
   // ── Health check ─────────────────────────────────────────────────────────
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
