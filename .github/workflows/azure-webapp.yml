@@ -15,9 +15,15 @@
 
 name: Deploy to Azure Web App
 
+# NOTE (2026-07-05): publish-profile deploys are BROKEN for this app — SCM
+# basic auth is disabled on studai-prism, so azure/webapps-deploy@v3 with a
+# publish profile fails on every run (verified: run 28728644215). Production
+# deploys use the az-CLI prebuilt-zip path instead (scripts/make-deploy-zip.ps1
+# + `az webapp deploy --type zip --clean true`). This workflow is manual-only
+# until it is migrated to OIDC (azure/login) — do NOT re-enable the push
+# trigger before that migration, or every push will report a false failure.
+
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 env:
