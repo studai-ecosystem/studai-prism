@@ -81,6 +81,19 @@ def run(conn=None, seed: int = 42) -> dict:
 
     metrics = correlate([(float(r["prism_overall"]), float(r["external_score"])) for r in rows])
     run_id = write_run(conn, "transfer_corr", inputs, {"metrics": metrics})
+    # Stage 2 registry write: the preregistered S5 metric row.
+    import uuid as _uuid
+    import json as _json
+    with conn.cursor() as cur:
+        cur.execute("SELECT study_id FROM studies WHERE study_key = 'sim_to_real_transfer'")
+        s_row = cur.fetchone()
+        if s_row and metrics.get("pearson_r") is not None:
+            cur.execute(
+                """INSERT INTO study_results (result_id, study_id, metric_name, value, detail, n, analysis_version)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                (str(_uuid.uuid4()), s_row[0], "transfer_pearson_r", metrics["pearson_r"],
+                 _json.dumps(metrics), metrics["n"], "transfer-v1"),
+            )
     res = summarize("transfer_corr", run_id, "ok", **metrics)
     if own and conn:
         conn.close()

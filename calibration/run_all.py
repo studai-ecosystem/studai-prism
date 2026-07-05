@@ -27,6 +27,7 @@ from jobs import (
     reliability,
     retest_s3,
     review_package,
+    steering_s1,
     tech_manual,
     transfer_corr,
 )
@@ -48,6 +49,7 @@ ORDER = [
     # Track 1.2: latent growth curves from the candidate timeline (dark).
     ("growth_curve", growth_curve),
     # Phase 3 Stage 2: preregistered study analyses (insufficient until gated).
+    ("steering_s1", steering_s1),
     ("agreement_s2", agreement_s2),
     ("retest_s3", retest_s3),
     # Phase 3 artifacts — render whatever the registry now holds, honestly.

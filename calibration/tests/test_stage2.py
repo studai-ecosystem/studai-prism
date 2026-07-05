@@ -13,11 +13,89 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from jobs import agreement_s2, bias_audit, retest_s3, review_package  # noqa: E402
+from jobs import agreement_s2, bias_audit, retest_s3, review_package, steering_s1  # noqa: E402
 
 
 def _sid():
     return str(uuid.uuid4())
+
+
+class TestS1Steering(unittest.TestCase):
+    def _sessions(self, effect: float, n=70):
+        """Synthetic arms: executive evidence rate = lite + effect."""
+        rng = np.random.default_rng(42)
+        sessions = {}
+        for arm, base in (("executive", 0.5 + effect), ("lite", 0.5)):
+            for _ in range(n):
+                turns = []
+                for _t in range(5):
+                    levels = {}
+                    for d in steering_s1.DIMENSIONS:
+                        levels[d] = int(rng.integers(0, 5)) if rng.random() < base else "NA"
+                    turns.append(levels)
+                sessions[_sid()] = {"arm": arm, "turns": turns, "fallback": False}
+        return sessions
+
+    def test_positive_effect_detected(self):
+        m = steering_s1.compute_steering(self._sessions(effect=0.25))
+        self.assertEqual(m["conclusion"], "positive")
+        self.assertGreater(m["arms"]["executive"]["mean_evidence_rate"], m["arms"]["lite"]["mean_evidence_rate"])
+        memo = steering_s1.results_memo(m)
+        self.assertIn("POSITIVE", memo)
+        self.assertIn("does NOT support", memo)
+
+    def test_null_effect_is_inconclusive_not_negative(self):
+        m = steering_s1.compute_steering(self._sessions(effect=0.0))
+        self.assertEqual(m["conclusion"], "inconclusive")
+
+    def test_reversed_effect_reported_identically(self):
+        m = steering_s1.compute_steering(self._sessions(effect=-0.25))
+        self.assertEqual(m["conclusion"], "negative")
+        self.assertIn("NEGATIVE", steering_s1.results_memo(m))
+
+    def test_abandoned_sessions_excluded(self):
+        sessions = self._sessions(effect=0.2)
+        sessions[_sid()] = {"arm": "executive", "turns": [{}, {}], "fallback": False}  # <3 turns
+        m = steering_s1.compute_steering(sessions)
+        self.assertEqual(m["arms"]["executive"]["sessions"], 70)
+
+    def test_mann_whitney_sane(self):
+        _u, p_same = steering_s1.mann_whitney_u([1, 2, 3, 4, 5] * 20, [1, 2, 3, 4, 5] * 20)
+        self.assertGreater(p_same, 0.5)
+        _u2, p_diff = steering_s1.mann_whitney_u([5, 6, 7] * 30, [1, 2, 3] * 30)
+        self.assertLess(p_diff, 0.001)
+
+    def test_no_db_is_insufficient(self):
+        env = os.environ.pop("DATABASE_URL", None)
+        try:
+            self.assertEqual(steering_s1.run()["status"], "insufficient_data")
+        finally:
+            if env is not None:
+                os.environ["DATABASE_URL"] = env
+
+
+class TestRegistryLoop(unittest.TestCase):
+    """The Stage 2 → Stage 3 loop must be closed: every flag-map precondition
+    field is written by exactly the job that computes that study."""
+
+    def test_flagmap_fields_have_writers(self):
+        import pathlib
+        jobs_dir = pathlib.Path(__file__).resolve().parent.parent / "jobs"
+        sources = {p.name: p.read_text(encoding="utf-8") for p in jobs_dir.glob("*.py")}
+        # (study_key the flag map queries, detail/metric field it reads, writer job)
+        loop = [
+            ("steering_ab", "conclusion", "steering_s1.py"),
+            ("human_llm_agreement", "non_inferior_all_dimensions", "agreement_s2.py"),
+            ("test_retest", "all_dimensions_reliable", "retest_s3.py"),
+            ("adversarial_evasion", "evasion_rate_at_5fpr", "relay_detect.py"),
+            ("multilingual_dif", "adequately_powered", "dif_audit.py"),
+            ("sim_to_real_transfer", "transfer_pearson_r", "transfer_corr.py"),
+        ]
+        for study_key, field, job in loop:
+            src = sources[job]
+            self.assertIn(study_key, src, f"{job} must target study {study_key}")
+            self.assertIn(field, src, f"{job} must write the field {field} the flag map reads")
+            self.assertIn("INSERT INTO study_results", src, f"{job} must write the registry")
 
 
 class TestWeightedKappa(unittest.TestCase):

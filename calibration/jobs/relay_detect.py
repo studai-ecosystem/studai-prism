@@ -184,6 +184,22 @@ def run(conn=None, seed: int = 42, synthetic: bool = False) -> dict:
     run_id = write_run(conn, "relay_detect", inputs,
                        {"metrics": metrics, "feature_keys": FEATURE_KEYS,
                         "weights": [round(float(v), 6) for v in model["w"]]})
+    # Stage 2/3 registry write: the preregistered S4 metric — the row the flag
+    # map (PRISM_PRESSURE) and the public benchmark page read. Red-team
+    # sessions are is_synthetic by protocol; their LABELS are the real study
+    # data, so this row is legitimate evidence.
+    import uuid as _uuid
+    with conn.cursor() as cur:
+        cur.execute("SELECT study_id FROM studies WHERE study_key = 'adversarial_evasion'")
+        s_row = cur.fetchone()
+        if s_row and metrics.get("evasion_rate_at_5fpr") is not None:
+            cur.execute(
+                """INSERT INTO study_results (result_id, study_id, metric_name, value, detail, n, analysis_version)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                (str(_uuid.uuid4()), s_row[0], "evasion_rate_at_5fpr",
+                 metrics["evasion_rate_at_5fpr"], json.dumps(metrics),
+                 int(metrics.get("assisted_total", 0) + metrics.get("honest_total", 0)), "relay-v1"),
+            )
     return summarize("relay_detect", run_id, "ok", **metrics)
 
 

@@ -159,6 +159,34 @@ def run(conn=None, seed: int = 42) -> dict:
     outputs = {"flags": findings, "n_flags": len(findings),
                "groups_audited": GROUPS}
     run_id = write_run(conn, "dif", inputs, outputs)
+    # Stage 2.5 registry write (S6): only when LANGUAGE contrasts exist.
+    # Power is reported honestly: adequately_powered requires the protocol's
+    # >= 150 real sessions per language group — an underpowered contrast is
+    # never presented as "no DIF found".
+    lang_counts: dict[str, int] = {}
+    for d in demo_by_session.values():
+        lang = d.get("language")
+        if lang:
+            lang_counts[lang] = lang_counts.get(lang, 0) + 1
+    if len(lang_counts) >= 2:
+        lang_flags = [f for f in findings if f["group"] == "language"]
+        adequately_powered = all(n >= 150 for n in lang_counts.values())
+        detail = {"language_sessions": lang_counts, "language_flags": lang_flags,
+                  "n_language_flags": len(lang_flags),
+                  "adequately_powered": bool(adequately_powered),
+                  "power_note": None if adequately_powered else "UNDERPOWERED: below 150 sessions per language group — not evidence of fairness"}
+        import uuid as _uuid
+        import json as _json
+        with conn.cursor() as cur:
+            cur.execute("SELECT study_id FROM studies WHERE study_key = 'multilingual_dif'")
+            s_row = cur.fetchone()
+            if s_row:
+                cur.execute(
+                    """INSERT INTO study_results (result_id, study_id, metric_name, value, detail, n, analysis_version)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                    (str(_uuid.uuid4()), s_row[0], "language_dif_flags", len(lang_flags),
+                     _json.dumps(detail), sum(lang_counts.values()), "dif-v1"),
+                )
     res = summarize("dif", run_id, "ok", n_flags=len(findings))
     if own and conn:
         conn.close()
