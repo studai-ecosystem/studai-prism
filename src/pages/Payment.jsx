@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ShieldCheck, Clock, Layers, BadgeCheck, Lock, Loader2 } from 'lucide-react'
@@ -70,6 +70,16 @@ export default function Payment() {
   const user = getUser()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [dummyMode, setDummyMode] = useState(false)
+
+  // Surface test/dummy mode so nobody thinks a real charge happens (the server
+  // decides the mode — the client only displays it).
+  useEffect(() => {
+    fetch('/api/payment/config')
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((cfg) => setDummyMode(Boolean(cfg.dummyMode)))
+      .catch(() => {})
+  }, [])
 
   const handlePay = async () => {
     if (loading) return
@@ -172,12 +182,18 @@ export default function Payment() {
             whileTap={loading ? {} : { scale: 0.98 }}
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={15} />}
-            {loading ? 'Starting…' : 'Pay $10 & Continue'}
+            {loading ? 'Starting…' : dummyMode ? 'Continue (free preview)' : 'Pay $10 & Continue'}
           </motion.button>
 
-          <p className="text-center font-sans text-xs text-[#A0A4B0] mt-4">
-            Secure payment via Razorpay · Coming soon. You’ll proceed to the assessment briefing.
-          </p>
+          {dummyMode ? (
+            <p className="text-center font-sans text-xs text-[#A0A4B0] mt-4">
+              Payments are in test mode — you will not be charged. You’ll proceed straight to the assessment briefing.
+            </p>
+          ) : (
+            <p className="text-center font-sans text-xs text-[#A0A4B0] mt-4">
+              Secure payment via Razorpay. You’ll proceed to the assessment briefing.
+            </p>
+          )}
         </motion.div>
       </div>
     </div>

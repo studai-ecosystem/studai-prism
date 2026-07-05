@@ -15,7 +15,7 @@ $archive = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compressi
 $count = 0
 Get-ChildItem -Path $srcFull -Recurse -File -Force | ForEach-Object {
   # TrimStart guards against off-by-one prefix math (e.g. 8.3 short paths in
-  # $env:TEMP) that produced entries like "/package.json" — Linux unzip then
+  # TEMP) that produced entries like "/package.json" - Linux unzip then
   # extracts NOTHING usable and Kudu deploys 0 files (2026-07-05 incident).
   $rel = $_.FullName.Substring($srcFull.Length).TrimStart('\','/') -replace '\\','/'
   $entry = $archive.CreateEntry($rel, [System.IO.Compression.CompressionLevel]::Optimal)
@@ -27,10 +27,10 @@ Get-ChildItem -Path $srcFull -Recurse -File -Force | ForEach-Object {
 }
 $archive.Dispose()
 $fs.Close()
-if ($count -eq 0) { throw "Zip is empty — refusing to produce a no-op deploy artifact." }
+if ($count -eq 0) { throw "Zip is empty - refusing to produce a no-op deploy artifact." }
 $check = [System.IO.Compression.ZipFile]::OpenRead($Zip)
 $bad = $check.Entries | Where-Object { $_.FullName.StartsWith('/') -or $_.FullName.Contains('\') } | Select-Object -First 1
 $check.Dispose()
-if ($bad) { throw "Zip entry '$($bad.FullName)' has a leading slash or backslash — Azure Linux cannot extract it." }
+if ($bad) { throw "Zip entry '$($bad.FullName)' has a leading slash or backslash - Azure Linux cannot extract it." }
 Write-Host "Entries: $count"
 Write-Host ("Zip MB: " + [math]::Round((Get-Item $Zip).Length/1MB,1))

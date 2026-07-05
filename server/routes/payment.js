@@ -9,6 +9,14 @@ const router = Router()
 
 const PRICE_PAISE = 1000 // $10 (in cents)
 
+// Dummy-payments mode (PRISM_DUMMY_PAYMENTS=true): checkout is bypassed and a
+// free session entitlement is minted instead — INCLUDING in production. Used
+// while the Razorpay account/keys are not live (2026-07-05: prod test keys are
+// rejected by Razorpay with 401). Read lazily so tests/ops can flip it without
+// a code change. Every dummy entitlement is recorded with mode='dummy' so paid
+// vs free sessions stay distinguishable forever.
+const isDummyPayments = () => process.env.PRISM_DUMMY_PAYMENTS === 'true'
+
 // Validate env
 const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } = process.env
 if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
@@ -33,12 +41,14 @@ function getRazorpay() {
 // Razorpay checkout is available. When disabled, the client falls back to the
 // dev-session flow (non-production only).
 router.get('/config', (_req, res) => {
+  const dummy = isDummyPayments()
   res.json({
-    enabled: Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
-    keyId: RAZORPAY_KEY_ID || null,
+    enabled: Boolean(!dummy && RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
+    keyId: dummy ? null : RAZORPAY_KEY_ID || null,
     amount: PRICE_PAISE,
     currency: 'USD',
-    devSessionAvailable: process.env.NODE_ENV !== 'production',
+    devSessionAvailable: dummy || process.env.NODE_ENV !== 'production',
+    dummyMode: dummy,
   })
 })
 
@@ -117,14 +127,18 @@ router.post('/verify', async (req, res) => {
 })
 
 // ── POST /api/payment/dev-session ─────────────────────────────────────────────
-// Creates a free session without payment — only available outside production.
-// Used to test the assessment flow locally without Razorpay keys.
+// Creates a free session without payment. Available outside production, OR in
+// production when PRISM_DUMMY_PAYMENTS=true (checkout bypass while the
+// payment gateway is not live). Dummy sessions are marked mode='dummy'.
 router.post('/dev-session', async (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
+  const dummy = isDummyPayments()
+  if (process.env.NODE_ENV === 'production' && !dummy) {
     return res.status(403).json({ error: 'Not available in production' })
   }
   const sessionId = uuidv4()
-  await createEntitlement({ sessionId, mode: 'dev', amount: 0 })
+  const mode = dummy && process.env.NODE_ENV === 'production' ? 'dummy' : 'dev'
+  await createEntitlement({ sessionId, mode, amount: 0 })
+  logger.info('payment_session_minted', { sessionId, mode, requestId: req.requestId })
   res.json({ sessionId })
 })
 
