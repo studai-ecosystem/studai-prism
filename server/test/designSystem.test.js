@@ -34,7 +34,7 @@ const LEGACY_ALLOWLIST = [
   'pages/Assessment.jsx', 'pages/Auth.jsx', 'pages/Briefing.jsx', 'pages/Landing.jsx',
   'pages/LandingPage.jsx', 'pages/LinkPhone.jsx', 'pages/Payment.jsx',
   'pages/PhoneProctor.jsx', 'pages/Profile.jsx', 'pages/RaterWorkbench.jsx',
-  'pages/RoomScan.jsx', 'pages/ScoreReport.jsx', 'pages/Verify.jsx',
+  'pages/RoomScan.jsx', 'pages/ScoreReport.jsx',
   'pages/VerifyIdentity.jsx',
   'pages/about/AboutStudAI.jsx', 'pages/about/Careers.jsx', 'pages/about/Mission.jsx',
   'pages/research/AIEvaluation.jsx', 'pages/research/Blog.jsx', 'pages/research/BlogPost.jsx',
@@ -115,5 +115,50 @@ test('PART A: the evidence thread exists, is accent-colored, and is print-safe',
   const guide = await readFile(join(SRC, 'pages', 'DesignSystem.jsx'), 'utf-8')
   for (const ctx of ['ds-report', 'ds-ci', 'ds-claim']) {
     assert.ok(guide.includes(ctx), `style guide demonstrates the thread in context ${ctx}`)
+  }
+})
+
+// ── PART B gates ──────────────────────────────────────────────────────────────
+test('PART B: ConfidenceBand cannot render a number without API data', async () => {
+  const src = await readFile(join(SRC, 'components', 'ui', 'measurement.jsx'), 'utf-8')
+  // Null-guard is structural: malformed/absent ci returns null before any render.
+  assert.ok(src.includes("if (!ci || !Number.isFinite(Number(ci.low)) || !Number.isFinite(Number(ci.high))) return null"),
+    'ConfidenceBand refuses to render without a real API-shaped CI')
+  assert.ok(!/ci\s*=\s*\{[^}]*low:\s*\d/.test(src), 'no default CI values exist in the component')
+  // ReliabilityLabel: unknown level renders nothing, never guesses.
+  assert.ok(src.includes('if (!spec) return null'))
+  // FlagGate reads server truth via useClaims — LAW 2: no inline env checks.
+  assert.ok(src.includes('claims?.features?.[feature]'))
+  assert.ok(!src.includes('import.meta.env'), 'no client env flag checks')
+})
+
+test('PART B/LAW 1: the claims endpoint returns nulls (pending), never substitute numbers', async () => {
+  const { buildApp } = await import('../app.js')
+  const app = buildApp()
+  const server = app.listen(0)
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/evidence/claims`)
+    assert.equal(res.status, 200)
+    const body = await res.json()
+    assert.equal(body.standingClaim, 'cryptographically verifiable evidence chain')
+    // No DB locally: every stat must be null — the UI renders pending states.
+    for (const [k, v] of Object.entries(body.stats)) {
+      assert.equal(v, null, `stat ${k} must be null when the registry has nothing`)
+    }
+    assert.ok(body.note.includes('pending'))
+  } finally {
+    server.close()
+  }
+})
+
+test('PART B: rebuilt Verify page renders zero raw hex and uses the measurement primitives', async () => {
+  const verify = await readFile(join(SRC, 'pages', 'Verify.jsx'), 'utf-8')
+  assert.ok(!HEX.test(verify), 'Verify.jsx is fully tokenized (removed from the legacy allowlist)')
+  for (const primitive of ['ReliabilityLabel', 'ConfidenceBand', 'PendingStat', 'EvidenceThread']) {
+    assert.ok(verify.includes(primitive), `Verify uses ${primitive}`)
+  }
+  // All credential states still handled (T2/T4 logic preserved).
+  for (const state of ['revoked', 'superseded', 'Signature check failed', 'provisional_uncalibrated', 'chain']) {
+    assert.ok(verify.includes(state), `Verify handles state: ${state}`)
   }
 })

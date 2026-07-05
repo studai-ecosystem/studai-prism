@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import tokens, { color, font, typeScale, space, radius, elevation, motion } from '../design/tokens.js'
 import '../design/tokens.css'
 import { EvidenceThread, EvidenceTick, evidenceThreadStyles } from '../components/ui/EvidenceThread.jsx'
+import { ReliabilityLabel, ConfidenceBand, PendingStat } from '../components/ui/measurement.jsx'
 
 const TYPE_TESTS = [
   { lang: 'Latin', text: 'Measurement you can see inside — every score carries its evidence.' },
@@ -198,6 +199,31 @@ export default function DesignSystem() {
             Under <span style={{ fontFamily: 'var(--font-utility)' }}>prefers-reduced-motion</span> every duration collapses globally
             (tokens.css); nothing conveys meaning by motion alone.
           </p>
+        </Section>
+
+        <Section title="Measurement primitives (Part B) — API-shape driven">
+          <div style={{ display: 'grid', gap: 'var(--space-6)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+              <ReliabilityLabel level="high" />
+              <ReliabilityLabel level="moderate" />
+              <ReliabilityLabel level="low" />
+            </div>
+            <div style={{ maxWidth: 420 }}>
+              <ConfidenceBand ci={{ low: 64, high: 78, provisional: true }} />
+            </div>
+            <div style={{ maxWidth: 420 }}>
+              <PendingStat
+                label="Percentile"
+                missing="A percentile appears once enough candidates have completed this assessment for a fair comparison."
+                arrives="The score is final; the comparison is what's pending."
+              />
+            </div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', maxWidth: '64ch' }}>
+              ConfidenceBand renders a band ONLY from an API-shaped CI — there is no prop to invent a
+              number (CI-tested). ReliabilityLabel refuses unknown levels. PendingStat is the honest
+              empty state, designed as carefully as the filled one.
+            </p>
+          </div>
         </Section>
 
         <Section title="The room, dark">
