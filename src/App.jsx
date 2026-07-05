@@ -21,6 +21,7 @@ import BlogPost from './pages/research/BlogPost.jsx'
 import AboutStudAI from './pages/about/AboutStudAI.jsx'
 import Mission from './pages/about/Mission.jsx'
 import Careers from './pages/about/Careers.jsx'
+import DesignSystem from './pages/DesignSystem.jsx'
 import { isAuthenticated } from './lib/session.js'
 
 // Gate funnel pages behind a (mock) authenticated session.
@@ -51,6 +52,8 @@ export default function App() {
       <Route path="/about" element={<AboutStudAI />} />
       <Route path="/about/mission" element={<Mission />} />
       <Route path="/about/careers" element={<Careers />} />
+      {/* Internal living style guide (Part A) — admin-token gated in-page. */}
+      <Route path="/design-system" element={<DesignSystem />} />
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Auth />} />
       <Route path="/register" element={<Auth />} />
