@@ -30,14 +30,17 @@ import {
   getVerification,
   recordItem,
   eraseSession,
+  getSessionIdsByUser,
 } from '../lib/store.js'
 import { extractTurnFeatures } from '../lib/behavioralFeatures.js'
 import { emptyEvidence, accumulateEvidence, decideDirector } from '../lib/director.js'
 import { buildPanelPlan } from '../lib/judgePanel.js'
 import { aggregateSamples } from '../lib/scoreAggregator.js'
-import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession } from '../lib/telemetry.js'
-import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS } from '../lib/sharedConstants.js'
+import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession, recordTimelineEntry, activeFlagSnapshot, eraseTelemetry } from '../lib/telemetry.js'
+import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, SCALE_VERSION } from '../lib/sharedConstants.js'
 import { getJwtSecret } from '../lib/security.js'
+import { ensureCandidateId } from '../lib/identity.js'
+import { configuredGapDays, reassessmentBlock } from '../lib/eligibility.js'
 import { isExecutiveEnabled, isEarlyStopEnabled } from '../engine/executiveConfig.js'
 import { EvidenceLedger } from '../engine/evidenceLedger.js'
 import { microRateTurn, normalizeLevels } from '../engine/microRater.js'
@@ -506,6 +509,38 @@ router.post('/start', async (req, res) => {
   // Avoid serving a scenario this signed-in user has already seen, so repeat
   // attempts get a fresh problem statement.
   const authUser = getAuthUser(req)
+
+  // Track 0.1: durable pseudonymous candidate id (minted on first assessment).
+  const candidateId = authUser ? await ensureCandidateId(authUser.id) : null
+
+  // Track 0.3: re-assessment eligibility — growth measurement is only valid
+  // with spaced attempts. Skipped in trial mode (PRISM_DUMMY_PAYMENTS) and
+  // when the gap is configured to 0.
+  if (authUser && process.env.PRISM_DUMMY_PAYMENTS !== 'true') {
+    const gapDays = configuredGapDays()
+    if (gapDays > 0) {
+      try {
+        const reports = await getReportsByUser(authUser.id)
+        const latest = reports
+          .map((r) => r.issuedAt)
+          .filter(Boolean)
+          .sort()
+          .pop()
+        const block = reassessmentBlock(latest, gapDays)
+        if (block) {
+          auditLog('reassessment_blocked', sessionId, { candidateId, ...block, gapDays })
+          return res.status(403).json({
+            error: `You can retake the assessment after ${block.daysRemaining} day(s) (spacing keeps growth measurement meaningful).`,
+            blockedUntil: block.blockedUntil,
+          })
+        }
+      } catch (err) {
+        logger.captureException(err, { msg: 'eligibility_check_failed', requestId: req.requestId })
+        // Eligibility must never dead-end a candidate on an internal error.
+      }
+    }
+  }
+
   const seenScenarioIds = await getRecentScenarioIdsByUser(authUser?.id)
   const scenario = pickScenario(tier, seenScenarioIds)
 
@@ -552,6 +587,7 @@ router.post('/start', async (req, res) => {
       tokensUsed: response.usage?.total_tokens || 0,
       userId: authUser?.id || null,
       userEmail: authUser?.email || null,
+      candidateId: candidateId || null,
       consentVersion: consentRecord?.meta?.consentVersion || null,
       consentScopes: consentRecord?.scopes || null,
     })
@@ -1036,6 +1072,21 @@ router.post('/evaluate', async (req, res) => {
     const saved = await saveReport(sessionId, report)
     await sessions.delete(sessionId)
 
+    // Track 0.2: append this completed assessment to the candidate's timeline
+    // (pseudonymous). Dummy/dev sessions are marked synthetic (RULE 3) so they
+    // can never enter calibration or growth models.
+    const entitlementRec = await getEntitlement(sessionId)
+    recordTimelineEntry({
+      sessionId,
+      candidateId: persisted?.candidateId || null,
+      scenarioKey: scenario.id,
+      scaleVersion: SCALE_VERSION,
+      calibrationRunId: null, // stamped once a frozen equating run exists
+      consentVersion: persisted?.consentVersion || null,
+      flagsActive: activeFlagSnapshot(),
+      isSynthetic: (entitlementRec?.mode || 'paid') !== 'paid',
+    })
+
     // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): scoring done.
     auditLog('scoring_complete', sessionId, {
       overall: report.scores?.overall ?? null,
@@ -1438,7 +1489,8 @@ router.get('/dispute/:sessionId', async (req, res) => {
 })
 
 // ── DELETE /api/assessment/data/:sessionId ───────────────────────────────────
-// Right to erasure (DPDP) — permanently removes all data tied to a session.
+// Right to erasure (DPDP) — permanently removes all data tied to a session,
+// INCLUDING telemetry/research rows (Track 0.4 closes audit gap C23).
 router.delete('/data/:sessionId', async (req, res) => {
   const { sessionId } = req.params
   if (!sessionId) return res.status(400).json({ error: 'sessionId required' })
@@ -1446,9 +1498,34 @@ router.delete('/data/:sessionId', async (req, res) => {
     // Also drop any cached live session.
     if (await sessions.has(sessionId)) await sessions.delete(sessionId)
     const removed = await eraseSession(sessionId)
-    res.json({ ok: true, removed })
+    const telemetryRemoved = await eraseTelemetry(sessionId)
+    res.json({ ok: true, removed, telemetryRemoved })
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_data_delete_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Failed to erase data' })
+  }
+})
+
+// ── DELETE /api/assessment/candidate-data ────────────────────────────────────
+// Candidate-level right to erasure (Track 0.4): removes EVERY session the
+// authenticated user owns, across the v1 store and all telemetry/research
+// tables. Auth required — you can only erase yourself.
+router.delete('/candidate-data', async (req, res) => {
+  const authUser = getAuthUser(req)
+  if (!authUser) return res.status(401).json({ error: 'Sign in to erase your data.' })
+  try {
+    const sessionIds = await getSessionIdsByUser(authUser.id)
+    const results = []
+    for (const sid of sessionIds) {
+      if (await sessions.has(sid)) await sessions.delete(sid)
+      const removed = await eraseSession(sid)
+      const telemetryRemoved = await eraseTelemetry(sid)
+      results.push({ sessionId: sid, removed, telemetryRemoved })
+    }
+    auditLog('candidate_erasure', null, { sessions: sessionIds.length })
+    res.json({ ok: true, erasedSessions: sessionIds.length, results })
+  } catch (err) {
+    logger.captureException(err, { msg: 'candidate_data_delete_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to erase data' })
   }
 })

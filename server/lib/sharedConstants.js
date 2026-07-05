@@ -47,6 +47,11 @@ export const SCORE_VALIDITY_MONTHS = 12
 // Days before a candidate can take a reassessment.
 export const REASSESSMENT_DAYS = 90
 
+// Reporting-scale version stamped onto every completed assessment (Track 0.2).
+// Bump ONLY when a frozen calibration/equating run changes score meaning —
+// scores across different scale versions are not directly comparable.
+export const SCALE_VERSION = 'prism-scale-v1'
+
 // Consent copy version. Bump whenever the wording or scope set in
 // src/pages/Briefing.jsx CONSENT_ITEMS changes; recorded with every consent
 // and stamped onto the session record (audit finding C5).

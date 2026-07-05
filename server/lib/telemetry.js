@@ -115,6 +115,94 @@ export function recordAbilityEstimate({ sessionId, exchangeNo, thetaMean, thetaV
     .catch((err) => logger.captureException(err, { msg: 'ability_estimate_log_failed', sessionId }))
 }
 
+// ── assessment_timeline (Track 0.2) ──────────────────────────────────────────────
+// One row per COMPLETED assessment — the longitudinal raw material for growth
+// curves and "same conditions?" comparisons. Pseudonymous: candidate_id only,
+// never user id/email. Fire-and-forget; never throws.
+export function recordTimelineEntry({
+  sessionId,
+  candidateId,
+  scenarioKey,
+  scaleVersion,
+  calibrationRunId = null,
+  consentVersion = null,
+  flagsActive = null,
+  isSynthetic = false,
+}) {
+  if (!isTelemetryEnabled()) return
+  if (!isUuid(sessionId)) return
+  Promise.resolve()
+    .then(async () => {
+      // attempt_no is 1-based per candidate at write time.
+      let attemptNo = null
+      if (isUuid(candidateId)) {
+        const r = await query(
+          'SELECT COUNT(*)::int AS n FROM assessment_timeline WHERE candidate_id = $1',
+          [candidateId],
+        )
+        attemptNo = (r?.rows?.[0]?.n ?? 0) + 1
+      }
+      await query(
+        `INSERT INTO assessment_timeline
+           (timeline_id, candidate_id, session_id, attempt_no, scenario_key,
+            scale_version, calibration_run_id, consent_version, flags_active, is_synthetic)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT (session_id) DO NOTHING`,
+        [
+          randomUUID(),
+          isUuid(candidateId) ? candidateId : null,
+          sessionId,
+          attemptNo,
+          scenarioKey || null,
+          scaleVersion || null,
+          calibrationRunId,
+          consentVersion,
+          flagsActive ? JSON.stringify(flagsActive) : null,
+          Boolean(isSynthetic),
+        ],
+      )
+    })
+    .catch((err) => logger.captureException(err, { msg: 'timeline_log_failed', sessionId }))
+}
+
+// Snapshot of PRISM_* feature flags at test time (T0.2). Names+values only —
+// anything smelling like a secret is excluded defensively.
+export function activeFlagSnapshot(env = process.env) {
+  const out = {}
+  for (const [k, v] of Object.entries(env)) {
+    if (!/^PRISM_[A-Z0-9_]+$/.test(k)) continue
+    if (/KEY|SECRET|TOKEN|PASS/.test(k)) continue
+    if (typeof v === 'string' && v.length <= 40) out[k] = v
+  }
+  return out
+}
+
+// ── erasure cascade (Track 0.4 / audit C23) ────────────────────────────────
+// AWAITED (not fire-and-forget): right-to-erasure must be reliable. Deletes
+// every telemetry/research row tied to a session, child tables first.
+// Returns per-table deleted counts; {} when telemetry is off.
+export async function eraseTelemetry(sessionId) {
+  if (!isTelemetryEnabled() || !isUuid(sessionId)) return {}
+  const counts = {}
+  const votes = await query(
+    `DELETE FROM judge_votes WHERE response_id IN
+       (SELECT response_id FROM item_responses WHERE session_id = $1)`,
+    [sessionId],
+  )
+  counts.judge_votes = votes?.rowCount ?? 0
+  for (const [table, col] of [
+    ['item_responses', 'session_id'],
+    ['ability_estimates', 'session_id'],
+    ['behavioral_features', 'session_id'],
+    ['assessment_timeline', 'session_id'],
+    ['audit_log', 'session_id'],
+  ]) {
+    const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId])
+    counts[table] = r?.rowCount ?? 0
+  }
+  return counts
+}
+
 // ── readers (Phase 2) ────────────────────────────────────────────────────────
 // Map exchange_no → response_id for a session, so the dual scorer can link a
 // candidate turn to its persisted item_response (for judge_votes FK). Returns

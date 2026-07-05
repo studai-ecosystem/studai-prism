@@ -114,6 +114,21 @@ export async function getRecentScenarioIdsByUser(userId, limit = 20) {
     .map((s) => s.scenarioId)
 }
 
+// Track 0.4: every session id tied to a user (sessions + reports), for the
+// candidate-level erasure cascade.
+export async function getSessionIdsByUser(userId) {
+  if (!userId) return []
+  const db = await readDB()
+  const ids = new Set()
+  for (const s of Object.values(db.sessions)) {
+    if (s && s.userId === userId) ids.add(s.sessionId)
+  }
+  for (const r of Object.values(db.reports)) {
+    if (r && r.userId === userId) ids.add(r.sessionId)
+  }
+  return [...ids]
+}
+
 export async function updateSession(sessionId, patch) {
   const db = await readDB()
   const existing = db.sessions[sessionId]

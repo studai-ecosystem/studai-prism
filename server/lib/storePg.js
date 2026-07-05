@@ -96,8 +96,19 @@ export async function getRecentScenarioIdsByUser(userId, limit = 20) {
   return (r?.rows || []).map((row) => row.scenario_id)
 }
 
-export async function updateSession(sessionId, patch = {}) {
-  const existing = await getSession(sessionId)
+// Track 0.4: every session id tied to a user (sessions + reports), for the
+// candidate-level erasure cascade.
+export async function getSessionIdsByUser(userId) {
+  if (!userId) return []
+  const ids = new Set()
+  const s = await query('SELECT session_id FROM v1_sessions WHERE user_id = $1', [userId])
+  for (const row of s?.rows || []) ids.add(row.session_id)
+  const r = await query('SELECT session_id FROM v1_reports WHERE user_id = $1', [userId])
+  for (const row of r?.rows || []) ids.add(row.session_id)
+  return [...ids]
+}
+
+export async function updateSession(sessionId, patch = {}) {  const existing = await getSession(sessionId)
   if (!existing) return null
   const merged = { ...existing, ...patch, updatedAt: Date.now() }
   const { sessionId: _s, scenarioId = null, userId = null, userEmail = null,

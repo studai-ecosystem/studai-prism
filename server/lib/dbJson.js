@@ -77,6 +77,8 @@ export async function updateUser(id, fields) {
   if (typeof fields.name === 'string') user.name = fields.name.trim()
   if (typeof fields.college === 'string') user.college = fields.college.trim()
   if (typeof fields.year === 'string') user.year = fields.year.trim()
+  // Track 0.1: durable pseudonymous candidate id (set once; never overwritten).
+  if (typeof fields.candidateId === 'string' && !user.candidateId) user.candidateId = fields.candidateId
   await writeDB(db)
   return user
 }

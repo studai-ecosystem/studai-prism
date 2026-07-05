@@ -14,6 +14,7 @@ function rowToUser(row) {
     college: row.college || '',
     year: row.year || '',
     passwordHash: row.password_hash,
+    candidateId: row.candidate_id || null,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
   }
 }
@@ -60,6 +61,14 @@ export async function updateUser(id, fields) {
     'UPDATE v1_users SET name = $2, college = $3, year = $4 WHERE id = $1',
     [id, user.name, user.college, user.year],
   )
+  // Track 0.1: candidate_id is write-once — set only when currently null.
+  if (typeof fields.candidateId === 'string' && !user.candidateId) {
+    await query(
+      'UPDATE v1_users SET candidate_id = $2 WHERE id = $1 AND candidate_id IS NULL',
+      [id, fields.candidateId],
+    )
+    user.candidateId = fields.candidateId
+  }
   return user
 }
 

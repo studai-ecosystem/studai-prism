@@ -24,6 +24,7 @@ export const getEntitlement = impl.getEntitlement
 export const createSession = impl.createSession
 export const getSession = impl.getSession
 export const getRecentScenarioIdsByUser = impl.getRecentScenarioIdsByUser
+export const getSessionIdsByUser = impl.getSessionIdsByUser
 export const updateSession = impl.updateSession
 export const saveReport = impl.saveReport
 export const getReport = impl.getReport
