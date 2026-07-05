@@ -57,6 +57,7 @@ export function recordItemResponse({
   latencyMs,
   asrConfidence,
   microLevels = null,
+  behavior = null, // Track 3.1 clamped interaction-pattern summary
 }) {
   if (!isTelemetryEnabled()) return
   if (!isUuid(sessionId)) return // UUID-typed column; skip legacy ids
@@ -67,8 +68,8 @@ export function recordItemResponse({
     .then(() =>
       query(
         `INSERT INTO item_responses
-           (response_id, session_id, item_id, exchange_no, candidate_text, latency_ms, asr_confidence, micro_levels)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+           (response_id, session_id, item_id, exchange_no, candidate_text, latency_ms, asr_confidence, micro_levels, behavior)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           randomUUID(),
           sessionId,
@@ -78,12 +79,104 @@ export function recordItemResponse({
           latency,
           asr,
           microLevels ? JSON.stringify(microLevels) : null,
+          behavior ? JSON.stringify(behavior) : null,
         ],
       ),
     )
     .catch((err) =>
       logger.captureException(err, { msg: 'item_response_log_failed', sessionId }),
     )
+}
+
+// ── behavioral_features rollup (Track 3.1) ───────────────────────────────────
+// One session-level feature vector, computed at /evaluate from the per-turn
+// behavior summaries. Includes latency-vs-question-complexity residuals from
+// a least-squares fit WITHIN this session (n>=3 turns with both values) — the
+// classifier job recomputes population residuals later; these are the
+// self-contained per-session view.
+export function summarizeSessionBehavior(turns) {
+  const rows = (Array.isArray(turns) ? turns : []).filter((t) => t && typeof t === 'object')
+  const stats = (xs) => {
+    if (!xs.length) return null
+    const sorted = [...xs].sort((a, b) => a - b)
+    const mean = xs.reduce((s, v) => s + v, 0) / xs.length
+    const sd = xs.length > 1 ? Math.sqrt(xs.reduce((s, v) => s + (v - mean) ** 2, 0) / (xs.length - 1)) : 0
+    return {
+      n: xs.length,
+      mean: Math.round(mean),
+      median: Math.round(sorted[Math.floor(sorted.length / 2)]),
+      sd: Math.round(sd),
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+    }
+  }
+  const latencies = rows.map((t) => t.responseMs).filter(Number.isFinite)
+  // Least-squares latency ~ promptWordCount within the session.
+  const pairs = rows
+    .filter((t) => Number.isFinite(t.responseMs) && Number.isFinite(t.promptWordCount))
+    .map((t) => [t.promptWordCount, t.responseMs])
+  let residuals = null
+  if (pairs.length >= 3) {
+    const n = pairs.length
+    const mx = pairs.reduce((s, [x]) => s + x, 0) / n
+    const my = pairs.reduce((s, [, y]) => s + y, 0) / n
+    const sxx = pairs.reduce((s, [x]) => s + (x - mx) ** 2, 0)
+    const sxy = pairs.reduce((s, [x, y]) => s + (x - mx) * (y - my), 0)
+    const b = sxx > 0 ? sxy / sxx : 0
+    const a = my - b * mx
+    const perTurn = pairs.map(([x, y]) => Math.round(y - (a + b * x)))
+    const absStats = stats(perTurn.map(Math.abs))
+    residuals = {
+      slope: +b.toFixed(2),
+      intercept: Math.round(a),
+      perTurn,
+      ...(absStats ? { absMean: absStats.mean, absMax: absStats.max } : {}),
+    }
+  }
+  const typingTurns = rows.filter((t) => t.typing)
+  const voiceTurns = rows.filter((t) => t.voice)
+  const modalities = rows.map((t) => t.modality).filter(Boolean)
+  return {
+    turns: rows.length,
+    latency: stats(latencies),
+    latencyResiduals: residuals,
+    typing: typingTurns.length
+      ? {
+          turns: typingTurns.length,
+          meanInterKeyMs: stats(typingTurns.map((t) => t.typing.meanInterKeyMs).filter(Number.isFinite)),
+          revisionRatio: +(typingTurns.reduce((s, t) => s + (t.typing.revisionRatio || 0), 0) / typingTurns.length).toFixed(3),
+          backspaceTotal: typingTurns.reduce((s, t) => s + (t.typing.backspaceCount || 0), 0),
+          longPauseTotal: typingTurns.reduce((s, t) => s + (t.typing.longPauseCount || 0), 0),
+          pasteAttempts: typingTurns.reduce((s, t) => s + (t.typing.pasteAttempts || 0), 0),
+        }
+      : null,
+    voice: voiceTurns.length
+      ? {
+          turns: voiceTurns.length,
+          speechOnsetMs: stats(voiceTurns.map((t) => t.voice.speechOnsetMs).filter(Number.isFinite)),
+          silenceGapTotal: voiceTurns.reduce((s, t) => s + (t.voice.silenceGapCount || 0), 0),
+        }
+      : null,
+    modalities: modalities.length ? [...new Set(modalities)] : [],
+    pressureProbes: rows.filter((t) => t.pressure).map((t) => t.pressure),
+  }
+}
+
+// Fire-and-forget; never throws.
+export function recordBehavioralFeatures(sessionId, features) {
+  if (!isTelemetryEnabled()) return
+  if (!isUuid(sessionId) || !features) return
+  Promise.resolve()
+    .then(() =>
+      query(
+        `INSERT INTO behavioral_features (session_id, features, model_version)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (session_id)
+         DO UPDATE SET features = EXCLUDED.features, model_version = EXCLUDED.model_version`,
+        [sessionId, JSON.stringify(features), 't3.1-v1'],
+      ),
+    )
+    .catch((err) => logger.captureException(err, { msg: 'behavioral_features_log_failed', sessionId }))
 }
 
 export { isDbConfigured }

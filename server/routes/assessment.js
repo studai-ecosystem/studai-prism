@@ -32,11 +32,11 @@ import {
   eraseSession,
   getSessionIdsByUser,
 } from '../lib/store.js'
-import { extractTurnFeatures } from '../lib/behavioralFeatures.js'
+import { extractTurnFeatures, sanitizeBehaviorTelemetry } from '../lib/behavioralFeatures.js'
 import { emptyEvidence, accumulateEvidence, decideDirector } from '../lib/director.js'
 import { buildPanelPlan } from '../lib/judgePanel.js'
 import { aggregateSamples } from '../lib/scoreAggregator.js'
-import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession, recordTimelineEntry, activeFlagSnapshot, eraseTelemetry, recordSessionTranscript } from '../lib/telemetry.js'
+import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession, recordTimelineEntry, activeFlagSnapshot, eraseTelemetry, recordSessionTranscript, summarizeSessionBehavior, recordBehavioralFeatures, isDbConfigured as telemetryDbConfigured } from '../lib/telemetry.js'
 import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, SCALE_VERSION } from '../lib/sharedConstants.js'
 import { getJwtSecret } from '../lib/security.js'
 import { ensureCandidateId } from '../lib/identity.js'
@@ -46,7 +46,7 @@ import { isGlassBoxEnabled, issueCredential } from '../lib/credentials.js'
 import { isExecutiveEnabled, isEarlyStopEnabled } from '../engine/executiveConfig.js'
 import { EvidenceLedger } from '../engine/evidenceLedger.js'
 import { microRateTurn, normalizeLevels } from '../engine/microRater.js'
-import { selectProbe, stopDecision } from '../engine/probeSelector.js'
+import { selectProbe, stopDecision, isPressureEnabled } from '../engine/probeSelector.js'
 import { anchorsToTheta, heuristicTheta, thetaToTier } from '../engine/entryEstimator.js'
 import { loadPrompt, loadPromptJson, renderPrompt } from '../engine/prompts.js'
 import { sanitizeCandidateText, INJECTION_GUARD } from '../lib/promptSecurity.js'
@@ -706,6 +706,8 @@ router.post('/message', async (req, res) => {
   let ledger = null
   let usedFacets = Array.isArray(session._persisted?.usedFacets) ? [...session._persisted.usedFacets] : []
   let challengerTurns = Array.isArray(session._persisted?.challengerTurns) ? [...session._persisted.challengerTurns] : []
+  // Track 3.2: pressure moves already deployed this session [{exchange, kind, dimension}].
+  let pressureTurns = Array.isArray(session._persisted?.pressureTurns) ? [...session._persisted.pressureTurns] : []
 
   if (executive) {
     // Rehydrate the ledger, micro-rate this turn, fold it in, pick the probe.
@@ -716,10 +718,23 @@ router.post('/message', async (req, res) => {
     microLevels = rated || levelsFromSignals(signals)
     ledger.applyLevels(microLevels)
 
+    // Track 3.2 (callback probe material): the candidate's own earlier
+    // phrasing — first substantial SANITIZED user turn, quote-safe and short.
+    const earlierUserTexts = history
+      .filter((m) => m.role === 'user')
+      .map((m) => sanitizeCandidateText(String(m.content).replace('[Candidate]: ', ''), 400))
+      .filter((t) => t.split(/\s+/).length >= 8)
+    const candidateQuote = earlierUserTexts.length
+      ? earlierUserTexts[0].replace(/["\n\r]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140)
+      : null
+
     const probe = selectProbe(ledger, {
       nextExchange: nextExchangeCount,
       usedFacets,
       challengerTurns,
+      pressureEnabled: isPressureEnabled(),
+      pressureTurns,
+      candidateQuote,
     })
     targetDimension = probe.targetDimension
     deployChallenger = probe.deployChallenger
@@ -727,6 +742,14 @@ router.post('/message', async (req, res) => {
     directive = probe.directive
     if (!usedFacets.includes(probe.facet)) usedFacets.push(probe.facet)
     if (deployChallenger) challengerTurns.push(nextExchangeCount)
+    if (probe.pressure) {
+      pressureTurns.push({ exchange: nextExchangeCount, kind: probe.pressure.kind, dimension: probe.pressure.dimension })
+      auditLog('pressure_probe', sessionId, {
+        exchange: nextExchangeCount,
+        kind: probe.pressure.kind,
+        evidencesDimension: probe.pressure.dimension,
+      })
+    }
   } else {
     const d = decideDirector({ evidence, nextExchange: nextExchangeCount, lastSignals: signals })
     targetDimension = d.targetDimension
@@ -779,6 +802,7 @@ router.post('/message', async (req, res) => {
             ledger: ledger.snapshot(),
             usedFacets,
             challengerTurns,
+            pressureTurns,
           }
         : {}),
       tokensUsed: prevTokens + (response.usage?.total_tokens || 0),
@@ -810,6 +834,30 @@ router.post('/message', async (req, res) => {
     const asrConfidence = telemetry && Number.isFinite(Number(telemetry.asrConfidence))
       ? Math.max(0, Math.min(1, Number(telemetry.asrConfidence)))
       : undefined
+    // Track 3.1: clamp the untrusted interaction-pattern summary, then enrich
+    // it SERVER-SIDE with what the client can't be trusted to report: the
+    // complexity of the question being answered (word count of the previous
+    // AI turn) and whether that question carried a pressure move.
+    const behavior = (() => {
+      const clamped = sanitizeBehaviorTelemetry(telemetry)
+      const lastAi = [...history].reverse().find((m) => m.role === 'assistant')
+      let promptWordCount = null
+      if (lastAi) {
+        try {
+          const parsed = JSON.parse(lastAi.content)
+          promptWordCount = (parsed.messages || []).map((m) => m.content || '').join(' ').split(/\s+/).filter(Boolean).length
+        } catch {
+          promptWordCount = String(lastAi.content).split(/\s+/).filter(Boolean).length
+        }
+      }
+      const answeredPressure = pressureTurns.find((t) => t.exchange === nextExchangeCount - 1) || null
+      if (!clamped && promptWordCount === null && !answeredPressure) return null
+      return {
+        ...(clamped || {}),
+        ...(promptWordCount !== null ? { promptWordCount } : {}),
+        pressure: answeredPressure ? { kind: answeredPressure.kind, dimension: answeredPressure.dimension } : null,
+      }
+    })()
     recordItemResponse({
       sessionId,
       scenarioKey: scenario.id,
@@ -819,6 +867,7 @@ router.post('/message', async (req, res) => {
       latencyMs: telemetry && typeof telemetry.responseMs === 'number' ? telemetry.responseMs : undefined,
       asrConfidence,
       microLevels,
+      behavior,
     })
     auditLog('probe_selected', sessionId, {
       exchange: nextExchangeCount,
@@ -1123,6 +1172,19 @@ router.post('/evaluate', async (req, res) => {
       overall: report.scores?.overall ?? null,
       reliability: report.reliability?.label ?? null,
     })
+
+    // Track 3.1: session-level behavioral rollup (latency distribution,
+    // typing/voice aggregates, within-session latency-vs-complexity
+    // residuals) for the relay-detection research corpus. Fire-and-forget.
+    if (telemetryDbConfigured()) {
+      import('../db/pool.js')
+        .then(({ query }) => query('SELECT behavior FROM item_responses WHERE session_id = $1 ORDER BY exchange_no', [sessionId]))
+        .then((r) => {
+          const turns = (r?.rows || []).map((row) => row.behavior).filter(Boolean)
+          if (turns.length) recordBehavioralFeatures(sessionId, summarizeSessionBehavior(turns))
+        })
+        .catch((err) => logger.captureException(err, { msg: 'behavior_rollup_failed', sessionId }))
+    }
 
     // Track 2 (PRISM_GLASS_BOX, default OFF): issue the signed evidence-chain
     // credential. Never blocks scoring — failure logs and the report still

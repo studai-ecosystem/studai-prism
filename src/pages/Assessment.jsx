@@ -9,6 +9,7 @@ import PrismLogo from '../components/ui/PrismLogo.jsx'
 import { getToken } from '../lib/session.js'
 import { startProctorSession, subscribeProctor, endProctorSession, scheduleEndProctorSession, cancelScheduledEnd, recallPairCode } from '../lib/proctorLink.js'
 import { useFaceProctor } from '../hooks/useFaceProctor.js'
+import { createTurnTracker, createVoiceMeter } from '../lib/turnSignals.js'
 
 const INSTRUCTIONS = [
   { icon: '🎯', text: 'You will be placed in a realistic everyday scenario with AI participants who play different roles.' },
@@ -285,6 +286,10 @@ export default function Assessment() {
   const phoneImgRef = useRef(null)
   const voiceAnswerRef = useRef('')
   const answerModeRef = useRef(false) // true while the primary mic is capturing a full spoken answer (WebSpeech fallback)
+  // Track 3.1 — per-turn interaction-pattern signals (timing/typing/voice
+  // summaries only; consented under the research scope; server re-clamps).
+  const turnTrackerRef = useRef(createTurnTracker())
+  const voiceMeterRef = useRef(null)
   // Browsers auto-stop SpeechRecognition after a few seconds of silence (even
   // with continuous=true). This ref records whether we still WANT to be
   // listening, so onend/onerror can transparently restart it instead of going
@@ -629,6 +634,7 @@ export default function Assessment() {
         setActiveOverlay('scenario_card')
       } else {
         startTimer()
+        turnTrackerRef.current.promptShown()
       }
     } catch (e) {
       setError(e.message)
@@ -641,6 +647,7 @@ export default function Assessment() {
   const beginAfterScenario = useCallback(() => {
     setActiveOverlay(null)
     startTimer()
+    turnTrackerRef.current.promptShown() // first answer's clock starts now
   }, [startTimer])
 
   const handleSubmit = useCallback(async (autoSubmit = false) => {
@@ -686,6 +693,11 @@ export default function Assessment() {
     const text = (rawText || '').trim()
     if (!text || loading || submitting) return
 
+    // Track 3.1: summarise HOW this answer was produced, then reset for the
+    // next turn. Summary numbers only — never keystrokes, never audio.
+    const telemetry = turnTrackerRef.current.summary(text)
+    turnTrackerRef.current.reset()
+
     setInput('')
     setMessages((prev) => [...prev, { type: 'user', content: text }])
     setExchangeCount((c) => c + 1)
@@ -695,11 +707,12 @@ export default function Assessment() {
       const res = await fetch('/api/assessment/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, message: text }),
+        body: JSON.stringify({ sessionId, message: text, telemetry }),
       })
       if (!res.ok) throw new Error('Failed to get AI response')
       const data = await res.json()
       setMessages((prev) => [...prev, { type: 'ai', messages: data.messages, isNew: true }])
+      turnTrackerRef.current.promptShown() // next answer's clock starts now
     } catch (e) {
       setMessages((prev) => [
         ...prev,
@@ -791,6 +804,9 @@ export default function Assessment() {
       recorder.ondataavailable = (e) => { if (e.data && e.data.size) audioChunksRef.current.push(e.data) }
       recorder.onstop = handleRecordingStop
       mediaRecorderRef.current = recorder
+      // Track 3.1: speech-onset/pause timing from loudness only — audio is
+      // never persisted, and nothing about tone/prosody is measured.
+      voiceMeterRef.current = createVoiceMeter(audioStream)
       recorder.start()
       setRecording(true)
     } catch {
@@ -802,6 +818,10 @@ export default function Assessment() {
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') {
       try { recorder.stop() } catch { /* ignore */ }
+    }
+    if (voiceMeterRef.current) {
+      turnTrackerRef.current.setVoice(voiceMeterRef.current.stop())
+      voiceMeterRef.current = null
     }
     setRecording(false)
   }, [])
@@ -823,6 +843,7 @@ export default function Assessment() {
     voiceAnswerRef.current = ''
     answerModeRef.current = true
     listeningIntentRef.current = true
+    turnTrackerRef.current.dictation()
     try {
       recognition.start()
       setRecording(true)
@@ -958,7 +979,8 @@ export default function Assessment() {
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
+            onKeyDown={(e) => { turnTrackerRef.current.key(e); onKeyDown(e) }}
+            onPaste={() => turnTrackerRef.current.paste()}
             disabled={loading || submitting || initialising || recording || transcribing}
             placeholder="Speak your answer with the mic — or type here (Enter to send)"
             rows={2}

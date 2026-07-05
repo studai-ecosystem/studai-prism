@@ -37,6 +37,16 @@
     "evidence": { "type": ["object", "null"], "description": "Per-dimension transcript quotes. Disclosure-gated at the API (candidate's share token); always inside the signed bundle." },
     "judgeVotes": { "type": ["array", "null"], "description": "Per-vote judge records with model ids (dual scorer only)." },
     "integrityEvents": { "type": "object", "description": "Counts per proctoring event type; never raw payloads." },
+    "review": {
+      "type": ["object", "null"],
+      "description": "Human-review state. Detection/integrity signals are ADVISORY ONLY: they may route a session to human review; they never auto-fail a candidate. There is no machine verdict vocabulary.",
+      "properties": {
+        "status": { "enum": ["none", "human_review_pending", "human_reviewed"] },
+        "outcome": { "enum": ["confirmed_valid", "annulled", null] }
+      },
+      "required": ["status", "outcome"],
+      "additionalProperties": false
+    },
     "consent": {
       "type": "object",
       "required": ["version"],

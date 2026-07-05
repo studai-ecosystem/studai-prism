@@ -55,4 +55,6 @@ export const SCALE_VERSION = 'prism-scale-v1'
 // Consent copy version. Bump whenever the wording or scope set in
 // src/pages/Briefing.jsx CONSENT_ITEMS changes; recorded with every consent
 // and stamped onto the session record (audit finding C5).
-export const CONSENT_VERSION = '2026-07-04.1'
+// 2026-07-05.1: research_calibration now explicitly covers interaction-
+// pattern signals (response timing, typing rhythm, revision counts) — Track 3.1.
+export const CONSENT_VERSION = '2026-07-05.1'

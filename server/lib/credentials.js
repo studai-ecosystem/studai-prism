@@ -129,6 +129,11 @@ export async function assembleEvidenceBundle(sessionId) {
     evidence: report.evidence || null, // per-dimension transcript quotes (disclosure-gated at the API)
     judgeVotes,
     integrityEvents: integrity,
+    // Track 3.5: integrity/detection signals are ADVISORY — they can route a
+    // session to HUMAN review, never auto-fail it. The controlled vocabulary
+    // has no negative verdict: outcomes are 'confirmed_valid', 'annulled'
+    // (by a named human process), or null. Never "cheater", never automated.
+    review: { status: 'none', outcome: null },
     consent: {
       version: consent?.meta?.consentVersion || session?.consentVersion || null,
       currentCopyVersion: CONSENT_VERSION,

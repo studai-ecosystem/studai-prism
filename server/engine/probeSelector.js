@@ -67,10 +67,77 @@ export function pickFacet(usedFacets, exchangeNo) {
   return FACETS[(exchangeNo || 0) % FACETS.length]
 }
 
+// ── Track 3.2: pressure dynamics (flag PRISM_PRESSURE, default OFF) ──────────
+// Director moves designed to make external-LLM relaying detectably laggy or
+// discontinuous. HARD CONSTRAINT: every probe is a legitimate skill probe,
+// fair to honest candidates — each kind maps to the dimension it evidences
+// (documented in docs/pressure-probes-v1.md; keep the two in sync). Nothing
+// here exists only to trap.
+export function isPressureEnabled() {
+  return process.env.PRISM_PRESSURE === 'true'
+}
+
+export const PRESSURE_PROBES = {
+  // Mid-turn contingency shift — the situation changes right before they
+  // answer. Evidences ADAPTIVE PROBLEM SOLVING (re-planning under a changed
+  // constraint); honest candidates simply adjust their answer.
+  contingency_shift: {
+    dimension: 'problemSolving',
+    line:
+      'PRESSURE MOVE — contingency shift: just before the candidate answers, have the speaker change ONE concrete fact of the situation ("actually, before you answer — [a realistic small change: the budget, the deadline, or who is available] just changed"). Ask how their answer holds up under the new fact. Keep the change small, realistic, and clearly stated.',
+  },
+  // Time-boxed micro-response — one line only. Evidences COMMUNICATION
+  // (concision and prioritisation under constraint).
+  micro_response: {
+    dimension: 'communication',
+    line:
+      'PRESSURE MOVE — micro-response: ask the candidate for a ONE-SENTENCE answer this turn ("in one line — what is your call?"). Make clear a fuller explanation can follow next turn. Judge nothing except that the constraint is stated plainly.',
+  },
+  // Callback to the candidate's own earlier phrasing. Evidences CRITICAL
+  // THINKING (consistency of reasoning across the conversation).
+  callback: {
+    dimension: 'criticalThinking',
+    line: null, // built dynamically with the candidate's own words
+  },
+}
+
+const PRESSURE_MIN_EXCHANGE = 4 // never in the opening turns
+const PRESSURE_SPACING = 3 // at most one pressure move per 3 turns
+const PRESSURE_MAX_PER_SESSION = 2
+
+// Decide whether THIS turn carries a pressure move, and which kind. The kind
+// is chosen to match the turn's target dimension where possible, so pressure
+// is always also the most useful skill probe.
+export function selectPressure(target, state = {}) {
+  if (!state.pressureEnabled) return null
+  const nextExchange = state.nextExchange || 1
+  const used = Array.isArray(state.pressureTurns) ? state.pressureTurns : []
+  if (nextExchange < PRESSURE_MIN_EXCHANGE) return null
+  if (used.length >= PRESSURE_MAX_PER_SESSION) return null
+  if (used.some((t) => nextExchange - t.exchange < PRESSURE_SPACING)) return null
+
+  const usedKinds = new Set(used.map((t) => t.kind))
+  const quote = typeof state.candidateQuote === 'string' && state.candidateQuote.length >= 20 ? state.candidateQuote : null
+  // Prefer the kind that evidences the target dimension; fall back sensibly.
+  let kind = null
+  if (target === 'communication' && !usedKinds.has('micro_response')) kind = 'micro_response'
+  else if (target === 'criticalThinking' && quote && !usedKinds.has('callback')) kind = 'callback'
+  else if (!usedKinds.has('contingency_shift')) kind = 'contingency_shift'
+  else if (!usedKinds.has('micro_response')) kind = 'micro_response'
+  else if (quote && !usedKinds.has('callback')) kind = 'callback'
+  if (!kind) return null
+
+  const line = kind === 'callback'
+    ? `PRESSURE MOVE — callback: earlier the candidate said "${quote}". Have the speaker quote that back and ask how it squares with what they are proposing now ("earlier you said … — how does that fit with this?"). A genuine reconciliation is a good answer; so is revising their view with a reason.`
+    : PRESSURE_PROBES[kind].line
+  return { kind, dimension: PRESSURE_PROBES[kind].dimension, line }
+}
+
 // Decide the Executive steering for the next turn.
 //   ledger        — EvidenceLedger instance
-//   state         — { nextExchange, usedFacets, challengerTurns: [exchangeNos] }
-// Returns { targetDimension, facet, deployChallenger, avatarStyle, directive }.
+//   state         — { nextExchange, usedFacets, challengerTurns: [exchangeNos],
+//                     pressureEnabled, pressureTurns: [{exchange,kind}], candidateQuote }
+// Returns { targetDimension, facet, deployChallenger, avatarStyle, directive, pressure }.
 export function selectProbe(ledger, state = {}) {
   const nextExchange = state.nextExchange || 1
   const target = targetDimension(ledger)
@@ -88,6 +155,10 @@ export function selectProbe(ledger, state = {}) {
   if (deployChallenger) avatarStyle = 2
   else if (target === 'communication') avatarStyle = 3
 
+  // Track 3.2: at most one pressure move per turn, never stacked on a
+  // challenger push-back (one source of pressure at a time — fairness).
+  const pressure = deployChallenger ? null : selectPressure(target, state)
+
   const label = DIMENSION_LABEL[target]
   const challengerLine = deployChallenger
     ? 'The "speaks only when needed" character SHOULD jump in this turn with one short, respectful push-back to surface this skill — frame it as a normal part of the scenario, never as a personal test.'
@@ -99,10 +170,11 @@ export function selectProbe(ledger, state = {}) {
     `Give the candidate a natural chance to show ${label}: ${DIMENSION_PROBES[target]}`,
     `Angle this around ${FACET_HINT[facet]} (a fresh angle we have not used yet).`,
     challengerLine,
+    ...(pressure ? [pressure.line] : []),
     'Stay fully in character and keep it natural — the candidate must never feel "tested" on a specific skill. Ask exactly one clear, specific question in simple everyday English.',
   ].join('\n')
 
-  return { targetDimension: target, facet, deployChallenger, avatarStyle, directive }
+  return { targetDimension: target, facet, deployChallenger, avatarStyle, directive, pressure }
 }
 
 // ── Adaptive stop / extend rule (conversation-CAT) ────────────────────────────

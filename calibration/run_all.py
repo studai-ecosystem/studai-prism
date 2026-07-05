@@ -19,6 +19,7 @@ from jobs import (
     equate,
     irt_fit,
     rasch_facets,
+    relay_detect,
     reliability,
 )
 from jobs._base import connect
@@ -31,6 +32,9 @@ ORDER = [
     ("dif", dif_audit),
     ("conformal", conformal_refresh),
     ("channelB_train", channelB_train),
+    # Track 3.3 (dark): exits insufficient_data until the preregistered
+    # adversarial study supplies labeled arms. Never deploys anything.
+    ("relay_detect", relay_detect),
 ]
 
 

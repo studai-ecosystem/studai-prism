@@ -105,4 +105,55 @@ export function extractTurnFeatures(text, meta = {}) {
   return { features, signals }
 }
 
+// ── Track 3.1: behavioral-telemetry validation ───────────────────────────────
+// The client's turn summary is UNTRUSTED. Whitelist every key and clamp every
+// number so a manipulated client can neither poison the research corpus nor
+// smuggle arbitrary payloads into telemetry. Returns null when nothing valid.
+const clampNum = (v, min, max) => {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return null
+  return Math.max(min, Math.min(max, Math.round(n)))
+}
+const clampRatio = (v) => {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return null
+  return Math.max(0, Math.min(1, +n.toFixed(3)))
+}
+const MODALITIES = new Set(['typed', 'voice', 'dictation', 'mixed'])
+const MAX_MS = 30 * 60 * 1000 // nothing in a 30-minute test exceeds this
+const MAX_COUNT = 100000
+
+export function sanitizeBehaviorTelemetry(t) {
+  if (!t || typeof t !== 'object') return null
+  const out = {}
+  const responseMs = clampNum(t.responseMs, 0, MAX_MS)
+  if (responseMs !== null) out.responseMs = responseMs
+  if (typeof t.modality === 'string' && MODALITIES.has(t.modality)) out.modality = t.modality
+  if (t.typing && typeof t.typing === 'object') {
+    const ty = {}
+    for (const k of ['keyCount', 'backspaceCount', 'grossChars', 'netChars', 'longPauseCount', 'pasteAttempts']) {
+      const v = clampNum(t.typing[k], 0, MAX_COUNT)
+      if (v !== null) ty[k] = v
+    }
+    for (const k of ['firstKeyMs', 'meanInterKeyMs', 'medianInterKeyMs', 'sdInterKeyMs', 'maxPauseMs']) {
+      const v = clampNum(t.typing[k], 0, MAX_MS)
+      if (v !== null) ty[k] = v
+    }
+    const rr = clampRatio(t.typing.revisionRatio)
+    if (rr !== null) ty.revisionRatio = rr
+    if (Object.keys(ty).length) out.typing = ty
+  }
+  if (t.voice && typeof t.voice === 'object') {
+    const vo = {}
+    for (const k of ['speechOnsetMs', 'recordingMs']) {
+      const v = clampNum(t.voice[k], 0, MAX_MS)
+      if (v !== null) vo[k] = v
+    }
+    const gaps = clampNum(t.voice.silenceGapCount, 0, MAX_COUNT)
+    if (gaps !== null) vo.silenceGapCount = gaps
+    if (Object.keys(vo).length) out.voice = vo
+  }
+  return Object.keys(out).length ? out : null
+}
+
 export { DIMENSION_KEYS }
