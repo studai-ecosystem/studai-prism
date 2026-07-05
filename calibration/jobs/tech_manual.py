@@ -56,6 +56,10 @@ def gather(conn) -> dict:
         SELECT s.study_key, r.metric_name, r.value, r.n, r.analysis_version, r.computed_at AS created_at
           FROM study_results r JOIN studies s ON s.study_id = r.study_id
          WHERE r.superseded_by IS NULL
+           -- RULE 3: verification artifacts and synthetic-input computes are
+           -- labeled rows, never evidence. They must not render as results.
+           AND r.metric_name <> 'deploy_probe'
+           AND COALESCE(r.detail->>'includeSynthetic', 'false') <> 'true'
          ORDER BY r.computed_at
     """)
     for key, _ in STUDIES:
