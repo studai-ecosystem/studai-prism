@@ -99,3 +99,45 @@ test('ONE LAW: no code path flips a feature flag at runtime', async () => {
     assert.ok(!/process\.env\.PRISM_[A-Z0-9_]+\s*=(?!==?)/.test(code), `${f} assigns a PRISM_* flag at runtime`)
   }
 })
+
+// ── Stage 3: the map as law ──────────────────────────────────────────────────
+test('S3: every Stage-3 flag is on the map with a ceiling and preconditions', async () => {
+  const { FLAG_MAP } = await import('../lib/flagMap.js')
+  for (const flag of ['PRISM_V2_EXECUTIVE', 'PRISM_V2_DUAL_SCORER', 'CONFORMAL_CI', 'CERTIFIED_LANGUAGE', 'PRISM_VELOCITY', 'PRISM_PRESSURE', 'PRISM_LANG', 'PRISM_REPLAY', 'PRISM_TEAMFIT']) {
+    const entry = FLAG_MAP[flag]
+    assert.ok(entry, `${flag} missing from the map`)
+    assert.ok(entry.claimCeiling?.length > 10, `${flag} has a claim ceiling`)
+    assert.ok(entry.preconditions?.length >= 1, `${flag} has registry preconditions`)
+  }
+})
+
+test('S3: off-map flips ESCALATE; empty registry means NO-GO everywhere', async () => {
+  const { checkFlag } = await import('../lib/flagMap.js')
+  const rogue = await checkFlag('PRISM_SOMETHING_THE_FOUNDER_ASKED_FOR')
+  assert.equal(rogue.verdict, 'ESCALATE')
+  assert.ok(rogue.reason.includes('the founder asked'), 'cites the Law verbatim')
+  // Without a DB (local test env), preconditions cannot verify => never GO.
+  const exec = await checkFlag('PRISM_V2_EXECUTIVE')
+  assert.notEqual(exec.verdict, 'GO')
+  assert.ok(exec.claimCeiling)
+})
+
+// ── Stage 4.3: public benchmark page stays under the ceiling ────────────────
+test('S4.3: adversarial benchmark page is public and claims nothing without S4 data', async () => {
+  const { buildApp } = await import('../app.js')
+  const app = buildApp()
+  const server = app.listen(0)
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/evidence/adversarial`)
+    assert.equal(res.status, 200, 'public — no auth required')
+    const body = await res.json()
+    assert.ok(body.status.includes('preregistered'), 'pending state is explicit')
+    assert.equal(body.currentEvasionRate, null, 'no number without a registry row')
+    assert.ok(body.note.includes('No detection claim is made'))
+    assert.ok(body.detectionPolicy.includes('never auto-fail'))
+    const text = JSON.stringify(body)
+    assert.ok(!/\d+(\.\d+)?%/.test(text), 'no percentage appears anywhere in the pending state')
+  } finally {
+    server.close()
+  }
+})

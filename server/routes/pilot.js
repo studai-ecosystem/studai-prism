@@ -17,6 +17,7 @@ import { TRAINING_KAPPA_THRESHOLD } from '../lib/studies.js'
 import { getReport, getConsent } from '../lib/store.js'
 import { getLatestCredential } from '../lib/credentials.js'
 import { modelDriftStatus } from '../lib/modelDrift.js'
+import { FLAG_MAP, checkFlag } from '../lib/flagMap.js'
 
 const router = Router()
 
@@ -241,6 +242,19 @@ router.get('/report/weekly', async (req, res) => {
     logger.captureException(err, { msg: 'weekly_report_failed', requestId: req.requestId })
     res.status(500).json({ error: 'weekly report failed' })
   }
+})
+
+// ── Stage 3: flag-flip verification (the map as law) ──────────────────────
+router.get('/flip-check', async (_req, res) => {
+  const out = {}
+  for (const flag of Object.keys(FLAG_MAP)) out[flag] = await checkFlag(flag)
+  res.json({ note: 'GO blesses a HUMAN flip; NO-GO refuses it, citing the map.', flags: out })
+})
+
+router.get('/flip-check/:flag', async (req, res) => {
+  const result = await checkFlag(req.params.flag)
+  auditLog('flip_check', null, { flag: req.params.flag, verdict: result.verdict })
+  res.status(result.verdict === 'ESCALATE' ? 422 : 200).json(result)
 })
 
 export default router

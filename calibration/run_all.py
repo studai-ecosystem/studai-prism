@@ -13,15 +13,20 @@ import argparse
 import json
 
 from jobs import (
+    agreement_s2,
+    bias_audit,
     channelB_train,
     conformal_refresh,
     dif_audit,
     equate,
+    evidence_onepager,
     growth_curve,
     irt_fit,
     rasch_facets,
     relay_detect,
     reliability,
+    retest_s3,
+    review_package,
     tech_manual,
     transfer_corr,
 )
@@ -42,6 +47,13 @@ ORDER = [
     ("transfer_corr", transfer_corr),
     # Track 1.2: latent growth curves from the candidate timeline (dark).
     ("growth_curve", growth_curve),
+    # Phase 3 Stage 2: preregistered study analyses (insufficient until gated).
+    ("agreement_s2", agreement_s2),
+    ("retest_s3", retest_s3),
+    # Phase 3 artifacts — render whatever the registry now holds, honestly.
+    ("bias_audit", bias_audit),
+    ("evidence_onepager", evidence_onepager),
+    ("review_package", review_package),
     # Track 4.4: render the Technical Manual from whatever the DB now holds.
     ("tech_manual", tech_manual),
 ]

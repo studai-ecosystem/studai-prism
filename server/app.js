@@ -21,6 +21,7 @@ import credentialsRouter from './routes/credentials.js'
 import replayRouter from './routes/replay.js'
 import teamfitRouter from './routes/teamfit.js'
 import pilotRouter from './routes/pilot.js'
+import evidenceRouter from './routes/evidence.js'
 import { checkModelDriftAtBoot } from './lib/modelDrift.js'
 import {
   isProduction,
@@ -133,6 +134,8 @@ export function buildApp() {
   app.use('/api/teamfit', teamfitRouter)
   // Phase 3 Stage 1: pilot instrument panel (admin-gated; read-only).
   app.use('/api/pilot', pilotRouter)
+  // Phase 3 Stage 4.3: public evidence surfaces (registry-rendered, ceiling-safe).
+  app.use('/api/evidence', evidenceRouter)
   // Phase 3 Stage 6.1: surface judge-model drift loudly at boot.
   checkModelDriftAtBoot()
 
