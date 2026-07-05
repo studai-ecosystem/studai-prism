@@ -1,0 +1,101 @@
+// Phase 3 Stage 1/6 gate tests — pilot instrument panel + model-drift guard.
+
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { modelDriftStatus, assertJudgeAnchoredForIssuance, judgeFingerprint } from '../lib/modelDrift.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+// ── Stage 6.1: drift detection + escalation semantics ────────────────────────
+test('S6.1: drift is anchored/detected/blocking exactly per the escalation rule', () => {
+  const saved = process.env.AZURE_OPENAI_DEPLOYMENT
+  const savedHard = process.env.PRISM_DRIFT_HARD
+  try {
+    const fp = judgeFingerprint()
+    assert.ok(fp.deployment && fp.escalationRule, 'fingerprint pins deployment + rule')
+    process.env.AZURE_OPENAI_DEPLOYMENT = fp.deployment
+    delete process.env.PRISM_DRIFT_HARD
+    assert.equal(modelDriftStatus().status, 'anchored')
+    assert.doesNotThrow(assertJudgeAnchoredForIssuance)
+    // Drifted, soft era: detected, surfaced, NOT blocking.
+    process.env.AZURE_OPENAI_DEPLOYMENT = 'gpt-6-new'
+    assert.equal(modelDriftStatus().status, 'DRIFT_DETECTED')
+    assert.doesNotThrow(assertJudgeAnchoredForIssuance, 'pre-calibration: surface, never block')
+    // Drifted, hard gate (post-calibration-v1): issuance BLOCKS.
+    process.env.PRISM_DRIFT_HARD = 'true'
+    assert.equal(modelDriftStatus().status, 'DRIFT_BLOCKING')
+    assert.throws(assertJudgeAnchoredForIssuance, /issuance blocked/)
+  } finally {
+    if (saved === undefined) delete process.env.AZURE_OPENAI_DEPLOYMENT
+    else process.env.AZURE_OPENAI_DEPLOYMENT = saved
+    if (savedHard === undefined) delete process.env.PRISM_DRIFT_HARD
+    else process.env.PRISM_DRIFT_HARD = savedHard
+  }
+})
+
+// ── Stage 1: panel is admin-gated and read-only ──────────────────────────────
+test('S1: pilot panel requires the admin token (503/401 otherwise)', async () => {
+  const savedToken = process.env.ADMIN_TOKEN
+  try {
+    const { buildApp } = await import('../app.js')
+    delete process.env.ADMIN_TOKEN
+    const app = buildApp()
+    const server = app.listen(0)
+    const base = `http://127.0.0.1:${server.address().port}`
+    try {
+      assert.equal((await fetch(`${base}/api/pilot/dashboard`)).status, 503, 'no ADMIN_TOKEN => disabled')
+      process.env.ADMIN_TOKEN = 'test-token-abc'
+      assert.equal((await fetch(`${base}/api/pilot/dashboard`)).status, 401, 'wrong/missing token => unauthorized')
+    } finally {
+      server.close()
+    }
+  } finally {
+    if (savedToken === undefined) delete process.env.ADMIN_TOKEN
+    else process.env.ADMIN_TOKEN = savedToken
+  }
+})
+
+test('S1: instrument panel is read-only — no writes to any scoring/consent table', async () => {
+  for (const f of ['routes/pilot.js', 'lib/sentinels.js']) {
+    const raw = await readFile(join(__dirname, '..', f), 'utf-8')
+    const code = raw.replace(/^\s*\/\/.*$/gm, '')
+    for (const banned of ['INSERT INTO', 'UPDATE ', 'DELETE FROM', 'saveReport', 'issueCredential', 'recordItemResponse']) {
+      assert.ok(!code.includes(banned), `${f} must be read-only (${banned})`)
+    }
+    // Sentinels alert, never delete (Stage 1.2 letter).
+  }
+})
+
+test('S1: sentinels + dashboard honesty — projections never fabricate', async () => {
+  const { GATES } = await import('../routes/pilot.js')
+  assert.equal(GATES.totalRealSessions, 300)
+  assert.equal(GATES.doubleRatedSessions, 100)
+  const pilot = await readFile(join(__dirname, '..', 'routes', 'pilot.js'), 'utf-8')
+  assert.ok(pilot.includes('NO CURRENT VELOCITY'), 'zero-velocity gates are named, not projected')
+  const sentinels = await readFile(join(__dirname, '..', 'lib', 'sentinels.js'), 'utf-8')
+  assert.ok(sentinels.includes('never delete') || sentinels.includes('ALERT'), 'alert-only discipline stated')
+})
+
+// ── The One Law, encoded ─────────────────────────────────────────────────────
+test('ONE LAW: no code path flips a feature flag at runtime', async () => {
+  // Flags are environment-owned (humans + deploy). Nothing in the server may
+  // assign process.env.PRISM_* — flips happen via app settings, with a human.
+  const { readdir } = await import('node:fs/promises')
+  const walk = async (dir) => {
+    const out = []
+    for (const e of await readdir(join(__dirname, '..', dir), { withFileTypes: true })) {
+      if (e.isDirectory()) out.push(...(await walk(join(dir, e.name))))
+      else if (e.name.endsWith('.js')) out.push(join(dir, e.name))
+    }
+    return out
+  }
+  const files = [...(await walk('routes')), ...(await walk('lib')), ...(await walk('engine')), ...(await walk('scoring'))]
+  for (const f of files) {
+    const code = (await readFile(join(__dirname, '..', f), 'utf-8')).replace(/^\s*\/\/.*$/gm, '')
+    assert.ok(!/process\.env\.PRISM_[A-Z0-9_]+\s*=(?!==?)/.test(code), `${f} assigns a PRISM_* flag at runtime`)
+  }
+})

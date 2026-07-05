@@ -1,7 +1,7 @@
 import { useId } from 'react'
 
 // PRISM brand logo — a hand-built, scalable SVG (no image asset). Renders the
-// gold certificate-with-ribbon mark and, optionally, the navy serif "PRISM"
+// gold ribbon mark and, optionally, the navy serif "PRISM"
 // wordmark + "by StudAI One" subtitle. Used across the app's headers, footer
 // and report so the brand stays consistent everywhere.
 //

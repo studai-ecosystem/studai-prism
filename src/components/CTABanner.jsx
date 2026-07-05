@@ -27,7 +27,7 @@ export default function CTABanner({ onGetAssessed }) {
           variants={fadeUp}
           className="font-sans text-lg text-[#64687A] max-w-xl"
         >
-          One conversation. A certified map of your capability.
+          One conversation. A verified map of your capability.
         </motion.p>
 
         <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center gap-4 mt-2">

@@ -9,7 +9,7 @@ import { SCORE_VALIDITY_MONTHS } from '../../server/lib/sharedConstants.js'
 const INCLUDES = [
   { icon: Clock, text: '30-minute live AI scenario assessment' },
   { icon: Layers, text: 'Scored across 5 workplace skill dimensions' },
-  { icon: BadgeCheck, text: 'Certified, verified & shareable Prism Score' },
+  { icon: BadgeCheck, text: 'Verified & shareable Prism Score' },
 ]
 
 // Inject the Razorpay Checkout script once; resolves when window.Razorpay exists.

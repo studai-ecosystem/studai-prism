@@ -34,7 +34,7 @@ export default function AboutStudAI() {
             StudAI One is a privately held intelligence company built in
             Chennai, India. We build AI-powered products for students, colleges,
             and employers across India and APAC. Prism is our skills
-            certification product — the foundation on which we believe serious
+            verification product — the foundation on which we believe serious
             hiring should be built.
           </p>
         </div>
@@ -49,7 +49,7 @@ export default function AboutStudAI() {
           <p className="text-[#5A5F6E] leading-relaxed text-lg">
             We kept hearing the same thing from placement officers and hiring
             managers — resumes tell us where someone studied, not what they can
-            do. We built Prism to fix that. One conversation. A certified score.
+            do. We built Prism to fix that. One conversation. A verified score.
             Proof that works.
           </p>
         </div>

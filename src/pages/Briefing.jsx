@@ -182,7 +182,7 @@ export default function Briefing() {
               <ShieldCheck size={22} className="text-[#C9A84C]" />
             </div>
             <h1 className="font-serif text-4xl text-[#F0EDE6] mb-2">Your assessment is about to begin</h1>
-            <p className="font-sans text-sm text-[#8A8FA0]">30-minute assessment · 5 skill dimensions · Certified result</p>
+            <p className="font-sans text-sm text-[#8A8FA0]">30-minute assessment · 5 skill dimensions · Verified result</p>
           </div>
 
           {/* Rules */}

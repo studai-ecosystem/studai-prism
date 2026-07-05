@@ -9,7 +9,7 @@ const personas = [
     title: 'Students',
     icon: GraduationCap,
     description:
-      "Certify your ability before placement season. Add a verified Prism Score to your profile that hiring managers can trust — before you've had a single job.",
+      "Verify your ability before placement season. Add a verified Prism Score to your profile that hiring managers can trust — before you've had a single job.",
   },
   {
     title: 'Colleges & Universities',
@@ -27,7 +27,7 @@ const personas = [
     title: 'MBA & Management Institutes',
     icon: BarChart2,
     description:
-      'Give every student a certified score before placement season. Build employer confidence in your cohort with data-backed skill maps.',
+      'Give every student a verified score before placement season. Build employer confidence in your cohort with data-backed skill maps.',
   },
 ]
 

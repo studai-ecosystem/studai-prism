@@ -39,7 +39,7 @@ function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
               <ShieldCheck size={22} className="text-[#C9A84C]" />
             </div>
             <h1 className="font-serif text-3xl text-[#1A1A2E] mb-2">Before you begin</h1>
-            <p className="font-sans text-sm text-[#64687A]">30-minute assessment · 5 skill dimensions · Certified result</p>
+            <p className="font-sans text-sm text-[#64687A]">30-minute assessment · 5 skill dimensions · Verified result</p>
           </div>
 
           <ul className="flex flex-col gap-4">

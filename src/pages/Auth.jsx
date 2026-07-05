@@ -97,7 +97,7 @@ export default function Auth() {
               {isRegister ? 'Create your account' : 'Welcome back'}
             </h1>
             <p className="font-sans text-sm text-[#64687A]">
-              {isRegister ? 'Start your certified Prism assessment' : 'Sign in to continue'}
+              {isRegister ? 'Start your Prism assessment' : 'Sign in to continue'}
             </p>
           </div>
 

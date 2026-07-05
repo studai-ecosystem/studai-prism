@@ -661,7 +661,7 @@ export default function ScoreReport() {
           </div>
           <div>
             <div className="pr-logo-name">StudAI Prism</div>
-            <div className="pr-logo-sub">Certified Assessment</div>
+            <div className="pr-logo-sub">Verified Assessment</div>
           </div>
         </div>
         <div className="pr-header-right">
@@ -688,7 +688,7 @@ export default function ScoreReport() {
             <div className="cert-overline">
               <div className="cert-overline-badge">
                 <div className="cert-overline-dot"><Award size={12} /></div>
-                <span className="cert-overline-txt">Prism Certified · Issued {issuedDate}</span>
+                <span className="cert-overline-txt">Prism Verified · Issued {issuedDate}</span>
               </div>
             </div>
             <div className="cert-name">{displayName}</div>
@@ -942,7 +942,7 @@ export default function ScoreReport() {
             <button className="share-btn share-btn-linkedin" onClick={handleLinkedInShare}><Linkedin size={15} />Add to LinkedIn Profile</button>
             <button className="share-btn" onClick={handleDownloadPdf} disabled={downloading}><Download size={15} />{downloading ? 'Preparing…' : 'Download PDF'}</button>
             <button className="share-btn" onClick={() => { setEmailState('idle'); setEmailMsg(''); setEmailOpen(true) }}><Mail size={15} />Email report</button>
-            <button className="share-btn" onClick={handleDownloadPdf}><Award size={15} />Download certificate</button>
+            <button className="share-btn" onClick={handleDownloadPdf}><Award size={15} />Download report</button>
           </div>
           <div className="link-box">
             <LinkIcon size={15} color="var(--t3)" style={{ flexShrink: 0 }} />
@@ -1058,7 +1058,7 @@ export default function ScoreReport() {
                 </h3>
               </div>
               <p style={{ fontSize: 14, color: '#64687A', margin: '0 0 14px' }}>
-                We’ll send the certified PDF to your inbox.
+                We’ll send the verified PDF to your inbox.
               </p>
 
               {emailState === 'done' ? (

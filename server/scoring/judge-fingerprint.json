@@ -1,0 +1,8 @@
+{
+  "deployment": "gpt-5.4",
+  "apiVersion": "2025-04-01-preview",
+  "anchoredAt": "2026-07-05",
+  "anchorRunId": null,
+  "note": "Pre-calibration era: gpt-5.4 is the deployment that has scored every session to date. anchorRunId stays null until the first anchor re-score exists.",
+  "escalationRule": "When calibration-run v1 freezes: (1) set PRISM_DRIFT_HARD=true in prod; (2) any judge deployment change must shadow re-score the fixed anchor set (rater training refs + golden transcripts) and pass conformal recalibration; (3) only then update this file (new deployment + anchorRunId of the re-score) in the same commit as the config change. A drifted judge cannot mint credentials under the hard gate."
+}

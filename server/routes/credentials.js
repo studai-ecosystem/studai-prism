@@ -13,6 +13,7 @@ import { Router } from 'express'
 import { createHash } from 'node:crypto'
 import logger from '../lib/logger.js'
 import { query, isDbConfigured } from '../db/pool.js'
+import { auditLog } from '../lib/telemetry.js'
 import {
   isGlassBoxEnabled,
   getPublicKeyInfo,
@@ -53,6 +54,19 @@ router.get('/:sessionId/verify', async (req, res) => {
     if (!credential) return res.status(404).json({ error: 'no credential issued for this session' })
     const verification = await verifyCredential(credential)
     const chain = await getCredentialChain(req.params.sessionId)
+
+    // Phase 3 Stage 5: verification analytics — the employer-demand signal.
+    // Pseudonymous by construction: referrer HOST + UA family only, no IPs.
+    try {
+      const referer = req.get('referer') ? new URL(req.get('referer')).host : null
+      const ua = req.get('user-agent') || ''
+      auditLog('credential_verified_public', req.params.sessionId, {
+        credentialId: credential.credential_id,
+        refererHost: referer,
+        uaFamily: /bot|crawl|spider/i.test(ua) ? 'bot' : ua.split('/')[0].slice(0, 40) || null,
+        disclosure: typeof req.query.disclosure === 'string' ? 'token-attempted' : 'scores',
+      })
+    } catch { /* analytics must never break verification */ }
 
     const bundle = typeof credential.bundle === 'string' ? JSON.parse(credential.bundle) : credential.bundle
     const fullDisclosure =

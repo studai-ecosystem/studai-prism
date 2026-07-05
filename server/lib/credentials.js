@@ -22,6 +22,7 @@ import { query, isDbConfigured } from '../db/pool.js'
 import { getReport, getEvents, getConsent, getSession } from './store.js'
 import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCALE_VERSION, SCORE_VALIDITY_MONTHS, CONSENT_VERSION } from './sharedConstants.js'
 import { activeFlagSnapshot } from './telemetry.js'
+import { assertJudgeAnchoredForIssuance } from './modelDrift.js'
 import logger from './logger.js'
 
 export function isGlassBoxEnabled() {
@@ -165,6 +166,9 @@ export function assertBundlePseudonymous(bundle, path = '') {
 // ── T2.2 issuance & verification ─────────────────────────────────────────────
 export async function issueCredential(sessionId, { supersedes = null } = {}) {
   if (!isGlassBoxEnabled()) return null
+  // Stage 6.1: under the hard drift gate, a judge deployment that hasn't been
+  // re-anchored cannot mint certified artifacts. Throws when blocking.
+  assertJudgeAnchoredForIssuance()
   const k = keys()
   const bundle = await assembleEvidenceBundle(sessionId)
   if (!bundle) return null

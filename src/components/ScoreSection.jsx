@@ -51,7 +51,7 @@ export default function ScoreSection() {
               variants={fadeUp}
               className="font-sans text-[#64687A] leading-relaxed mb-8"
             >
-              Your Prism Score is a certified, verifiable number between 0–100. It comes
+              Your Prism Score is a verifiable number between 0–100. It comes
               with a detailed breakdown across all five dimensions — so employers and
               colleges see exactly where you excel, not just whether you cleared a cutoff.
             </motion.p>

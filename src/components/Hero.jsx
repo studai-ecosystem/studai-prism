@@ -5,7 +5,7 @@ import HeroAvatars from './HeroAvatars.jsx'
 
 const trustStats = [
   { value: '30 min', label: 'One conversation' },
-  { value: '5 dimensions', label: 'Certified assessment' },
+  { value: '5 dimensions', label: 'Verified assessment' },
   { value: 'Verified', label: 'Shareable score' },
 ]
 
@@ -34,7 +34,7 @@ export default function Hero({ onGetAssessed }) {
           variants={fadeUp}
           className="inline-block font-sans text-xs font-semibold tracking-[0.22em] text-[#C9A84C] uppercase"
         >
-          AI Skills Certification
+          AI Skills Assessment
         </motion.span>
 
         {/* H1 */}
@@ -43,7 +43,7 @@ export default function Hero({ onGetAssessed }) {
           className="font-serif italic text-5xl sm:text-6xl md:text-7xl text-[#1A1A2E] leading-[1.08] tracking-tight max-w-4xl"
         >
           One conversation.{' '}
-          <span className="not-italic">A certified map</span>{' '}
+          <span className="not-italic">A verified map</span>{' '}
           of what you can do.
         </motion.h1>
 
@@ -53,7 +53,7 @@ export default function Hero({ onGetAssessed }) {
           className="font-sans text-lg md:text-xl text-[#64687A] max-w-2xl leading-relaxed"
         >
           Not a multiple-choice test. A live 30-minute AI scenario that surfaces
-          how you actually think — then certifies it with a score employers trust.
+          how you actually think — then verifies it with a score employers can check.
         </motion.p>
 
         {/* Animated avatar characters + chat preview */}

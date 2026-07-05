@@ -98,7 +98,7 @@ export default function ScoreMockup({ scores = {} }) {
       <div className="flex items-center justify-between px-5 py-4 border-b border-[#EEEEF4]">
         <PrismLogo size={28} wordmarkColor="#0A0D14" subtitleColor="#8A8FA0" />
         <span className="font-sans text-[10px] font-semibold tracking-[0.18em] text-[#8A8FA0] uppercase">
-          Official Certificate
+          Official Score Report
         </span>
       </div>
 
@@ -125,7 +125,7 @@ export default function ScoreMockup({ scores = {} }) {
 
       {/* Footer */}
       <div className="px-5 py-3 bg-[#FAFAFC] border-t border-[#EEEEF4] text-center">
-        <p className="font-sans text-[11px] text-[#64687A]">Certified · Verified · Shareable</p>
+        <p className="font-sans text-[11px] text-[#64687A]">Verified · Evidence-backed · Shareable</p>
       </div>
     </motion.div>
   )

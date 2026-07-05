@@ -3,7 +3,7 @@ import PageLayout, { PageHeading } from '../../components/PageLayout.jsx'
 const pillars = [
   {
     name: 'Accessible',
-    desc: '$10 puts certification within reach of every student.',
+    desc: '$10 puts skill verification within reach of every student.',
   },
   {
     name: 'Trustworthy',
@@ -42,7 +42,7 @@ export default function Mission() {
       <section className="py-12 px-6 max-w-6xl mx-auto">
         <div className="bg-[#F6EFE2] rounded-2xl shadow-sm p-10 md:p-14 max-w-3xl mx-auto border-l-4 border-gold">
           <p className="text-2xl md:text-3xl font-serif text-[#0A0D14] leading-snug">
-            “A world where every capable person has a certified, verifiable
+            “A world where every capable person has a verified, verifiable
             proof of what they can do — regardless of where they studied or who
             they know.”
           </p>

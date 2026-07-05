@@ -20,6 +20,8 @@ import studiesRouter from './routes/studies.js'
 import credentialsRouter from './routes/credentials.js'
 import replayRouter from './routes/replay.js'
 import teamfitRouter from './routes/teamfit.js'
+import pilotRouter from './routes/pilot.js'
+import { checkModelDriftAtBoot } from './lib/modelDrift.js'
 import {
   isProduction,
   apiLimiter,
@@ -129,6 +131,10 @@ export function buildApp() {
   // Track 5 (both dark; 404 without their flags): practice replay + team-fit.
   app.use('/api/replay', replayRouter)
   app.use('/api/teamfit', teamfitRouter)
+  // Phase 3 Stage 1: pilot instrument panel (admin-gated; read-only).
+  app.use('/api/pilot', pilotRouter)
+  // Phase 3 Stage 6.1: surface judge-model drift loudly at boot.
+  checkModelDriftAtBoot()
 
   // ── Health check ─────────────────────────────────────────────────────────
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))

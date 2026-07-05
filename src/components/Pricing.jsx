@@ -6,7 +6,7 @@ import { SCORE_VALIDITY_MONTHS } from '../../server/lib/sharedConstants.js'
 
 const individualFeatures = [
   'One 30-minute AI assessment',
-  'Certified Prism Score',
+  'Verified Prism Score',
   'Full 5-dimension skill map report',
   'Shareable score link',
   `Valid for ${SCORE_VALIDITY_MONTHS} months`,

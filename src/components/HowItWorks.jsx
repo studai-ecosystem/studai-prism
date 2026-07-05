@@ -31,7 +31,7 @@ const steps = [
     title: 'Receive Your Prism Score',
     icon: Award,
     description:
-      'Your certified Prism Score and detailed skill map are ready within minutes. Share instantly on LinkedIn, résumé, or your college profile.',
+      'Your verified Prism Score and detailed skill map are ready within minutes. Share instantly on LinkedIn, résumé, or your college profile.',
     isLast: true,
   },
 ]
@@ -55,7 +55,7 @@ export default function HowItWorks() {
             variants={fadeUp}
             className="font-serif text-4xl md:text-5xl text-[#1A1A2E] leading-tight mt-1"
           >
-            Four steps from conversation to certification
+            Four steps from conversation to verified score
           </motion.h2>
         </motion.div>
 

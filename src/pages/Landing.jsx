@@ -502,17 +502,17 @@ export default function Landing({ onGetAssessed, onSeeHow }) {
 
         {/* 1. Eyebrow */}
         <span className="text-xs font-bold tracking-[0.25em] uppercase text-[#92600A]">
-          AI Skills Certification
+          AI Skills Assessment
         </span>
 
         {/* 2. H1 */}
         <h1 className="font-serif italic text-4xl md:text-6xl text-[#1A1A2E] leading-tight max-w-3xl">
-          One conversation. A certified map of what you can do.
+          One conversation. A verified map of what you can do.
         </h1>
 
         {/* 3. Subtext */}
         <p className="text-lg md:text-xl text-[#1E3A8A]/70 max-w-xl">
-          30 minutes. 3 AI avatars. 5 skills certified.
+          30 minutes. 3 AI avatars. 5 skills assessed.
         </p>
 
         {/* 4 + 5. Robots side by side with labels */}
@@ -552,7 +552,7 @@ export default function Landing({ onGetAssessed, onSeeHow }) {
         <div className="flex items-center justify-center gap-8 md:gap-12 mt-8">
           {[
             { value: '30 min', label: 'One conversation' },
-            { value: '5 dimensions', label: 'Certified' },
+            { value: '5 dimensions', label: 'Verified' },
             { value: 'Verified', label: 'Shareable score' },
           ].map((stat) => (
             <div key={stat.value} className="flex flex-col items-center">

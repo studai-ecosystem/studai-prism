@@ -1,0 +1,45 @@
+name: CI
+
+# Phase 3 Stage 3/5: the claims-ceiling suite runs on every push, permanently.
+# A claim without a registry entry is a bug with a legal payload.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Server tests (includes claims-ceiling + all track gates)
+        working-directory: server
+        run: |
+          npm ci
+          npm test
+      - name: Client build
+        run: |
+          npm ci
+          npm run build
+      - name: Judge fingerprint consistency (Stage 6.1)
+        # The pinned judge deployment file must parse and carry the escalation
+        # rule; config changes touching the deployment must update it in the
+        # same commit (enforced by review + the runtime drift guard).
+        run: node -e "const f=require('./server/scoring/judge-fingerprint.json'); if(!f.deployment||!f.escalationRule) throw new Error('judge-fingerprint.json incomplete')"
+
+  calibration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Calibration job tests (synthetic-only; no DB)
+        working-directory: calibration
+        run: |
+          pip install numpy pytest
+          python -m pytest tests -q
