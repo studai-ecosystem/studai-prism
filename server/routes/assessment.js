@@ -10,6 +10,7 @@ import { isWhisperEnabled, transcribeAudio } from '../lib/openaiWhisper.js'
 import { isMailEnabled, sendReportEmail } from '../lib/mailer.js'
 import {
   getEntitlement,
+  createEntitlement,
   createSession,
   getSession,
   getRecentScenarioIdsByUser,
@@ -472,11 +473,19 @@ router.post('/start', async (req, res) => {
   if (!sessionId) return res.status(400).json({ error: 'sessionId required' })
 
   // Paid-session gate — refuse to serve assessment content without a valid
-  // entitlement (created by payment verification or a dev session).
+  // entitlement (created by payment verification or a dev/dummy session).
   // In non-production we skip this gate so the flow can be tested freely.
-  const entitlement = await getEntitlement(sessionId)
+  // Under PRISM_DUMMY_PAYMENTS (trial), a missing entitlement self-heals to a
+  // 'dummy' one instead of blocking — anyone could mint one for free anyway,
+  // and the JSON store losing a row mid-trial must never dead-end a candidate.
+  let entitlement = await getEntitlement(sessionId)
   if (!entitlement && process.env.NODE_ENV === 'production') {
-    return res.status(402).json({ error: 'Payment required to start this assessment.' })
+    if (process.env.PRISM_DUMMY_PAYMENTS === 'true') {
+      entitlement = await createEntitlement({ sessionId, mode: 'dummy', amount: 0 })
+      logger.info('entitlement_self_healed', { sessionId, mode: 'dummy', requestId: req.requestId })
+    } else {
+      return res.status(402).json({ error: 'Payment required to start this assessment.' })
+    }
   }
 
   // Prevent restarting a session that already produced a report.
