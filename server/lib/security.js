@@ -47,11 +47,26 @@ export function assertProductionSecrets() {
 
 // ── Rate limiters (C7) ───────────────────────────────────────────────────────
 // req.ip is proxy-aware because index.js sets `trust proxy` (Azure App Service
-// fronts the app with one proxy hop). Limits are deliberately generous for
-// legitimate single-candidate flows and tight for abuse vectors.
+// fronts the app with one proxy hop). Azure ARR appends the SOURCE PORT to
+// X-Forwarded-For ("1.2.3.4:56789") — without normalisation every connection
+// would get its own bucket, silently disabling per-IP limits (observed in prod
+// 2026-07-05). Strip the port so limits key on the real client address.
+export function clientIpKey(req) {
+  const raw = String(req.ip || 'unknown')
+  const v4 = raw.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/)
+  if (v4) return v4[1]
+  const v6 = raw.match(/^\[([0-9a-fA-F:.]+)\]:\d+$/)
+  if (v6) return v6[1]
+  return raw
+}
+
 const baseOptions = {
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: clientIpKey,
+  // The library's own IP-format check rejects ARR's "ip:port" — our
+  // keyGenerator handles it, so silence that specific validation.
+  validate: { ip: false, keyGeneratorIpFallback: false },
   message: { error: 'Too many requests. Please slow down and try again shortly.' },
 }
 

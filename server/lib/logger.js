@@ -53,17 +53,33 @@ const logger = {
   debug: (msg, meta) => emit('debug', msg, meta),
 
   // Log an exception with stack trace and forward it to Sentry when available.
+  // Serialises SDK-style errors (e.g. Razorpay: {statusCode, error:{code,
+  // description}}) that carry no .message — those previously logged as an
+  // empty error line, hiding the real cause (2026-07-05 checkout incident).
   captureException: (err, context = {}) => {
-    emit('error', context.msg || err?.message || 'exception', {
+    const detail =
+      err?.message ||
+      err?.error?.description ||
+      (err && typeof err === 'object' ? safeStringify(err) : String(err))
+    emit('error', context.msg || detail || 'exception', {
       ...context,
       msg: undefined,
-      error: err?.message,
+      error: detail,
+      statusCode: err?.statusCode,
       stack: err?.stack,
     })
     if (sentry) {
       try { sentry.captureException(err, { extra: context }) } catch { /* never throw from logging */ }
     }
   },
+}
+
+function safeStringify(obj) {
+  try {
+    return JSON.stringify(obj).slice(0, 500)
+  } catch {
+    return '[unserializable error]'
+  }
 }
 
 // ── Express request-logging middleware ────────────────────────────────────────

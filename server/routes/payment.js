@@ -53,7 +53,20 @@ router.post('/create-order', async (req, res) => {
     })
     res.json({ id: order.id, amount: order.amount, currency: order.currency })
   } catch (err) {
-    logger.captureException(err, { msg: 'payment_create_order_failed', requestId: req.requestId })
+    logger.captureException(err, {
+      msg: 'payment_create_order_failed',
+      requestId: req.requestId,
+      rzpStatus: err?.statusCode,
+      rzpCode: err?.error?.code,
+      rzpDescription: err?.error?.description,
+    })
+    // Razorpay 401 = OUR credentials are wrong — an ops problem, not the
+    // candidate's. Return 503 with an honest message instead of a generic 500.
+    if (err?.statusCode === 401) {
+      return res.status(503).json({
+        error: 'Payments are temporarily unavailable (gateway configuration). Please try again later or contact support.',
+      })
+    }
     res.status(500).json({ error: 'Failed to create payment order' })
   }
 })

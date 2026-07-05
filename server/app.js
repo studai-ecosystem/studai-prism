@@ -65,6 +65,10 @@ export function buildApp() {
       // Static avatars/models are fetched cross-origin by the LAN phone page in dev.
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       crossOriginEmbedderPolicy: false,
+      // Razorpay checkout opens bank-auth/UPI popups that must keep their
+      // window.opener — helmet's default COOP (same-origin) severs it and
+      // breaks payment completion.
+      crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
     }),
   )
 

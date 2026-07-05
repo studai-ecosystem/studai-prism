@@ -17,7 +17,7 @@ process.env.JWT_SECRET = 'test-secret-for-security-suite'
 delete process.env.PRISM_PG_STORE
 
 const { buildApp } = await import('../app.js')
-const { assertProductionSecrets, getJwtSecret } = await import('../lib/security.js')
+const { assertProductionSecrets, getJwtSecret, clientIpKey } = await import('../lib/security.js')
 const { createSession, saveReport } = await import('../lib/store.js')
 
 const app = buildApp()
@@ -137,6 +137,19 @@ test('C21: responses carry CSP / HSTS / X-Content-Type-Options headers', async (
   assert.ok(res.headers.get('content-security-policy'), 'CSP header missing')
   assert.ok(res.headers.get('strict-transport-security'), 'HSTS header missing')
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff')
+})
+
+test('payments: COOP allows popups (Razorpay bank-auth windows need window.opener)', async () => {
+  const res = await fetch(`${base}/api/health`)
+  assert.equal(res.headers.get('cross-origin-opener-policy'), 'same-origin-allow-popups')
+})
+
+test('C7: rate-limit keys strip the port Azure ARR appends to X-Forwarded-For', () => {
+  assert.equal(clientIpKey({ ip: '98.70.48.29:57559' }), '98.70.48.29')
+  assert.equal(clientIpKey({ ip: '98.70.48.29' }), '98.70.48.29')
+  assert.equal(clientIpKey({ ip: '[2001:db8::1]:443' }), '2001:db8::1')
+  assert.equal(clientIpKey({ ip: '2001:db8::1' }), '2001:db8::1')
+  assert.equal(clientIpKey({}), 'unknown')
 })
 
 test('C21: production app does not reflect arbitrary Origins (no CORS wildcard)', async () => {

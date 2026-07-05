@@ -84,7 +84,10 @@ export default function Payment() {
         // ── Live Razorpay checkout ──────────────────────────────────────────
         await loadRazorpayScript()
         const orderRes = await fetch('/api/payment/create-order', { method: 'POST' })
-        if (!orderRes.ok) throw new Error('Could not start checkout. Please try again.')
+        if (!orderRes.ok) {
+          const data = await orderRes.json().catch(() => ({}))
+          throw new Error(data.error || 'Could not start checkout. Please try again.')
+        }
         const order = await orderRes.json()
         const sessionId = await openRazorpayCheckout({ cfg, order, user })
         navigate(`/verify-identity?session=${sessionId}`)
