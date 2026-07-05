@@ -69,3 +69,14 @@ test('non-production keeps the classic dev-session flow with the flag unset', ()
     const { sessionId } = await res.json()
     assert.ok(sessionId)
   }))
+
+test('PRISM_SKIP_VERIFICATION is reflected in config (and defaults off)', async () => {
+  await withEnv({ PRISM_SKIP_VERIFICATION: 'true' }, async () => {
+    const cfg = await (await fetch(`${base}/api/payment/config`)).json()
+    assert.equal(cfg.skipVerification, true)
+  })
+  await withEnv({ PRISM_SKIP_VERIFICATION: undefined }, async () => {
+    const cfg = await (await fetch(`${base}/api/payment/config`)).json()
+    assert.equal(cfg.skipVerification, false)
+  })
+})

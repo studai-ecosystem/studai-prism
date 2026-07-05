@@ -89,6 +89,10 @@ export default function Payment() {
       // Ask the server which checkout flow is available (publishable key only).
       const cfgRes = await fetch('/api/payment/config')
       const cfg = cfgRes.ok ? await cfgRes.json() : {}
+      // Trial mode (PRISM_SKIP_VERIFICATION): skip identity verification and
+      // proctor setup — straight to the briefing (consent still applies there).
+      const nextStep = (sessionId) =>
+        cfg.skipVerification ? `/briefing?session=${sessionId}` : `/verify-identity?session=${sessionId}`
 
       if (cfg.enabled && cfg.keyId) {
         // ── Live Razorpay checkout ──────────────────────────────────────────
@@ -100,7 +104,7 @@ export default function Payment() {
         }
         const order = await orderRes.json()
         const sessionId = await openRazorpayCheckout({ cfg, order, user })
-        navigate(`/verify-identity?session=${sessionId}`)
+        navigate(nextStep(sessionId))
         return
       }
 
@@ -111,9 +115,9 @@ export default function Payment() {
       const res = await fetch('/api/payment/dev-session', { method: 'POST' })
       if (!res.ok) throw new Error('Could not start your session. Please try again.')
       const { sessionId } = await res.json()
-      // Continue into identity verification + proctoring (which carry the
-      // sessionId through to the briefing and the assessment itself).
-      navigate(`/verify-identity?session=${sessionId}`)
+      // Continue into the next step (which carries the sessionId through to
+      // the briefing and the assessment itself).
+      navigate(nextStep(sessionId))
     } catch (err) {
       setError(err.message)
       setLoading(false)

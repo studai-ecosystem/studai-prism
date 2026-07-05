@@ -159,7 +159,6 @@ export default function VerifyIdentity() {
     rollNumber: '',
   })
   const [aadhaarDoc, setAadhaarDoc] = useState({ matched: false, score: null, scanning: false })
-  const [collegeDoc, setCollegeDoc] = useState({ matched: false, score: null, scanning: false })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -168,15 +167,13 @@ export default function VerifyIdentity() {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
-  const scanning = aadhaarDoc.scanning || collegeDoc.scanning
-  const nameMatch = aadhaarDoc.matched || collegeDoc.matched
-  const bestScore = Math.max(aadhaarDoc.score ?? 0, collegeDoc.score ?? 0)
+  const scanning = aadhaarDoc.scanning
+  const nameMatch = aadhaarDoc.matched
+  const bestScore = aadhaarDoc.score ?? 0
 
-  const requiredFilled =
-    form.fullName.trim() &&
-    form.aadhaarLast4.length === 4 &&
-    form.college.trim() &&
-    form.rollNumber.trim()
+  // College / roll number are OPTIONAL — working professionals take Prism too
+  // (the college ID document requirement was removed for the same reason).
+  const requiredFilled = form.fullName.trim() && form.aadhaarLast4.length === 4
 
   const canContinue = requiredFilled && nameMatch && !scanning && !submitting
 
@@ -253,22 +250,16 @@ export default function VerifyIdentity() {
               <Field label="Father's name" value={form.fathersName} onChange={update('fathersName')} placeholder="As on document" />
               <Field label="Date of birth" type="date" value={form.dob} onChange={update('dob')} />
               <Field label="Aadhaar — last 4 digits" value={form.aadhaarLast4} onChange={update('aadhaarLast4')} placeholder="••••" maxLength={4} inputMode="numeric" />
-              <Field label="College / University" value={form.college} onChange={update('college')} placeholder="Your institution" />
-              <Field label="Roll / Enrollment number" value={form.rollNumber} onChange={update('rollNumber')} placeholder="Your roll number" />
+              <Field label="College / Organisation (optional)" value={form.college} onChange={update('college')} placeholder="Your institution or employer" />
+              <Field label="Roll / Employee number (optional)" value={form.rollNumber} onChange={update('rollNumber')} placeholder="Roll or employee ID" />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4">
               <DocUpload
                 title="Aadhaar card"
                 hint="Front side, name clearly visible"
                 declaredName={form.fullName}
                 onResult={setAadhaarDoc}
-              />
-              <DocUpload
-                title="College ID card"
-                hint="Photo and name visible"
-                declaredName={form.fullName}
-                onResult={setCollegeDoc}
               />
             </div>
 
@@ -280,7 +271,7 @@ export default function VerifyIdentity() {
               </p>
             </div>
 
-            {!nameMatch && (aadhaarDoc.score !== null || collegeDoc.score !== null) && !scanning && (
+            {!nameMatch && aadhaarDoc.score !== null && !scanning && (
               <p className="font-sans text-sm font-medium text-red-600">
                 The name on your document does not match your registered name. You cannot proceed.
               </p>

@@ -17,6 +17,12 @@ const PRICE_PAISE = 1000 // $10 (in cents)
 // vs free sessions stay distinguishable forever.
 const isDummyPayments = () => process.env.PRISM_DUMMY_PAYMENTS === 'true'
 
+// Skip-verification mode (PRISM_SKIP_VERIFICATION=true): the client routes
+// candidates straight from payment to the briefing, bypassing identity
+// verification and the phone/room proctor setup. For trial/preview periods
+// only — never for certified assessments. Read lazily like the dummy flag.
+const isSkipVerification = () => process.env.PRISM_SKIP_VERIFICATION === 'true'
+
 // Validate env
 const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } = process.env
 if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
@@ -49,6 +55,7 @@ router.get('/config', (_req, res) => {
     currency: 'USD',
     devSessionAvailable: dummy || process.env.NODE_ENV !== 'production',
     dummyMode: dummy,
+    skipVerification: isSkipVerification(),
   })
 })
 
