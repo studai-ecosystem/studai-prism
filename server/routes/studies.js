@@ -310,4 +310,34 @@ router.get('/transfer/ratings', requireAdmin, async (_req, res) => {
   }
 })
 
+// ── Track 1.5: test–retest study enrolment ───────────────────────────────
+// Admin-triggered: tags a consenting pilot candidate's session into the
+// preregistered test_retest study (arm = baseline | retest). Assignment is
+// immutable (study_sessions trigger); form assignment reuses the Track 0.3
+// never-same-scenario rule automatically on the retest session.
+router.post('/test_retest/enroll', requireAdmin, async (req, res) => {
+  const { sessionId, arm } = req.body || {}
+  if (!sessionId || !['baseline', 'retest'].includes(arm)) {
+    return res.status(400).json({ error: "sessionId and arm ('baseline'|'retest') required" })
+  }
+  try {
+    const study = await getStudyByKey('test_retest')
+    if (!study) return res.status(404).json({ error: 'test_retest study not registered' })
+    const isSynthetic = Boolean(req.body?.isSynthetic)
+    await query(
+      `INSERT INTO study_sessions (study_id, session_id, arm, is_synthetic)
+       VALUES ($1,$2,$3,$4) ON CONFLICT (study_id, session_id) DO NOTHING`,
+      [study.study_id, sessionId, arm, isSynthetic],
+    )
+    const r = await query(
+      'SELECT arm FROM study_sessions WHERE study_id = $1 AND session_id = $2',
+      [study.study_id, sessionId],
+    )
+    res.status(201).json({ ok: true, sessionId, arm: r?.rows?.[0]?.arm || arm, study: 'test_retest' })
+  } catch (err) {
+    logger.captureException(err, { msg: 'test_retest_enroll_failed' })
+    res.status(500).json({ error: 'failed to enroll session' })
+  }
+})
+
 export default router

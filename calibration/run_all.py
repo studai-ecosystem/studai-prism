@@ -17,6 +17,7 @@ from jobs import (
     conformal_refresh,
     dif_audit,
     equate,
+    growth_curve,
     irt_fit,
     rasch_facets,
     relay_detect,
@@ -39,6 +40,8 @@ ORDER = [
     ("relay_detect", relay_detect),
     # Track 4.3: prism-vs-external-rating correlation (sim-to-reality).
     ("transfer_corr", transfer_corr),
+    # Track 1.2: latent growth curves from the candidate timeline (dark).
+    ("growth_curve", growth_curve),
     # Track 4.4: render the Technical Manual from whatever the DB now holds.
     ("tech_manual", tech_manual),
 ]

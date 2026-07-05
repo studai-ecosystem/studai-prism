@@ -53,6 +53,7 @@ import { sanitizeCandidateText, INJECTION_GUARD } from '../lib/promptSecurity.js
 import { isDualScorerEnabled, runDualScorer } from '../scoring/dualScorer.js'
 import { equateScore, isEquatingEnabled } from '../scoring/equating.js'
 import { isLangEnabled, resolveLanguage, scoringStatusFor, asrHintFor, languageOptions } from '../lib/lang.js'
+import { isVelocityEnabled, thetaFromReport, velocityView } from '../lib/velocity.js'
 
 const router = Router()
 
@@ -1182,6 +1183,8 @@ router.post('/evaluate', async (req, res) => {
       flagsActive: activeFlagSnapshot(),
       isSynthetic: (entitlementRec?.mode || 'paid') !== 'paid',
       language: evalLanguage,
+      // Track 1.1: the growth-curve measurement point (per-dimension θ + SE).
+      finalTheta: thetaFromReport(report),
     })
 
     // Track 6.3: persist the blinded transcript (turns only, never scores) as
@@ -1460,6 +1463,54 @@ router.get('/history', async (req, res) => {
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_history_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to load test history.' })
+  }
+})
+
+// ── GET /api/assessment/velocity ─────────────────────────────────────────────
+// Track 1.3 (PRISM_VELOCITY, default OFF — invisible without the flag).
+// The candidate's own growth trajectory with uncertainty bands, governed by
+// the honesty rules in server/psychometrics/GROWTH.md: >=3 equated points +
+// slope distinguishable from zero before ANY growth statement; 2 points show
+// scores + "trend after next assessment"; 1 point shows no trend language;
+// mixed scale_versions render "not directly comparable" (T1.4).
+router.get('/velocity', async (req, res) => {
+  if (!isVelocityEnabled()) return res.status(404).json({ error: 'Not found' })
+  const authUser = getAuthUser(req)
+  if (!authUser) return res.status(401).json({ error: 'Not authenticated.' })
+  try {
+    const candidateId = await ensureCandidateId(authUser.id)
+    if (!candidateId) return res.status(404).json({ error: 'No assessment timeline yet.' })
+    const { query: pgQuery, isDbConfigured: dbOk } = await import('../db/pool.js')
+    if (!dbOk()) return res.status(503).json({ error: 'not available' })
+    const r = await pgQuery(
+      'SELECT attempt_no, scale_version, final_theta, completed_at, is_synthetic FROM assessment_timeline WHERE candidate_id = $1 ORDER BY attempt_no',
+      [candidateId],
+    )
+    res.json(velocityView(r?.rows || []))
+  } catch (err) {
+    logger.captureException(err, { msg: 'velocity_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Failed to compute trajectory' })
+  }
+})
+
+// Admin variant for the dark demo + support: same view for any candidate_id.
+router.get('/velocity/:candidateId', async (req, res) => {
+  if (!isVelocityEnabled()) return res.status(404).json({ error: 'Not found' })
+  const expected = process.env.ADMIN_TOKEN
+  if (!expected) return res.status(503).json({ error: 'velocity admin disabled (set ADMIN_TOKEN)' })
+  if (req.get('x-admin-token') !== expected) return res.status(401).json({ error: 'unauthorized' })
+  try {
+    const { query: pgQuery, isDbConfigured: dbOk } = await import('../db/pool.js')
+    if (!dbOk()) return res.status(503).json({ error: 'not available' })
+    const r = await pgQuery(
+      'SELECT attempt_no, scale_version, final_theta, completed_at, is_synthetic FROM assessment_timeline WHERE candidate_id = $1 ORDER BY attempt_no',
+      [req.params.candidateId],
+    )
+    if (!r?.rows?.length) return res.status(404).json({ error: 'unknown candidate' })
+    res.json(velocityView(r.rows))
+  } catch (err) {
+    logger.captureException(err, { msg: 'velocity_admin_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Failed to compute trajectory' })
   }
 })
 

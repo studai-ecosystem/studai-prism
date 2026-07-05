@@ -86,6 +86,44 @@ def _ability_bin(score: float, edges: list[float]) -> int:
     return len(edges)
 
 
+# ── logistic DIF (uniform + non-uniform) ─────────────────────────────────────
+# Preregistered alongside MH in the protocols: P(correct) ~ ability + group
+# (+ ability×group). Uniform DIF = group coefficient significant; non-uniform
+# = interaction significant (Wald z > 1.96). Plain-numpy gradient logistic —
+# deterministic, no extra dependencies.
+def _fit_logistic(X: np.ndarray, y: np.ndarray, iters: int = 400, lr: float = 0.5, lam: float = 1e-4):
+    Xb = np.hstack([np.ones((len(X), 1)), X])
+    w = np.zeros(Xb.shape[1])
+    for _ in range(iters):
+        p = 1 / (1 + np.exp(-Xb @ w))
+        grad = Xb.T @ (p - y) / len(y) + lam * np.r_[0, w[1:]]
+        w -= lr * grad
+    p = 1 / (1 + np.exp(-Xb @ w))
+    # Wald SEs from the observed information matrix.
+    V = Xb.T @ (Xb * (p * (1 - p))[:, None]) + lam * np.eye(Xb.shape[1])
+    try:
+        se = np.sqrt(np.diag(np.linalg.inv(V)))
+    except np.linalg.LinAlgError:
+        se = np.full(Xb.shape[1], np.inf)
+    return w, se
+
+
+def logistic_dif(ability: np.ndarray, group: np.ndarray, correct: np.ndarray) -> dict:
+    """ability (float), group (0=ref/1=focal), correct (0/1). Returns Wald z
+    for the uniform (group) and non-uniform (ability×group) terms."""
+    a = (ability - ability.mean()) / (ability.std() or 1.0)
+    X = np.column_stack([a, group, a * group])
+    w, se = _fit_logistic(X, correct.astype(float))
+    z_uniform = float(w[2] / se[2]) if se[2] > 0 else 0.0
+    z_nonuniform = float(w[3] / se[3]) if se[3] > 0 else 0.0
+    return {
+        "z_uniform": round(z_uniform, 3),
+        "z_nonuniform": round(z_nonuniform, 3),
+        "uniform_flag": abs(z_uniform) > 1.96,
+        "nonuniform_flag": abs(z_nonuniform) > 1.96,
+    }
+
+
 def run(conn=None, seed: int = 42) -> dict:
     seed_everything(seed)
     own = conn is None
@@ -179,11 +217,21 @@ def compute_dif(rows: list[dict], demo_by_session: dict[str, dict]) -> list[dict
             or_mh, chi = mh_odds_ratio(strata)
             cls = ets_class(or_mh, chi)
             if cls != "A":
+                # Preregistered second method: logistic uniform + non-uniform
+                # DIF on the same item (protocol: MH χ² + logistic regression).
+                sids_lv = [(sid, lv) for sid, lv in pairs
+                           if demo_by_session.get(sid, {}).get(group_var) in (focal, ref)]
+                lg = logistic_dif(
+                    np.array([ability.get(sid, 0.0) for sid, _ in sids_lv]),
+                    np.array([1.0 if demo_by_session[sid][group_var] == focal else 0.0 for sid, _ in sids_lv]),
+                    np.array([1.0 if lv > cut else 0.0 for _, lv in sids_lv]),
+                )
                 findings.append({
                     "group": group_var, "focal": focal, "reference": ref,
                     "item_id": item_id, "dimension": dim,
                     "odds_ratio": round(or_mh, 4) if math.isfinite(or_mh) else None,
                     "chi_square": round(chi, 4), "ets_class": cls,
+                    "logistic": lg,
                 })
 
     return findings

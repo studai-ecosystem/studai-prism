@@ -85,6 +85,39 @@ router.get('/:sessionId/verify', async (req, res) => {
       issuedAt: credential.issued_at,
       chain,
       view,
+      // T2.2: W3C Verifiable Credential rendering of the SAME signed bundle
+      // (data-model envelope; proof = the stored Ed25519 signature over the
+      // canonical bundle hash). Claim discipline: this is a "cryptographically
+      // verifiable evidence chain" — nothing stronger.
+      ...(req.query.format === 'vc'
+        ? {
+            verifiableCredential: {
+              '@context': ['https://www.w3.org/ns/credentials/v2'],
+              type: ['VerifiableCredential', 'PrismSkillAssessmentCredential'],
+              issuer: `did:web:prism.studai.one#${credential.key_id}`,
+              validFrom: credential.issued_at,
+              credentialStatus: {
+                id: `https://prism.studai.one/api/credentials/id/${credential.credential_id}/status`,
+                type: 'PrismRevocationStatus',
+              },
+              credentialSubject: {
+                id: `urn:uuid:${req.params.sessionId}`, // pseudonymous session id — never identity
+                evidenceBundle: view, // disclosure-appropriate view of the signed bundle
+                bundleHash: credential.bundle_hash,
+                schema: 'https://prism.studai.one/docs/evidence-bundle-schema-v1.json',
+              },
+              proof: {
+                type: 'Ed25519Signature2020',
+                created: credential.issued_at,
+                verificationMethod: `did:web:prism.studai.one#${credential.key_id}`,
+                proofPurpose: 'assertionMethod',
+                proofValue: credential.signature,
+                // The signature is over sha256(canonical bundle) — verify via
+                // GET /api/credentials/public-key + the published schema.
+              },
+            },
+          }
+        : {}),
     })
   } catch (err) {
     logger.captureException(err, { msg: 'credential_verify_failed', requestId: req.requestId })

@@ -34,7 +34,7 @@ STUDIES = [
     ("multilingual_dif", "Study 6 — Multilingual Fairness (DIF)"),
 ]
 
-CALIBRATION_RUNS = ["irt", "rasch", "equate", "reliability", "dif", "conformal", "channelB_train", "relay_detect", "transfer_corr"]
+CALIBRATION_RUNS = ["irt", "rasch", "equate", "reliability", "dif", "conformal", "channelB_train", "relay_detect", "transfer_corr", "growth_curve"]
 
 
 def _fmt(v) -> str:
