@@ -315,6 +315,9 @@ export async function eraseTelemetry(sessionId) {
     // candidate's answers — erasure must destroy them too (delete is the ONE
     // mutation the immutability trigger permits, exactly for this right).
     ['credentials', 'session_id'],
+    // Track 4.3: external live-exercise ratings are evaluative data about
+    // the same candidate — erased with the session (append-only otherwise).
+    ['external_ratings', 'session_id'],
     ['audit_log', 'session_id'],
   ]) {
     const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId]).catch(() => null)

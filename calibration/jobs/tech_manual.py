@@ -53,9 +53,10 @@ def gather(conn) -> dict:
     registry = {r["study_key"]: r for r in fetch_all(
         conn, "SELECT s.study_key, s.status, s.title FROM studies s")}
     results = fetch_all(conn, """
-        SELECT s.study_key, r.metric_name, r.value, r.n, r.analysis_version, r.created_at
+        SELECT s.study_key, r.metric_name, r.value, r.n, r.analysis_version, r.computed_at AS created_at
           FROM study_results r JOIN studies s ON s.study_id = r.study_id
-         ORDER BY r.created_at
+         WHERE r.superseded_by IS NULL
+         ORDER BY r.computed_at
     """)
     for key, _ in STUDIES:
         data["studies"][key] = {
