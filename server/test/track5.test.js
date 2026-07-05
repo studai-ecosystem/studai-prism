@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { detectMoments, truncateHistoryForReplay, isReplayEnabled, MAX_REPLAY_TURNS } from '../lib/replay.js'
+import { detectMoments, truncateHistoryForReplay, historyFromTranscript, isReplayEnabled, MAX_REPLAY_TURNS } from '../lib/replay.js'
 import {
   isTeamfitEnabled, TEAMFIT_CONSENT_SCOPE, verifyTeamConsent, personaFromReport,
   sanitizeObservations, assertNoNumericFit, composeTwins, FORBIDDEN_FIT_KEYS,
@@ -110,6 +110,27 @@ test('T5.1: history reconstruction stops right before the replayed answer', () =
   assert.equal(truncateHistoryForReplay(history, 9), null, 'unknown exchange refuses')
   assert.equal(truncateHistoryForReplay(null, 1), null)
   assert.ok(MAX_REPLAY_TURNS <= 5, 'replay stays a practice rep, not a second assessment')
+})
+
+test('T5.1: completed sessions reconstruct from the blinded transcript (store frees history at scoring)', () => {
+  const turns = [
+    { speaker: 'avatar', name: 'Priya', text: 'opening question?' },
+    { speaker: 'candidate', text: 'first answer' },
+    { speaker: 'avatar', name: 'Priya', text: 'second question?' },
+    { speaker: 'avatar', name: 'Arjun', text: 'and a challenge.' },
+    { speaker: 'candidate', text: 'second answer' },
+  ]
+  const history = historyFromTranscript(turns)
+  assert.equal(history.length, 5)
+  assert.equal(history[1].content, '[Candidate]: first answer')
+  assert.ok(JSON.parse(history[3].content).messages[0].speaker === 'Arjun')
+  // Truncation over the rebuilt form: replaying exchange 2 keeps both avatar
+  // questions the candidate was answering.
+  const at2 = truncateHistoryForReplay(history, 2)
+  assert.equal(at2.length, 4)
+  assert.ok(at2[at2.length - 1].content.includes('challenge'))
+  assert.equal(historyFromTranscript([]), null)
+  assert.equal(historyFromTranscript(null), null)
 })
 
 // ── Gate 2: consent verification for every member ────────────────────────────

@@ -15,7 +15,7 @@ import logger from '../lib/logger.js'
 import { query, isDbConfigured } from '../db/pool.js'
 import { getSession, getReport } from '../lib/store.js'
 import { auditLog } from '../lib/telemetry.js'
-import { isReplayEnabled, loadMoments, truncateHistoryForReplay, MAX_REPLAY_TURNS } from '../lib/replay.js'
+import { isReplayEnabled, loadMoments, truncateHistoryForReplay, loadReplayHistory, MAX_REPLAY_TURNS } from '../lib/replay.js'
 import { sanitizeCandidateText } from '../lib/promptSecurity.js'
 import { microRateTurn } from '../engine/microRater.js'
 import { resolveLanguage } from '../lib/lang.js'
@@ -57,9 +57,12 @@ router.post('/:sessionId/start', async (req, res) => {
     if (!report) return res.status(404).json({ error: 'No completed assessment for this session.' })
     const persisted = await getSession(sessionId)
     const scenario = SCENARIOS.find((s) => s.id === persisted?.scenarioId)
-    if (!persisted?.history || !scenario) return res.status(404).json({ error: 'Session history unavailable.' })
+    // The live store frees the transcript at completion — rebuild from the
+    // durable blinded transcript (Track 6.3) when needed.
+    const fullHistory = await loadReplayHistory(sessionId, persisted)
+    if (!fullHistory || !scenario) return res.status(404).json({ error: 'Session history unavailable.' })
 
-    const history = truncateHistoryForReplay(persisted.history, exchangeNo)
+    const history = truncateHistoryForReplay(fullHistory, exchangeNo)
     if (!history) return res.status(400).json({ error: 'That exchange cannot be replayed.' })
 
     const moments = await loadMoments(sessionId, 10)

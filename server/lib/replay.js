@@ -113,3 +113,30 @@ export function truncateHistoryForReplay(history, exchangeNo) {
   }
   return null // exchange not found — session too short
 }
+
+// The v1 store deliberately frees a session's transcript at completion
+// (saveReport), but the blinded session_transcripts row (Track 6.3) survives.
+// Rebuild prompt-shaped history from those turns so completed sessions — the
+// only sessions replay applies to — can be reconstructed.
+export function historyFromTranscript(turns) {
+  if (!Array.isArray(turns) || !turns.length) return null
+  const history = []
+  for (const t of turns) {
+    if (t?.speaker === 'candidate' && t.text) {
+      history.push({ role: 'user', content: `[Candidate]: ${t.text}` })
+    } else if (t?.text) {
+      history.push({
+        role: 'assistant',
+        content: JSON.stringify({ messages: [{ speaker: t.name || 'Avatar', role: '', content: t.text }] }),
+      })
+    }
+  }
+  return history.length ? history : null
+}
+
+export async function loadReplayHistory(sessionId, persisted) {
+  if (Array.isArray(persisted?.history) && persisted.history.length) return persisted.history
+  if (!isDbConfigured()) return null
+  const r = await query('SELECT turns FROM session_transcripts WHERE session_id = $1', [sessionId]).catch(() => null)
+  return historyFromTranscript(r?.rows?.[0]?.turns)
+}
