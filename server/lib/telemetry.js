@@ -216,6 +216,10 @@ export async function eraseTelemetry(sessionId) {
     ['human_ratings', 'session_id'],
     ['session_transcripts', 'session_id'],
     ['study_sessions', 'session_id'],
+    // Track 2: signed credentials embed evidence quotes derived from the
+    // candidate's answers — erasure must destroy them too (delete is the ONE
+    // mutation the immutability trigger permits, exactly for this right).
+    ['credentials', 'session_id'],
     ['audit_log', 'session_id'],
   ]) {
     const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId]).catch(() => null)
