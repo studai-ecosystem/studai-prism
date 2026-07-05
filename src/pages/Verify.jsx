@@ -26,6 +26,7 @@ const getBand = (s) => BANDS.find((b) => s >= b.min) || BANDS[BANDS.length - 1]
 export default function Verify() {
   const { id } = useParams()
   const [state, setState] = useState({ status: 'loading', report: null })
+  const [credential, setCredential] = useState(null) // glass-box verification (when issued)
 
   useEffect(() => {
     let cancelled = false
@@ -33,6 +34,12 @@ export default function Verify() {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('not found'))))
       .then((report) => { if (!cancelled) setState({ status: 'ok', report }) })
       .catch(() => { if (!cancelled) setState({ status: 'error', report: null }) })
+    // Track 2: cryptographic verification of the signed evidence bundle.
+    // Optional — older sessions may predate credential issuance.
+    fetch(`/api/credentials/${id}/verify`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((c) => { if (!cancelled) setCredential(c) })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [id])
 
@@ -74,6 +81,26 @@ export default function Verify() {
           <span className="inline-flex items-center gap-1.5 bg-[#047857]/10 border border-[#047857]/25 text-[#047857] text-xs font-semibold rounded-full px-3 py-1.5">
             <BadgeCheck size={14} /> Verified Prism Credential
           </span>
+          {credential?.verification?.verified && credential.status === 'active' && (
+            <span className="inline-flex items-center gap-1.5 bg-[#1A1A2E] text-[#C9A84C] text-xs font-semibold rounded-full px-3 py-1.5" title={`bundle ${credential.bundleHash?.slice(0, 16)}… · key ${credential.keyId}`}>
+            <ShieldCheck size={14} /> Evidence chain cryptographically verified
+            </span>
+          )}
+          {credential && credential.status === 'revoked' && (
+            <span className="inline-flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-full px-3 py-1.5">
+              <AlertTriangle size={14} /> Credential revoked{credential.revokedReason ? ` — ${credential.revokedReason}` : ''}
+            </span>
+          )}
+          {credential && credential.status === 'superseded' && (
+            <span className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold rounded-full px-3 py-1.5">
+              Superseded by a corrected credential
+            </span>
+          )}
+          {credential?.verification && !credential.verification.verified && (
+            <span className="inline-flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-full px-3 py-1.5">
+              <AlertTriangle size={14} /> Signature check FAILED — do not trust this artifact
+            </span>
+          )}
         </div>
 
         <div className="bg-white border border-[#4C35A8]/10 rounded-2xl overflow-hidden">

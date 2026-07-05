@@ -42,6 +42,7 @@ import { getJwtSecret } from '../lib/security.js'
 import { ensureCandidateId } from '../lib/identity.js'
 import { configuredGapDays, reassessmentBlock } from '../lib/eligibility.js'
 import { assignSteeringArm } from '../lib/studies.js'
+import { isGlassBoxEnabled, issueCredential } from '../lib/credentials.js'
 import { isExecutiveEnabled, isEarlyStopEnabled } from '../engine/executiveConfig.js'
 import { EvidenceLedger } from '../engine/evidenceLedger.js'
 import { microRateTurn, normalizeLevels } from '../engine/microRater.js'
@@ -1122,6 +1123,21 @@ router.post('/evaluate', async (req, res) => {
       overall: report.scores?.overall ?? null,
       reliability: report.reliability?.label ?? null,
     })
+
+    // Track 2 (PRISM_GLASS_BOX, default OFF): issue the signed evidence-chain
+    // credential. Never blocks scoring — failure logs and the report still
+    // returns; the credential can be issued later via the admin plane.
+    if (isGlassBoxEnabled()) {
+      try {
+        const issued = await issueCredential(sessionId)
+        if (issued) {
+          saved.credential = { credentialId: issued.credentialId, bundleHash: issued.bundleHash, keyId: issued.keyId, shareToken: issued.shareToken }
+          auditLog('credential_issued', sessionId, { credentialId: issued.credentialId, keyId: issued.keyId })
+        }
+      } catch (err) {
+        logger.captureException(err, { msg: 'credential_issue_failed', requestId: req.requestId })
+      }
+    }
 
     res.json(saved)
   } catch (err) {

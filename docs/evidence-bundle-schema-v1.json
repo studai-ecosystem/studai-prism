@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://prism.studai.one/docs/evidence-bundle-schema-v1.json",
+  "title": "Prism Evidence Bundle v1",
+  "description": "Canonical, pseudonymous evidence bundle signed into every glass-box credential. Serialization for hashing: recursively key-sorted JSON with no whitespace (see server/lib/credentials.js canonicalStringify). The signature is Ed25519 over the SHA-256 of that canonical form. Claim supported: 'cryptographically verifiable evidence chain' — nothing stronger.",
+  "type": "object",
+  "required": ["schema", "sessionId", "issued", "scores", "consent", "provenance"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "evidence-bundle-v1" },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "candidateId": { "type": ["string", "null"], "description": "Pseudonymous candidate id. The bundle NEVER carries name/email/identity fields (enforced at issuance)." },
+    "issued": {
+      "type": "object",
+      "required": ["scaleVersion", "validityMonths"],
+      "properties": {
+        "scaleVersion": { "type": "string" },
+        "calibrationRunId": { "type": ["string", "null"], "description": "Frozen calibration run applied; null until the first equating run exists." },
+        "validityMonths": { "type": "integer" },
+        "attemptNo": { "type": ["integer", "null"] },
+        "isSynthetic": { "type": ["boolean", "null"], "description": "true for dummy/dev/test sessions — such credentials are demos, never certificates." }
+      }
+    },
+    "scenario": { "type": ["object", "null"], "properties": { "title": { "type": "string" }, "domain": { "type": "string" } } },
+    "scores": {
+      "type": "object",
+      "required": ["overall", "dimensions", "weights", "arithmetic"],
+      "properties": {
+        "overall": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+        "dimensions": { "type": "object" },
+        "weights": { "type": "object", "description": "Exact server weights at issuance (sum to 1)." },
+        "arithmetic": { "type": "array", "items": { "type": "object", "required": ["dimension", "score", "weight", "contribution"] } }
+      }
+    },
+    "reliability": { "type": ["object", "null"], "description": "Judge-panel agreement record (method, label, agreement, panel, positionSwapDelta, flaggedForReview)." },
+    "confidenceInterval": { "type": ["object", "null"], "description": "Conformal CI when the dual scorer produced one; null otherwise. Never fabricated." },
+    "evidence": { "type": ["object", "null"], "description": "Per-dimension transcript quotes. Disclosure-gated at the API (candidate's share token); always inside the signed bundle." },
+    "judgeVotes": { "type": ["array", "null"], "description": "Per-vote judge records with model ids (dual scorer only)." },
+    "integrityEvents": { "type": "object", "description": "Counts per proctoring event type; never raw payloads." },
+    "consent": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {
+        "version": { "type": ["string", "null"], "description": "Consent copy version the candidate accepted." },
+        "currentCopyVersion": { "type": "string" },
+        "scopes": { "type": ["array", "null"] }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["promptVersions", "flagsActive"],
+      "properties": {
+        "promptVersions": { "type": "array", "items": { "type": "string" }, "description": "Versioned prompt files governing scoring at issuance." },
+        "flagsActive": { "type": "object", "description": "PRISM_* feature flags at issuance (secret-named keys excluded)." },
+        "judgeDeployment": { "type": ["string", "null"], "description": "Azure OpenAI deployment name used by the judge panel." }
+      }
+    }
+  }
+}

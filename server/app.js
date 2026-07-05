@@ -17,6 +17,7 @@ import deviceRouter from './routes/device.js'
 import contentRouter from './routes/content.js'
 import psychometricsRouter from './routes/psychometrics.js'
 import studiesRouter from './routes/studies.js'
+import credentialsRouter from './routes/credentials.js'
 import {
   isProduction,
   apiLimiter,
@@ -121,6 +122,8 @@ export function buildApp() {
   app.use('/api/psychometrics', psychometricsRouter)
   // Track 6: study runner (admin + rater planes, both guarded in-router).
   app.use('/api/studies', studiesRouter)
+  // Track 2: glass-box credentials (public verify plane + admin lifecycle).
+  app.use('/api/credentials', credentialsRouter)
 
   // ── Health check ─────────────────────────────────────────────────────────
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
