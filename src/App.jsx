@@ -13,6 +13,7 @@ import ScoreReport from './pages/ScoreReport.jsx'
 import Verify from './pages/Verify.jsx'
 import Profile from './pages/Profile.jsx'
 import RaterWorkbench from './pages/RaterWorkbench.jsx'
+import Admin from './pages/Admin.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
 import AIEvaluation from './pages/research/AIEvaluation.jsx'
@@ -54,6 +55,8 @@ export default function App() {
       <Route path="/about/careers" element={<Careers />} />
       {/* Internal living style guide (Part A) — admin-token gated in-page. */}
       <Route path="/design-system" element={<DesignSystem />} />
+      {/* Part F — pilot cockpit (admin-token gated in-page, read-only). */}
+      <Route path="/admin" element={<Admin />} />
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Auth />} />
       <Route path="/register" element={<Auth />} />

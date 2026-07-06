@@ -18,27 +18,13 @@ const SRC = join(__dirname, '..', '..', 'src')
 // The ONLY files allowed to contain raw hex values.
 const TOKEN_SOURCES = ['design/tokens.js', 'design/tokens.css']
 
-// Grandfathered legacy files (pre-rebuild). RATCHET: shrink-only.
+// The rebuild is COMPLETE: every page and component renders from tokens.
+// The two remaining entries are content assets, not UI code — the character
+// avatar illustrations and the brand logo mark, whose colors are artwork.
+// RATCHET: shrink-only (an addition fails the test below).
 const LEGACY_ALLOWLIST = [
-  'App.jsx', 'index.css', 'main.jsx',
-  'components/CTABanner.jsx', 'components/Dimensions.jsx', 'components/FAQ.jsx',
-  'components/Footer.jsx', 'components/Hero.jsx', 'components/HeroAvatars.jsx',
-  'components/HowItWorks.jsx', 'components/Nav.jsx', 'components/PageLayout.jsx',
-  'components/Pricing.jsx', 'components/ScoreSection.jsx', 'components/WhoItsFor.jsx',
-  'components/ui/PrismLogo.jsx', 'components/ui/ScoreMockup.jsx',
-  'components/ui/DimensionCard.jsx', 'components/ui/FAQItem.jsx',
-  'components/ui/GoldButton.jsx', 'components/ui/OutlineButton.jsx',
-  'components/ui/PersonaCard.jsx', 'components/ui/PricingCard.jsx',
-  'components/ui/SectionLabel.jsx', 'components/ui/StepCard.jsx',
-  'pages/Auth.jsx', 'pages/Briefing.jsx',
-  'pages/LandingPage.jsx', 'pages/LinkPhone.jsx', 'pages/Payment.jsx',
-  'pages/PhoneProctor.jsx', 'pages/Profile.jsx', 'pages/RaterWorkbench.jsx',
-  'pages/RoomScan.jsx', 'pages/ScoreReport.jsx',
-  'pages/VerifyIdentity.jsx',
-  'pages/about/AboutStudAI.jsx', 'pages/about/Careers.jsx', 'pages/about/Mission.jsx',
-  'pages/research/AIEvaluation.jsx', 'pages/research/Blog.jsx', 'pages/research/BlogPost.jsx',
-  'pages/research/ScienceBehindPrism.jsx', 'pages/research/ValidityStudy.jsx',
-  'lib/characters.jsx', 'lib/assessmentFlow.js', 'hooks/useFaceProctor.js',
+  'components/ui/PrismLogo.jsx',
+  'lib/characters.jsx',
 ]
 
 const HEX = /#[0-9a-fA-F]{3,8}\b/

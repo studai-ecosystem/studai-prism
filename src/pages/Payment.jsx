@@ -43,7 +43,7 @@ function openRazorpayCheckout({ cfg, order, user }) {
       name: 'Prism Assessment',
       description: '30-minute Prism Assessment',
       prefill: { name: user?.name || '', email: user?.email || '' },
-      theme: { color: '#C9A84C' },
+      theme: { color: 'var(--color-accent)' },
       handler: async (response) => {
         try {
           const verifyRes = await fetch('/api/payment/verify', {
@@ -125,8 +125,8 @@ export default function Payment() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#1A1A2E] flex flex-col">
-      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[#E0E0E8]">
+    <div className="min-h-screen bg-white text-[var(--color-ink)] flex flex-col">
+      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[var(--color-line)]">
         <Link to="/" aria-label="Prism home">
           <PrismLogo size={32} />
         </Link>
@@ -140,48 +140,48 @@ export default function Payment() {
           className="w-full max-w-lg"
         >
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#C9A84C]/10 mb-4">
-              <ShieldCheck size={22} className="text-[#C9A84C]" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-accent)]/10 mb-4">
+              <ShieldCheck size={22} className="text-[var(--color-accent)]" />
             </div>
-            <h1 className="font-serif text-3xl text-[#1A1A2E] mb-1">Confirm your assessment</h1>
+            <h1 className="font-serif text-3xl text-[var(--color-ink)] mb-1">Confirm your assessment</h1>
             {user?.name && (
-              <p className="font-sans text-sm text-[#64687A]">Signed in as {user.name}</p>
+              <p className="font-sans text-sm text-[var(--color-ink-muted)]">Signed in as {user.name}</p>
             )}
           </div>
 
           {/* Summary card */}
-          <div className="rounded-2xl border border-[#E8E8F0] bg-[#F5F5FA] overflow-hidden">
-            <div className="px-6 py-5 border-b border-[#E8E8F0] flex items-center justify-between">
+          <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-paper)] overflow-hidden">
+            <div className="px-6 py-5 border-b border-[var(--color-line)] flex items-center justify-between">
               <div>
-                <p className="font-sans font-semibold text-sm text-[#1A1A2E]">30-minute Prism Assessment</p>
-                <p className="font-sans text-xs text-[#64687A] mt-0.5">One-time · Score valid {SCORE_VALIDITY_MONTHS} months</p>
+                <p className="font-sans font-semibold text-sm text-[var(--color-ink)]">30-minute Prism Assessment</p>
+                <p className="font-sans text-xs text-[var(--color-ink-muted)] mt-0.5">One-time · Score valid {SCORE_VALIDITY_MONTHS} months</p>
               </div>
-              <p className="font-serif text-2xl text-[#1A1A2E]">$10</p>
+              <p className="font-serif text-2xl text-[var(--color-ink)]">$10</p>
             </div>
 
             <ul className="px-6 py-5 flex flex-col gap-3">
               {INCLUDES.map(({ icon: Icon, text }) => (
                 <li key={text} className="flex gap-3 items-start">
-                  <Icon size={16} className="text-[#C9A84C] shrink-0 mt-0.5" />
-                  <span className="font-sans text-sm text-[#3A3A4A]">{text}</span>
+                  <Icon size={16} className="text-[var(--color-accent)] shrink-0 mt-0.5" />
+                  <span className="font-sans text-sm text-[var(--color-ink)]">{text}</span>
                 </li>
               ))}
             </ul>
 
-            <div className="px-6 py-4 border-t border-[#E8E8F0] flex items-center justify-between bg-white">
-              <span className="font-sans text-sm font-semibold text-[#1A1A2E]">Total</span>
-              <span className="font-sans text-sm font-semibold text-[#1A1A2E]">$10</span>
+            <div className="px-6 py-4 border-t border-[var(--color-line)] flex items-center justify-between bg-white">
+              <span className="font-sans text-sm font-semibold text-[var(--color-ink)]">Total</span>
+              <span className="font-sans text-sm font-semibold text-[var(--color-ink)]">$10</span>
             </div>
           </div>
 
           {error && (
-            <p className="font-sans text-sm text-[#E05252] text-center mt-4">{error}</p>
+            <p className="font-sans text-sm text-[var(--color-danger)] text-center mt-4">{error}</p>
           )}
 
           <motion.button
             onClick={handlePay}
             disabled={loading}
-            className="mt-6 w-full py-4 rounded-xl bg-[#1A1A2E] font-sans font-semibold text-sm text-[#C9A84C] tracking-wide hover:bg-[#252A3A] transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+            className="mt-6 w-full py-4 rounded-xl bg-[var(--color-ink)] font-sans font-semibold text-sm text-[var(--color-paper)] tracking-wide hover:opacity-90 transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
             whileHover={loading ? {} : { scale: 1.01 }}
             whileTap={loading ? {} : { scale: 0.98 }}
           >
@@ -190,11 +190,11 @@ export default function Payment() {
           </motion.button>
 
           {dummyMode ? (
-            <p className="text-center font-sans text-xs text-[#A0A4B0] mt-4">
+            <p className="text-center font-sans text-xs text-[var(--color-ink-muted)] mt-4">
               Payments are in test mode — you will not be charged. You’ll proceed straight to the assessment briefing.
             </p>
           ) : (
-            <p className="text-center font-sans text-xs text-[#A0A4B0] mt-4">
+            <p className="text-center font-sans text-xs text-[var(--color-ink-muted)] mt-4">
               Secure payment via Razorpay. You’ll proceed to the assessment briefing.
             </p>
           )}

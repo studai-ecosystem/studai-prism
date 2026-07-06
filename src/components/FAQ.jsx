@@ -43,7 +43,7 @@ const faqs = [
 
 export default function FAQ() {
   return (
-    <section id="faq" className="py-24 bg-[#F5F5FA]">
+    <section id="faq" className="py-24 bg-[var(--color-paper)]">
       <div className="max-w-3xl mx-auto px-6">
         {/* Header */}
         <motion.div
@@ -58,7 +58,7 @@ export default function FAQ() {
           </motion.div>
           <motion.h2
             variants={fadeUp}
-            className="font-serif text-4xl md:text-5xl text-[#1A1A2E] leading-tight mt-1"
+            className="font-serif text-4xl md:text-5xl text-[var(--color-ink)] leading-tight mt-1"
           >
             Common questions.
           </motion.h2>

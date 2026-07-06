@@ -21,11 +21,11 @@ function formatDate(iso) {
 }
 
 function scoreBand(score) {
-  if (score == null) return { label: 'Pending', color: '#8A8FA0' }
-  if (score >= 85) return { label: 'Strong Performer', color: '#1F8A4C' }
-  if (score >= 70) return { label: 'Proficient', color: '#C9A84C' }
-  if (score >= 50) return { label: 'Developing', color: '#D08A3E' }
-  return { label: 'Emerging', color: '#C25151' }
+  if (score == null) return { label: 'Pending', color: 'var(--color-ink-muted)' }
+  if (score >= 85) return { label: 'Strong Performer', color: 'var(--color-success)' }
+  if (score >= 70) return { label: 'Proficient', color: 'var(--color-accent)' }
+  if (score >= 50) return { label: 'Developing', color: 'var(--color-reliability-moderate)' }
+  return { label: 'Emerging', color: 'var(--color-danger)' }
 }
 
 // English ordinal suffix: 1 → "st", 2 → "nd", 3 → "rd", 11 → "th".
@@ -137,8 +137,8 @@ export default function Profile() {
         {/* Profile header */}
         <div className="flex items-start gap-5 mb-10">
           <div
-            className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold text-[#0A0D14] flex-shrink-0"
-            style={{ background: '#C9A84C' }}
+            className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold text-[var(--color-ink)] flex-shrink-0"
+            style={{ background: 'var(--color-accent)' }}
           >
             {initials}
           </div>
@@ -147,31 +147,31 @@ export default function Profile() {
             <form onSubmit={handleSave} className="flex-1 min-w-0 max-w-md">
               <div className="flex flex-col gap-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-[#5A5F6E]">Full name</span>
+                  <span className="text-xs font-semibold text-[var(--color-ink-muted)]">Full name</span>
                   <input
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                     placeholder="Your name"
-                    className="w-full px-3 py-2 rounded-lg border border-[#E8E0D0] bg-white text-[15px] text-[#0A0D14] focus:outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/20"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--color-line)] bg-white text-[15px] text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-[#5A5F6E]">College</span>
+                  <span className="text-xs font-semibold text-[var(--color-ink-muted)]">College</span>
                   <input
                     type="text"
                     value={form.college}
                     onChange={(e) => setForm((f) => ({ ...f, college: e.target.value }))}
                     placeholder="e.g. IIT Madras"
-                    className="w-full px-3 py-2 rounded-lg border border-[#E8E0D0] bg-white text-[15px] text-[#0A0D14] focus:outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/20"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--color-line)] bg-white text-[15px] text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-[#5A5F6E]">Year of study</span>
+                  <span className="text-xs font-semibold text-[var(--color-ink-muted)]">Year of study</span>
                   <select
                     value={form.year}
                     onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-[#E8E0D0] bg-white text-[15px] text-[#0A0D14] focus:outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/20"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--color-line)] bg-white text-[15px] text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
                   >
                     <option value="">Select year</option>
                     {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -179,14 +179,14 @@ export default function Profile() {
                 </label>
 
                 {saveError && (
-                  <p className="text-[13px] text-[#C25151]">{saveError}</p>
+                  <p className="text-[13px] text-[var(--color-danger)]">{saveError}</p>
                 )}
 
                 <div className="flex items-center gap-2 mt-1">
                   <button
                     type="submit"
                     disabled={saving}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm text-[#0A0D14] bg-[#C9A84C] cursor-pointer hover:brightness-105 transition disabled:opacity-60"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-[var(--color-accent)] cursor-pointer hover:brightness-105 transition disabled:opacity-60"
                   >
                     {saving && <Loader2 size={14} className="animate-spin" />}
                     Save details
@@ -195,7 +195,7 @@ export default function Profile() {
                     type="button"
                     onClick={() => setEditing(false)}
                     disabled={saving}
-                    className="px-4 py-2 rounded-lg font-semibold text-sm text-[#5A5F6E] bg-[#F2EEE4] cursor-pointer hover:bg-[#EAE4D6] transition disabled:opacity-60"
+                    className="px-4 py-2 rounded-lg font-semibold text-sm text-[var(--color-ink-muted)] bg-[var(--color-paper)] cursor-pointer hover:bg-[var(--color-line)] transition disabled:opacity-60"
                   >
                     Cancel
                   </button>
@@ -205,23 +205,23 @@ export default function Profile() {
           ) : (
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-[#0A0D14] tracking-tight truncate">
+                <h1 className="text-3xl font-bold text-[var(--color-ink)] tracking-tight truncate">
                   {user?.name || 'Your profile'}
                 </h1>
                 <button
                   onClick={openEditor}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-[#5A5F6E] bg-[#F2EEE4] cursor-pointer hover:bg-[#EAE4D6] transition flex-shrink-0"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-[var(--color-ink-muted)] bg-[var(--color-paper)] cursor-pointer hover:bg-[var(--color-line)] transition flex-shrink-0"
                 >
                   <Pencil size={13} /> Edit
                 </button>
               </div>
-              <p className="text-[15px] text-[#5A5F6E] mt-1 truncate">{user?.email}</p>
+              <p className="text-[15px] text-[var(--color-ink-muted)] mt-1 truncate">{user?.email}</p>
               {(user?.college || user?.year) ? (
-                <p className="text-[13px] text-[#8A8FA0] mt-0.5 truncate">
+                <p className="text-[13px] text-[var(--color-ink-muted)] mt-0.5 truncate">
                   {[user?.college, user?.year].filter(Boolean).join(' · ')}
                 </p>
               ) : (
-                <p className="text-[13px] text-[#8A8FA0] mt-0.5">
+                <p className="text-[13px] text-[var(--color-ink-muted)] mt-0.5">
                   Add your college and year of study
                 </p>
               )}
@@ -231,32 +231,32 @@ export default function Profile() {
 
         {/* Test history */}
         <div className="flex items-center gap-2 mb-4">
-          <ClipboardList size={18} className="text-[#C9A84C]" />
-          <h2 className="text-lg font-bold text-[#0A0D14]">Assessment history</h2>
+          <ClipboardList size={18} className="text-[var(--color-accent)]" />
+          <h2 className="text-lg font-bold text-[var(--color-ink)]">Assessment history</h2>
         </div>
 
         {loading && (
-          <div className="rounded-xl border border-[#E8E0D0] bg-white p-8 text-center text-[#8A8FA0]">
+          <div className="rounded-xl border border-[var(--color-line)] bg-white p-8 text-center text-[var(--color-ink-muted)]">
             Loading your tests…
           </div>
         )}
 
         {!loading && error && (
-          <div className="rounded-xl border border-[#E8C0C0] bg-[#FCF4F4] p-6 text-center text-[#C25151]">
+          <div className="rounded-xl border border-[var(--color-danger)] bg-[var(--color-danger-surface)] p-6 text-center text-[var(--color-danger)]">
             {error}
           </div>
         )}
 
         {!loading && !error && history.length === 0 && (
-          <div className="rounded-xl border border-[#E8E0D0] bg-white p-10 text-center">
-            <FileText size={32} className="mx-auto text-[#C9A84C]" />
-            <p className="mt-4 text-[15px] font-semibold text-[#0A0D14]">No tests yet</p>
-            <p className="mt-1 text-[14px] text-[#8A8FA0]">
+          <div className="rounded-xl border border-[var(--color-line)] bg-white p-10 text-center">
+            <FileText size={32} className="mx-auto text-[var(--color-accent)]" />
+            <p className="mt-4 text-[15px] font-semibold text-[var(--color-ink)]">No tests yet</p>
+            <p className="mt-1 text-[14px] text-[var(--color-ink-muted)]">
               Complete an assessment and your results will appear here.
             </p>
             <button
               onClick={() => navigate('/register')}
-              className="mt-5 px-5 py-2.5 rounded-lg font-bold text-sm text-[#0A0D14] bg-[#C9A84C] cursor-pointer hover:brightness-105 transition"
+              className="mt-5 px-5 py-2.5 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-[var(--color-accent)] cursor-pointer hover:brightness-105 transition"
             >
               Take an assessment
             </button>
@@ -264,7 +264,7 @@ export default function Profile() {
         )}
 
         {!loading && !error && history.length > 0 && (
-          <div className="rounded-xl border border-[#E8E0D0] bg-white overflow-hidden divide-y divide-[#EFE9DC]">
+          <div className="rounded-xl border border-[var(--color-line)] bg-white overflow-hidden divide-y divide-[var(--color-paper)]">
             {history.map((row) => {
               const band = scoreBand(row.overall)
               const pct = resolvePercentile(row.percentile, row.overall)
@@ -272,22 +272,22 @@ export default function Profile() {
                 <Link
                   key={row.sessionId}
                   to={`/score?session=${row.sessionId}`}
-                  className="flex items-center gap-4 px-5 py-4 no-underline hover:bg-[#FAF7F2] transition-colors"
+                  className="flex items-center gap-4 px-5 py-4 no-underline hover:bg-[var(--color-paper)] transition-colors"
                 >
                   {/* Score badge */}
                   <div className="flex flex-col items-center justify-center w-14 flex-shrink-0">
                     <span className="text-2xl font-bold leading-none" style={{ color: band.color }}>
                       {row.overall != null ? `${row.overall}%` : '—'}
                     </span>
-                    <span className="text-[10px] text-[#8A8FA0] mt-0.5">overall</span>
+                    <span className="text-[10px] text-[var(--color-ink-muted)] mt-0.5">overall</span>
                   </div>
 
                   {/* Scenario + meta */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[15px] font-semibold text-[#0A0D14] truncate">
+                    <p className="text-[15px] font-semibold text-[var(--color-ink)] truncate">
                       {row.scenario?.title || 'Skills Assessment'}
                     </p>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[12px] text-[#8A8FA0]">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-[12px] text-[var(--color-ink-muted)]">
                       <span className="inline-flex items-center gap-1">
                         <Calendar size={12} /> {formatDate(row.issuedAt)}
                       </span>
@@ -307,7 +307,7 @@ export default function Profile() {
                   >
                     {band.label}
                   </span>
-                  <ChevronRight size={18} className="text-[#C9B98C] flex-shrink-0" />
+                  <ChevronRight size={18} className="text-[var(--color-line)] flex-shrink-0" />
                 </Link>
               )
             })}

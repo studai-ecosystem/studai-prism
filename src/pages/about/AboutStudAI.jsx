@@ -29,8 +29,8 @@ export default function AboutStudAI() {
       {/* Section 1 — Who we are */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-[#0A0D14] mb-4">Who we are</h2>
-          <p className="text-[#5A5F6E] leading-relaxed text-lg">
+          <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">Who we are</h2>
+          <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
             StudAI One is a privately held intelligence company built in
             Chennai, India. We build AI-powered products for students, colleges,
             and employers across India and APAC. Prism is our skills
@@ -43,10 +43,10 @@ export default function AboutStudAI() {
       {/* Section 2 — Why we built Prism */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-gold">
-          <h2 className="text-2xl font-bold text-[#0A0D14] mb-4">
+          <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">
             Why we built Prism
           </h2>
-          <p className="text-[#5A5F6E] leading-relaxed text-lg">
+          <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
             We kept hearing the same thing from placement officers and hiring
             managers — resumes tell us where someone studied, not what they can
             do. We built Prism to fix that. One conversation. A verified score.
@@ -64,7 +64,7 @@ export default function AboutStudAI() {
               className="bg-white rounded-2xl shadow-sm p-8 text-center"
             >
               <p className="text-4xl font-bold text-gold mb-2">{s.value}</p>
-              <p className="text-[#5A5F6E]">{s.label}</p>
+              <p className="text-[var(--color-ink-muted)]">{s.label}</p>
             </div>
           ))}
         </div>
@@ -72,7 +72,7 @@ export default function AboutStudAI() {
 
       {/* Section 4 — Company details */}
       <section className="py-12 pb-20 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[#0A0D14] text-center mb-12">
+        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
           Company details
         </h2>
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden max-w-2xl mx-auto">
@@ -81,12 +81,12 @@ export default function AboutStudAI() {
               {details.map((row, i) => (
                 <tr
                   key={row.label}
-                  className={i === 0 ? '' : 'border-t border-[#E8E0D0]'}
+                  className={i === 0 ? '' : 'border-t border-[var(--color-line)]'}
                 >
-                  <td className="py-4 px-6 font-semibold text-[#0A0D14] w-1/3 align-top">
+                  <td className="py-4 px-6 font-semibold text-[var(--color-ink)] w-1/3 align-top">
                     {row.label}
                   </td>
-                  <td className="py-4 px-6 text-[#5A5F6E] align-top">
+                  <td className="py-4 px-6 text-[var(--color-ink-muted)] align-top">
                     {row.value}
                   </td>
                 </tr>

@@ -172,9 +172,9 @@ export default function PhoneProctor() {
   }, [pairCode, startCamera])
 
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-6 py-10">
+    <div className="min-h-screen bg-[var(--color-ink)] text-white flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-sm">
-        <div className="flex items-center gap-2 text-[#C9A84C]">
+        <div className="flex items-center gap-2 text-[var(--color-accent)]">
           <Camera size={20} />
           <h1 className="font-sans text-base font-semibold">Prism proctor camera</h1>
         </div>
@@ -189,7 +189,7 @@ export default function PhoneProctor() {
           />
           {status !== 'streaming' && (
             <div className="flex aspect-[3/4] w-full items-center justify-center">
-              {status === 'starting' && <Loader2 size={32} className="animate-spin text-[#C9A84C]" />}
+              {status === 'starting' && <Loader2 size={32} className="animate-spin text-[var(--color-accent)]" />}
               {(status === 'denied' || status === 'error') && (
                 <AlertTriangle size={32} className="text-amber-400" />
               )}
@@ -223,7 +223,7 @@ export default function PhoneProctor() {
           <button
             type="button"
             onClick={startCamera}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#C9A84C] px-4 py-3 font-sans text-sm font-bold text-[#1A1A2E] transition-colors hover:bg-[#b89640]"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] px-4 py-3 font-sans text-sm font-bold text-[var(--color-ink)] transition-colors hover:bg-[var(--color-accent)]"
           >
             <RefreshCw size={16} />
             Enable camera

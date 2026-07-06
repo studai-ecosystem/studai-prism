@@ -28,9 +28,9 @@ function api(path, token, opts = {}) {
 
 function Transcript({ turns }) {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-[#E0E0E8] bg-white p-4 max-h-[50vh] overflow-y-auto">
+    <div className="flex flex-col gap-2 rounded-xl border border-[var(--color-line)] bg-white p-4 max-h-[50vh] overflow-y-auto">
       {(turns || []).map((t, i) => (
-        <div key={i} className={t.speaker === 'candidate' ? 'text-[#1A1A2E]' : 'text-[#5A5F6E]'}>
+        <div key={i} className={t.speaker === 'candidate' ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)]'}>
           <span className="font-sans text-xs font-bold uppercase tracking-wide">
             {t.speaker === 'candidate' ? 'Candidate' : t.name || 'Avatar'}
           </span>
@@ -47,7 +47,7 @@ function RubricForm({ dimensions, onSubmit, submitting }) {
     <div className="mt-4 flex flex-col gap-3">
       {dimensions.map((dim) => (
         <div key={dim} className="flex items-center justify-between gap-3">
-          <span className="font-sans text-sm font-semibold text-[#1A1A2E]">{DIMENSION_LABELS[dim] || dim}</span>
+          <span className="font-sans text-sm font-semibold text-[var(--color-ink)]">{DIMENSION_LABELS[dim] || dim}</span>
           <div className="flex gap-1">
             {LEVELS.map((lvl) => (
               <button
@@ -56,8 +56,8 @@ function RubricForm({ dimensions, onSubmit, submitting }) {
                 onClick={() => setLevels((p) => ({ ...p, [dim]: lvl }))}
                 className={`px-3 py-1.5 rounded-lg border font-sans text-sm ${
                   levels[dim] === lvl
-                    ? 'bg-[#1A1A2E] text-[#C9A84C] border-[#1A1A2E]'
-                    : 'bg-white text-[#5A5F6E] border-[#E0E0E8] hover:border-[#C9A84C]'
+                    ? 'bg-[var(--color-ink)] text-[var(--color-accent)] border-[var(--color-ink)]'
+                    : 'bg-white text-[var(--color-ink-muted)] border-[var(--color-line)] hover:border-[var(--color-accent)]'
                 }`}
               >
                 {String(lvl)}
@@ -70,7 +70,7 @@ function RubricForm({ dimensions, onSubmit, submitting }) {
         type="button"
         disabled={submitting || dimensions.some((d) => levels[d] === undefined)}
         onClick={() => onSubmit(levels)}
-        className="mt-2 self-end px-6 py-2.5 rounded-xl bg-[#1A1A2E] font-sans text-sm font-semibold text-[#C9A84C] disabled:opacity-50"
+        className="mt-2 self-end px-6 py-2.5 rounded-xl bg-[var(--color-ink)] font-sans text-sm font-semibold text-[var(--color-accent)] disabled:opacity-50"
       >
         {submitting ? 'Submitting…' : 'Submit rating'}
       </button>
@@ -134,10 +134,10 @@ export default function RaterWorkbench() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F5FA] text-[#1A1A2E] px-6 py-10">
+    <div className="min-h-screen bg-[var(--color-paper)] text-[var(--color-ink)] px-6 py-10">
       <div className="mx-auto max-w-3xl">
         <h1 className="font-serif text-3xl mb-1">Prism Rating Workbench</h1>
-        <p className="font-sans text-sm text-[#7A7F8C] mb-6">
+        <p className="font-sans text-sm text-[var(--color-ink-muted)] mb-6">
           Blinded human rating (0–4 per dimension, NA when a dimension had no opportunity). You will never see AI scores.
         </p>
 
@@ -148,19 +148,19 @@ export default function RaterWorkbench() {
               value={token}
               onChange={(e) => setToken(e.target.value)}
               placeholder="Rater access token"
-              className="flex-1 rounded-xl border border-[#E0E0E8] px-4 py-3 font-sans text-sm"
+              className="flex-1 rounded-xl border border-[var(--color-line)] px-4 py-3 font-sans text-sm"
             />
-            <button onClick={handleSignIn} className="px-6 rounded-xl bg-[#1A1A2E] font-sans text-sm font-semibold text-[#C9A84C]">
+            <button onClick={handleSignIn} className="px-6 rounded-xl bg-[var(--color-ink)] font-sans text-sm font-semibold text-[var(--color-accent)]">
               Enter
             </button>
           </div>
         ) : (
           <>
-            <div className="mb-4 font-sans text-xs text-[#7A7F8C]">
+            <div className="mb-4 font-sans text-xs text-[var(--color-ink-muted)]">
               Signed in as <b>{me.handle}</b> · status: <b>{me.status}</b>
               {me.trainingKappa != null && <> · training κ: <b>{me.trainingKappa}</b></>}
             </div>
-            {message && <p className="mb-3 font-sans text-sm text-[#3A3A4A]">{message}</p>}
+            {message && <p className="mb-3 font-sans text-sm text-[var(--color-ink)]">{message}</p>}
             {item && (
               <>
                 <Transcript turns={item.kind === 'training' ? item.ref.transcript : item.session.turns} />

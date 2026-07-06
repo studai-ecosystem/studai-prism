@@ -114,8 +114,8 @@ export default function LinkPhone() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#1A1A2E] flex flex-col">
-      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[#E0E0E8]">
+    <div className="min-h-screen bg-white text-[var(--color-ink)] flex flex-col">
+      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[var(--color-line)]">
         <Link to="/" aria-label="Prism home">
           <PrismLogo size={32} />
         </Link>
@@ -129,12 +129,12 @@ export default function LinkPhone() {
           className="w-full max-w-3xl"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#C9A84C]/12 text-[#9A7B23]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-accent)]/12 text-[var(--color-accent)]">
               <Smartphone size={22} />
             </div>
             <div>
-              <h1 className="font-serif text-2xl font-bold text-[#1A1A2E]">Connect your phone camera</h1>
-              <p className="font-sans text-sm text-[#7A7F8C]">
+              <h1 className="font-serif text-2xl font-bold text-[var(--color-ink)]">Connect your phone camera</h1>
+              <p className="font-sans text-sm text-[var(--color-ink-muted)]">
                 Your phone acts as a second camera during the proctored test.
               </p>
             </div>
@@ -142,31 +142,31 @@ export default function LinkPhone() {
 
           <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
             {/* QR / instructions */}
-            <div className="rounded-2xl border border-[#E0E0E8] bg-white p-6">
-              <h2 className="font-sans text-sm font-semibold text-[#1A1A2E]">Scan to link</h2>
-              <ol className="mt-2 list-decimal space-y-1 pl-4 font-sans text-xs text-[#7A7F8C]">
+            <div className="rounded-2xl border border-[var(--color-line)] bg-white p-6">
+              <h2 className="font-sans text-sm font-semibold text-[var(--color-ink)]">Scan to link</h2>
+              <ol className="mt-2 list-decimal space-y-1 pl-4 font-sans text-xs text-[var(--color-ink-muted)]">
                 <li>Open your phone camera and scan the code.</li>
                 <li>Allow camera access on your phone.</li>
                 <li>Prop the phone to show you and your desk from the side.</li>
               </ol>
 
-              <div className="mt-5 flex items-center justify-center rounded-xl bg-[#F5F5FA] p-5">
+              <div className="mt-5 flex items-center justify-center rounded-xl bg-[var(--color-paper)] p-5">
                 {loading ? (
-                  <Loader2 size={28} className="animate-spin text-[#9A7B23]" />
+                  <Loader2 size={28} className="animate-spin text-[var(--color-accent)]" />
                 ) : qrDataUrl ? (
                   <img src={qrDataUrl} alt="Pairing QR code" className="h-[200px] w-[200px]" />
                 ) : (
-                  <p className="text-center font-sans text-xs text-[#A0A4B0]">QR unavailable</p>
+                  <p className="text-center font-sans text-xs text-[var(--color-ink-muted)]">QR unavailable</p>
                 )}
               </div>
 
               {pairCode && (
-                <p className="mt-3 text-center font-sans text-xs text-[#7A7F8C]">
-                  Pairing code: <span className="font-mono font-semibold tracking-widest text-[#1A1A2E]">{pairCode}</span>
+                <p className="mt-3 text-center font-sans text-xs text-[var(--color-ink-muted)]">
+                  Pairing code: <span className="font-mono font-semibold tracking-widest text-[var(--color-ink)]">{pairCode}</span>
                 </p>
               )}
               {phoneUrl && (
-                <p className="mt-1 break-all text-center font-sans text-[11px] text-[#A0A4B0]">{phoneUrl}</p>
+                <p className="mt-1 break-all text-center font-sans text-[11px] text-[var(--color-ink-muted)]">{phoneUrl}</p>
               )}
 
               {(error || unsupported) && (
@@ -180,7 +180,7 @@ export default function LinkPhone() {
                     <button
                       type="button"
                       onClick={setup}
-                      className="inline-flex items-center gap-1 rounded-lg border border-[#E0E0E8] px-3 py-1.5 font-sans text-xs font-semibold text-[#5A5F6E] hover:bg-[#F5F5FA]"
+                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-line)] px-3 py-1.5 font-sans text-xs font-semibold text-[var(--color-ink-muted)] hover:bg-[var(--color-paper)]"
                     >
                       <RefreshCw size={12} /> Retry
                     </button>
@@ -191,7 +191,7 @@ export default function LinkPhone() {
                         clearRememberedPair(sessionId)
                         navigate(`/room-scan?session=${sessionId}`)
                       }}
-                      className="rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-[#9A7B23] hover:underline"
+                      className="rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-[var(--color-accent)] hover:underline"
                     >
                       Skip for now
                     </button>
@@ -201,12 +201,12 @@ export default function LinkPhone() {
             </div>
 
             {/* Live preview / status */}
-            <div className="rounded-2xl border border-[#E0E0E8] bg-white p-6">
+            <div className="rounded-2xl border border-[var(--color-line)] bg-white p-6">
               <div className="flex items-center justify-between">
-                <h2 className="font-sans text-sm font-semibold text-[#1A1A2E]">Phone camera</h2>
+                <h2 className="font-sans text-sm font-semibold text-[var(--color-ink)]">Phone camera</h2>
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                    linked ? 'bg-green-50 text-green-700' : 'bg-[#F5F5FA] text-[#A0A4B0]'
+                    linked ? 'bg-green-50 text-green-700' : 'bg-[var(--color-paper)] text-[var(--color-ink-muted)]'
                   }`}
                 >
                   {linked ? <Check size={13} /> : <Wifi size={13} />}
@@ -214,7 +214,7 @@ export default function LinkPhone() {
                 </span>
               </div>
 
-              <div className="mt-4 flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl bg-[#0A0D14]">
+              <div className="mt-4 flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl bg-[var(--color-ink)]">
                 {/* eslint-disable-next-line jsx-a11y/img-redundant-alt */}
                 <img
                   ref={imgRef}
@@ -222,7 +222,7 @@ export default function LinkPhone() {
                   className={`h-full w-full object-cover ${linked ? 'block' : 'hidden'}`}
                 />
                 {!linked && (
-                  <div className="flex flex-col items-center gap-2 text-[#5A5F6E]">
+                  <div className="flex flex-col items-center gap-2 text-[var(--color-ink-muted)]">
                     <Smartphone size={28} />
                     <p className="font-sans text-xs">Waiting for phone…</p>
                   </div>
@@ -237,13 +237,13 @@ export default function LinkPhone() {
               type="button"
               onClick={handleContinue}
               disabled={!linked}
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#C9A84C] px-6 py-3.5 font-sans text-sm font-bold text-[#1A1A2E] transition-all hover:bg-[#b89640] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] px-6 py-3.5 font-sans text-sm font-bold text-[var(--color-ink)] transition-all hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <ShieldCheck size={18} />
               Continue to briefing
             </button>
             {!linked && (
-              <span className="font-sans text-xs text-[#A0A4B0]">
+              <span className="font-sans text-xs text-[var(--color-ink-muted)]">
                 Link your phone to continue.
               </span>
             )}

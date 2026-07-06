@@ -53,7 +53,7 @@ export default function HowItWorks() {
           </motion.div>
           <motion.h2
             variants={fadeUp}
-            className="font-serif text-4xl md:text-5xl text-[#1A1A2E] leading-tight mt-1"
+            className="font-serif text-4xl md:text-5xl text-[var(--color-ink)] leading-tight mt-1"
           >
             Four steps from conversation to verified score
           </motion.h2>

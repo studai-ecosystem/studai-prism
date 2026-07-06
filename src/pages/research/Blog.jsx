@@ -35,15 +35,15 @@ export default function Blog() {
 
       <section className="pb-20 px-6 max-w-6xl mx-auto">
         {status === 'loading' && (
-          <p className="text-center text-[#8A8FA0]">Loading insights…</p>
+          <p className="text-center text-[var(--color-ink-muted)]">Loading insights…</p>
         )}
         {status === 'error' && (
-          <p className="text-center text-[#8A8FA0]">
+          <p className="text-center text-[var(--color-ink-muted)]">
             Couldn’t load posts right now. Please try again later.
           </p>
         )}
         {status === 'ready' && posts.length === 0 && (
-          <p className="text-center text-[#8A8FA0]">No posts published yet.</p>
+          <p className="text-center text-[var(--color-ink-muted)]">No posts published yet.</p>
         )}
         {status === 'ready' && posts.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -53,13 +53,13 @@ export default function Blog() {
                 to={`/research/blog/${post.slug}`}
                 className="group bg-white rounded-2xl shadow-sm p-6 flex flex-col no-underline border-t-2 border-transparent hover:border-gold transition-colors"
               >
-                <p className="text-xs font-semibold tracking-[0.15em] text-[#8A8FA0] uppercase mb-3">
+                <p className="text-xs font-semibold tracking-[0.15em] text-[var(--color-ink-muted)] uppercase mb-3">
                   {post.date}
                 </p>
-                <h3 className="text-xl font-bold text-[#0A0D14] mb-3 leading-snug">
+                <h3 className="text-xl font-bold text-[var(--color-ink)] mb-3 leading-snug">
                   {post.title}
                 </h3>
-                <p className="text-[#5A5F6E] leading-relaxed mb-6">{post.desc}</p>
+                <p className="text-[var(--color-ink-muted)] leading-relaxed mb-6">{post.desc}</p>
                 <span className="mt-auto text-gold font-semibold group-hover:translate-x-1 transition-transform">
                   Read more →
                 </span>

@@ -192,8 +192,8 @@ export default function RoomScan() {
   const holdSecondsLeft = Math.ceil((REQUIRED_HOLD_MS - holdMs) / 1000)
 
   return (
-    <div className="min-h-screen bg-white text-[#1A1A2E] flex flex-col">
-      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[#E0E0E8]">
+    <div className="min-h-screen bg-white text-[var(--color-ink)] flex flex-col">
+      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[var(--color-line)]">
         <Link to="/" aria-label="Prism home">
           <PrismLogo size={32} />
         </Link>
@@ -207,12 +207,12 @@ export default function RoomScan() {
           className="w-full max-w-4xl"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#C9A84C]/12 text-[#9A7B23]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-accent)]/12 text-[var(--color-accent)]">
               <ScanLine size={22} />
             </div>
             <div>
-              <h1 className="font-serif text-2xl font-bold text-[#1A1A2E]">Environment check</h1>
-              <p className="font-sans text-sm text-[#7A7F8C]">
+              <h1 className="font-serif text-2xl font-bold text-[var(--color-ink)]">Environment check</h1>
+              <p className="font-sans text-sm text-[var(--color-ink-muted)]">
                 Use your phone camera to show your surroundings before the test begins.
               </p>
             </div>
@@ -224,20 +224,20 @@ export default function RoomScan() {
               <div
                 key={s.id}
                 className={`h-1.5 flex-1 rounded-full transition-colors ${
-                  i < completedCount ? 'bg-[#C9A84C]' : i === current ? 'bg-[#C9A84C]/40' : 'bg-[#E8E8F0]'
+                  i < completedCount ? 'bg-[var(--color-accent)]' : i === current ? 'bg-[var(--color-accent)]/40' : 'bg-[var(--color-line)]'
                 }`}
               />
             ))}
           </div>
-          <p className="mt-2 font-sans text-xs text-[#A0A4B0]">
+          <p className="mt-2 font-sans text-xs text-[var(--color-ink-muted)]">
             Step {Math.min(completedCount + (allComplete ? 0 : 1), total)} of {total}
           </p>
 
           <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
             {/* Live phone preview */}
-            <div className="rounded-2xl border border-[#E0E0E8] bg-white p-5">
+            <div className="rounded-2xl border border-[var(--color-line)] bg-white p-5">
               <div className="flex items-center justify-between">
-                <h2 className="font-sans text-sm font-semibold text-[#1A1A2E]">Phone camera</h2>
+                <h2 className="font-sans text-sm font-semibold text-[var(--color-ink)]">Phone camera</h2>
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
                     phoneLinked || !phoneRequired ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
@@ -248,7 +248,7 @@ export default function RoomScan() {
                 </span>
               </div>
 
-              <div className="mt-4 flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl bg-[#0A0D14]">
+              <div className="mt-4 flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl bg-[var(--color-ink)]">
                 {phoneRequired ? (
                   <>
                     {/* eslint-disable-next-line jsx-a11y/img-redundant-alt */}
@@ -258,14 +258,14 @@ export default function RoomScan() {
                       className={`h-full w-full object-cover ${phoneLinked ? 'block' : 'hidden'}`}
                     />
                     {!phoneLinked && (
-                      <div className="flex flex-col items-center gap-2 text-[#5A5F6E]">
+                      <div className="flex flex-col items-center gap-2 text-[var(--color-ink-muted)]">
                         <Smartphone size={28} />
                         <p className="font-sans text-xs">Reconnect your phone to continue</p>
                       </div>
                     )}
                   </>
                 ) : (
-                  <div className="flex flex-col items-center gap-2 px-4 text-center text-[#5A5F6E]">
+                  <div className="flex flex-col items-center gap-2 px-4 text-center text-[var(--color-ink-muted)]">
                     <Smartphone size={28} />
                     <p className="font-sans text-xs">
                       No phone linked. Follow each step using your webcam and surroundings.
@@ -276,7 +276,7 @@ export default function RoomScan() {
             </div>
 
             {/* Current step / completion */}
-            <div className="rounded-2xl border border-[#E0E0E8] bg-white p-6 flex flex-col">
+            <div className="rounded-2xl border border-[var(--color-line)] bg-white p-6 flex flex-col">
               {!allComplete ? (
                 <motion.div
                   key={step.id}
@@ -285,19 +285,19 @@ export default function RoomScan() {
                   transition={{ duration: 0.25 }}
                   className="flex flex-1 flex-col"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#1A1A2E] text-[#C9A84C]">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--color-ink)] text-[var(--color-accent)]">
                     <StepIcon size={24} />
                   </div>
-                  <h3 className="mt-4 font-serif text-xl font-bold text-[#1A1A2E]">{step.title}</h3>
-                  <p className="mt-2 font-sans text-sm text-[#3A3A4A] leading-relaxed">{step.instruction}</p>
-                  <p className="mt-2 font-sans text-xs text-[#A0A4B0]">{step.hint}</p>
+                  <h3 className="mt-4 font-serif text-xl font-bold text-[var(--color-ink)]">{step.title}</h3>
+                  <p className="mt-2 font-sans text-sm text-[var(--color-ink)] leading-relaxed">{step.instruction}</p>
+                  <p className="mt-2 font-sans text-xs text-[var(--color-ink-muted)]">{step.hint}</p>
 
                   <div className="mt-auto pt-6">
                     <button
                       type="button"
                       onClick={confirmStep}
                       disabled={!canConfirm}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#C9A84C] px-6 py-3.5 font-sans text-sm font-bold text-[#1A1A2E] transition-all hover:bg-[#b89640] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] px-6 py-3.5 font-sans text-sm font-bold text-[var(--color-ink)] transition-all hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {!phoneOk ? (
                         <>
@@ -325,7 +325,7 @@ export default function RoomScan() {
                       <button
                         type="button"
                         onClick={goBack}
-                        className="mt-2 w-full font-sans text-xs font-semibold text-[#9A7B23] hover:underline"
+                        className="mt-2 w-full font-sans text-xs font-semibold text-[var(--color-accent)] hover:underline"
                       >
                         ← Previous step
                       </button>
@@ -342,8 +342,8 @@ export default function RoomScan() {
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-green-700">
                     <ShieldCheck size={24} />
                   </div>
-                  <h3 className="mt-4 font-serif text-xl font-bold text-[#1A1A2E]">Environment check complete</h3>
-                  <p className="mt-2 font-sans text-sm text-[#3A3A4A] leading-relaxed">
+                  <h3 className="mt-4 font-serif text-xl font-bold text-[var(--color-ink)]">Environment check complete</h3>
+                  <p className="mt-2 font-sans text-sm text-[var(--color-ink)] leading-relaxed">
                     Thanks — your surroundings are verified. Keep your phone propped up and this
                     screen open for the whole test.
                   </p>
@@ -352,7 +352,7 @@ export default function RoomScan() {
                       type="button"
                       onClick={finish}
                       disabled={saving}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1A1A2E] px-6 py-3.5 font-sans text-sm font-bold text-[#C9A84C] transition-colors hover:bg-[#252A3A] disabled:opacity-60"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-ink)] px-6 py-3.5 font-sans text-sm font-bold text-[var(--color-accent)] transition-colors hover:bg-[var(--color-line)] disabled:opacity-60"
                     >
                       {saving ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
                       Continue to briefing
@@ -376,18 +376,18 @@ export default function RoomScan() {
                     isDone
                       ? 'border-green-200 bg-green-50'
                       : isCurrent
-                        ? 'border-[#C9A84C]/40 bg-[#C9A84C]/5'
-                        : 'border-[#E8E8F0] bg-white'
+                        ? 'border-[var(--color-accent)]/40 bg-[var(--color-accent)]/5'
+                        : 'border-[var(--color-line)] bg-white'
                   }`}
                 >
                   <span
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                      isDone ? 'bg-green-600 text-white' : 'bg-[#EEEEF4] text-[#7A7F8C]'
+                      isDone ? 'bg-green-600 text-white' : 'bg-[var(--color-paper)] text-[var(--color-ink-muted)]'
                     }`}
                   >
                     {isDone ? <Check size={13} /> : <Icon size={13} />}
                   </span>
-                  <span className="font-sans text-xs font-medium text-[#3A3A4A]">{s.title}</span>
+                  <span className="font-sans text-xs font-medium text-[var(--color-ink)]">{s.title}</span>
                 </div>
               )
             })}

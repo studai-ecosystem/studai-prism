@@ -14,7 +14,7 @@ export default function PageLayout({ children }) {
 
   return (
     <main
-      className="bg-[#FAF7F2] min-h-screen overflow-x-hidden"
+      className="bg-[var(--color-paper)] min-h-screen overflow-x-hidden"
       style={{ fontFamily: "'DM Sans', sans-serif" }}
     >
       <Nav onGetAssessed={handleGetAssessed} />
@@ -29,12 +29,12 @@ export default function PageLayout({ children }) {
 export function PageHeading({ title, subtitle }) {
   return (
     <header className="text-center max-w-3xl mx-auto">
-      <h1 className="text-4xl md:text-5xl font-bold text-[#0A0D14] tracking-tight">
+      <h1 className="text-4xl md:text-5xl font-bold text-[var(--color-ink)] tracking-tight">
         {title}
       </h1>
       <div className="w-16 h-1 bg-gold mx-auto mt-4" />
       {subtitle && (
-        <p className="mt-6 text-lg text-[#5A5F6E] leading-relaxed">{subtitle}</p>
+        <p className="mt-6 text-lg text-[var(--color-ink-muted)] leading-relaxed">{subtitle}</p>
       )}
     </header>
   )

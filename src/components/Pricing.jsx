@@ -37,7 +37,7 @@ export default function Pricing({ onGetAssessed, onContactSales }) {
           </motion.div>
           <motion.h2
             variants={fadeUp}
-            className="font-serif text-4xl md:text-5xl text-[#1A1A2E] leading-tight mt-1"
+            className="font-serif text-4xl md:text-5xl text-[var(--color-ink)] leading-tight mt-1"
           >
             Simple, transparent pricing.
           </motion.h2>
@@ -79,7 +79,7 @@ export default function Pricing({ onGetAssessed, onContactSales }) {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="text-center font-sans text-xs text-[#8A8FA0] mt-6"
+          className="text-center font-sans text-xs text-[var(--color-ink-muted)] mt-6"
         >
           For larger cohorts, custom pricing available.
         </motion.p>

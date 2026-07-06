@@ -57,10 +57,10 @@ export default function ValidityStudy() {
       {/* Section 1 — Validation status (honest) */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-gold">
-          <h2 className="text-2xl font-bold text-[#0A0D14] mb-4">
+          <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">
             Where validation stands today
           </h2>
-          <p className="text-[#5A5F6E] leading-relaxed text-lg">
+          <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
             A valid assessment measures what it claims to measure. Prism is
             built for that from day one: each of the 5 dimensions is defined by
             observable behaviours, every score is produced by a multi-judge
@@ -76,14 +76,14 @@ export default function ValidityStudy() {
 
       {/* Section 2 — How a score is produced */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[#0A0D14] text-center mb-12">
+        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
           How a score is produced
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {scoringSteps.map((s) => (
             <div key={s.title} className="bg-white rounded-2xl shadow-sm p-6">
-              <h3 className="text-xl font-bold text-[#0A0D14] mb-3">{s.title}</h3>
-              <p className="text-[#5A5F6E] leading-relaxed">{s.desc}</p>
+              <h3 className="text-xl font-bold text-[var(--color-ink)] mb-3">{s.title}</h3>
+              <p className="text-[var(--color-ink-muted)] leading-relaxed">{s.desc}</p>
             </div>
           ))}
         </div>
@@ -91,35 +91,35 @@ export default function ValidityStudy() {
 
       {/* Section 3 — Scoring weights */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[#0A0D14] text-center mb-4">
+        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-4">
           Scoring weights
         </h2>
-        <p className="text-[#5A5F6E] text-center max-w-2xl mx-auto mb-12">
+        <p className="text-[var(--color-ink-muted)] text-center max-w-2xl mx-auto mb-12">
           Your overall Prism Score is a weighted average of the five dimension
           scores. These are the exact weights used by the scoring engine.
         </p>
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden max-w-4xl mx-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#F6EFE2]">
-                <th className="py-4 px-6 text-sm font-bold text-[#0A0D14] uppercase tracking-wide">
+              <tr className="bg-[var(--color-paper)]">
+                <th className="py-4 px-6 text-sm font-bold text-[var(--color-ink)] uppercase tracking-wide">
                   Dimension
                 </th>
-                <th className="py-4 px-6 text-sm font-bold text-[#0A0D14] uppercase tracking-wide">
+                <th className="py-4 px-6 text-sm font-bold text-[var(--color-ink)] uppercase tracking-wide">
                   Signal the AI looks for
                 </th>
-                <th className="py-4 px-6 text-sm font-bold text-[#0A0D14] uppercase tracking-wide text-right">
+                <th className="py-4 px-6 text-sm font-bold text-[var(--color-ink)] uppercase tracking-wide text-right">
                   Weight
                 </th>
               </tr>
             </thead>
             <tbody>
               {methodology.map((row) => (
-                <tr key={row.dimension} className="border-t border-[#E8E0D0]">
-                  <td className="py-4 px-6 font-semibold text-[#0A0D14] align-top">
+                <tr key={row.dimension} className="border-t border-[var(--color-line)]">
+                  <td className="py-4 px-6 font-semibold text-[var(--color-ink)] align-top">
                     {row.dimension}
                   </td>
-                  <td className="py-4 px-6 text-[#5A5F6E] align-top">
+                  <td className="py-4 px-6 text-[var(--color-ink-muted)] align-top">
                     {row.signal}
                   </td>
                   <td className="py-4 px-6 font-bold text-gold text-right align-top">
@@ -134,15 +134,15 @@ export default function ValidityStudy() {
 
       {/* Section 4 — Score bands (mirrors the bands shown on the score report) */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[#0A0D14] text-center mb-12">
+        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
           Score bands
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
           {[
-            { range: '0–49', name: 'Developing', desc: 'Early stage. Core skills need structured development.', color: '#E05252' },
-            { range: '50–69', name: 'Growing', desc: 'Shows potential. Some dimensions strong, others need work.', color: '#E0A028' },
-            { range: '70–84', name: 'Strong', desc: 'Ready for most roles. Strong across multiple dimensions.', color: '#3CB97A' },
-            { range: '85–100', name: 'Exceptional', desc: 'Exceptional. Stands out in competitive hiring.', color: '#C9A84C' },
+            { range: '0–49', name: 'Developing', desc: 'Early stage. Core skills need structured development.', color: 'var(--color-danger)' },
+            { range: '50–69', name: 'Growing', desc: 'Shows potential. Some dimensions strong, others need work.', color: 'var(--color-reliability-moderate)' },
+            { range: '70–84', name: 'Strong', desc: 'Ready for most roles. Strong across multiple dimensions.', color: 'var(--color-success)' },
+            { range: '85–100', name: 'Exceptional', desc: 'Exceptional. Stands out in competitive hiring.', color: 'var(--color-accent)' },
           ].map((b) => (
             <div
               key={b.name}
@@ -150,14 +150,14 @@ export default function ValidityStudy() {
               style={{ borderLeftColor: b.color }}
             >
               <div className="flex items-baseline gap-3 mb-2">
-                <span className="text-2xl font-bold text-[#0A0D14]">
+                <span className="text-2xl font-bold text-[var(--color-ink)]">
                   {b.range}
                 </span>
                 <span className="text-lg font-semibold" style={{ color: b.color }}>
                   {b.name}
                 </span>
               </div>
-              <p className="text-[#5A5F6E] leading-relaxed">{b.desc}</p>
+              <p className="text-[var(--color-ink-muted)] leading-relaxed">{b.desc}</p>
             </div>
           ))}
         </div>
@@ -166,10 +166,10 @@ export default function ValidityStudy() {
       {/* Section 5 — Retake policy */}
       <section className="py-12 pb-20 px-6 max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-[#0A0D14] mb-4">
+          <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">
             Retake policy
           </h2>
-          <p className="text-[#5A5F6E] leading-relaxed text-lg">
+          <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
             Each assessment uses a different scenario. Candidates can retake
             after {REASSESSMENT_DAYS} days. Scores from multiple attempts are
             not averaged — the most recent score is used.

@@ -28,7 +28,7 @@ export default function Mission() {
       {/* Body */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto">
-          <p className="text-[#5A5F6E] leading-relaxed text-lg">
+          <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
             Every year millions of students graduate across India. Most of them
             are capable. Very few of them have a way to prove it. Degrees tell
             you where someone studied. Grades tell you how they performed in
@@ -40,8 +40,8 @@ export default function Mission() {
 
       {/* Vision statement */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <div className="bg-[#F6EFE2] rounded-2xl shadow-sm p-10 md:p-14 max-w-3xl mx-auto border-l-4 border-gold">
-          <p className="text-2xl md:text-3xl font-serif text-[#0A0D14] leading-snug">
+        <div className="bg-[var(--color-paper)] rounded-2xl shadow-sm p-10 md:p-14 max-w-3xl mx-auto border-l-4 border-gold">
+          <p className="text-2xl md:text-3xl font-serif text-[var(--color-ink)] leading-snug">
             “A world where every capable person has a verified, verifiable
             proof of what they can do — regardless of where they studied or who
             they know.”
@@ -51,7 +51,7 @@ export default function Mission() {
 
       {/* Three pillars */}
       <section className="py-12 pb-20 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[#0A0D14] text-center mb-12">
+        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
           What we stand for
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -63,10 +63,10 @@ export default function Mission() {
               <span className="text-3xl font-bold text-gold">
                 {String(i + 1).padStart(2, '0')}
               </span>
-              <h3 className="text-xl font-bold text-[#0A0D14] mt-3 mb-3">
+              <h3 className="text-xl font-bold text-[var(--color-ink)] mt-3 mb-3">
                 {p.name}
               </h3>
-              <p className="text-[#5A5F6E] leading-relaxed">{p.desc}</p>
+              <p className="text-[var(--color-ink-muted)] leading-relaxed">{p.desc}</p>
             </div>
           ))}
         </div>

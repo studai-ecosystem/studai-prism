@@ -5,15 +5,15 @@
 /* ── Google Fonts are loaded in index.html ── */
 
 :root {
-  --bg-primary: #EDE4D3;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #F6EFE2;
-  --card: #FFFFFF;
-  --gold: #C9A84C;
-  --gold-light: #E8C96A;
-  --text-primary: #0A0D14;
-  --text-secondary: #5A5F6E;
-  --border: #E8E0D0;
+  --bg-primary: var(--color-line);
+  --bg-secondary: var(--color-surface);
+  --bg-tertiary: var(--color-paper);
+  --card: var(--color-surface);
+  --gold: var(--color-accent);
+  --gold-light: var(--color-accent-bright);
+  --text-primary: var(--color-ink);
+  --text-secondary: var(--color-ink-muted);
+  --border: var(--color-line);
 }
 
 * {
@@ -35,8 +35,8 @@ body {
 
 /* ── Custom scrollbar ── */
 ::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: #EDE4D3; }
-::-webkit-scrollbar-thumb { background: #E8E0D0; border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--color-line); }
+::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 
 /* ── Noise texture ── */
@@ -59,10 +59,10 @@ body {
 .shimmer-btn {
   background: linear-gradient(
     90deg,
-    #C9A84C 0%,
-    #E8C96A 30%,
-    #C9A84C 60%,
-    #E8C96A 100%
+    var(--color-accent) 0%,
+    var(--color-accent-bright) 30%,
+    var(--color-accent) 60%,
+    var(--color-accent-bright) 100%
   );
   background-size: 200% auto;
   animation: shimmer 2.8s linear infinite;

@@ -10,7 +10,7 @@ const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Wor
 function Field({ label, type = 'text', value, onChange, placeholder, required = true, autoComplete }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="font-sans text-xs font-semibold text-[#3A3A4A] tracking-wide">{label}</span>
+      <span className="font-sans text-xs font-semibold text-[var(--color-ink)] tracking-wide">{label}</span>
       <input
         type={type}
         value={value}
@@ -18,7 +18,7 @@ function Field({ label, type = 'text', value, onChange, placeholder, required = 
         placeholder={placeholder}
         required={required}
         autoComplete={autoComplete}
-        className="w-full px-4 py-3 rounded-xl bg-[#F5F5FA] border border-[#E0E0E8] font-sans text-sm text-[#1A1A2E] placeholder:text-[#A0A4B0] focus:outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/20 transition-all"
+        className="w-full px-4 py-3 rounded-xl bg-[var(--color-paper)] border border-[var(--color-line)] font-sans text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
       />
     </label>
   )
@@ -74,9 +74,9 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#1A1A2E] flex flex-col">
+    <div className="min-h-screen bg-white text-[var(--color-ink)] flex flex-col">
       {/* Minimal header */}
-      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[#E0E0E8]">
+      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[var(--color-line)]">
         <Link to="/" aria-label="Prism home">
           <PrismLogo size={32} />
         </Link>
@@ -90,23 +90,23 @@ export default function Auth() {
           className="w-full max-w-md"
         >
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#C9A84C]/10 mb-4">
-              <ShieldCheck size={22} className="text-[#C9A84C]" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-accent)]/10 mb-4">
+              <ShieldCheck size={22} className="text-[var(--color-accent)]" />
             </div>
-            <h1 className="font-serif text-3xl text-[#1A1A2E] mb-1">
+            <h1 className="font-serif text-3xl text-[var(--color-ink)] mb-1">
               {isRegister ? 'Create your account' : 'Welcome back'}
             </h1>
-            <p className="font-sans text-sm text-[#64687A]">
+            <p className="font-sans text-sm text-[var(--color-ink-muted)]">
               {isRegister ? 'Start your Prism assessment' : 'Sign in to continue'}
             </p>
           </div>
 
           {/* Tabs */}
-          <div className="flex p-1 rounded-xl bg-[#F5F5FA] border border-[#E8E8F0] mb-6">
+          <div className="flex p-1 rounded-xl bg-[var(--color-paper)] border border-[var(--color-line)] mb-6">
             <Link
               to="/login"
               className={`flex-1 text-center py-2 rounded-lg font-sans text-sm font-semibold transition-colors ${
-                !isRegister ? 'bg-white text-[#1A1A2E] shadow-sm' : 'text-[#64687A]'
+                !isRegister ? 'bg-white text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-ink-muted)]'
               }`}
             >
               Login
@@ -114,7 +114,7 @@ export default function Auth() {
             <Link
               to="/register"
               className={`flex-1 text-center py-2 rounded-lg font-sans text-sm font-semibold transition-colors ${
-                isRegister ? 'bg-white text-[#1A1A2E] shadow-sm' : 'text-[#64687A]'
+                isRegister ? 'bg-white text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-ink-muted)]'
               }`}
             >
               Register
@@ -148,11 +148,11 @@ export default function Auth() {
                 >
                   <Field label="College" value={form.college} onChange={update('college')} placeholder="IIT Madras" autoComplete="organization" />
                   <label className="flex flex-col gap-1.5">
-                    <span className="font-sans text-xs font-semibold text-[#3A3A4A] tracking-wide">Year of Study</span>
+                    <span className="font-sans text-xs font-semibold text-[var(--color-ink)] tracking-wide">Year of Study</span>
                     <select
                       value={form.year}
                       onChange={update('year')}
-                      className="w-full px-4 py-3 rounded-xl bg-[#F5F5FA] border border-[#E0E0E8] font-sans text-sm text-[#1A1A2E] focus:outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/20 transition-all"
+                      className="w-full px-4 py-3 rounded-xl bg-[var(--color-paper)] border border-[var(--color-line)] font-sans text-sm text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
                     >
                       <option value="" disabled>Select year</option>
                       {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -165,13 +165,13 @@ export default function Auth() {
             <Field label="Password" type="password" value={form.password} onChange={update('password')} placeholder="••••••••" autoComplete={isRegister ? 'new-password' : 'current-password'} />
 
             {error && (
-              <p className="font-sans text-sm text-[#E05252] text-center">{error}</p>
+              <p className="font-sans text-sm text-[var(--color-danger)] text-center">{error}</p>
             )}
 
             <motion.button
               type="submit"
               disabled={submitting}
-              className="mt-2 w-full py-3.5 rounded-xl bg-[#1A1A2E] font-sans font-semibold text-sm text-[#C9A84C] tracking-wide hover:bg-[#252A3A] transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+              className="mt-2 w-full py-3.5 rounded-xl bg-[var(--color-ink)] font-sans font-semibold text-sm text-[var(--color-paper)] tracking-wide hover:opacity-90 transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
               whileHover={submitting ? {} : { scale: 1.01 }}
               whileTap={submitting ? {} : { scale: 0.98 }}
             >
@@ -180,9 +180,9 @@ export default function Auth() {
             </motion.button>
           </form>
 
-          <p className="text-center font-sans text-xs text-[#A0A4B0] mt-6">
+          <p className="text-center font-sans text-xs text-[var(--color-ink-muted)] mt-6">
             {isRegister ? 'Already have an account? ' : "Don't have an account? "}
-            <Link to={isRegister ? '/login' : '/register'} className="text-[#C9A84C] font-semibold hover:underline">
+            <Link to={isRegister ? '/login' : '/register'} className="text-[var(--color-accent)] font-semibold hover:underline">
               {isRegister ? 'Login' : 'Register'}
             </Link>
           </p>

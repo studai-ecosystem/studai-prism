@@ -33,7 +33,7 @@ const personas = [
 
 export default function WhoItsFor() {
   return (
-    <section id="who-its-for" className="py-24 bg-[#F5F5FA]">
+    <section id="who-its-for" className="py-24 bg-[var(--color-paper)]">
       <div className="max-w-7xl mx-auto px-6">
         {/* Header */}
         <motion.div
@@ -48,7 +48,7 @@ export default function WhoItsFor() {
           </motion.div>
           <motion.h2
             variants={fadeUp}
-            className="font-serif text-4xl md:text-5xl text-[#1A1A2E] leading-tight mt-1"
+            className="font-serif text-4xl md:text-5xl text-[var(--color-ink)] leading-tight mt-1"
           >
             Built for every stage of the journey.
           </motion.h2>

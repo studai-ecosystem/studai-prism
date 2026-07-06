@@ -41,26 +41,26 @@ export default function BlogPost() {
         </Link>
 
         {status === 'loading' && (
-          <p className="mt-10 text-[#8A8FA0]">Loading…</p>
+          <p className="mt-10 text-[var(--color-ink-muted)]">Loading…</p>
         )}
         {status === 'notfound' && (
-          <p className="mt-10 text-[#8A8FA0]">That post could not be found.</p>
+          <p className="mt-10 text-[var(--color-ink-muted)]">That post could not be found.</p>
         )}
         {status === 'error' && (
-          <p className="mt-10 text-[#8A8FA0]">
+          <p className="mt-10 text-[var(--color-ink-muted)]">
             Couldn’t load this post right now. Please try again later.
           </p>
         )}
         {status === 'ready' && post && (
           <>
-            <p className="mt-10 text-xs font-semibold tracking-[0.15em] text-[#8A8FA0] uppercase mb-3">
+            <p className="mt-10 text-xs font-semibold tracking-[0.15em] text-[var(--color-ink-muted)] uppercase mb-3">
               {post.date}
             </p>
-            <h1 className="text-3xl md:text-4xl font-bold text-[#0A0D14] mb-6 leading-tight">
+            <h1 className="text-3xl md:text-4xl font-bold text-[var(--color-ink)] mb-6 leading-tight">
               {post.title}
             </h1>
-            <p className="text-lg text-[#5A5F6E] leading-relaxed mb-8">{post.desc}</p>
-            <div className="prose text-[#2A2E3A] leading-relaxed whitespace-pre-line">
+            <p className="text-lg text-[var(--color-ink-muted)] leading-relaxed mb-8">{post.desc}</p>
+            <div className="prose text-[var(--color-ink)] leading-relaxed whitespace-pre-line">
               {post.body}
             </div>
           </>

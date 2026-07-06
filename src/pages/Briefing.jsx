@@ -165,9 +165,9 @@ export default function Briefing() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-[#F0EDE6] flex flex-col overflow-x-hidden">
-      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[#252A3A]">
-        <PrismLogo size={32} wordmarkColor="#F0EDE6" subtitleColor="#8A8FA0" />
+    <div className="min-h-screen bg-[var(--color-paper)] text-[var(--color-ink)] flex flex-col overflow-x-hidden">
+      <header className="shrink-0 flex items-center px-6 h-16 bg-[var(--color-surface)] border-b border-[var(--color-line)]">
+        <PrismLogo size={32} />
       </header>
 
       <div className="flex-1 flex items-center justify-center px-6 py-12">
@@ -178,11 +178,11 @@ export default function Briefing() {
           className="w-full max-w-xl flex flex-col gap-8"
         >
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#C9A84C]/15 mb-4">
-              <ShieldCheck size={22} className="text-[#C9A84C]" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-accent)]/10 mb-4">
+              <ShieldCheck size={22} className="text-[var(--color-accent)]" />
             </div>
-            <h1 className="font-serif text-4xl text-[#F0EDE6] mb-2">Your assessment is about to begin</h1>
-            <p className="font-sans text-sm text-[#8A8FA0]">30-minute assessment · 5 skill dimensions · Verified result</p>
+            <h1 className="font-serif text-4xl text-[var(--color-ink)] mb-2">Your assessment is about to begin</h1>
+            <p className="font-sans text-sm text-[var(--color-ink-muted)]">30-minute assessment · 5 skill dimensions · Verified result</p>
           </div>
 
           {/* Rules */}
@@ -193,10 +193,10 @@ export default function Briefing() {
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.1 + i * 0.07 }}
-                className="flex gap-3 items-center p-4 rounded-xl bg-[#111520] border border-[#252A3A]"
+                className="flex gap-3 items-center p-4 rounded-xl bg-[var(--color-surface)] border border-[var(--color-line)]"
               >
-                <Icon size={18} className="text-[#C9A84C] shrink-0" />
-                <span className="font-sans text-sm text-[#C9CDD8]">{text}</span>
+                <Icon size={18} className="text-[var(--color-ink-muted)] shrink-0" />
+                <span className="font-sans text-sm text-[var(--color-ink)]">{text}</span>
               </motion.li>
             ))}
           </ul>
@@ -205,8 +205,8 @@ export default function Briefing() {
           <div className="flex flex-col items-center">
             <label
               htmlFor="prism-name"
-              className="font-sans font-bold text-[16px] text-[#F0EDE6] mb-2"
-              style={{ color: '#F0EDE6' }}
+              className="font-sans font-bold text-[16px] mb-2"
+              style={{ color: 'var(--color-ink)' }}
             >
               What's your name?
             </label>
@@ -220,11 +220,11 @@ export default function Briefing() {
               placeholder="Enter your name..."
               className="w-full max-w-sm rounded-lg px-4 py-3"
               style={{
-                backgroundColor: '#FFFFFF',
-                border: `1px solid ${nameFocused ? '#C9A84C' : '#E8E0D0'}`,
+                backgroundColor: 'var(--color-surface)',
+                border: `1px solid ${nameFocused ? 'var(--color-accent)' : 'var(--color-line)'}`,
                 borderRadius: '0.5rem',
                 fontSize: '16px',
-                color: '#1A1A2E',
+                color: 'var(--color-ink)',
                 boxShadow: nameFocused ? '0 0 0 3px rgba(201,168,76,0.25)' : 'none',
                 transition: 'all 200ms ease',
                 outline: 'none',
@@ -233,7 +233,7 @@ export default function Briefing() {
             {nameError && (
               <span
                 className="w-full max-w-sm mt-1.5 font-sans"
-                style={{ color: '#E05252', fontSize: '13px' }}
+                style={{ color: 'var(--color-danger)', fontSize: '13px' }}
               >
                 {nameError}
               </span>
@@ -251,12 +251,12 @@ export default function Briefing() {
               .prism-panel{animation:prismPanelIn .3s cubic-bezier(0.34,1.56,0.64,1) forwards}
               .prism-card{transition:transform 250ms ease,box-shadow 200ms ease,filter 200ms ease}
               .prism-card:not(.is-selected):hover{filter:brightness(1.1);box-shadow:0 0 0 2px rgba(201,168,76,0.5)}
-              .prism-surprise:hover{background:#1E3A8A !important;color:#fff !important}
+              .prism-surprise:hover{background:var(--color-info) !important;color:white !important}
             `}</style>
 
             <div className="mx-auto px-4 w-full" style={{ maxWidth: 1040 }}>
-              <h2 className="text-center font-sans font-bold text-[18px] text-[#F0EDE6] mb-1">Choose your character</h2>
-              <p className="text-center font-sans text-[13px] text-[#8A8FA0] mb-5">
+              <h2 className="text-center font-sans font-bold text-[18px] text-[var(--color-ink)] mb-1">Choose your character</h2>
+              <p className="text-center font-sans text-[13px] text-[var(--color-ink-muted)] mb-5">
                 This is how you will appear in the assessment
               </p>
 
@@ -272,8 +272,8 @@ export default function Briefing() {
                       className="rounded-full px-5 py-2 font-sans text-[13px] font-semibold capitalize transition-all duration-200"
                       style={
                         active
-                          ? { background: '#C9A84C', color: '#0A0D14', border: '1px solid #C9A84C' }
-                          : { background: 'transparent', color: '#8A8FA0', border: '1px solid #E8E0D0' }
+                          ? { background: 'var(--color-ink)', color: 'var(--color-paper)', border: '1px solid var(--color-ink)' }
+                          : { background: 'transparent', color: 'var(--color-ink-muted)', border: '1px solid var(--color-line)' }
                       }
                     >
                       {f}
@@ -284,7 +284,7 @@ export default function Briefing() {
                   type="button"
                   onClick={handleSurprise}
                   className="prism-surprise rounded-full px-4 py-2 font-sans text-[13px] font-semibold transition-all duration-200"
-                  style={{ background: 'transparent', color: '#9BB4E8', border: '1px solid #3B5CA8' }}
+                  style={{ background: 'transparent', color: 'var(--color-info)', border: '1px solid var(--color-info)' }}
                 >
                   🎲 Surprise me
                 </button>
@@ -311,7 +311,7 @@ export default function Briefing() {
                           minHeight: 200,
                           transform: isSelected ? 'scale(1.05)' : 'scale(1)',
                           ...(isSelected
-                            ? { boxShadow: '0 0 0 3px #C9A84C, 0 0 0 7px rgba(201,168,76,0.30)' }
+                            ? { boxShadow: '0 0 0 3px var(--color-accent), 0 0 0 7px rgba(201,168,76,0.30)' }
                             : {}),
                         }}
                       >
@@ -336,7 +336,7 @@ export default function Briefing() {
                         {isSelected && (
                           <span
                             className="absolute top-2 right-2 flex items-center justify-center rounded-full"
-                            style={{ width: 22, height: 22, background: '#C9A84C' }}
+                            style={{ width: 22, height: 22, background: 'var(--color-accent)' }}
                           >
                             <Check size={13} className="text-white" strokeWidth={3} />
                           </span>
@@ -356,8 +356,8 @@ export default function Briefing() {
                 style={{
                   width: 220,
                   transform: 'translateY(-50%)',
-                  background: '#FFFFFF',
-                  borderLeft: '3px solid #C9A84C',
+                  background: 'var(--color-surface)',
+                  borderLeft: '3px solid var(--color-accent)',
                   borderTopLeftRadius: 16,
                   borderBottomLeftRadius: 16,
                   boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
@@ -368,36 +368,36 @@ export default function Briefing() {
                   type="button"
                   onClick={() => setSelectedCharacter(null)}
                   aria-label="Close"
-                  className="absolute top-3 right-3 text-[#8A8FA0] text-lg leading-none"
+                  className="absolute top-3 right-3 text-[var(--color-ink-muted)] text-lg leading-none"
                 >
                   ✕
                 </button>
                 <div className="flex justify-center">
                   <CharacterAvatar id={selectedCharacter.id} size={120} />
                 </div>
-                <div className="text-center font-sans font-bold text-[18px]" style={{ color: '#1A1A2E' }}>
+                <div className="text-center font-sans font-bold text-[18px]" style={{ color: 'var(--color-ink)' }}>
                   {selectedCharacter.name}
                 </div>
                 <div className="flex justify-center">
                   <span
                     className="rounded-full px-3 py-1 font-sans text-[12px] font-semibold"
-                    style={{ background: 'rgba(201,168,76,0.15)', color: '#9A7B20' }}
+                    style={{ background: 'rgba(201,168,76,0.15)', color: 'var(--color-accent)' }}
                   >
                     {selectedCharacter.personality}
                   </span>
                 </div>
-                <p className="text-center font-sans text-[13px]" style={{ color: '#64687A' }}>
+                <p className="text-center font-sans text-[13px]" style={{ color: 'var(--color-ink-muted)' }}>
                   {selectedCharacter.description}
                 </p>
-                <p className="text-center font-sans text-[12px] font-semibold" style={{ color: '#16A34A' }}>
+                <p className="text-center font-sans text-[12px] font-semibold" style={{ color: 'var(--color-success)' }}>
                   This is you ✓
                 </p>
-                <div className="h-px w-full" style={{ background: '#E8E0D0' }} />
+                <div className="h-px w-full" style={{ background: 'var(--color-line)' }} />
                 <button
                   type="button"
                   onClick={handleEnter}
                   className="w-full rounded-xl py-3 font-sans font-semibold text-[14px]"
-                  style={{ background: '#C9A84C', color: '#0A0D14' }}
+                  style={{ background: 'var(--color-ink)', color: 'var(--color-paper)' }}
                 >
                   Confirm Character
                 </button>
@@ -409,8 +409,8 @@ export default function Briefing() {
           {sessionId && (
             <>
               {languages.length > 1 && (
-                <div className="rounded-xl border border-[#252A3A] bg-[#111520] p-5">
-                  <span className="font-sans text-xs font-semibold tracking-[0.18em] text-[#C9A84C] uppercase">
+                <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
+                  <span className="font-mono text-xs tracking-[0.08em] text-[var(--color-accent)] uppercase">
                     Assessment language
                   </span>
                   <div className="flex flex-wrap gap-2 mt-3">
@@ -421,9 +421,9 @@ export default function Briefing() {
                         onClick={() => pickLanguage(l.code)}
                         className="px-4 py-2 rounded-lg font-sans text-sm border transition-colors"
                         style={{
-                          borderColor: language === l.code ? '#C9A84C' : '#252A3A',
-                          background: language === l.code ? '#C9A84C22' : 'transparent',
-                          color: language === l.code ? '#C9A84C' : '#C9CDD8',
+                          borderColor: language === l.code ? 'var(--color-accent)' : 'var(--color-line)',
+                          background: language === l.code ? 'color-mix(in srgb, var(--color-accent) 13%, transparent)' : 'transparent',
+                          color: language === l.code ? 'var(--color-accent)' : 'var(--color-ink-muted)',
                         }}
                       >
                         {l.nativeLabel}
@@ -431,18 +431,18 @@ export default function Briefing() {
                     ))}
                   </div>
                   {language !== 'en' && (
-                    <p className="font-sans text-[12px] text-[#8A8FA0] leading-relaxed mt-3">
+                    <p className="font-sans text-[12px] text-[var(--color-ink-muted)] leading-relaxed mt-3">
                       Scoring in this language is provisional — it has not yet been calibrated against the
                       English scale. Your report and credential will say so until our fairness study completes.
                     </p>
                   )}
                 </div>
               )}
-              <div className="rounded-xl border border-[#252A3A] bg-[#111520] p-5">
-                <span className="font-sans text-xs font-semibold tracking-[0.18em] text-[#C9A84C] uppercase">
+              <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
+                <span className="font-mono text-xs tracking-[0.08em] text-[var(--color-accent)] uppercase">
                   Quick calibration (optional)
                 </span>
-                <p className="font-sans text-sm text-[#C9CDD8] leading-relaxed mt-2 mb-3">
+                <p className="font-sans text-sm text-[var(--color-ink)] leading-relaxed mt-2 mb-3">
                   {CALIBRATION_PROMPT}
                 </p>
                 <textarea
@@ -450,12 +450,12 @@ export default function Briefing() {
                   onChange={(e) => setCalibrationAnswer(e.target.value)}
                   rows={4}
                   placeholder="Type a few sentences… this helps us match the difficulty to you."
-                  className="w-full rounded-lg px-4 py-3 font-sans text-sm bg-[#0A0D14] border border-[#252A3A] text-[#F0EDE6] placeholder:text-[#5A5F70] focus:border-[#C9A84C] focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/25 transition-all resize-none"
+                  className="w-full rounded-lg px-4 py-3 font-sans text-sm bg-[var(--color-paper)] border border-[var(--color-line)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/25 transition-all resize-none"
                 />
               </div>
 
               <div className="flex flex-col gap-3">
-                <span className="font-sans text-xs font-semibold tracking-[0.18em] text-[#C9A84C] uppercase">
+                <span className="font-mono text-xs tracking-[0.08em] text-[var(--color-accent)] uppercase">
                   Before you begin
                 </span>
                 {CONSENT_ITEMS.map(({ scope, label }) => (
@@ -463,19 +463,19 @@ export default function Briefing() {
                     key={scope}
                     type="button"
                     onClick={() => toggleConsent(scope)}
-                    className="flex gap-3 items-start text-left p-3 rounded-xl bg-[#111520] border border-[#252A3A] hover:border-[#C9A84C]/40 transition-colors"
+                    className="flex gap-3 items-start text-left p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-line)] hover:border-[var(--color-accent)]/50 transition-colors"
                     aria-pressed={!!consent[scope]}
                   >
                     <span
                       className="mt-0.5 shrink-0 flex items-center justify-center w-5 h-5 rounded-md transition-colors"
                       style={{
-                        backgroundColor: consent[scope] ? '#C9A84C' : 'transparent',
-                        border: `1.5px solid ${consent[scope] ? '#C9A84C' : '#3A4055'}`,
+                        backgroundColor: consent[scope] ? 'var(--color-accent)' : 'transparent',
+                        border: `1.5px solid ${consent[scope] ? 'var(--color-accent)' : 'var(--color-line)'}`,
                       }}
                     >
-                      {consent[scope] && <Check size={13} className="text-[#0A0D14]" strokeWidth={3} />}
+                      {consent[scope] && <Check size={13} className="text-[var(--color-surface)]" strokeWidth={3} />}
                     </span>
-                    <span className="font-sans text-[13px] text-[#C9CDD8] leading-relaxed">{label}</span>
+                    <span className="font-sans text-[13px] text-[var(--color-ink)] leading-relaxed">{label}</span>
                   </button>
                 ))}
               </div>
@@ -483,7 +483,7 @@ export default function Briefing() {
           )}
 
           {submitError && (
-            <p className="text-center font-sans text-sm" style={{ color: '#E05252' }}>
+            <p className="text-center font-sans text-sm" style={{ color: 'var(--color-danger)' }}>
               {submitError}
             </p>
           )}
@@ -496,10 +496,10 @@ export default function Briefing() {
                   <motion.button
                     onClick={handleEnter}
                     disabled={!canEnter}
-                    className={`w-full py-4 rounded-xl font-sans font-semibold text-sm text-[#0A0D14] tracking-wide transition-colors ${
+                    className={`w-full py-4 rounded-xl font-sans font-semibold text-sm text-[var(--color-paper)] tracking-wide transition-opacity ${
                       canEnter
-                        ? 'bg-[#C9A84C] hover:bg-[#E8C96A] cursor-pointer'
-                        : 'bg-[#C9A84C]/40 text-[#0A0D14]/60 cursor-not-allowed'
+                        ? 'bg-[var(--color-ink)] hover:opacity-90 cursor-pointer'
+                        : 'bg-[var(--color-ink)]/40 cursor-not-allowed'
                     }`}
                     whileHover={canEnter ? { scale: 1.01 } : {}}
                     whileTap={canEnter ? { scale: 0.98 } : {}}
@@ -507,7 +507,7 @@ export default function Briefing() {
                     {submitting ? 'Preparing…' : 'Enter Assessment →'}
                   </motion.button>
                   {!selectedCharacter && (
-                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-9 px-3 py-1.5 rounded-md bg-[#1A1F2E] text-[#F0EDE6] text-xs font-sans whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity">
+                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-9 px-3 py-1.5 rounded-md bg-[var(--color-ink)] text-[var(--color-paper)] text-xs font-sans whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity">
                       Please choose a character first
                     </span>
                   )}
@@ -516,7 +516,7 @@ export default function Briefing() {
             })()}
           </div>
 
-          <p className="text-center font-sans text-xs text-[#5A5F70]">
+          <p className="text-center font-sans text-xs text-[var(--color-ink-muted)]">
             By entering you confirm this is your own unaided work.
           </p>
         </motion.div>

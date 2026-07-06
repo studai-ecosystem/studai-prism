@@ -70,10 +70,10 @@ export default function ScienceBehindPrism() {
       {/* Section 1 — Why conversation not a test */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
         <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-[#0A0D14] mb-4">
+          <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">
             Why a conversation, not a test
           </h2>
-          <p className="text-[#5A5F6E] leading-relaxed text-lg">
+          <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
             Traditional assessments measure memory. Prism measures thinking. A
             live AI conversation surfaces how a person actually reasons,
             communicates, and collaborates — under real pressure, in real time.
@@ -84,7 +84,7 @@ export default function ScienceBehindPrism() {
 
       {/* Section 2 — The 5 dimensions */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[#0A0D14] text-center mb-12">
+        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
           The 5 dimensions explained
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -94,9 +94,9 @@ export default function ScienceBehindPrism() {
               className="bg-white rounded-2xl shadow-sm p-6 flex flex-col border-t-2 border-transparent hover:border-gold transition-colors"
             >
               <span className="text-3xl font-bold text-gold mb-3">{d.num}</span>
-              <h3 className="text-xl font-bold text-[#0A0D14] mb-3">{d.name}</h3>
-              <p className="text-[#5A5F6E] leading-relaxed mb-4">{d.measures}</p>
-              <p className="text-[#8A8FA0] italic leading-relaxed mt-auto">
+              <h3 className="text-xl font-bold text-[var(--color-ink)] mb-3">{d.name}</h3>
+              <p className="text-[var(--color-ink-muted)] leading-relaxed mb-4">{d.measures}</p>
+              <p className="text-[var(--color-ink-muted)] italic leading-relaxed mt-auto">
                 {d.inConversation}
               </p>
             </div>
@@ -106,7 +106,7 @@ export default function ScienceBehindPrism() {
 
       {/* Section 3 — How scoring works */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[#0A0D14] text-center mb-12">
+        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
           How scoring works
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -115,10 +115,10 @@ export default function ScienceBehindPrism() {
               key={s.num}
               className="bg-white rounded-2xl shadow-sm p-8 flex flex-col items-center text-center"
             >
-              <div className="w-12 h-12 rounded-full bg-gold text-[#0A0D14] font-bold text-xl flex items-center justify-center mb-5">
+              <div className="w-12 h-12 rounded-full bg-gold text-[var(--color-ink)] font-bold text-xl flex items-center justify-center mb-5">
                 {s.num}
               </div>
-              <p className="text-[#5A5F6E] leading-relaxed text-lg">{s.text}</p>
+              <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">{s.text}</p>
             </div>
           ))}
         </div>
@@ -127,11 +127,11 @@ export default function ScienceBehindPrism() {
       {/* Section 4 — Quote block */}
       <section className="py-20 px-6 max-w-6xl mx-auto">
         <blockquote className="bg-white rounded-2xl shadow-sm p-10 md:p-14 max-w-3xl mx-auto border-l-4 border-gold">
-          <p className="text-2xl md:text-3xl font-serif text-[#0A0D14] leading-snug">
+          <p className="text-2xl md:text-3xl font-serif text-[var(--color-ink)] leading-snug">
             “The best predictor of job performance is not where you studied. It
             is how you think. Prism measures that.”
           </p>
-          <footer className="mt-6 text-[#8A8FA0] font-semibold">
+          <footer className="mt-6 text-[var(--color-ink-muted)] font-semibold">
             — StudAI One Research Team
           </footer>
         </blockquote>

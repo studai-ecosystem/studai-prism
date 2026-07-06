@@ -40,7 +40,7 @@ const dimensions = [
 
 export default function Dimensions() {
   return (
-    <section id="dimensions" className="py-24 bg-[#F5F5FA]">
+    <section id="dimensions" className="py-24 bg-[var(--color-paper)]">
       <div className="max-w-7xl mx-auto px-6">
         {/* Header */}
         <motion.div
@@ -55,7 +55,7 @@ export default function Dimensions() {
           </motion.div>
           <motion.h2
             variants={fadeUp}
-            className="font-serif text-4xl md:text-5xl text-[#1A1A2E] leading-tight mt-1"
+            className="font-serif text-4xl md:text-5xl text-[var(--color-ink)] leading-tight mt-1"
           >
             Five dimensions. Every role. Every industry.
           </motion.h2>

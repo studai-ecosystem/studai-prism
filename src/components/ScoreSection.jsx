@@ -35,21 +35,21 @@ export default function ScoreSection() {
 
             <motion.h2
               variants={fadeUp}
-              className="font-serif text-4xl md:text-5xl text-[#1A1A2E] leading-tight mt-1 mb-4"
+              className="font-serif text-4xl md:text-5xl text-[var(--color-ink)] leading-tight mt-1 mb-4"
             >
               A score that shows what you can actually do.
             </motion.h2>
 
             <motion.h3
               variants={fadeUp}
-              className="font-sans font-semibold text-[#1A1A2E] text-xl mb-3"
+              className="font-sans font-semibold text-[var(--color-ink)] text-xl mb-3"
             >
               Not a pass/fail. A detailed map.
             </motion.h3>
 
             <motion.p
               variants={fadeUp}
-              className="font-sans text-[#64687A] leading-relaxed mb-8"
+              className="font-sans text-[var(--color-ink-muted)] leading-relaxed mb-8"
             >
               Your Prism Score is a verifiable number between 0–100. It comes
               with a detailed breakdown across all five dimensions — so employers and
@@ -63,10 +63,10 @@ export default function ScoreSection() {
                   variants={fadeUp}
                   className="flex items-start gap-3"
                 >
-                  <div className="mt-0.5 flex items-center justify-center w-5 h-5 rounded-full bg-[#C9A84C]/15 shrink-0">
-                    <Check size={12} className="text-[#C9A84C]" />
+                  <div className="mt-0.5 flex items-center justify-center w-5 h-5 rounded-full bg-[var(--color-accent)]/15 shrink-0">
+                    <Check size={12} className="text-[var(--color-accent)]" />
                   </div>
-                  <span className="font-sans text-sm text-[#1A1A2E]/80 leading-relaxed">{b}</span>
+                  <span className="font-sans text-sm text-[var(--color-ink)]/80 leading-relaxed">{b}</span>
                 </motion.li>
               ))}
             </motion.ul>

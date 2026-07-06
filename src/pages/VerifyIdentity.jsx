@@ -45,7 +45,7 @@ function matchScore(declaredName, ocrText) {
 function Field({ label, type = 'text', value, onChange, placeholder, maxLength, inputMode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="font-sans text-xs font-semibold text-[#3A3A4A] tracking-wide">{label}</span>
+      <span className="font-sans text-xs font-semibold text-[var(--color-ink)] tracking-wide">{label}</span>
       <input
         type={type}
         value={value}
@@ -53,7 +53,7 @@ function Field({ label, type = 'text', value, onChange, placeholder, maxLength, 
         placeholder={placeholder}
         maxLength={maxLength}
         inputMode={inputMode}
-        className="w-full px-4 py-3 rounded-xl bg-[#F5F5FA] border border-[#E0E0E8] font-sans text-sm text-[#1A1A2E] placeholder:text-[#A0A4B0] focus:outline-none focus:border-[#C9A84C] focus:ring-2 focus:ring-[#C9A84C]/20 transition-all"
+        className="w-full px-4 py-3 rounded-xl bg-[var(--color-paper)] border border-[var(--color-line)] font-sans text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
       />
     </label>
   )
@@ -88,11 +88,11 @@ function DocUpload({ title, hint, declaredName, onResult }) {
   }
 
   return (
-    <div className="rounded-2xl border border-[#E0E0E8] bg-white p-5">
+    <div className="rounded-2xl border border-[var(--color-line)] bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-sans text-sm font-semibold text-[#1A1A2E]">{title}</h3>
-          <p className="mt-0.5 font-sans text-xs text-[#7A7F8C]">{hint}</p>
+          <h3 className="font-sans text-sm font-semibold text-[var(--color-ink)]">{title}</h3>
+          <p className="mt-0.5 font-sans text-xs text-[var(--color-ink-muted)]">{hint}</p>
         </div>
         {status === 'matched' && (
           <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
@@ -105,7 +105,7 @@ function DocUpload({ title, hint, declaredName, onResult }) {
           </span>
         )}
         {status === 'scanning' && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#C9A84C]/10 px-2.5 py-1 text-xs font-semibold text-[#9A7B23]">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--color-accent)]">
             <Loader2 size={13} className="animate-spin" /> Reading
           </span>
         )}
@@ -122,13 +122,13 @@ function DocUpload({ title, hint, declaredName, onResult }) {
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={status === 'scanning'}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#C9A84C]/50 bg-[#FBF8F0] px-4 py-3 font-sans text-sm font-semibold text-[#9A7B23] transition-colors hover:bg-[#F5EFD9] disabled:opacity-60"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--color-accent)]/50 bg-[var(--color-paper)] px-4 py-3 font-sans text-sm font-semibold text-[var(--color-accent)] transition-colors hover:bg-[var(--color-warn-surface)] disabled:opacity-60"
       >
         <Upload size={16} />
         {fileName ? 'Choose a different image' : 'Upload photo of document'}
       </button>
       {fileName && (
-        <p className="mt-2 truncate font-sans text-xs text-[#A0A4B0]">{fileName}</p>
+        <p className="mt-2 truncate font-sans text-xs text-[var(--color-ink-muted)]">{fileName}</p>
       )}
       {status === 'mismatch' && score !== null && (
         <p className="mt-2 font-sans text-xs text-red-600">
@@ -218,8 +218,8 @@ export default function VerifyIdentity() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#1A1A2E] flex flex-col">
-      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[#E0E0E8]">
+    <div className="min-h-screen bg-white text-[var(--color-ink)] flex flex-col">
+      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[var(--color-line)]">
         <Link to="/" aria-label="Prism home">
           <PrismLogo size={32} />
         </Link>
@@ -233,12 +233,12 @@ export default function VerifyIdentity() {
           className="w-full max-w-2xl"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#C9A84C]/12 text-[#9A7B23]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-accent)]/12 text-[var(--color-accent)]">
               <ShieldCheck size={22} />
             </div>
             <div>
-              <h1 className="font-serif text-2xl font-bold text-[#1A1A2E]">Verify your identity</h1>
-              <p className="font-sans text-sm text-[#7A7F8C]">
+              <h1 className="font-serif text-2xl font-bold text-[var(--color-ink)]">Verify your identity</h1>
+              <p className="font-sans text-sm text-[var(--color-ink-muted)]">
                 A quick check before your proctored test begins.
               </p>
             </div>
@@ -263,9 +263,9 @@ export default function VerifyIdentity() {
               />
             </div>
 
-            <div className="flex items-start gap-2 rounded-xl bg-[#F5F5FA] px-4 py-3">
-              <Lock size={15} className="mt-0.5 shrink-0 text-[#9A7B23]" />
-              <p className="font-sans text-xs leading-relaxed text-[#5A5F6E]">
+            <div className="flex items-start gap-2 rounded-xl bg-[var(--color-paper)] px-4 py-3">
+              <Lock size={15} className="mt-0.5 shrink-0 text-[var(--color-accent)]" />
+              <p className="font-sans text-xs leading-relaxed text-[var(--color-ink-muted)]">
                 Your documents are processed in your browser and never uploaded. We store only the
                 match result and the last 4 digits of your Aadhaar.
               </p>
@@ -281,7 +281,7 @@ export default function VerifyIdentity() {
             <button
               type="submit"
               disabled={!canContinue}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#C9A84C] px-6 py-3.5 font-sans text-sm font-bold text-[#1A1A2E] transition-all hover:bg-[#b89640] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] px-6 py-3.5 font-sans text-sm font-bold text-[var(--color-ink)] transition-all hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
               {submitting ? 'Verifying…' : 'Continue'}
@@ -291,7 +291,7 @@ export default function VerifyIdentity() {
               <button
                 type="button"
                 onClick={() => navigate(`/link-phone?session=${sessionId}`)}
-                className="w-full text-center font-sans text-xs font-semibold text-[#9A7B23] hover:underline"
+                className="w-full text-center font-sans text-xs font-semibold text-[var(--color-accent)] hover:underline"
               >
                 Skip verification (dev only) →
               </button>
