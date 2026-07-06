@@ -19,8 +19,12 @@ export default {
         success: '#3CB97A',
       },
       fontFamily: {
-        serif: ['"Instrument Serif"', 'Georgia', 'serif'],
-        sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+        // Design-system pair (Part A): Fraunces display + Noto Sans body with
+        // Devanagari/Tamil companions + IBM Plex Mono utility. Loaded in
+        // index.html; swapping here restyles every legacy page at once.
+        serif: ['"Fraunces"', 'Georgia', 'serif'],
+        sans: ['"Noto Sans"', '"Noto Sans Devanagari"', '"Noto Sans Tamil"', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
       animation: {
         shimmer: 'shimmer 3s linear infinite',

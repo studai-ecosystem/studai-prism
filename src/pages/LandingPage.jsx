@@ -1,7 +1,8 @@
 import { useCallback, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import Nav from '../components/Nav.jsx'
-import Landing from './Landing.jsx'
+import HeroThesis from '../components/HeroThesis.jsx'
+import { ClaimsProvider } from '../components/ui/measurement.jsx'
 import HowItWorks from '../components/HowItWorks.jsx'
 import Dimensions from '../components/Dimensions.jsx'
 import ScoreSection from '../components/ScoreSection.jsx'
@@ -38,7 +39,9 @@ export default function LandingPage() {
   return (
     <main className="bg-white min-h-screen overflow-x-hidden">
       <Nav onGetAssessed={handleGetAssessed} />
-      <Landing onGetAssessed={handleGetAssessed} onSeeHow={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} />
+      <ClaimsProvider>
+        <HeroThesis onGetAssessed={handleGetAssessed} onSeeHow={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} />
+      </ClaimsProvider>
       <HowItWorks />
       <Dimensions />
       <ScoreSection />

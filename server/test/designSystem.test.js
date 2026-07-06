@@ -31,7 +31,7 @@ const LEGACY_ALLOWLIST = [
   'components/ui/GoldButton.jsx', 'components/ui/OutlineButton.jsx',
   'components/ui/PersonaCard.jsx', 'components/ui/PricingCard.jsx',
   'components/ui/SectionLabel.jsx', 'components/ui/StepCard.jsx',
-  'pages/Assessment.jsx', 'pages/Auth.jsx', 'pages/Briefing.jsx', 'pages/Landing.jsx',
+  'pages/Assessment.jsx', 'pages/Auth.jsx', 'pages/Briefing.jsx',
   'pages/LandingPage.jsx', 'pages/LinkPhone.jsx', 'pages/Payment.jsx',
   'pages/PhoneProctor.jsx', 'pages/Profile.jsx', 'pages/RaterWorkbench.jsx',
   'pages/RoomScan.jsx', 'pages/ScoreReport.jsx',
