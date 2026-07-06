@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, AlertTriangle, Clock, CheckCircle, ShieldCheck, Video, VideoOff, Mic, MicOff, Square, Loader2, Volume2, VolumeX, Smartphone, ScanFace } from 'lucide-react'
-import { DURATION_SECONDS, currentStage, overlayStagesDue } from '../lib/assessmentFlow.js'
+import { Send, AlertTriangle, CheckCircle, ShieldCheck, Video, VideoOff, Mic, MicOff, Square, Loader2, Volume2, VolumeX, Smartphone, ScanFace, Target, Lightbulb, Brain, Timer, Ban, Eye, EyeOff, ChevronDown, X } from 'lucide-react'
+import { DURATION_SECONDS, ASSESSMENT_FLOW, currentStage, overlayStagesDue } from '../lib/assessmentFlow.js'
 import ScenarioCard from '../components/assessment/ScenarioCard.jsx'
 import { CharacterAvatar } from '../lib/characters.jsx'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
@@ -12,61 +12,66 @@ import { useFaceProctor } from '../hooks/useFaceProctor.js'
 import { createTurnTracker, createVoiceMeter } from '../lib/turnSignals.js'
 
 const INSTRUCTIONS = [
-  { icon: '🎯', text: 'You will be placed in a realistic everyday scenario with AI participants who play different roles.' },
-  { icon: '💡', text: 'This is NOT a knowledge test. You do not need to know any industry or job. There is no single right answer — we only want to see how you think and talk things through.' },
-  { icon: '🎙️', text: 'This is a spoken assessment. Listen to each question, then tap the mic and speak your answer — it is transcribed automatically. You can also type if you prefer.' },
-  { icon: '🧠', text: 'You are assessed on Critical Thinking, Communication, Collaboration, Problem Solving, and AI & Digital Fluency — not on facts you have memorised.' },
-  { icon: '⏱️', text: 'You have 30 minutes. Your timer starts once you have read the scenario briefing — it cannot be paused.' },
-  { icon: '🚫', text: 'Do not switch tabs or use external tools. This is your performance — not a research exercise.' },
+  { Icon: Target, text: 'You will be placed in a realistic everyday scenario with AI participants who play different roles.' },
+  { Icon: Lightbulb, text: 'This is NOT a knowledge test. You do not need to know any industry or job. There is no single right answer — we only want to see how you think and talk things through.' },
+  { Icon: Mic, text: 'This is a spoken assessment. Listen to each question, then tap the mic and speak your answer — it is transcribed automatically. You can also type if you prefer.' },
+  { Icon: Brain, text: 'You are assessed on Critical Thinking, Communication, Collaboration, Problem Solving, and AI & Digital Fluency — not on facts you have memorised.' },
+  { Icon: Timer, text: 'You have 30 minutes. Your timer starts once you have read the scenario briefing — it cannot be paused.' },
+  { Icon: Ban, text: 'Do not switch tabs or use external tools. This is your performance — not a research exercise.' },
 ]
 
 function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
   const blocked = phoneRequired && !phoneLinked
   return (
-    <div className="flex flex-col h-screen bg-white text-[#1A1A2E]">
-      <header className="shrink-0 flex items-center px-6 py-3 bg-[#F5F5FA] border-b border-[#E0E0E8]">
+    <div className="flex flex-col h-screen bg-[var(--color-paper)] text-[var(--color-ink)]">
+      <header className="shrink-0 flex items-center justify-between px-6 py-3 bg-[var(--color-surface)] border-b border-[var(--color-line)]">
         <PrismLogo size={28} subtitle={null} />
+        <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+          Assessment · about 30 minutes
+        </span>
       </header>
       <div className="flex-1 overflow-y-auto py-10 px-6">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.4 }}
           className="w-full max-w-lg mx-auto flex flex-col gap-8"
         >
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#C9A84C]/10 mb-4">
-              <ShieldCheck size={22} className="text-[#C9A84C]" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-accent)]/10 mb-4">
+              <ShieldCheck size={22} className="text-[var(--color-accent)]" />
             </div>
-            <h1 className="font-serif text-3xl text-[#1A1A2E] mb-2">Before you begin</h1>
-            <p className="font-sans text-sm text-[#64687A]">30-minute assessment · 5 skill dimensions · Verified result</p>
+            <h1 className="font-serif text-3xl text-[var(--color-ink)] mb-2">Before you begin</h1>
+            <p className="font-sans text-sm text-[var(--color-ink-muted)]">30-minute assessment · 5 skill dimensions · Verified result</p>
           </div>
 
-          <ul className="flex flex-col gap-4">
+          <ul className="flex flex-col gap-3">
             {INSTRUCTIONS.map((item, i) => (
               <motion.li
                 key={i}
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 + i * 0.08 }}
-                className="flex gap-3 items-start p-4 rounded-xl bg-[#F5F5FA] border border-[#E8E8F0]"
+                transition={{ delay: 0.08 + i * 0.06 }}
+                className="flex gap-3.5 items-start p-4 rounded-[var(--radius-md)] bg-[var(--color-surface)] border border-[var(--color-line)]"
               >
-                <span className="text-xl shrink-0 mt-0.5">{item.icon}</span>
-                <span className="font-sans text-sm text-[#3A3A4A] leading-relaxed">{item.text}</span>
+                <span className="shrink-0 mt-0.5 w-8 h-8 rounded-full bg-[var(--color-paper)] border border-[var(--color-line)] flex items-center justify-center">
+                  <item.Icon size={15} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
+                </span>
+                <span className="font-sans text-sm text-[var(--color-ink)] leading-relaxed">{item.text}</span>
               </motion.li>
             ))}
           </ul>
 
           {phoneRequired && (
             <div
-              className={`flex items-center gap-3 p-4 rounded-xl border ${
+              className={`flex items-center gap-3 p-4 rounded-[var(--radius-md)] border font-sans text-sm ${
                 phoneLinked
-                  ? 'bg-green-50 border-green-200 text-green-800'
-                  : 'bg-amber-50 border-amber-200 text-amber-800'
+                  ? 'bg-[var(--color-success-surface)] border-[var(--color-success)]/30 text-[var(--color-success)]'
+                  : 'bg-[var(--color-warn-surface)] border-[var(--color-reliability-moderate)]/30 text-[var(--color-reliability-moderate)]'
               }`}
             >
               <Smartphone size={18} className="shrink-0" />
-              <span className="font-sans text-sm">
+              <span>
                 {phoneLinked
                   ? 'Phone camera connected — you are ready to begin.'
                   : 'Phone camera disconnected. Reconnect your phone (keep the proctor page open) to begin.'}
@@ -77,15 +82,15 @@ function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 0.5 }}
             onClick={onBegin}
             disabled={blocked}
-            className="w-full py-4 rounded-xl bg-[#1A1A2E] font-sans font-semibold text-sm text-[#C9A84C] tracking-wide hover:bg-[#252A3A] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full py-4 rounded-[var(--radius-md)] bg-[var(--color-ink)] font-sans font-semibold text-sm text-[var(--color-paper)] tracking-wide hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {blocked ? 'Waiting for phone camera…' : 'Begin Assessment →'}
+            {blocked ? 'Waiting for phone camera…' : 'Begin assessment'}
           </motion.button>
 
-          <p className="text-center font-sans text-xs text-[#A0A4B0]">
+          <p className="text-center font-sans text-xs text-[var(--color-ink-muted)]">
             By beginning you confirm this is your own unaided work.
           </p>
         </motion.div>
@@ -100,143 +105,185 @@ function formatTime(secs) {
   return `${m}:${s}`
 }
 
-// Avatar colours per speaker (deterministic)
-const AVATAR_COLORS = ['#C9A84C', '#3CB97A', '#7C6ADE', '#E05252', '#4A9EE8']
-function speakerColor(name) {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]
+// ── The screenplay transcript ────────────────────────────────────────────────
+// The room is a stage, not a chat app: turns render as a script — a mono
+// speaker label above body text — never bubbles. The candidate's turns are
+// visually distinct but equal (an accent rule, same typography).
+
+function initialsOf(name) {
+  return (name || '?').trim().charAt(0).toUpperCase()
 }
 
-function Avatar({ name }) {
-  const color = speakerColor(name)
+function SpeakerBadge({ name, speaking }) {
   return (
-    <div
-      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-[#0A0D14] shrink-0"
-      style={{ backgroundColor: color }}
+    <span
       aria-hidden="true"
+      className={`w-7 h-7 rounded-full flex items-center justify-center font-mono text-[11px] shrink-0 border transition-colors ${
+        speaking
+          ? 'bg-[var(--color-accent-bright)]/15 border-[var(--color-accent-bright)] text-[var(--color-accent-bright)]'
+          : 'bg-[var(--color-room-surface)] border-[var(--color-room-line)] text-[var(--color-ink-muted)]'
+      }`}
     >
-      {name.charAt(0).toUpperCase()}
-    </div>
+      {initialsOf(name)}
+    </span>
   )
 }
 
-function InlineTyping({ name }) {
+// One spoken turn in the script. `you` marks the candidate's own turns.
+function ScriptTurn({ speaker, role, content, you = false, animate = false }) {
   return (
-    <div className="flex gap-3 items-start">
-      <Avatar name={name} />
-      <div className="bg-[#E0E0E8] border border-[#D0D0DC] rounded-2xl rounded-tl-sm px-4 py-3">
-        <div className="flex gap-1 items-center">
-          {[0, 1, 2].map((i) => (
-            <motion.span
-              key={i}
-              className="w-1.5 h-1.5 rounded-full bg-[#8A8FA0]"
-              animate={{ opacity: [0.3, 1, 0.3] }}
-              transition={{ duration: 1, delay: i * 0.2, repeat: Infinity }}
-            />
-          ))}
-        </div>
+    <motion.div
+      initial={animate ? { opacity: 0, y: 10 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className={`group flex flex-col gap-1.5 pl-4 border-l-2 ${
+        you ? 'border-[var(--color-accent-bright)]' : 'border-[var(--color-room-line)]'
+      }`}
+    >
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span
+          className={`font-mono text-[11px] tracking-[0.08em] uppercase ${
+            you ? 'text-[var(--color-accent-bright)]' : 'text-[var(--color-ink)]'
+          }`}
+        >
+          {speaker}
+        </span>
+        {role && (
+          <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">{role}</span>
+        )}
       </div>
+      <p className="font-sans text-[15px] leading-[1.7] text-[var(--color-ink)] max-w-prose whitespace-pre-wrap">
+        {content}
+      </p>
+    </motion.div>
+  )
+}
+
+// Inline stage direction while a persona is composing (paired with text so
+// nothing conveys by motion alone — LAW 4).
+function RespondingNote({ name }) {
+  return (
+    <div className="flex items-center gap-2 pl-4 border-l-2 border-[var(--color-room-line)]" role="status">
+      <span className="inline-flex gap-1" aria-hidden="true">
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="w-1 h-1 rounded-full bg-[var(--color-ink-muted)]"
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1, delay: i * 0.2, repeat: Infinity }}
+          />
+        ))}
+      </span>
+      <span className="font-mono text-[11px] text-[var(--color-ink-muted)] italic">
+        {name ? `${name} is responding…` : 'The panel is responding…'}
+      </span>
     </div>
   )
 }
 
-function AiMessage({ msg, isNew }) {
+// A full panel turn: participants reveal one at a time so voices don't
+// overlap. Reports the currently-speaking persona upward so the stage
+// foregrounds the right presence card. Already-seen history renders instantly.
+function PanelTurn({ msg, isNew, onSpeakingChange }) {
   const list = msg.messages || []
-  // Reveal participants one at a time so avatars don't all "speak" at once.
-  // Already-seen history (isNew === false) renders fully and instantly.
   const [visibleCount, setVisibleCount] = useState(isNew ? 0 : list.length)
-  const [typing, setTyping] = useState(isNew && list.length > 0)
 
   useEffect(() => {
     if (!isNew) return
     if (visibleCount >= list.length) {
-      setTyping(false)
+      onSpeakingChange?.(null)
       return
     }
-    // Show a brief typing indicator, then reveal the next speaker's message.
-    setTyping(true)
-    const typingTimer = setTimeout(() => {
-      setTyping(false)
-      setVisibleCount((c) => c + 1)
-    }, 900)
-    return () => clearTimeout(typingTimer)
-  }, [isNew, visibleCount, list.length])
+    onSpeakingChange?.(list[visibleCount]?.speaker || null)
+    const t = setTimeout(() => setVisibleCount((c) => c + 1), 900)
+    return () => clearTimeout(t)
+  }, [isNew, visibleCount, list.length, onSpeakingChange])
 
   return (
-    <motion.div
-      initial={isNew ? { opacity: 0, y: 12 } : false}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col gap-3"
-    >
+    <div className="flex flex-col gap-5">
       {list.slice(0, visibleCount).map((m, i) => (
-        <motion.div
+        <ScriptTurn
           key={i}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex gap-3 items-start"
-        >
-          <Avatar name={m.speaker} />
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-sans text-xs font-semibold text-[#1A1A2E]">{m.speaker}</span>
-              <span className="font-sans text-[10px] text-[#64687A] bg-[#EEEEF4] px-2 py-0.5 rounded-full">
-                {m.role}
-              </span>
-            </div>
-            <div className="bg-[#E0E0E8] border border-[#D0D0DC] rounded-2xl rounded-tl-sm px-4 py-3 max-w-lg">
-              <p className="font-sans text-sm text-[#1A1A2E]/90 leading-relaxed">{m.content}</p>
-            </div>
-          </div>
-        </motion.div>
+          speaker={m.speaker}
+          role={m.role}
+          content={m.content}
+          animate={isNew}
+        />
       ))}
-      {typing && visibleCount < list.length && (
-        <InlineTyping name={list[visibleCount]?.speaker || 'AI'} />
+      {isNew && visibleCount < list.length && (
+        <RespondingNote name={list[visibleCount]?.speaker} />
       )}
-    </motion.div>
+    </div>
   )
 }
 
-function UserMessage({ content, character, userName }) {
+// ── The persona stage ──────────────────────────────────────────────────────
+// Presence cards for the AI participants: idle / listening (candidate is
+// speaking) / speaking (voice bars + label). Continuity from the briefing.
+
+function VoiceBars() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex justify-end items-start gap-2"
+    <span className="inline-flex items-end gap-[2px] h-3" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <span key={i} className="prism-voicebar w-[2.5px] rounded-full bg-[var(--color-accent-bright)]" style={{ animationDelay: `${i * 120}ms` }} />
+      ))}
+    </span>
+  )
+}
+
+function PersonaCard({ name, role, state }) {
+  const speaking = state === 'speaking'
+  const listening = state === 'listening'
+  return (
+    <div
+      className={`flex items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2 min-w-0 transition-colors ${
+        speaking
+          ? 'bg-[var(--color-room-surface)] border-[var(--color-accent-bright)]'
+          : 'bg-[var(--color-room-surface)] border-[var(--color-room-line)]'
+      }`}
     >
-      <div className="bg-[#C9A84C]/15 border border-[#C9A84C]/30 rounded-2xl rounded-tr-sm px-4 py-3 max-w-lg">
-        <p className="font-sans text-sm text-[#1A1A2E] leading-relaxed">{content}</p>
-      </div>
-      {character && (
-        <div className="flex flex-col items-center shrink-0">
-          <CharacterAvatar id={character.id} size={32} />
-          <span className="font-sans text-[10px] font-semibold text-[#64687A] mt-0.5">{userName}</span>
-        </div>
-      )}
-    </motion.div>
-  )
-}
-
-function TypingIndicator() {
-  return (
-    <div className="flex gap-3 items-start">
-      <div className="w-8 h-8 rounded-full bg-[#EEEEF4] flex items-center justify-center shrink-0">
-        <span className="text-[#64687A] text-xs">AI</span>
-      </div>
-      <div className="bg-[#111520] border border-[#252A3A] rounded-2xl rounded-tl-sm px-4 py-3">
-        <div className="flex gap-1 items-center">
-          {[0, 1, 2].map((i) => (
-            <motion.span
-              key={i}
-              className="w-1.5 h-1.5 rounded-full bg-[#8A8FA0]"
-              animate={{ opacity: [0.3, 1, 0.3] }}
-              transition={{ duration: 1, delay: i * 0.2, repeat: Infinity }}
-            />
-          ))}
-        </div>
+      <SpeakerBadge name={name} speaking={speaking} />
+      <div className="min-w-0">
+        <p className="font-sans text-xs font-semibold text-[var(--color-ink)] truncate">{name}</p>
+        <p className="font-mono text-[10px] text-[var(--color-ink-muted)] truncate flex items-center gap-1.5">
+          {speaking ? (
+            <>
+              <VoiceBars />
+              speaking
+            </>
+          ) : listening ? (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent-bright)]" aria-hidden="true" />
+              listening
+            </>
+          ) : (
+            role || 'in the room'
+          )}
+        </p>
       </div>
     </div>
+  )
+}
+
+// The candidate's own turn — same script treatment, marked with the accent
+// rule and their chosen identity. Never a right-aligned bubble.
+function CandidateTurn({ content, character, userName }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="flex flex-col gap-1.5 pl-4 border-l-2 border-[var(--color-accent-bright)]"
+    >
+      <div className="flex items-center gap-2">
+        {character && <CharacterAvatar id={character.id} size={20} />}
+        <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-accent-bright)]">
+          {userName || 'You'}
+        </span>
+        <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">you</span>
+      </div>
+      <p className="font-sans text-[15px] leading-[1.7] text-[var(--color-ink)] max-w-prose whitespace-pre-wrap">{content}</p>
+    </motion.div>
   )
 }
 
@@ -266,6 +313,14 @@ export default function Assessment() {
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [ttsEnabled, setTtsEnabled] = useState(true)
+  // Part E room state — presentation only, never score-affecting.
+  const [activeSpeaker, setActiveSpeaker] = useState(null) // persona currently "speaking" in the reveal
+  const [followNow, setFollowNow] = useState(true) // transcript auto-follow; false once the candidate scrolls up
+  const [notice, setNotice] = useState(null) // transient, dismissible console notice (STT hiccups etc.)
+  const [reviewDeadline, setReviewDeadline] = useState(null) // ASR review window: ms epoch when the transcript auto-commits
+  const [reviewLeft, setReviewLeft] = useState(0) // seconds left in the review window (display)
+  const [selfViewOpen, setSelfViewOpen] = useState(true) // own-camera thumbnail expanded vs. collapsed to the strip
+  const [recordSeconds, setRecordSeconds] = useState(0) // elapsed recording clock for the listening state
   // Phone proctor link (second camera). pairCode is remembered from the
   // link-phone step; if present, the test requires the phone to stay connected.
   const [phonePairCode] = useState(() => recallPairCode(params.get('session')))
@@ -306,11 +361,62 @@ export default function Assessment() {
 
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
+  const transcriptRef = useRef(null)
 
-  // Scroll to bottom on new messages
+  // Auto-follow the script — but never fight the candidate: once they scroll
+  // up to re-read, following pauses and a "jump to now" affordance appears.
   useEffect(() => {
+    if (followNow) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading, followNow])
+
+  const handleTranscriptScroll = useCallback(() => {
+    const el = transcriptRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160
+    setFollowNow(atBottom)
+  }, [])
+
+  const jumpToNow = useCallback(() => {
+    setFollowNow(true)
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+  }, [])
+
+  // Elapsed clock for the listening state — the candidate always sees that the
+  // mic is live and for how long (push-to-talk, no open-mic ambiguity).
+  useEffect(() => {
+    if (!recording) {
+      setRecordSeconds(0)
+      return undefined
+    }
+    const t = setInterval(() => setRecordSeconds((s) => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [recording])
+
+  // ASR review window: the transcribed turn sits in the input for a short,
+  // consistent window (12s) so the candidate can correct mis-recognitions —
+  // corrections are captured by the Track 3.1 turn tracker as typing signals —
+  // then it commits. No unlimited editing: this is a spoken assessment.
+  const REVIEW_SECONDS = 12
+  const enterReview = useCallback((transcript) => {
+    setInput(transcript)
+    setReviewDeadline(Date.now() + REVIEW_SECONDS * 1000)
+    setReviewLeft(REVIEW_SECONDS)
+    setTimeout(() => inputRef.current?.focus(), 60)
+  }, [])
+
+  const commitReviewRef = useRef(null)
+  useEffect(() => {
+    if (!reviewDeadline) return undefined
+    const tick = setInterval(() => {
+      const left = Math.max(0, Math.ceil((reviewDeadline - Date.now()) / 1000))
+      setReviewLeft(left)
+      if (left <= 0) {
+        clearInterval(tick)
+        commitReviewRef.current?.()
+      }
+    }, 250)
+    return () => clearInterval(tick)
+  }, [reviewDeadline])
 
   // Redirect if no session
   useEffect(() => {
@@ -548,16 +654,20 @@ export default function Assessment() {
     }
   }, [phase, sessionId])
 
-  // Enforce fullscreen while assessment is active; re-enter if user exits
+  // Enforce fullscreen while assessment is active; re-enter if user exits.
+  // The proctoring strip reports the TRUE state (E.4: indicators must match
+  // actual capture behaviour — never claim fullscreen that isn't).
+  const [fsActive, setFsActive] = useState(false)
   useEffect(() => {
     if (phase !== 'chat') return
     const handleFSChange = () => {
+      setFsActive(Boolean(document.fullscreenElement))
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen?.().catch(() => {})
       }
     }
     // Enter fullscreen immediately
-    document.documentElement.requestFullscreen?.().catch(() => {})
+    document.documentElement.requestFullscreen?.().then(() => setFsActive(true)).catch(() => {})
     document.addEventListener('fullscreenchange', handleFSChange)
     return () => document.removeEventListener('fullscreenchange', handleFSChange)
   }, [phase])
@@ -622,7 +732,15 @@ export default function Assessment() {
         body: JSON.stringify({ sessionId, language: localStorage.getItem('prismLanguage') || 'en' }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Failed to start assessment session')
+      if (!res.ok) {
+        // Server errors may be structured ({ error: { message } }) — always
+        // surface a human sentence, never "[object Object]".
+        const msg =
+          typeof data.error === 'string'
+            ? data.error
+            : data.error?.message || data.message || 'Failed to start assessment session'
+        throw new Error(msg)
+      }
       setMessages([{ type: 'ai', messages: data.messages, isNew: true }])
       setScenario(data.scenario || null)
       setInitialising(false)
@@ -666,7 +784,9 @@ export default function Assessment() {
       endProctorSession()
       navigate(`/score?session=${sessionId}`, { state: { report: data } })
     } catch (e) {
-      setError('Could not generate your score. Please try again.')
+      // Honest, non-destructive failure: the conversation stays on screen and
+      // the candidate can retry — never a raw error, never a lost transcript.
+      setNotice('We could not score your conversation just now. Nothing was lost — please press Submit again.')
       setSubmitting(false)
     }
   }, [sessionId, navigate, submitting])
@@ -692,6 +812,9 @@ export default function Assessment() {
   const sendText = useCallback(async (rawText) => {
     const text = (rawText || '').trim()
     if (!text || loading || submitting) return
+
+    // Committing ends any ASR review window.
+    setReviewDeadline(null)
 
     // Track 3.1: summarise HOW this answer was produced, then reset for the
     // next turn. Summary numbers only — never keystrokes, never audio.
@@ -769,20 +892,22 @@ export default function Assessment() {
       const res = await fetch('/api/assessment/transcribe', { method: 'POST', body: form })
       if (res.status === 503) {
         // Server-side transcription not configured — fall back to dictation.
-        setError('Voice transcription is unavailable right now. Type your answer or use the dictation mic.')
+        setNotice('Voice transcription is unavailable right now. Type your answer or use the dictation mic.')
         return
       }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Could not transcribe your answer.')
       if (data.transcript) {
-        await sendText(data.transcript)
+        // E.2: the candidate reviews the transcript for a short window (typing
+        // corrections are Track 3.1 signals), then it commits.
+        enterReview(data.transcript)
       }
     } catch (e) {
-      setError(e.message || 'Could not transcribe your answer. Please try again.')
+      setNotice(e.message || 'Could not transcribe your answer. Please try again.')
     } finally {
       setTranscribing(false)
     }
-  }, [sendText, sessionId])
+  }, [enterReview, sessionId])
 
   const startRecording = useCallback(async () => {
     if (recording || loading || submitting || transcribing) return
@@ -794,7 +919,7 @@ export default function Assessment() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       } catch {
-        setError('Microphone access is required to answer by voice.')
+        setNotice('Microphone access is required to answer by voice.')
         return
       }
     }
@@ -811,7 +936,7 @@ export default function Assessment() {
       recorder.start()
       setRecording(true)
     } catch {
-      setError('Voice recording is not supported in this browser. Please type your answer.')
+      setNotice('Voice recording is not supported in this browser. Please type your answer.')
     }
   }, [recording, loading, submitting, transcribing, handleRecordingStop])
 
@@ -836,7 +961,7 @@ export default function Assessment() {
     if (sttMode === 'whisper') return startRecording()
     const recognition = recognitionRef.current
     if (!recognition) {
-      setError('Voice input is not supported in this browser. Please type your answer.')
+      setNotice('Voice input is not supported in this browser. Please type your answer.')
       return
     }
     try { window.speechSynthesis?.cancel() } catch { /* ignore */ }
@@ -861,13 +986,14 @@ export default function Assessment() {
     listeningIntentRef.current = false
     try { recognition?.stop() } catch { /* ignore */ }
     setRecording(false)
-    // Let the final recognition result settle, then send the spoken answer.
+    // Let the final recognition result settle, then open the review window on
+    // the spoken answer (same commit semantics as the Whisper path).
     setTimeout(() => {
       const text = (voiceAnswerRef.current || '').trim()
       voiceAnswerRef.current = ''
-      if (text) sendText(text)
+      if (text) enterReview(text)
     }, 450)
-  }, [sttMode, stopRecording, sendText])
+  }, [sttMode, stopRecording, enterReview])
 
 
   const onKeyDown = (e) => {
@@ -877,9 +1003,64 @@ export default function Assessment() {
     }
   }
 
-  const warningThreshold = 5 * 60 // 5 minutes
-  const isWarning = timeLeft <= warningThreshold && timeLeft > 0
-  const stage = currentStage(DURATION_SECONDS - timeLeft)
+  // Keep the review auto-commit closure fresh: at the deadline the CURRENT
+  // text in the box (with any corrections) is what commits.
+  useEffect(() => {
+    commitReviewRef.current = () => {
+      if (!input.trim()) {
+        setReviewDeadline(null)
+        return
+      }
+      sendText(input)
+    }
+  })
+
+  // Transient notices self-dismiss — they are hints, not blockers.
+  useEffect(() => {
+    if (!notice) return undefined
+    const t = setTimeout(() => setNotice(null), 8000)
+    return () => clearTimeout(t)
+  }, [notice])
+
+  // The persona stage: presence cards for the AI participants. Prefer the
+  // scenario's cast (briefing continuity); fall back to speakers seen in the
+  // script. Max 4 cards — this is a stage, not a roster.
+  const personas = useMemo(() => {
+    const seen = new Map()
+    for (const p of scenario?.participants || []) {
+      if (p?.name) seen.set(p.name, { name: p.name, role: p.role || '' })
+    }
+    for (const m of messages) {
+      if (m.type !== 'ai') continue
+      for (const t of m.messages || []) {
+        if (t.speaker && t.speaker !== 'System' && !seen.has(t.speaker)) {
+          seen.set(t.speaker, { name: t.speaker, role: t.role || '' })
+        }
+      }
+    }
+    return Array.from(seen.values()).slice(0, 4)
+  }, [scenario, messages])
+
+  // E.3 — time as calm information: elapsed + phase, gentle thresholds at 75%
+  // and 90% (visual shift + polite announcement), never a red countdown. The
+  // adaptive engine may extend, so duration is framed as "about 30 minutes".
+  const elapsed = DURATION_SECONDS - timeLeft
+  const progress = Math.min(1, elapsed / DURATION_SECONDS)
+  const timePhase = progress >= 0.9 ? 'final' : progress >= 0.75 ? 'closing' : 'open'
+  const stage = currentStage(elapsed)
+
+  // Everything the mic state machine tells the candidate (and screen readers).
+  const micStatus = recording
+    ? `Listening — ${formatTime(recordSeconds)}. Tap the stop button to end your turn.`
+    : transcribing
+      ? 'Transcribing your answer…'
+      : reviewDeadline
+        ? `Check your transcribed answer — it sends in ${reviewLeft}s. Fix anything the transcription got wrong, or send now.`
+        : listening
+          ? 'Dictating — your words appear in the box. Send when ready.'
+          : loading
+            ? 'The panel is responding…'
+            : 'Tap the mic to speak your answer, or type. Enter sends.'
 
   if (!sessionId) return null
 
@@ -894,88 +1075,224 @@ export default function Assessment() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-white text-[#1A1A2E]">
-      {/* Top bar */}
-      <header className="shrink-0 flex items-center justify-between px-6 py-3 bg-[#F5F5FA] border-b border-[#E0E0E8]">
-        <div className="flex items-center gap-3">
-          <PrismLogo size={28} subtitle={null} />
-          <span className="hidden sm:inline font-sans text-xs text-[#64687A] bg-[#EEEEF4] px-2 py-0.5 rounded-full">
-            {stage.label}
-          </span>
+    <div className="room-dark flex flex-col h-screen bg-[var(--color-room)] text-[var(--color-ink)] font-sans">
+      <style>{`
+        .prism-voicebar{height:3px;animation:prismVoice 900ms ease-in-out infinite}
+        @keyframes prismVoice{0%,100%{height:3px}50%{height:12px}}
+        .room-dark ::selection{background:var(--color-accent-bright);color:var(--color-room)}
+        .room-dark textarea::placeholder{color:var(--color-ink-muted);opacity:0.8}
+      `}</style>
+
+      {/* Top bar: identity · stage · calm time · submit */}
+      <header className="shrink-0 border-b border-[var(--color-room-line)] bg-[var(--color-room-surface)]">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5">
+          <div className="flex items-center gap-3 min-w-0">
+            <PrismLogo size={24} subtitle={null} wordmarkColor="var(--color-room-ink)" />
+            <span className="hidden sm:inline font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+              {stage.label}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 sm:gap-4">
+            <span
+              className={`font-mono text-[11px] tabular-nums ${
+                timePhase === 'open' ? 'text-[var(--color-ink-muted)]' : 'text-[var(--color-reliability-moderate)]'
+              }`}
+              role="timer"
+              aria-label={`${formatTime(elapsed)} elapsed of about thirty minutes`}
+            >
+              {formatTime(elapsed)} <span className="hidden sm:inline">· about 30 min</span>
+            </span>
+            <button
+              onClick={() => handleSubmit(false)}
+              disabled={submitting || exchangeCount < 3}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] font-sans font-semibold text-xs border border-[var(--color-room-line)] bg-[var(--color-room)] text-[var(--color-ink)] enabled:hover:border-[var(--color-accent-bright)] enabled:hover:text-[var(--color-accent-bright)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              title={exchangeCount < 3 ? 'Please engage more before submitting' : 'End assessment and get your score'}
+            >
+              <CheckCircle size={14} />
+              <span>Submit & Get Score</span>
+            </button>
+          </div>
         </div>
 
-        <div />
-
-        <motion.button
-          onClick={() => handleSubmit(false)}
-          disabled={submitting || exchangeCount < 3}
-          className="flex items-center gap-2 px-4 py-2 rounded-md font-sans font-semibold text-sm bg-[#C9A84C] text-[#1A1A2E] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-          whileHover={exchangeCount >= 3 ? { scale: 1.02 } : {}}
-          whileTap={exchangeCount >= 3 ? { scale: 0.97 } : {}}
-          title={exchangeCount < 3 ? 'Please engage more before submitting' : 'End assessment and get your score'}
-        >
-          <CheckCircle size={15} />
-          <span>Submit & Get Score</span>
-        </motion.button>
+        {/* Thin session progress with phase markers — information, not alarm */}
+        <div className="relative h-[3px] bg-[var(--color-room-line)]" aria-hidden="true">
+          <div
+            className="absolute inset-y-0 left-0 bg-[var(--color-accent-bright)] transition-[width] duration-1000 ease-linear"
+            style={{ width: `${progress * 100}%` }}
+          />
+          {ASSESSMENT_FLOW.filter((s) => s.atSecond > 60).map((s) => (
+            <span
+              key={s.id}
+              className="absolute top-0 bottom-0 w-px bg-[var(--color-room)]"
+              style={{ left: `${(s.atSecond / DURATION_SECONDS) * 100}%` }}
+            />
+          ))}
+        </div>
       </header>
 
-      {/* Warning banner */}
+      {/* Polite time announcements for screen readers */}
+      <div aria-live="polite" className="sr-only">
+        {timePhase === 'closing' && 'The conversation is in its closing phase.'}
+        {timePhase === 'final' && 'Final minutes. Wrap up your thoughts and submit when ready.'}
+      </div>
+
+      {/* Gentle wrap-up ribbon (replaces the old red banner) */}
       <AnimatePresence>
-        {isWarning && (
+        {timePhase !== 'open' && !submitting && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="shrink-0 overflow-hidden bg-[#E05252]/10 border-b border-[#E05252]/30"
+            className="shrink-0 overflow-hidden bg-[var(--color-room-surface)] border-b border-[var(--color-room-line)]"
           >
-            <div className="flex items-center gap-2 px-6 py-2">
-              <AlertTriangle size={14} className="text-[#E05252] shrink-0" />
-              <p className="font-sans text-xs text-[#E05252]">
-                Less than 5 minutes remaining. Wrap up your thoughts and click "Submit & Get Score".
+            <div className="flex items-center gap-2 px-4 sm:px-6 py-1.5">
+              <Timer size={12} className="text-[var(--color-reliability-moderate)] shrink-0" />
+              <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">
+                {timePhase === 'final'
+                  ? 'Final minutes — wrap up and press Submit & Get Score when you are ready.'
+                  : 'Closing phase — start bringing your thinking together.'}
               </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 max-w-4xl mx-auto w-full select-none" onCopy={(e) => e.preventDefault()}>
-        <div className="bg-white rounded-2xl border border-[#E0E0E8] shadow-sm min-h-full p-5 sm:p-7 flex flex-col gap-6">
-        {initialising ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4">
-            <div className="w-8 h-8 border-2 border-[#C9A84C] border-t-transparent rounded-full animate-spin" />
-            <p className="font-sans text-sm text-[#8A8FA0]">Setting up your scenario…</p>
+      {/* PERSONA STAGE — who is in the room, and who has the floor */}
+      {!initialising && !error && personas.length > 0 && (
+        <div className="shrink-0 border-b border-[var(--color-room-line)] bg-[var(--color-room)]">
+          <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-2.5 flex gap-2 overflow-x-auto">
+            {personas.map((p) => (
+              <PersonaCard
+                key={p.name}
+                name={p.name}
+                role={p.role}
+                state={
+                  activeSpeaker === p.name
+                    ? 'speaking'
+                    : recording || listening
+                      ? 'listening'
+                      : 'idle'
+                }
+              />
+            ))}
           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center">
-            <AlertTriangle size={32} className="text-[#E05252]" />
-            <p className="font-sans text-sm text-[#64687A]">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="font-sans text-xs text-[#C9A84C] underline"
-            >
-              Reload page
-            </button>
-          </div>
-        ) : (
-          <>
-            {messages.map((msg, i) =>
-              msg.type === 'user' ? (
-                <UserMessage key={i} content={msg.content} character={character} userName={userName} />
-              ) : (
-                <AiMessage key={i} msg={msg} isNew={msg.isNew} />
-              )
-            )}
-            {loading && <TypingIndicator />}
-          </>
-        )}
-        <div ref={bottomRef} />
         </div>
+      )}
+
+      {/* THE SCRIPT — speaker-labeled turns, not bubbles */}
+      <div
+        ref={transcriptRef}
+        onScroll={handleTranscriptScroll}
+        className="relative flex-1 overflow-y-auto select-none"
+        onCopy={(e) => e.preventDefault()}
+      >
+        <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-6 flex flex-col gap-7 min-h-full">
+          {initialising ? (
+            <div className="flex flex-col items-center justify-center flex-1 gap-4" role="status">
+              <div className="w-8 h-8 border-2 border-[var(--color-accent-bright)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              <p className="font-mono text-xs text-[var(--color-ink-muted)]">Setting up your scenario…</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center">
+              <AlertTriangle size={28} className="text-[var(--color-danger)]" />
+              <p className="font-sans text-sm text-[var(--color-ink-muted)] max-w-sm">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="font-mono text-xs text-[var(--color-accent-bright)] underline underline-offset-4 cursor-pointer"
+              >
+                Reload page
+              </button>
+            </div>
+          ) : (
+            <>
+              {messages.map((msg, i) =>
+                msg.type === 'user' ? (
+                  <CandidateTurn key={i} content={msg.content} character={character} userName={userName} />
+                ) : (
+                  <PanelTurn
+                    key={i}
+                    msg={msg}
+                    isNew={msg.isNew}
+                    onSpeakingChange={msg.isNew ? setActiveSpeaker : undefined}
+                  />
+                )
+              )}
+              {loading && <RespondingNote name={null} />}
+            </>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Jump-to-now affordance when the candidate has scrolled up */}
+        <AnimatePresence>
+          {!followNow && (
+            <motion.button
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              onClick={jumpToNow}
+              className="sticky bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3.5 py-2 rounded-[var(--radius-full)] bg-[var(--color-room-surface)] border border-[var(--color-room-line)] font-mono text-[11px] text-[var(--color-ink)] shadow-lg hover:border-[var(--color-accent-bright)] transition-colors cursor-pointer"
+            >
+              <ChevronDown size={13} aria-hidden="true" />
+              Jump to now
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Input area */}
-      <div className="shrink-0 bg-[#F5F5FA] border-t border-[#E0E0E8] px-4 sm:px-8 py-4">
-        <div className="max-w-4xl mx-auto flex gap-3 items-end">
+      {/* Transient console notice — honest, dismissible, never a raw error */}
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="shrink-0 overflow-hidden bg-[var(--color-room-surface)] border-t border-[var(--color-room-line)]"
+          >
+            <div className="max-w-3xl mx-auto w-full flex items-start gap-2 px-4 sm:px-6 py-2">
+              <AlertTriangle size={13} className="text-[var(--color-reliability-moderate)] shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="flex-1 font-sans text-xs text-[var(--color-ink)]" role="status">{notice}</p>
+              <button
+                onClick={() => setNotice(null)}
+                aria-label="Dismiss notice"
+                className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CANDIDATE CONSOLE — the mic state machine + full typing parity */}
+      <div className="shrink-0 bg-[var(--color-room-surface)] border-t border-[var(--color-room-line)] px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+        {/* ASR review strip — visible commit window, explicit send-now */}
+        <AnimatePresence>
+          {reviewDeadline && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              className="max-w-3xl mx-auto mb-2.5 flex items-center gap-2.5 px-3.5 py-2 rounded-[var(--radius-md)] border border-[var(--color-accent-bright)]/50 bg-[var(--color-room)]"
+            >
+              <span className="font-mono text-[11px] text-[var(--color-accent-bright)] tabular-nums shrink-0" aria-hidden="true">
+                {reviewLeft}s
+              </span>
+              <p className="flex-1 font-sans text-xs text-[var(--color-ink)]">
+                Check your transcribed answer below — fix anything the transcription missed. It sends automatically.
+              </p>
+              <button
+                onClick={sendMessage}
+                className="font-mono text-[11px] text-[var(--color-accent-bright)] underline underline-offset-4 shrink-0 cursor-pointer"
+              >
+                Send now
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="max-w-3xl mx-auto flex gap-2.5 items-end">
           <textarea
             ref={inputRef}
             value={input}
@@ -983,97 +1300,90 @@ export default function Assessment() {
             onKeyDown={(e) => { turnTrackerRef.current.key(e); onKeyDown(e) }}
             onPaste={() => turnTrackerRef.current.paste()}
             disabled={loading || submitting || initialising || recording || transcribing}
-            placeholder="Speak your answer with the mic — or type here (Enter to send)"
+            placeholder={
+              recording
+                ? 'Listening — speak your answer…'
+                : transcribing
+                  ? 'Transcribing…'
+                  : 'Speak with the mic, or type here — both count the same'
+            }
             rows={2}
-            className="flex-1 resize-none bg-white border border-[#E0E0E8] rounded-xl px-4 py-3 font-sans text-sm text-[#1A1A2E] placeholder-[#64687A] focus:outline-none focus:border-[#C9A84C]/60 transition-colors disabled:opacity-50"
+            className="flex-1 resize-none bg-[var(--color-room)] border border-[var(--color-room-line)] rounded-[var(--radius-md)] px-4 py-3 font-sans text-sm text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-accent-bright)]/70 transition-colors disabled:opacity-50"
             aria-label="Your response"
           />
 
-          {/* Narration toggle — read the avatar's questions aloud */}
-          <motion.button
+          {/* Narration toggle — the panel's questions read aloud */}
+          <button
             onClick={() => setTtsEnabled((v) => !v)}
             disabled={initialising}
-            aria-label={ttsEnabled ? 'Mute avatar narration' : 'Unmute avatar narration'}
-            title={ttsEnabled ? 'Avatar narration on' : 'Avatar narration off'}
-            className={`flex items-center justify-center w-11 h-11 rounded-xl border transition-colors disabled:opacity-40 cursor-pointer shrink-0 ${
+            aria-label={ttsEnabled ? 'Mute panel narration' : 'Unmute panel narration'}
+            title={ttsEnabled ? 'Narration on' : 'Narration off'}
+            className={`flex items-center justify-center w-11 h-11 rounded-[var(--radius-md)] border transition-colors disabled:opacity-40 cursor-pointer shrink-0 ${
               ttsEnabled
-                ? 'bg-white border-[#C9A84C]/60 text-[#C9A84C]'
-                : 'bg-white border-[#E0E0E8] text-[#64687A] hover:text-[#1A1A2E]'
+                ? 'bg-[var(--color-room)] border-[var(--color-room-line)] text-[var(--color-ink)]'
+                : 'bg-[var(--color-room)] border-[var(--color-room-line)] text-[var(--color-ink-muted)]'
             }`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
           >
             {ttsEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-          </motion.button>
+          </button>
 
-          {/* Primary voice answer — record → transcribe → send */}
-          <motion.button
+          {/* THE MIC — push-to-talk state machine: ready → listening →
+              processing → review → committed. Explicit end-turn, always. */}
+          <button
             onClick={recording ? stopVoiceAnswer : startVoiceAnswer}
-            disabled={loading || submitting || initialising || transcribing}
-            aria-label={recording ? 'Stop recording and submit' : 'Record your spoken answer'}
-            title={recording ? 'Stop & submit' : 'Hold a thought, then record your spoken answer'}
-            className={`relative flex items-center justify-center w-11 h-11 rounded-xl border transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 ${
+            disabled={loading || submitting || initialising || transcribing || Boolean(reviewDeadline)}
+            aria-label={recording ? `Stop recording — ${formatTime(recordSeconds)} recorded` : 'Record your spoken answer'}
+            title={recording ? 'End your turn' : 'Speak your answer'}
+            className={`relative flex items-center justify-center gap-2 h-11 rounded-[var(--radius-md)] border transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 ${
               recording
-                ? 'bg-[#E05252] border-[#E05252] text-white'
-                : 'bg-[#1A1A2E] border-[#1A1A2E] text-[#C9A84C] hover:bg-[#252A3A]'
+                ? 'px-3.5 bg-[var(--color-room)] border-[var(--color-accent-bright)] text-[var(--color-accent-bright)]'
+                : 'w-11 bg-[var(--color-accent-bright)]/10 border-[var(--color-accent-bright)]/60 text-[var(--color-accent-bright)] hover:bg-[var(--color-accent-bright)]/20'
             }`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
           >
             {transcribing ? (
-              <Loader2 size={16} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
             ) : recording ? (
-              <Square size={15} />
+              <>
+                <VoiceBars />
+                <span className="font-mono text-[11px] tabular-nums">{formatTime(recordSeconds)}</span>
+                <Square size={13} aria-hidden="true" />
+              </>
             ) : (
-              <Mic size={16} />
+              <Mic size={16} aria-hidden="true" />
             )}
-            {recording && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#E05252] animate-ping" />
-            )}
-          </motion.button>
+          </button>
 
           {/* Optional browser dictation into the text box (only useful as a
               separate control when Whisper does the primary capture). */}
           {voiceSupported && sttMode === 'whisper' && (
-            <motion.button
+            <button
               onClick={toggleVoice}
               disabled={loading || submitting || initialising || recording || transcribing}
               aria-label={listening ? 'Stop dictation' : 'Dictate into the box'}
               title={listening ? 'Stop dictation' : 'Dictate into the box'}
-              className={`relative flex items-center justify-center w-11 h-11 rounded-xl border transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 ${
+              className={`relative flex items-center justify-center w-11 h-11 rounded-[var(--radius-md)] border transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 ${
                 listening
-                  ? 'bg-[#E05252] border-[#E05252] text-white'
-                  : 'bg-white border-[#E0E0E8] text-[#64687A] hover:border-[#C9A84C]/60 hover:text-[#1A1A2E]'
+                  ? 'bg-[var(--color-room)] border-[var(--color-accent-bright)] text-[var(--color-accent-bright)]'
+                  : 'bg-[var(--color-room)] border-[var(--color-room-line)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
               }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
               {listening ? <Mic size={16} /> : <MicOff size={16} />}
-              {listening && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#E05252] animate-ping" />
-              )}
-            </motion.button>
+            </button>
           )}
 
-          <motion.button
+          <button
             onClick={sendMessage}
             disabled={!input.trim() || loading || submitting || initialising || recording || transcribing}
-            aria-label="Send message"
-            className="flex items-center justify-center w-11 h-11 rounded-xl bg-[#C9A84C] text-[#0A0D14] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            aria-label="Send your answer"
+            className="flex items-center justify-center w-11 h-11 rounded-[var(--radius-md)] bg-[var(--color-ink)] text-[var(--color-room)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 hover:opacity-90 transition-opacity"
           >
             <Send size={16} />
-          </motion.button>
+          </button>
         </div>
-        <p className="max-w-4xl mx-auto font-sans text-[10px] text-[#64687A] mt-2 px-1">
-          {recording
-            ? 'Recording… tap the stop button when you have finished speaking.'
-            : transcribing
-              ? 'Transcribing your answer…'
-              : listening
-                ? 'Dictating… your words appear in the box; tap send when ready.'
-                : 'Tap the dark mic to speak your answer · the speaker icon mutes narration · or type and press Enter.'}
+
+        {/* Mic state, announced — one line, always true */}
+        <p className="max-w-3xl mx-auto font-mono text-[10px] text-[var(--color-ink-muted)] mt-2 px-1" aria-live="polite">
+          {micStatus}
         </p>
       </div>
 
@@ -1084,43 +1394,65 @@ export default function Assessment() {
         )}
       </AnimatePresence>
 
-      {/* Tab-switch / screenshot warning overlay */}
+      {/* Scoring hold state — a graceful curtain, never a frozen room */}
+      <AnimatePresence>
+        {submitting && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[105] bg-[var(--color-room)]/95 backdrop-blur-sm flex items-center justify-center px-6"
+          >
+            <div className="text-center max-w-sm" role="status">
+              <div className="w-10 h-10 mx-auto mb-5 border-2 border-[var(--color-accent-bright)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              <h2 className="font-serif text-2xl text-[var(--color-ink)] mb-2">Scoring your conversation</h2>
+              <p className="font-sans text-sm text-[var(--color-ink-muted)] leading-relaxed">
+                An independent panel of AI judges is reading your full transcript.
+                This usually takes under a minute — please keep this window open.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Integrity notice — calm, tells the candidate exactly what was recorded */}
       <AnimatePresence>
         {showTabWarning && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center"
+            className="fixed inset-0 z-[100] bg-[var(--color-room)]/90 backdrop-blur-sm flex items-center justify-center"
           >
             <motion.div
-              initial={{ scale: 0.9, y: 16 }}
+              initial={{ scale: 0.95, y: 12 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 16 }}
-              className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl"
+              exit={{ scale: 0.95, y: 12 }}
+              className="bg-[var(--color-room-surface)] border border-[var(--color-room-line)] rounded-[var(--radius-lg)] p-7 max-w-sm w-full mx-4 text-center shadow-2xl"
             >
-              <div className="w-12 h-12 rounded-full bg-[#E05252]/10 flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle size={24} className="text-[#E05252]" />
+              <div className="w-11 h-11 rounded-full bg-[var(--color-reliability-moderate)]/15 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle size={22} className="text-[var(--color-reliability-moderate)]" aria-hidden="true" />
               </div>
-              <h2 className="font-serif text-xl text-[#1A1A2E] mb-2">Proctoring Alert</h2>
-              <p className="font-sans text-sm text-[#64687A] mb-1">
-                Tab switching or screenshot attempts are not allowed.
+              <h2 className="font-serif text-xl text-[var(--color-ink)] mb-2">Integrity event recorded</h2>
+              <p className="font-sans text-sm text-[var(--color-ink-muted)] mb-1 leading-relaxed">
+                Leaving this tab or attempting a screenshot is recorded with your session and may be
+                reviewed by a person.
               </p>
-              <p className="font-sans text-xs text-[#E05252] font-semibold mb-6">
-                Violation {tabViolations} recorded
+              <p className="font-mono text-[11px] text-[var(--color-ink-muted)] mb-6">
+                Recorded events this session: {tabViolations}
               </p>
               <button
                 onClick={() => setShowTabWarning(false)}
-                className="w-full py-3 rounded-xl bg-[#1A1A2E] font-sans font-semibold text-sm text-[#C9A84C] hover:bg-[#252A3A] transition-colors"
+                className="w-full py-3 rounded-[var(--radius-md)] bg-[var(--color-room-ink)] font-sans font-semibold text-sm text-[var(--color-room)] hover:opacity-90 transition-opacity cursor-pointer"
               >
-                Return to Assessment
+                Return to the conversation
               </button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Live face-proctoring violation toast */}
+      {/* Live face-proctoring notice — calm and specific */}
       <AnimatePresence>
         {faceWarning && (
           <motion.div
@@ -1129,9 +1461,9 @@ export default function Assessment() {
             exit={{ opacity: 0, y: -16 }}
             className="fixed top-4 left-1/2 -translate-x-1/2 z-[95]"
           >
-            <div className="flex items-center gap-2 rounded-full bg-[#E05252] px-4 py-2 shadow-lg">
-              <AlertTriangle size={15} className="text-white shrink-0" />
-              <span className="font-sans text-xs font-semibold text-white">{faceWarning}</span>
+            <div className="flex items-center gap-2 rounded-[var(--radius-full)] bg-[var(--color-room-surface)] border border-[var(--color-reliability-moderate)] px-4 py-2 shadow-lg">
+              <ScanFace size={14} className="text-[var(--color-reliability-moderate)] shrink-0" aria-hidden="true" />
+              <span className="font-sans text-xs font-medium text-[var(--color-ink)]" role="status">{faceWarning}</span>
             </div>
           </motion.div>
         )}
@@ -1145,25 +1477,25 @@ export default function Assessment() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90] bg-black/85 backdrop-blur-sm flex items-center justify-center"
+            className="fixed inset-0 z-[90] bg-[var(--color-room)]/95 backdrop-blur-sm flex items-center justify-center"
           >
             <motion.div
-              initial={{ scale: 0.9, y: 16 }}
+              initial={{ scale: 0.95, y: 12 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 16 }}
-              className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl"
+              exit={{ scale: 0.95, y: 12 }}
+              className="bg-[var(--color-room-surface)] border border-[var(--color-room-line)] rounded-[var(--radius-lg)] p-7 max-w-sm w-full mx-4 text-center shadow-2xl"
             >
-              <div className="w-12 h-12 rounded-full bg-[#7C6ADE]/10 flex items-center justify-center mx-auto mb-4">
-                <Smartphone size={24} className="text-[#7C6ADE]" />
+              <div className="w-11 h-11 rounded-full bg-[var(--color-info)]/15 flex items-center justify-center mx-auto mb-4">
+                <Smartphone size={22} className="text-[var(--color-info)]" aria-hidden="true" />
               </div>
-              <h2 className="font-serif text-xl text-[#1A1A2E] mb-2">Phone camera disconnected</h2>
-              <p className="font-sans text-sm text-[#64687A] mb-4">
+              <h2 className="font-serif text-xl text-[var(--color-ink)] mb-2">Phone camera disconnected</h2>
+              <p className="font-sans text-sm text-[var(--color-ink-muted)] mb-4 leading-relaxed">
                 Your second camera went offline. Re-open the proctor page on your phone (or scan the
                 QR again) and keep that screen on. The test will resume automatically once it
                 reconnects.
               </p>
-              <div className="inline-flex items-center gap-2 font-sans text-xs text-[#7C6ADE] font-semibold">
-                <Loader2 size={14} className="animate-spin" />
+              <div className="inline-flex items-center gap-2 font-mono text-xs text-[var(--color-ink)]" role="status">
+                <Loader2 size={14} className="animate-spin" aria-hidden="true" />
                 Waiting for your phone…
               </div>
             </motion.div>
@@ -1171,100 +1503,118 @@ export default function Assessment() {
         )}
       </AnimatePresence>
 
-      {/* Camera / proctoring overlay — always in DOM so ref is stable */}
+      {/* PROCTORING PRESENCE — honest, always-visible, collapsible thumbnail.
+          The video element stays mounted (and playing) even when collapsed so
+          face proctoring never silently stops (indicators = actual capture). */}
       <div className={`fixed bottom-4 right-4 z-50 flex flex-col items-end gap-1.5 transition-opacity duration-300 ${phase === 'chat' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         {/* Phone second-camera feed (when a phone was linked) */}
         {phonePairCode && (
-          <div className="relative">
+          <div className={`relative ${selfViewOpen ? '' : 'hidden'}`}>
             {/* eslint-disable-next-line jsx-a11y/img-redundant-alt */}
             <img
               ref={phoneImgRef}
               alt="Phone proctor camera"
-              className={`w-44 h-32 rounded-xl object-cover shadow-2xl bg-black border-2 ${
-                phoneLinked ? 'border-[#7C6ADE]' : 'border-[#E05252]/60'
+              className={`w-40 h-28 rounded-[var(--radius-md)] object-cover shadow-2xl bg-[var(--color-room)] border ${
+                phoneLinked ? 'border-[var(--color-room-line)]' : 'border-[var(--color-danger)]/60'
               } ${phoneLinked ? 'block' : 'opacity-30'}`}
             />
             {phoneLinked ? (
-              <span className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 rounded-full px-2 py-0.5">
-                <Smartphone size={10} className="text-[#7C6ADE]" />
-                <span className="font-sans text-[10px] text-white font-semibold tracking-wide">PHONE</span>
+              <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-[var(--color-room)]/70 rounded-[var(--radius-full)] px-2 py-0.5">
+                <Smartphone size={10} className="text-[var(--color-room-ink)]" aria-hidden="true" />
+                <span className="font-mono text-[9px] text-[var(--color-room-ink)] tracking-wide">PHONE</span>
               </span>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/80 rounded-xl">
-                <Smartphone size={18} className="text-[#E05252]" />
-                <span className="font-sans text-[10px] text-[#E05252]">Phone offline</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--color-room)]/85 rounded-[var(--radius-md)]">
+                <Smartphone size={16} className="text-[var(--color-danger)]" aria-hidden="true" />
+                <span className="font-mono text-[10px] text-[var(--color-danger)]">Phone offline</span>
               </div>
             )}
           </div>
         )}
-        <div className="relative">
+        <div className={`relative ${selfViewOpen ? '' : 'w-px h-px overflow-hidden opacity-0'}`}>
           <video
             ref={videoCallbackRef}
             autoPlay
             muted
             playsInline
-            className={`w-44 h-32 rounded-xl object-cover shadow-2xl bg-black border-2 ${
-              mediaAllowed === true ? 'border-[#C9A84C]' : 'border-[#E05252]/60'
+            className={`w-40 h-28 rounded-[var(--radius-md)] object-cover shadow-2xl bg-[var(--color-room)] border ${
+              mediaAllowed === true ? 'border-[var(--color-room-line)]' : 'border-[var(--color-danger)]/60'
             }`}
           />
           {/* Live indicator */}
           {mediaAllowed === true && (
-            <span className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 rounded-full px-2 py-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#E05252] animate-pulse" />
-              <span className="font-sans text-[10px] text-white font-semibold tracking-wide">LIVE</span>
+            <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-[var(--color-room)]/70 rounded-[var(--radius-full)] px-2 py-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] animate-pulse" aria-hidden="true" />
+              <span className="font-mono text-[9px] text-[var(--color-room-ink)] tracking-wide">REC</span>
             </span>
           )}
           {mediaAllowed === false && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/80 rounded-xl">
-              <VideoOff size={20} className="text-[#E05252]" />
-              <span className="font-sans text-[10px] text-[#E05252]">Camera blocked</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--color-room)]/85 rounded-[var(--radius-md)]">
+              <VideoOff size={18} className="text-[var(--color-danger)]" aria-hidden="true" />
+              <span className="font-mono text-[10px] text-[var(--color-danger)]">Camera blocked</span>
             </div>
           )}
           {mediaAllowed === null && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-xl">
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-room)]/70 rounded-[var(--radius-md)]">
+              <div className="w-5 h-5 border-2 border-[var(--color-room-ink)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
             </div>
           )}
         </div>
-        <span className="font-sans text-[10px] text-[#64687A] bg-white/90 backdrop-blur px-2 py-0.5 rounded-full border border-[#E0E0E8] flex items-center gap-1">
-          <Video size={10} />
-          Proctored
-        </span>
-        <span className="font-sans text-[10px] text-[#64687A] bg-white/90 backdrop-blur px-2 py-0.5 rounded-full border border-[#E0E0E8] flex items-center gap-1">
-          {mediaAllowed === true ? (
-            <>
-              <Mic size={10} className="text-[#3CB97A]" />
-              Mic on
-            </>
-          ) : (
-            <>
-              <MicOff size={10} className="text-[#E05252]" />
-              Mic off
-            </>
-          )}
-        </span>
-        {/* Live face-proctoring status */}
-        {mediaAllowed === true && faceStatus !== 'idle' && (
-          <span
-            className={`font-sans text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1 backdrop-blur ${
-              faceStatus === 'ok'
-                ? 'text-[#3CB97A] bg-white/90 border-[#E0E0E8]'
-                : faceStatus === 'loading'
-                  ? 'text-[#64687A] bg-white/90 border-[#E0E0E8]'
-                  : faceStatus === 'unavailable'
-                    ? 'text-[#A0A4B0] bg-white/90 border-[#E0E0E8]'
-                    : 'text-white bg-[#E05252] border-[#E05252]'
-            }`}
+
+        {/* The truthful indicator strip */}
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={() => setSelfViewOpen((v) => !v)}
+            className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1 hover:text-[var(--color-ink)] transition-colors cursor-pointer"
+            aria-pressed={!selfViewOpen}
           >
-            <ScanFace size={10} />
-            {faceStatus === 'ok' && 'Face OK'}
-            {faceStatus === 'loading' && 'Starting…'}
-            {faceStatus === 'no-face' && 'No face'}
-            {faceStatus === 'multiple-faces' && `${faceCount} faces`}
-            {faceStatus === 'looking-away' && 'Look here'}
-            {faceStatus === 'unavailable' && 'Face check off'}
+            {selfViewOpen ? <EyeOff size={10} aria-hidden="true" /> : <Eye size={10} aria-hidden="true" />}
+            {selfViewOpen ? 'Hide preview' : 'Show preview'}
+          </button>
+          <span className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1">
+            {mediaAllowed === true ? <Video size={10} aria-hidden="true" /> : <VideoOff size={10} className="text-[var(--color-danger)]" aria-hidden="true" />}
+            {mediaAllowed === true ? 'Camera recording' : mediaAllowed === false ? 'Camera blocked' : 'Camera starting…'}
           </span>
-        )}
+          <span className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1">
+            {mediaAllowed === true ? (
+              <>
+                <Mic size={10} className="text-[var(--color-success)]" aria-hidden="true" />
+                Mic on
+              </>
+            ) : (
+              <>
+                <MicOff size={10} className="text-[var(--color-danger)]" aria-hidden="true" />
+                Mic off
+              </>
+            )}
+          </span>
+          {!fsActive && (
+            <span className="font-mono text-[10px] text-[var(--color-reliability-moderate)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1">
+              <AlertTriangle size={10} aria-hidden="true" />
+              Not fullscreen
+            </span>
+          )}
+          {/* Live face-proctoring status */}
+          {mediaAllowed === true && faceStatus !== 'idle' && (
+            <span
+              className={`font-mono text-[10px] px-2 py-0.5 rounded-[var(--radius-full)] border flex items-center gap-1 bg-[var(--color-room-surface)] ${
+                faceStatus === 'ok'
+                  ? 'text-[var(--color-success)] border-[var(--color-room-line)]'
+                  : faceStatus === 'loading' || faceStatus === 'unavailable'
+                    ? 'text-[var(--color-ink-muted)] border-[var(--color-room-line)]'
+                    : 'text-[var(--color-danger)] border-[var(--color-danger)]/50'
+              }`}
+            >
+              <ScanFace size={10} aria-hidden="true" />
+              {faceStatus === 'ok' && 'Face OK'}
+              {faceStatus === 'loading' && 'Starting…'}
+              {faceStatus === 'no-face' && 'No face'}
+              {faceStatus === 'multiple-faces' && `${faceCount} faces`}
+              {faceStatus === 'looking-away' && 'Look here'}
+              {faceStatus === 'unavailable' && 'Face check off'}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )

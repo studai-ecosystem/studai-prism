@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion'
-import { Briefcase, Users, X } from 'lucide-react'
+import { Briefcase, Users, X, Timer } from 'lucide-react'
 
-// Scenario Card — a visual situation briefing that slides in mid-assessment.
-// Tests Critical Thinking: the candidate must absorb the full context quickly.
+// Scenario briefing — the opening beat of the room. The candidate absorbs the
+// situation and cast before the clock starts; dismissing it begins the
+// assessment. Design-system room-dark surfaces; the accent marks the moment
+// measurement begins.
 export default function ScenarioCard({ scenario, onDismiss }) {
   if (!scenario) return null
   const { title, domain, context, participants = [] } = scenario
@@ -12,55 +14,55 @@ export default function ScenarioCard({ scenario, onDismiss }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[110] bg-[#0A0D14]/80 backdrop-blur-sm flex items-center justify-center px-4"
+      className="room-dark fixed inset-0 z-[110] bg-[var(--color-room)]/92 backdrop-blur-sm flex items-center justify-center px-4"
     >
       <motion.div
-        initial={{ scale: 0.94, y: 20 }}
+        initial={{ scale: 0.96, y: 16 }}
         animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.94, y: 20 }}
-        transition={{ type: 'spring', damping: 24, stiffness: 280 }}
-        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden"
+        exit={{ scale: 0.96, y: 16 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--color-room-surface)] border border-[var(--color-room-line)] rounded-[var(--radius-lg)] shadow-2xl"
       >
+        {/* The accent rule: measurement begins here */}
+        <div className="h-[3px] bg-[var(--color-accent-bright)]" aria-hidden="true" />
+
         {/* Header */}
-        <div className="bg-[#1A1A2E] px-6 py-5">
-          <div className="flex items-center gap-2 mb-2">
-            <Briefcase size={15} className="text-[#C9A84C]" />
-            <span className="font-sans text-[11px] font-semibold tracking-[0.2em] text-[#C9A84C] uppercase">
-              {domain || 'Scenario Briefing'}
+        <div className="px-6 pt-5 pb-4 border-b border-[var(--color-room-line)]">
+          <div className="flex items-center gap-2 mb-2.5">
+            <Briefcase size={13} className="text-[var(--color-accent-bright)]" aria-hidden="true" />
+            <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-accent-bright)]">
+              {domain || 'Scenario briefing'}
             </span>
           </div>
-          <h2 className="font-serif text-2xl text-[#F0EDE6] leading-snug">{title}</h2>
+          <h2 className="font-serif text-2xl text-[var(--color-ink)] leading-snug">{title}</h2>
         </div>
 
         {/* Context */}
         <div className="px-6 py-5">
-          <p className="font-sans text-sm text-[#3A3A4A] leading-relaxed">{context}</p>
+          <p className="font-sans text-sm text-[var(--color-ink)] leading-[1.7]">{context}</p>
 
-          <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-[#C9A84C]/10 border border-[#C9A84C]/25">
-            <span className="text-base leading-none mt-0.5">💡</span>
-            <p className="font-sans text-xs text-[#5A4A1A] leading-relaxed">
-              There is no right or wrong answer, and you don't need to know this field.
-              Just talk through how you'd handle it — we're listening to how you think.
-            </p>
-          </div>
+          <p className="mt-4 p-3.5 rounded-[var(--radius-md)] bg-[var(--color-room)] border border-[var(--color-room-line)] font-sans text-xs text-[var(--color-ink-muted)] leading-relaxed">
+            There is no right or wrong answer, and you don't need to know this field.
+            Just talk through how you'd handle it — we're listening to how you think.
+          </p>
 
           {participants.length > 0 && (
             <div className="mt-5">
               <div className="flex items-center gap-2 mb-3">
-                <Users size={14} className="text-[#64687A]" />
-                <span className="font-sans text-[11px] font-semibold tracking-wide text-[#64687A] uppercase">
+                <Users size={13} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
+                <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
                   In the room
                 </span>
               </div>
               <ul className="flex flex-col gap-2">
                 {participants.map((p) => (
-                  <li key={p.name} className="flex items-center gap-3 p-2.5 rounded-lg bg-[#F5F5FA] border border-[#E8E8F0]">
-                    <span className="w-8 h-8 rounded-full bg-[#C9A84C]/15 text-[#C9A84C] flex items-center justify-center font-sans text-xs font-semibold shrink-0">
+                  <li key={p.name} className="flex items-center gap-3 p-2.5 rounded-[var(--radius-md)] bg-[var(--color-room)] border border-[var(--color-room-line)]">
+                    <span className="w-8 h-8 rounded-full bg-[var(--color-room-surface)] border border-[var(--color-room-line)] text-[var(--color-ink)] flex items-center justify-center font-mono text-xs shrink-0" aria-hidden="true">
                       {p.name.charAt(0).toUpperCase()}
                     </span>
                     <div>
-                      <p className="font-sans text-sm font-semibold text-[#1A1A2E] leading-tight">{p.name}</p>
-                      <p className="font-sans text-xs text-[#64687A]">{p.role}</p>
+                      <p className="font-sans text-sm font-semibold text-[var(--color-ink)] leading-tight">{p.name}</p>
+                      <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">{p.role}</p>
                     </div>
                   </li>
                 ))}
@@ -73,16 +75,20 @@ export default function ScenarioCard({ scenario, onDismiss }) {
         <div className="px-6 pb-6">
           <button
             onClick={onDismiss}
-            className="w-full py-3.5 rounded-xl bg-[#1A1A2E] font-sans font-semibold text-sm text-[#C9A84C] tracking-wide hover:bg-[#252A3A] transition-colors cursor-pointer"
+            className="w-full py-3.5 rounded-[var(--radius-md)] bg-[var(--color-room-ink)] font-sans font-semibold text-sm text-[var(--color-room)] tracking-wide hover:opacity-90 transition-opacity cursor-pointer"
           >
             Got it — continue
           </button>
+          <p className="mt-2.5 flex items-center justify-center gap-1.5 font-mono text-[11px] text-[var(--color-ink-muted)]">
+            <Timer size={11} aria-hidden="true" />
+            Your 30 minutes begin when you continue.
+          </p>
         </div>
 
         <button
           onClick={onDismiss}
           aria-label="Dismiss scenario briefing"
-          className="absolute top-4 right-4 text-[#F0EDE6]/60 hover:text-[#F0EDE6] transition-colors"
+          className="absolute top-4 right-4 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors cursor-pointer"
         >
           <X size={18} />
         </button>
