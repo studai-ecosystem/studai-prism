@@ -214,7 +214,7 @@ export default function ScoreReport() {
     return () => { cancelled = true }
   }, [report, sessionId])
 
-  const certRef = useRef(null)
+  const reportRef = useRef(null)
   const [downloading, setDownloading] = useState(false)
 
   // Email-report modal state.
@@ -401,7 +401,7 @@ export default function ScoreReport() {
   }
 
   const handleDownloadPdf = async () => {
-    if (!certRef.current || downloading) return
+    if (!reportRef.current || downloading) return
     setDownloading(true)
     try {
       const { pdf, filename } = await buildReportPdf()
@@ -415,21 +415,33 @@ export default function ScoreReport() {
   }
 
   // Shared PDF builder used by both "Download PDF" and "Email report" so the two
-  // produce an identical certificate. Returns the jsPDF instance + a safe
-  // filename; callers decide whether to .save() or extract base64 for upload.
+  // produce an identical document. Captures EVERY visible report section (the
+  // certificate, skill map, percentiles, score calculation, dimension evidence,
+  // AI summary and interviewer guide — not just the certificate card) and lays
+  // them out across as many A4 pages as needed, breaking pages between sections.
+  // Returns the jsPDF instance + a safe filename; callers decide whether to
+  // .save() or extract base64 for upload.
   async function buildReportPdf() {
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
       import('html2canvas'),
       import('jspdf'),
     ])
-    const canvas = await html2canvas(certRef.current, {
+
+    // Every top-level report block, in on-screen order, except interactive-only
+    // ones (share box, data-rights card, modals) which carry `no-print`.
+    const blocks = Array.from(reportRef.current?.children || []).filter(
+      (el) => el.nodeType === 1 && !el.classList.contains('no-print') && el.offsetHeight > 0,
+    )
+    if (!blocks.length) throw new Error('Report content not ready')
+
+    const captureOpts = {
       scale: 2,
       backgroundColor: '#FBF7EC',
       useCORS: true,
       // html2canvas renders text higher within its line-box than the browser
       // does, so very tight line-heights cause the name to overlap the meta
       // row beneath it. Relax those line-heights on the *cloned* node only so
-      // the on-screen certificate is untouched but the PDF is properly spaced.
+      // the on-screen report is untouched but the PDF is properly spaced.
       onclone: (doc) => {
         const setLH = (selector, lh, extra = {}) => {
           doc.querySelectorAll(selector).forEach((el) => {
@@ -444,13 +456,63 @@ export default function ScoreReport() {
         setLH('.cert-score-tier', 'normal')
         setLH('.cert-overline-txt', 'normal')
       },
-    })
-    const imgData = canvas.toDataURL('image/png')
+    }
+
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
     const pageWidth = pdf.internal.pageSize.getWidth()
-    const imgWidth = pageWidth - 48
-    const imgHeight = (canvas.height * imgWidth) / canvas.width
-    pdf.addImage(imgData, 'PNG', 24, 24, imgWidth, imgHeight)
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 24
+    const gap = 14
+    const imgWidth = pageWidth - margin * 2
+    const usableHeight = pageHeight - margin * 2
+
+    // Paint each page the same warm paper colour as the on-screen report so
+    // section captures blend seamlessly instead of floating on white.
+    const paintPage = () => {
+      pdf.setFillColor(251, 247, 236)
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F')
+    }
+    paintPage()
+    let y = margin
+
+    for (const block of blocks) {
+      // eslint-disable-next-line no-await-in-loop -- sections must render sequentially
+      const canvas = await html2canvas(block, captureOpts)
+      if (!canvas.width || !canvas.height) continue
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      // A section taller than a full page (e.g. the dimension breakdown on a
+      // narrow viewport) is sliced into page-height chunks; everything else
+      // stays whole and page-breaks happen between sections.
+      const pieces = []
+      if (imgHeight <= usableHeight) {
+        pieces.push(canvas)
+      } else {
+        const sliceHeightPx = Math.max(1, Math.floor((usableHeight * canvas.width) / imgWidth))
+        for (let offset = 0; offset < canvas.height; offset += sliceHeightPx) {
+          const slice = document.createElement('canvas')
+          slice.width = canvas.width
+          slice.height = Math.min(sliceHeightPx, canvas.height - offset)
+          const ctx = slice.getContext('2d')
+          ctx.fillStyle = '#FBF7EC'
+          ctx.fillRect(0, 0, slice.width, slice.height)
+          ctx.drawImage(canvas, 0, offset, canvas.width, slice.height, 0, 0, canvas.width, slice.height)
+          pieces.push(slice)
+        }
+      }
+
+      for (const piece of pieces) {
+        const pieceHeight = (piece.height * imgWidth) / piece.width
+        if (y > margin && y + pieceHeight > pageHeight - margin) {
+          pdf.addPage()
+          paintPage()
+          y = margin
+        }
+        pdf.addImage(piece.toDataURL('image/png'), 'PNG', margin, y, imgWidth, pieceHeight)
+        y += pieceHeight + gap
+      }
+    }
+
     const safeName = displayName.replace(/[^a-z0-9]+/gi, '-')
     return { pdf, filename: `Prism-Score-${safeName}.pdf` }
   }
@@ -673,9 +735,9 @@ export default function ScoreReport() {
         </div>
       </header>
 
-      <main className="pr-main">
+      <main className="pr-main" ref={reportRef}>
         {/* CERTIFICATE CARD */}
-        <div className="cert-card" ref={certRef}>
+        <div className="cert-card">
           <div className="cert-top">
             <svg className="cert-pattern" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice">
               <defs>
