@@ -10,6 +10,7 @@ import { getToken } from '../lib/session.js'
 import { startProctorSession, subscribeProctor, endProctorSession, scheduleEndProctorSession, cancelScheduledEnd, recallPairCode } from '../lib/proctorLink.js'
 import { useFaceProctor } from '../hooks/useFaceProctor.js'
 import { createTurnTracker, createVoiceMeter } from '../lib/turnSignals.js'
+import { loadVoices, assignCastVoices, speakTurn, speakTurnNeural } from '../lib/voice.js'
 
 const INSTRUCTIONS = [
   { Icon: Target, text: 'You will be placed in a realistic everyday scenario with AI participants who play different roles.' },
@@ -328,6 +329,18 @@ export default function Assessment() {
   // Speech-to-text mode: 'whisper' (server) when configured, else 'webspeech'
   // (browser live dictation) so the spoken test still works without an API key.
   const [sttMode, setSttMode] = useState('whisper')
+  // Neural persona voices (PRISM_TTS_NEURAL): server-proxied Azure Speech when
+  // the flag is lit; otherwise the persona-mapped browser voices. Either way
+  // each participant speaks with their OWN voice — never one robot for all.
+  const [neuralTts, setNeuralTts] = useState(false)
+  const castVoicesRef = useRef(null) // Map(personaName -> {voice,pitch,rate})
+  const speakCancelRef = useRef(null)
+  // The exam frame, honestly reported: standalone app window vs browser tab,
+  // and whether the Keyboard Lock API is holding Esc/Alt+Tab inside fullscreen.
+  const [standalone] = useState(() =>
+    typeof window !== 'undefined' &&
+    (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true))
+  const [keysLocked, setKeysLocked] = useState(false)
   // Live face-proctoring (laptop webcam). Transient banner shown on a violation.
   const [faceWarning, setFaceWarning] = useState(null)
   const faceWarningTimerRef = useRef(null)
@@ -441,6 +454,7 @@ export default function Assessment() {
       if (faceWarningTimerRef.current) clearTimeout(faceWarningTimerRef.current)
       streamRef.current?.getTracks().forEach((t) => t.stop())
       try { mediaRecorderRef.current?.stop() } catch { /* ignore */ }
+      speakCancelRef.current?.()
       try { window.speechSynthesis?.cancel() } catch { /* ignore */ }
     }
   }, [])
@@ -487,6 +501,30 @@ export default function Assessment() {
     return () => { cancelled = true }
   }, [])
 
+  // Detect whether neural persona voices are lit (PRISM_TTS_NEURAL). Dark →
+  // the persona-mapped browser voices carry the room; nothing else changes.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/assessment/tts-status')
+      .then((r) => (r.ok ? r.json() : { enabled: false }))
+      .then((d) => { if (!cancelled) setNeuralTts(Boolean(d.enabled)) })
+      .catch(() => { if (!cancelled) setNeuralTts(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Give every persona their own voice as soon as we know the cast. The
+  // assignment is deterministic per name, distinct within the scenario, and
+  // prefers the natural/Indian-English voices this device actually has.
+  useEffect(() => {
+    if (!scenario?.participants?.length) return
+    let cancelled = false
+    loadVoices().then((voices) => {
+      if (cancelled) return
+      castVoicesRef.current = assignCastVoices(scenario.participants, voices)
+    })
+    return () => { cancelled = true }
+  }, [scenario])
+
   // Report a proctoring event to the server (best-effort, never blocks the UI).
   const reportProctorEvent = useCallback((type, meta) => {
     if (!sessionId) return
@@ -527,9 +565,23 @@ export default function Assessment() {
   // Silence the avatar immediately if the candidate mutes narration mid-sentence.
   useEffect(() => {
     if (!ttsEnabled) {
+      speakCancelRef.current?.()
       try { window.speechSynthesis?.cancel() } catch { /* ignore */ }
     }
   }, [ttsEnabled])
+
+  // The exam frame, recorded honestly (E.4): whether the room runs in the
+  // installed app window or a browser tab — once per session at chat start —
+  // and focus losses while in the standalone app (a tab-switch has no meaning
+  // there, but losing the window to another app does).
+  useEffect(() => {
+    if (phase !== 'chat') return undefined
+    reportProctorEvent('display_mode', { standalone })
+    if (!standalone) return undefined
+    const onBlur = () => reportProctorEvent('app_blur', {})
+    window.addEventListener('blur', onBlur)
+    return () => window.removeEventListener('blur', onBlur)
+  }, [phase, standalone, reportProctorEvent])
 
 
   // Set up browser speech recognition for voice-to-text dictation
@@ -657,19 +709,38 @@ export default function Assessment() {
   // Enforce fullscreen while assessment is active; re-enter if user exits.
   // The proctoring strip reports the TRUE state (E.4: indicators must match
   // actual capture behaviour — never claim fullscreen that isn't).
+  // Where the Keyboard Lock API exists (Chromium), Esc/Alt+Tab are held
+  // INSIDE fullscreen so the browser chrome (tab strip) never surfaces — the
+  // strip shows whether the lock actually engaged, never assumes it.
   const [fsActive, setFsActive] = useState(false)
   useEffect(() => {
     if (phase !== 'chat') return
+    const lockKeys = () => {
+      const kb = navigator.keyboard
+      if (!kb?.lock) {
+        setKeysLocked(false)
+        return
+      }
+      kb.lock(['Escape', 'Tab', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'])
+        .then(() => setKeysLocked(true))
+        .catch(() => setKeysLocked(false))
+    }
     const handleFSChange = () => {
       setFsActive(Boolean(document.fullscreenElement))
       if (!document.fullscreenElement) {
+        setKeysLocked(false)
         document.documentElement.requestFullscreen?.().catch(() => {})
+      } else {
+        lockKeys()
       }
     }
     // Enter fullscreen immediately
-    document.documentElement.requestFullscreen?.().then(() => setFsActive(true)).catch(() => {})
+    document.documentElement.requestFullscreen?.().then(() => { setFsActive(true); lockKeys() }).catch(() => {})
     document.addEventListener('fullscreenchange', handleFSChange)
-    return () => document.removeEventListener('fullscreenchange', handleFSChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFSChange)
+      try { navigator.keyboard?.unlock?.() } catch { /* ignore */ }
+    }
   }, [phase])
 
   // Attach stream to video element after mediaAllowed becomes true
@@ -791,22 +862,22 @@ export default function Assessment() {
     }
   }, [sessionId, navigate, submitting])
 
-  // Read an AI turn aloud so the candidate can take the test by ear (voice-only
-  // experience). Uses the browser's built-in speech synthesis — no network.
+  // Read an AI turn aloud so the candidate can take the test by ear. Each
+  // message is spoken in ITS persona's voice — neural (server, flagged) when
+  // available, otherwise the best matching voices this browser offers.
   const speak = useCallback((aiMessages) => {
     if (!ttsEnabled) return
-    const synth = window.speechSynthesis
-    if (!synth || !Array.isArray(aiMessages)) return
-    const text = aiMessages.map((m) => m.content).filter(Boolean).join(' ')
-    if (!text) return
-    try {
-      synth.cancel()
-      const utter = new SpeechSynthesisUtterance(text)
-      utter.lang = 'en-US'
-      utter.rate = 1
-      synth.speak(utter)
-    } catch { /* ignore */ }
-  }, [ttsEnabled])
+    if (!Array.isArray(aiMessages) || !aiMessages.length) return
+    speakCancelRef.current?.()
+    if (neuralTts && sessionId) {
+      speakCancelRef.current = speakTurnNeural(aiMessages, {
+        sessionId,
+        castVoices: castVoicesRef.current,
+      })
+    } else {
+      speakCancelRef.current = speakTurn(aiMessages, castVoicesRef.current)
+    }
+  }, [ttsEnabled, neuralTts, sessionId])
 
   // Core send used by both typed and spoken answers.
   const sendText = useCallback(async (rawText) => {
@@ -1594,6 +1665,9 @@ export default function Assessment() {
               Not fullscreen
             </span>
           )}
+          <span className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)]">
+            {standalone ? 'App window' : 'Browser tab'}{fsActive ? (keysLocked ? ' · keys held' : '') : ''}
+          </span>
           {/* Live face-proctoring status */}
           {mediaAllowed === true && faceStatus !== 'idle' && (
             <span

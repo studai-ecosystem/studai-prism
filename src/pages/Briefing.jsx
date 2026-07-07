@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ShieldCheck, MonitorX, Clock, Copy, Eye, Camera, Check } from 'lucide-react'
+import { ShieldCheck, MonitorX, Clock, Copy, Eye, Camera, Check, MonitorDown } from 'lucide-react'
 import { CHARACTERS, CharacterAvatar } from '../lib/characters.jsx'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
 import { CONSENT_VERSION } from '../../server/lib/sharedConstants.js'
@@ -51,6 +51,27 @@ export default function Briefing() {
   // Track 4.1 — assessment language (selector shows only when PRISM_LANG on).
   const [languages, setLanguages] = useState([])
   const [language, setLanguage] = useState(() => localStorage.getItem('prismLanguage') || 'en')
+
+  // Installable app: a standalone window has no tab strip — a calmer exam
+  // frame. Offer it quietly when the browser says it's possible.
+  const [installable, setInstallable] = useState(() => Boolean(window.__prismInstallPrompt))
+  const [standalone] = useState(() =>
+    window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true)
+  useEffect(() => {
+    const onInstallable = () => setInstallable(true)
+    window.addEventListener('prism-installable', onInstallable)
+    return () => window.removeEventListener('prism-installable', onInstallable)
+  }, [])
+  const handleInstall = async () => {
+    const prompt = window.__prismInstallPrompt
+    if (!prompt) return
+    prompt.prompt()
+    const choice = await prompt.userChoice.catch(() => null)
+    if (choice?.outcome === 'accepted') {
+      window.__prismInstallPrompt = null
+      setInstallable(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -200,6 +221,24 @@ export default function Briefing() {
               </motion.li>
             ))}
           </ul>
+
+          {/* Installable app — a distraction-free window with no browser tabs */}
+          {installable && !standalone && (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--color-surface)] border border-[var(--color-line)]">
+              <MonitorDown size={18} className="text-[var(--color-ink-muted)] shrink-0" />
+              <div className="flex-1">
+                <p className="font-sans text-sm text-[var(--color-ink)]">Take the assessment in the Prism app window</p>
+                <p className="font-sans text-xs text-[var(--color-ink-muted)]">No browser tabs, no distractions — recommended for the cleanest session.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleInstall}
+                className="shrink-0 px-3.5 py-2 rounded-lg bg-[var(--color-ink)] font-sans text-xs font-semibold text-[var(--color-paper)] hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Install
+              </button>
+            </div>
+          )}
 
           {/* Name input */}
           <div className="flex flex-col items-center">

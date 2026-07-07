@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid'
 import logger from '../lib/logger.js'
 import { sessionCache } from '../lib/sessionCache.js'
 import { isWhisperEnabled, transcribeAudio } from '../lib/openaiWhisper.js'
+import { isTtsEnabled, synthesizeSpeech } from '../lib/azureSpeech.js'
 import { isMailEnabled, sendReportEmail } from '../lib/mailer.js'
 import {
   getEntitlement,
@@ -188,9 +189,9 @@ export const SCENARIOS = [
     title: 'The Group Project',
     context: `You are a final-year student leading a 4-person group project that is due in 3 days. It counts for 40% of your grade. One teammate has done almost no work and keeps making excuses. Another teammate wants to just do that person's part for them to be safe. You still have your own part left to finish too. Everyone is stressed and the group chat is getting tense.`,
     participants: [
-      { name: 'Aditya', role: 'The Hardworking Teammate', personality: 'Stressed and a bit angry. Wants to remove the slacker from the group or report them. Will ask you what you are actually going to do about it.' },
-      { name: 'Sneha', role: 'The Peacemaker Teammate', personality: 'Avoids conflict. Just wants to cover the missing work quietly so the grade is safe. Worried about hurting feelings.' },
-      { name: 'Ravi', role: 'The Quiet Teammate', personality: 'Mostly stays silent and just listens. Speaks only rarely, to say how the team is feeling or whether a plan seems fair to everyone.' },
+      { name: 'Aditya', role: 'The Hardworking Teammate', personality: 'Stressed and a bit angry. Wants to remove the slacker from the group or report them. Will ask you what you are actually going to do about it.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
+      { name: 'Sneha', role: 'The Peacemaker Teammate', personality: 'Avoids conflict. Just wants to cover the missing work quietly so the grade is safe. Worried about hurting feelings.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
+      { name: 'Ravi', role: 'The Quiet Teammate', personality: 'Mostly stays silent and just listens. Speaks only rarely, to say how the team is feeling or whether a plan seems fair to everyone.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
     ],
   },
   {
@@ -200,9 +201,9 @@ export const SCENARIOS = [
     title: 'The Fest Budget',
     context: `You are the coordinator for your college fest. You have ₹50,000 left and two days to go. The music club wants more money for a better sound system. The food stalls say they will pull out unless they get a bigger share. If you spend on one, the other gets less. Students are already excited and tickets are sold, so the event cannot flop.`,
     participants: [
-      { name: 'Karthik', role: 'Music Club Head', personality: 'Passionate about the show. Believes a great sound system is what people will remember. Will push hard for the bigger budget.' },
-      { name: 'Divya', role: 'Food Stall Organiser', personality: 'Practical. Says hungry people leave early and blame the organisers. Threatens to reduce stalls if her budget is cut.' },
-      { name: 'Prof. Nair', role: 'Faculty Advisor', personality: 'Observes quietly in the background. Speaks only rarely, to remind everyone of safety rules or that the budget is fixed.' },
+      { name: 'Karthik', role: 'Music Club Head', personality: 'Passionate about the show. Believes a great sound system is what people will remember. Will push hard for the bigger budget.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
+      { name: 'Divya', role: 'Food Stall Organiser', personality: 'Practical. Says hungry people leave early and blame the organisers. Threatens to reduce stalls if her budget is cut.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
+      { name: 'Prof. Nair', role: 'Faculty Advisor', personality: 'Observes quietly in the background. Speaks only rarely, to remind everyone of safety rules or that the budget is fixed.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
     ],
   },
   {
@@ -238,9 +239,9 @@ export const SCENARIOS = [
     title: 'The Delayed Launch',
     context: `You are the Product Manager at FinTrack, a growing fintech startup. Your mobile app was due to launch this quarter, but engineering says they need 6 more weeks. Your top enterprise client — accounting for 30% of revenue — has threatened to leave if the app is not live within 2 weeks. Marketing has already announced the launch date and there is social media buzz building.`,
     participants: [
-      { name: 'Rohan Mehta', role: 'CTO', personality: 'Protective of engineering quality, concerned about technical debt if rushed. Will push back strongly on unrealistic timelines but is open to creative solutions.' },
-      { name: 'Ananya Singh', role: 'Chief Revenue Officer', personality: 'Laser-focused on client retention and revenue. Willing to make bold promises to keep the client. Impatient with technical excuses.' },
-      { name: 'Priya Menon', role: 'Customer Success Lead', personality: 'Mostly listens. Speaks only rarely, to flag how the client is actually feeling on the ground.' },
+      { name: 'Rohan Mehta', role: 'CTO', personality: 'Protective of engineering quality, concerned about technical debt if rushed. Will push back strongly on unrealistic timelines but is open to creative solutions.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
+      { name: 'Ananya Singh', role: 'Chief Revenue Officer', personality: 'Laser-focused on client retention and revenue. Willing to make bold promises to keep the client. Impatient with technical excuses.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
+      { name: 'Priya Menon', role: 'Customer Success Lead', personality: 'Mostly listens. Speaks only rarely, to flag how the client is actually feeling on the ground.', tts: { gender: 'female', azureVoice: 'en-IN-AashiNeural' } },
     ],
   },
   {
@@ -250,9 +251,9 @@ export const SCENARIOS = [
     title: 'The Ethical AI Decision',
     context: `You are a Strategy Consultant advising RetailCo, a major retail chain that wants to implement an AI hiring system to filter 50,000 applicants per quarter. Your analysis shows that the model, trained on historical data, has statistically significant bias against certain demographic groups. The client wants full deployment in 3 weeks. Delaying could cost RetailCo ₹2 crore in manual screening costs.`,
     participants: [
-      { name: 'Vikram Nair', role: 'CEO, RetailCo', personality: 'Results-driven, skeptical of bias claims, sees this as over-engineering a problem. Puts business efficiency above all.' },
-      { name: 'Dr. Meera Patel', role: 'Independent AI Ethics Researcher', personality: 'Principled, data-driven. Will cite specific evidence of bias and potential legal risks. Advocates for a phased, fair approach.' },
-      { name: 'Arvind Rao', role: 'Legal Counsel', personality: 'Observes quietly. Speaks only rarely, to note a real legal or compliance risk that no one has raised.' },
+      { name: 'Vikram Nair', role: 'CEO, RetailCo', personality: 'Results-driven, skeptical of bias claims, sees this as over-engineering a problem. Puts business efficiency above all.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
+      { name: 'Dr. Meera Patel', role: 'Independent AI Ethics Researcher', personality: 'Principled, data-driven. Will cite specific evidence of bias and potential legal risks. Advocates for a phased, fair approach.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
+      { name: 'Arvind Rao', role: 'Legal Counsel', personality: 'Observes quietly. Speaks only rarely, to note a real legal or compliance risk that no one has raised.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
     ],
   },
   {
@@ -262,9 +263,9 @@ export const SCENARIOS = [
     title: 'The Team Restructure',
     context: `You are the newly appointed VP of Product at TechCorp. After a difficult quarter with 40% revenue decline, leadership has asked you to restructure your 30-person product team, potentially eliminating 8 positions. You must present a plan to the CEO in 2 days. Several team members have heard rumours and morale is fragile. The remaining team must still deliver on a major roadmap commitment.`,
     participants: [
-      { name: 'Arjun Kapoor', role: 'CEO', personality: 'Expects decisive action, clear business reasoning, and minimal disruption to delivery. Will challenge you hard on the business case and people decisions.' },
-      { name: 'Shreya Bansal', role: 'Senior Product Lead', personality: "Represents the team's concerns, deeply worried about morale and fairness. Will ask hard questions about process and which roles are cut." },
-      { name: 'Nisha Gupta', role: 'HR Business Partner', personality: 'Mostly listens. Speaks only rarely, to flag a fairness or process concern for the affected staff.' },
+      { name: 'Arjun Kapoor', role: 'CEO', personality: 'Expects decisive action, clear business reasoning, and minimal disruption to delivery. Will challenge you hard on the business case and people decisions.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
+      { name: 'Shreya Bansal', role: 'Senior Product Lead', personality: "Represents the team's concerns, deeply worried about morale and fairness. Will ask hard questions about process and which roles are cut.", tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
+      { name: 'Nisha Gupta', role: 'HR Business Partner', personality: 'Mostly listens. Speaks only rarely, to flag a fairness or process concern for the affected staff.', tts: { gender: 'female', azureVoice: 'en-IN-AashiNeural' } },
     ],
   },
   {
@@ -274,9 +275,9 @@ export const SCENARIOS = [
     title: 'The Supplier Crisis',
     context: `You are the Operations Manager at a mid-sized electronics manufacturer in Pune. Your key component supplier in Shenzhen has missed delivery — production stops in 6 hours without the parts. You have three options: air-freight the components at 4x cost, find an alternate supplier who can deliver in 72 hours but whose quality is unproven, or halt the production line and absorb the delay penalty with your biggest OEM client.`,
     participants: [
-      { name: 'Priya Desai', role: 'Head of Procurement', personality: 'Focused on cost and supplier relationships. Strongly opposed to using an unvetted supplier. Will push back on the air-freight cost.' },
-      { name: 'Sandeep Rao', role: 'OEM Client Relationship Manager', personality: 'Represents the client\'s interest. Escalating urgently. The client will impose ₹40 lakh penalty if the production target is missed this quarter.' },
-      { name: 'Ramesh Iyer', role: 'Plant Floor Supervisor', personality: 'Observes quietly. Speaks only rarely, to note what is actually possible on the production line right now.' },
+      { name: 'Priya Desai', role: 'Head of Procurement', personality: 'Focused on cost and supplier relationships. Strongly opposed to using an unvetted supplier. Will push back on the air-freight cost.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
+      { name: 'Sandeep Rao', role: 'OEM Client Relationship Manager', personality: 'Represents the client\'s interest. Escalating urgently. The client will impose ₹40 lakh penalty if the production target is missed this quarter.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
+      { name: 'Ramesh Iyer', role: 'Plant Floor Supervisor', personality: 'Observes quietly. Speaks only rarely, to note what is actually possible on the production line right now.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
     ],
   },
   {
@@ -325,9 +326,9 @@ export const SCENARIOS = [
     title: 'The Brand Crisis',
     context: `You are the Marketing Director at a fast-growing D2C skincare brand. A food safety YouTuber with 2 million subscribers has posted a video claiming your bestselling moisturiser contains a harmful chemical — based on a lab test he conducted. The claim is disputed by your R&D team, but the video has 800,000 views in 12 hours. Stock is moving off shelves in two major retail chains. Your PR agency says you have a 4-hour window to respond before the news cycle picks it up.`,
     participants: [
-      { name: 'Ritu Sharma', role: 'CEO', personality: "Wants to act fast. Concerned about brand equity. Willing to pull the product temporarily to show accountability, even without confirmed evidence." },
-      { name: 'Dr. Anand Pillai', role: 'Head of R&D', personality: "Confident the product is safe. Strongly opposed to pulling it — believes that's an admission of guilt and sets a bad precedent. Wants to wait for official lab verification." },
-      { name: 'Sneha Iyer', role: 'PR Agency Lead', personality: 'Observes quietly. Speaks only rarely, to note how the public mood is shifting online.' },
+      { name: 'Ritu Sharma', role: 'CEO', personality: "Wants to act fast. Concerned about brand equity. Willing to pull the product temporarily to show accountability, even without confirmed evidence.", tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
+      { name: 'Dr. Anand Pillai', role: 'Head of R&D', personality: "Confident the product is safe. Strongly opposed to pulling it — believes that's an admission of guilt and sets a bad precedent. Wants to wait for official lab verification.", tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
+      { name: 'Sneha Iyer', role: 'PR Agency Lead', personality: 'Observes quietly. Speaks only rarely, to note how the public mood is shifting online.', tts: { gender: 'female', azureVoice: 'en-IN-AashiNeural' } },
     ],
   },
   {
@@ -337,9 +338,9 @@ export const SCENARIOS = [
     title: 'The Clinic Backlog',
     context: `You manage a busy community health clinic in Nagpur. This morning 3 staff called in sick and 60 patients are waiting. A walk-in elderly patient looks seriously unwell but has no appointment, while patients with booked slots are already angry about the delay. You have two doctors available instead of the usual four, and the pharmacy queue is also building up.`,
     participants: [
-      { name: 'Nurse Latha', role: 'Senior Duty Nurse', personality: 'Practical and calm. Worried about patient safety and staff burnout. Will push you to set a clear priority rule for who is seen first.' },
-      { name: 'Mr. Joshi', role: 'Waiting Patient with Appointment', personality: 'Frustrated. Booked his slot a week ago and feels skipping him is unfair. Will challenge any decision to see walk-ins before him.' },
-      { name: 'Dr. Kamat', role: 'Duty Doctor', personality: 'Mostly listens. Speaks only rarely, to flag a real patient-safety concern.' },
+      { name: 'Nurse Latha', role: 'Senior Duty Nurse', personality: 'Practical and calm. Worried about patient safety and staff burnout. Will push you to set a clear priority rule for who is seen first.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
+      { name: 'Mr. Joshi', role: 'Waiting Patient with Appointment', personality: 'Frustrated. Booked his slot a week ago and feels skipping him is unfair. Will challenge any decision to see walk-ins before him.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
+      { name: 'Dr. Kamat', role: 'Duty Doctor', personality: 'Mostly listens. Speaks only rarely, to flag a real patient-safety concern.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
     ],
   },
   {
@@ -1300,6 +1301,80 @@ router.get('/stt-status', (_req, res) => {
   res.json({ enabled: isWhisperEnabled() })
 })
 
+// ── GET /api/assessment/tts-status ────────────────────────────────────────────
+// PRISM_TTS_NEURAL (ops flag, default off): neural persona voices via the
+// server's Azure Speech proxy. When dark, the room uses the browser's own
+// voices (still persona-mapped client-side) — nothing breaks, nothing leaks.
+router.get('/tts-status', (_req, res) => {
+  res.json({ enabled: isTtsEnabled(), provider: isTtsEnabled() ? 'azure-speech' : null })
+})
+
+// ── POST /api/assessment/speech ───────────────────────────────────────────────
+// Synthesize ONE avatar line in that persona's neural voice. Hard rules:
+//  · 404 while the flag is dark — the endpoint does not exist for the public.
+//  · The text must be EXACTLY a line the avatar spoke in this session (checked
+//    against the session history), so the endpoint can never be used as a
+//    general-purpose TTS service or made to say attacker-chosen words.
+//  · Voice comes from the scenario cast map — the caller cannot choose it.
+//  · Per-session rate cap. Audio is streamed and never persisted.
+const SPEECH_MAX_CHARS = 600
+const speechBudget = new Map() // sessionId -> { count, resetAt }
+function takeSpeechToken(sessionId) {
+  const now = Date.now()
+  const cur = speechBudget.get(sessionId)
+  if (!cur || now > cur.resetAt) {
+    speechBudget.set(sessionId, { count: 1, resetAt: now + 45 * 60 * 1000 })
+    return true
+  }
+  cur.count += 1
+  return cur.count <= 150 // ≈ 3 lines × ~30 turns + generous retries
+}
+
+router.post('/speech', async (req, res) => {
+  if (!isTtsEnabled()) return res.status(404).json({ error: 'Not enabled' })
+  const { sessionId, text, speaker } = req.body || {}
+  if (!sessionId || !text || !speaker) {
+    return res.status(400).json({ error: 'sessionId, speaker and text required' })
+  }
+  if (String(text).length > SPEECH_MAX_CHARS) {
+    return res.status(413).json({ error: 'Line too long to synthesize' })
+  }
+  if (!takeSpeechToken(sessionId)) {
+    return res.status(429).json({ error: 'Speech budget exhausted for this session' })
+  }
+  try {
+    const session = await getSession(sessionId)
+    if (!session) return res.status(404).json({ error: 'Session not found' })
+
+    // The requested line must be something the avatar actually said here.
+    const spoken = new Set()
+    for (const m of session.history || []) {
+      if (m.role !== 'assistant') continue
+      try {
+        for (const msg of JSON.parse(m.content)?.messages || []) {
+          if (msg?.content) spoken.add(`${msg.speaker}\u0000${msg.content}`)
+        }
+      } catch {
+        /* non-JSON assistant content — skip */
+      }
+    }
+    if (!spoken.has(`${speaker}\u0000${text}`)) {
+      return res.status(422).json({ error: 'That line is not part of this conversation' })
+    }
+
+    // Voice comes from the frozen cast map — never from the request.
+    const scenario = SCENARIOS.find((s) => s.id === session.scenarioId)
+    const participant = scenario?.participants?.find((p) => p.name === speaker)
+    const voice = participant?.tts?.azureVoice || 'en-IN-NeerjaNeural'
+
+    const audio = await synthesizeSpeech(text, voice)
+    res.type('audio/mpeg').send(audio)
+  } catch (err) {
+    logger.captureException(err, { msg: 'assessment_speech_failed', requestId: req.requestId })
+    res.status(502).json({ error: 'Speech synthesis failed' })
+  }
+})
+
 // ── GET /api/assessment/languages ──────────────────────────────────────
 // Track 4.1: the language selector's source of truth. Only meaningful when
 // PRISM_LANG is on; the client hides the selector otherwise.
@@ -1346,7 +1421,7 @@ router.post('/transcribe', audioUpload.single('audio'), async (req, res) => {
 router.post('/event', async (req, res) => {
   const { sessionId, type, meta } = req.body || {}
   if (!sessionId || !type) return res.status(400).json({ error: 'sessionId and type required' })
-  const allowed = ['tab_switch', 'screenshot_attempt', 'fullscreen_exit', 'paste', 'room_scan_complete', 'face_absent', 'multiple_faces', 'looking_away']
+  const allowed = ['tab_switch', 'screenshot_attempt', 'fullscreen_exit', 'paste', 'room_scan_complete', 'face_absent', 'multiple_faces', 'looking_away', 'display_mode', 'app_blur']
   if (!allowed.includes(type)) return res.status(400).json({ error: 'Unknown event type' })
   try {
     // Auth (audit C9): proctor integrity events are score-adjacent evidence —

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Maskable variant: full-bleed background + brand mark inside the 80% safe zone -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F6DD8B"/>
+      <stop offset="45%" stop-color="#E3B84E"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </linearGradient>
+    <linearGradient id="gd" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D9A93C"/>
+      <stop offset="100%" stop-color="#9A6E0A"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" fill="#0F1A3C"/>
+  <g transform="translate(32 32) scale(0.72) translate(-32 -32)">
+    <rect x="29" y="9" width="26" height="36" rx="4" fill="url(#g)"/>
+    <g stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity="0.55">
+      <line x1="35" y1="18" x2="49" y2="18"/>
+      <line x1="35" y1="24" x2="49" y2="24"/>
+      <line x1="35" y1="30" x2="46" y2="30"/>
+    </g>
+    <rect x="13" y="15" width="26" height="36" rx="4" fill="#FFFFFF" stroke="url(#g)" stroke-width="2.4"/>
+    <g stroke="url(#g)" stroke-width="2" stroke-linecap="round">
+      <line x1="18" y1="24" x2="34" y2="24"/>
+      <line x1="18" y1="30" x2="34" y2="30"/>
+      <line x1="18" y1="36" x2="30" y2="36"/>
+    </g>
+    <path d="M18 47 L13 61 L19 57 L22 62 L25 49 Z" fill="url(#gd)"/>
+    <path d="M32 47 L37 61 L31 57 L28 62 L25 49 Z" fill="url(#gd)"/>
+    <g transform="translate(25 45)">
+      <rect x="-9" y="-9" width="18" height="18" rx="3" fill="url(#g)"/>
+      <rect x="-9" y="-9" width="18" height="18" rx="3" fill="url(#g)" transform="rotate(45)"/>
+      <circle r="8.5" fill="url(#g)"/>
+      <circle r="6.2" fill="none" stroke="#fff" stroke-width="1.1" opacity="0.7"/>
+    </g>
+  </g>
+</svg>
