@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShieldCheck, Loader2 } from 'lucide-react'
-import { login, register } from '../lib/session.js'
+import { login, register, isAuthenticated } from '../lib/session.js'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional']
@@ -35,6 +35,13 @@ export default function Auth() {
 
   // Reset error when switching tabs
   useEffect(() => setError(null), [pathname])
+
+  // Already signed in? There is nothing to do here — continue into the
+  // funnel instead of asking the user to log in again (every "Get Assessed"
+  // entry point funnels through this guard).
+  useEffect(() => {
+    if (isAuthenticated()) navigate('/payment', { replace: true })
+  }, [navigate])
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 

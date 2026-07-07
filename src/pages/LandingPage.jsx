@@ -11,6 +11,7 @@ import Pricing from '../components/Pricing.jsx'
 import FAQ from '../components/FAQ.jsx'
 import CTABanner from '../components/CTABanner.jsx'
 import Footer from '../components/Footer.jsx'
+import { isAuthenticated } from '../lib/session.js'
 
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -29,7 +30,8 @@ export default function LandingPage() {
 
   const handleGetAssessed = useCallback(() => {
     // Enter the funnel: account → payment → briefing → assessment.
-    navigate('/register')
+    // Already signed in? Skip straight to checkout — never back to login.
+    navigate(isAuthenticated() ? '/payment' : '/register')
   }, [navigate])
 
   const handleContactSales = () => {

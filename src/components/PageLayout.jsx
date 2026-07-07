@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Nav from './Nav.jsx'
 import Footer from './Footer.jsx'
+import { isAuthenticated } from '../lib/session.js'
 
 // Shared shell for the marketing / research / about pages.
 // Renders the fixed Nav, the page content, and the Footer.
@@ -9,7 +10,8 @@ export default function PageLayout({ children }) {
   const navigate = useNavigate()
 
   const handleGetAssessed = useCallback(() => {
-    navigate('/register')
+    // Signed-in users go straight to checkout; new visitors register first.
+    navigate(isAuthenticated() ? '/payment' : '/register')
   }, [navigate])
 
   return (
