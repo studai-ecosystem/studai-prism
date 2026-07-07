@@ -7,13 +7,27 @@
 // empty registry it renders the standing claim and designed pending copy,
 // never a number.
 
-import { ArrowRight, ShieldCheck } from 'lucide-react'
+import { ArrowRight, ShieldCheck, ChevronDown } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
 import '../design/tokens.css'
 import { EvidenceThread, EvidenceTick, evidenceThreadStyles } from './ui/EvidenceThread.jsx'
 import { useClaims } from './ui/measurement.jsx'
 
+// Assembly choreography: the sample card builds itself — label, claim+thread,
+// then the ticks stamp in — so the first thing a visitor SEES is the product
+// assembling evidence. Reduced motion renders everything instantly (LAW 4).
+const cardStagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.22, delayChildren: 0.3 } },
+}
+const pieceIn = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45 } },
+}
+
 export default function HeroThesis({ onGetAssessed, onSeeHow }) {
   const claims = useClaims()
+  const reduced = useReducedMotion()
   const assessed = claims?.stats?.assessedRealSessions
 
   return (
@@ -95,8 +109,11 @@ export default function HeroThesis({ onGetAssessed, onSeeHow }) {
           </div>
 
           {/* The fragment — the evidence thread above the fold, sample-labeled */}
-          <div
+          <motion.div
             aria-label="Sample of a scored moment"
+            variants={reduced ? undefined : cardStagger}
+            initial={reduced ? false : 'hidden'}
+            animate="show"
             style={{
               background: 'var(--color-surface)',
               border: '1px solid var(--color-line)',
@@ -115,22 +132,38 @@ export default function HeroThesis({ onGetAssessed, onSeeHow }) {
             }}>
               Sample
             </span>
-            <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 'var(--space-4)' }}>
+            <motion.p variants={reduced ? undefined : pieceIn} style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 'var(--space-4)' }}>
               How a Prism score is built
-            </p>
-            <EvidenceThread
-              id="hero-sample"
-              claim={<span style={{ fontSize: 'var(--text-xl)', fontVariantNumeric: 'tabular-nums' }}>Critical thinking · 74</span>}
-              sourceLabel="Evidence · turn 3 of the conversation"
-              source={<>“Before we decide, what did usage actually look like last term? If the data
-                says students stopped coming, that changes my answer completely.”</>}
-            />
-            <div style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--color-line)', display: 'grid', gap: 'var(--space-2)' }}>
+            </motion.p>
+            <motion.div variants={reduced ? undefined : pieceIn}>
+              <EvidenceThread
+                id="hero-sample"
+                claim={<span style={{ fontSize: 'var(--text-xl)', fontVariantNumeric: 'tabular-nums' }}>Critical thinking · 74</span>}
+                sourceLabel="Evidence · turn 3 of the conversation"
+                source={<>“Before we decide, what did usage actually look like last term? If the data
+                  says students stopped coming, that changes my answer completely.”</>}
+              />
+            </motion.div>
+            <motion.div variants={reduced ? undefined : pieceIn} style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--color-line)', display: 'grid', gap: 'var(--space-2)' }}>
               <EvidenceTick>scored by a panel of AI evaluators — median vote</EvidenceTick>
               <EvidenceTick>every dimension carries its own evidence quote</EvidenceTick>
               <EvidenceTick>verifiable by any employer at its public link</EvidenceTick>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
+        </div>
+
+        {/* Scroll cue — the story continues below */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 'var(--space-12)' }}>
+          <motion.button
+            onClick={onSeeHow}
+            aria-label="Scroll to how it works"
+            animate={reduced ? undefined : { y: [0, 6, 0] }}
+            transition={reduced ? undefined : { duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase' }}
+          >
+            the story
+            <ChevronDown size={16} aria-hidden="true" />
+          </motion.button>
         </div>
       </div>
     </section>

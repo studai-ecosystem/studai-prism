@@ -3,13 +3,16 @@ import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import Nav from '../components/Nav.jsx'
 import HeroThesis from '../components/HeroThesis.jsx'
 import { ClaimsProvider } from '../components/ui/measurement.jsx'
-import HowItWorks from '../components/HowItWorks.jsx'
-import Dimensions from '../components/Dimensions.jsx'
-import ScoreSection from '../components/ScoreSection.jsx'
-import WhoItsFor from '../components/WhoItsFor.jsx'
+import StoryProblem from '../components/story/StoryProblem.jsx'
+import StoryRoom from '../components/story/StoryRoom.jsx'
+import StoryPanel from '../components/story/StoryPanel.jsx'
+import StoryThread from '../components/story/StoryThread.jsx'
+import StoryDimensions from '../components/story/StoryDimensions.jsx'
+import StoryCredential from '../components/story/StoryCredential.jsx'
+import StoryHonesty from '../components/story/StoryHonesty.jsx'
+import StoryPaths from '../components/story/StoryPaths.jsx'
 import Pricing from '../components/Pricing.jsx'
 import FAQ from '../components/FAQ.jsx'
-import CTABanner from '../components/CTABanner.jsx'
 import Footer from '../components/Footer.jsx'
 import AppHandoffModal, { useAppHandoff } from '../components/AppHandoff.jsx'
 import { isAuthenticated } from '../lib/session.js'
@@ -50,18 +53,22 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="bg-white min-h-screen overflow-x-hidden">
+    <main className="bg-[var(--color-paper)] min-h-screen overflow-x-hidden">
       <Nav onGetAssessed={handleGetAssessed} />
       <ClaimsProvider>
         <HeroThesis onGetAssessed={handleGetAssessed} onSeeHow={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} />
+        {/* The story — nine acts, scroll as time. Anchor ids keep the nav honest. */}
+        <StoryProblem />
+        <StoryRoom />
+        <div id="how-it-works"><StoryPanel /></div>
+        <StoryThread />
+        <div id="dimensions"><StoryDimensions /></div>
+        <StoryCredential />
+        <StoryHonesty />
+        <div id="who-its-for"><StoryPaths onGetAssessed={handleGetAssessed} /></div>
       </ClaimsProvider>
-      <HowItWorks />
-      <Dimensions />
-      <ScoreSection />
-      <WhoItsFor />
       <Pricing onGetAssessed={handleGetAssessed} onContactSales={handleContactSales} />
       <FAQ />
-      <CTABanner onGetAssessed={handleGetAssessed} />
       <Footer />
       <AppHandoffModal open={handoffOpen} onClose={closeHandoff} onContinueInBrowser={enterFunnel} />
     </main>
