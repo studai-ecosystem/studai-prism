@@ -56,7 +56,9 @@ export default function Briefing() {
   // frame. Offer it quietly when the browser says it's possible.
   const [installable, setInstallable] = useState(() => Boolean(window.__prismInstallPrompt))
   const [standalone] = useState(() =>
-    window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true)
+    window.matchMedia?.('(display-mode: standalone)')?.matches ||
+    window.navigator.standalone === true ||
+    /PrismShell/.test(window.navigator.userAgent || ''))
   useEffect(() => {
     const onInstallable = () => setInstallable(true)
     window.addEventListener('prism-installable', onInstallable)

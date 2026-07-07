@@ -1,0 +1,14 @@
+{
+  "name": "prism-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Prism assessment shell — a dedicated exam window for proctored centers",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icon": "tauri icon icons/source.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

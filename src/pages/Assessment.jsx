@@ -337,9 +337,12 @@ export default function Assessment() {
   const speakCancelRef = useRef(null)
   // The exam frame, honestly reported: standalone app window vs browser tab,
   // and whether the Keyboard Lock API is holding Esc/Alt+Tab inside fullscreen.
+  // The desktop shell (Tauri) announces itself via a PrismShell user agent.
   const [standalone] = useState(() =>
     typeof window !== 'undefined' &&
-    (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true))
+    (window.matchMedia?.('(display-mode: standalone)')?.matches ||
+      window.navigator.standalone === true ||
+      /PrismShell/.test(window.navigator.userAgent || '')))
   const [keysLocked, setKeysLocked] = useState(false)
   // Live face-proctoring (laptop webcam). Transient banner shown on a violation.
   const [faceWarning, setFaceWarning] = useState(null)
