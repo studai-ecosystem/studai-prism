@@ -743,6 +743,12 @@ export default function Assessment() {
     return () => {
       document.removeEventListener('fullscreenchange', handleFSChange)
       try { navigator.keyboard?.unlock?.() } catch { /* ignore */ }
+      // Fullscreen belongs to the assessment ONLY: leaving the room (submit →
+      // report, or any unmount) returns to a normal window — in the desktop
+      // shell this drops the window back out of fullscreen too.
+      if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch(() => {})
+      }
     }
   }, [phase])
 

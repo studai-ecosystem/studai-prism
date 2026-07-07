@@ -11,12 +11,16 @@
       {
         "title": "Prism Assessment",
         "url": "https://prism.studai.one/app",
-        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PrismShell/1.0",
-        "fullscreen": true,
-        "decorations": false,
-        "alwaysOnTop": true,
-        "resizable": false,
-        "maximized": true,
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PrismShell/1.1",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 640,
+        "center": true,
+        "fullscreen": false,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "resizable": true,
         "zoomHotkeysEnabled": false
       }
     ],

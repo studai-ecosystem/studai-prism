@@ -106,8 +106,10 @@ export default function AppHandoffModal({ open, onClose, onContinueInBrowser }) 
         </div>
 
         <p className="mt-4 font-mono text-[10px] text-[var(--color-ink-muted)] leading-relaxed">
-          The Windows installer is not yet code-signed — SmartScreen may ask you to
-          confirm ("More info → Run anyway").
+          New installer, building its reputation: Windows may show a publisher
+          notice on first run — choose "More info → Run anyway". Publisher
+          verification (code signing) is in progress; the download always comes
+          only from prism.studai.one.
         </p>
       </div>
     </div>
