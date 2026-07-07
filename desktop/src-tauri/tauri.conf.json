@@ -10,7 +10,7 @@
     "windows": [
       {
         "title": "Prism Assessment",
-        "url": "https://prism.studai.one/",
+        "url": "https://prism.studai.one/app",
         "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PrismShell/1.0",
         "fullscreen": true,
         "decorations": false,
@@ -23,6 +23,13 @@
     "security": {
       "csp": null,
       "dangerousDisableAssetCspModification": false
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["prism"]
+      }
     }
   },
   "bundle": {

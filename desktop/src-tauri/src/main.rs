@@ -19,8 +19,13 @@
 
 fn main() {
     tauri::Builder::default()
-        // Second launches focus the existing exam window instead of opening a
-        // parallel one (two rooms in one sitting would be an integrity mess).
+        // prism:// deep link — lets the website's "Open the Prism app" button
+        // start or focus the installed shell. The scheme is registered by the
+        // installer; launches simply bring up the launcher (no payload logic).
+        .plugin(tauri_plugin_deep_link::init())
+        // Second launches (including deep links) focus the existing exam
+        // window instead of opening a parallel one (two rooms in one sitting
+        // would be an integrity mess).
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             use tauri::Manager;
             if let Some(window) = app.get_webview_window("main") {

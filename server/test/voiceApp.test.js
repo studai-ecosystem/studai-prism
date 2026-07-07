@@ -101,6 +101,40 @@ test('APP: display_mode and app_blur are accepted event types; junk still reject
   }
 })
 
+// ── the app launcher's licence check ─────────────────────────────────────────
+
+test('APP: /api/payment/licence requires auth and reports honest store facts', async () => {
+  const unauth = await fetch(`${base}/api/payment/licence`)
+  assert.equal(unauth.status, 401, 'licence status is never public')
+
+  // Register a user, then check the empty-state licence shape.
+  const email = `licence-${Date.now()}@example.com`
+  const reg = await fetch(`${base}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Licence Test', email, college: 'QA', year: 'Graduated', password: 'licence-pass-1!' }),
+  })
+  assert.equal(reg.status, 201, 'registration works in the test store')
+  const { token } = await reg.json()
+
+  const res = await fetch(`${base}/api/payment/licence`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  assert.equal(res.status, 200)
+  const lic = await res.json()
+  assert.equal(lic.email, email)
+  assert.equal(lic.completed, 0, 'no invented history')
+  assert.equal(lic.pendingSessionId, null, 'no invented pending session')
+  assert.equal(typeof lic.canPurchase, 'boolean')
+  assert.ok(['dummy', 'paid'].includes(lic.mode))
+})
+
+test('APP: the Windows installer is published at /download', async () => {
+  const { stat } = await import('node:fs/promises')
+  const s = await stat(join(__dirname, '..', '..', 'public', 'download', 'Prism-Assessment-Setup.exe'))
+  assert.ok(s.size > 500_000, 'installer present and non-trivial')
+})
+
 // ── cast metadata ────────────────────────────────────────────────────────────
 
 test('VOICE: every ACTIVE scenario participant carries tts metadata (gender + azure voice)', () => {

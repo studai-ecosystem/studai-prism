@@ -1,9 +1,11 @@
 import { Router } from 'express'
 import Razorpay from 'razorpay'
 import crypto from 'node:crypto'
+import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
 import logger from '../lib/logger.js'
-import { createEntitlement } from '../lib/store.js'
+import { createEntitlement, getReportsByUser, getSessionIdsByUser, getReport, getSession } from '../lib/store.js'
+import { getJwtSecret } from '../lib/security.js'
 
 const router = Router()
 
@@ -147,6 +149,63 @@ router.post('/dev-session', async (req, res) => {
   await createEntitlement({ sessionId, mode, amount: 0 })
   logger.info('payment_session_minted', { sessionId, mode, requestId: req.requestId })
   res.json({ sessionId })
+})
+
+// ── GET /api/payment/licence ───────────────────────────────────────────────────
+// The app launcher's licence check: is this signed-in candidate resuming an
+// in-progress assessment, starting fresh, or in need of a purchase? Honest
+// facts only — everything comes from the store, nothing is invented:
+//   · pendingSessionId = a session they started but never completed (resume)
+//   · completed        = number of finished assessments (their history)
+//   · canPurchase      = whether checkout can mint a new session right now
+function getAuthUser(req) {
+  const header = req.headers.authorization || ''
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null
+  if (!token) return null
+  try {
+    const payload = jwt.verify(token, getJwtSecret())
+    return { id: payload.sub, email: payload.email }
+  } catch {
+    return null
+  }
+}
+
+router.get('/licence', async (req, res) => {
+  const authUser = getAuthUser(req)
+  if (!authUser) return res.status(401).json({ error: 'Not authenticated.' })
+  try {
+    const [reports, sessionIds] = await Promise.all([
+      getReportsByUser(authUser.id),
+      getSessionIdsByUser(authUser.id),
+    ])
+    const reported = new Set((reports || []).map((r) => r.sessionId).filter(Boolean))
+    // A pending licence = a session of theirs with no report yet (minted at
+    // payment, not yet scored) — the launcher offers to resume it.
+    let pendingSessionId = null
+    for (const sid of sessionIds || []) {
+      if (reported.has(sid)) continue
+      const report = await getReport(sid)
+      if (report) continue
+      const session = await getSession(sid)
+      if (session) {
+        pendingSessionId = sid
+        break
+      }
+    }
+    res.json({
+      email: authUser.email,
+      completed: (reports || []).length,
+      pendingSessionId,
+      canPurchase:
+        isDummyPayments() ||
+        Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) ||
+        process.env.NODE_ENV !== 'production',
+      mode: isDummyPayments() ? 'dummy' : 'paid',
+    })
+  } catch (err) {
+    logger.captureException(err, { msg: 'payment_licence_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Could not check the licence.' })
+  }
 })
 
 export default router

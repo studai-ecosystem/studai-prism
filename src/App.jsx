@@ -14,6 +14,7 @@ import Verify from './pages/Verify.jsx'
 import Profile from './pages/Profile.jsx'
 import RaterWorkbench from './pages/RaterWorkbench.jsx'
 import Admin from './pages/Admin.jsx'
+import ShellHome from './pages/ShellHome.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
 import AIEvaluation from './pages/research/AIEvaluation.jsx'
@@ -57,6 +58,8 @@ export default function App() {
       <Route path="/design-system" element={<DesignSystem />} />
       {/* Part F — pilot cockpit (admin-token gated in-page, read-only). */}
       <Route path="/admin" element={<Admin />} />
+      {/* The app launcher — what the desktop shell / installed PWA opens into. */}
+      <Route path="/app" element={<ShellHome />} />
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Auth />} />
       <Route path="/register" element={<Auth />} />
