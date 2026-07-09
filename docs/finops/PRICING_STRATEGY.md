@@ -49,18 +49,3 @@ Seat-price COGS check: worst plan ($2.50/seat Enterprise) vs worst COGS ($0.56) 
 | Practice snippet (future) | nano/mini, 2 turns | — | — | — |
 | Dual-scorer research channel | Internal only — never a sellable tier until Phase 2 agreement gate passes | | | |
 
-## 5. Portfolio frame — the other StudAI products
-
-**Honesty note (per audit rules):** Engage, BOS, Hire, Loop, Career, Creator and Training Programs have **no codebase in this repository** — nothing below is an audit; it is a pricing *template* to be re-grounded per product with this same method (measure token budgets → price meters → per-action COGS → plan limits).
-
-| Product | Likely billing atom (to verify in its repo) | Template model |
-| --- | --- | --- |
-| StudAI Engage | conversation / resolved thread | per-seat SaaS + metered conversations |
-| StudAI BOS | workflow run | platform fee + per-run |
-| StudAI Hire | candidate screened | per-candidate credits (natural Prism bundle: Hire seat includes Prism assessments at internal transfer price $0.35) |
-| StudAI Loop | learner-month | per-active-learner |
-| StudAI Career | roadmap/session | freemium + one-time reports |
-| StudAI Creator | generation job | credit packs (image/video COGS must be measured — 10–100× LLM text costs) |
-| Training Programs | cohort seat | course pricing; Prism attached as the assessment layer at bundle price |
-
-Cross-sell law: any StudAI product may resell a Prism assessment at internal COGS + $1 floor; the certificate is the ecosystem's trust anchor.
