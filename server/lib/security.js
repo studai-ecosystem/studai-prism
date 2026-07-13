@@ -86,3 +86,11 @@ export const sendReportLimiter = rateLimit({ ...baseOptions, windowMs: 10 * 60 *
 
 // Broad safety net across the whole API surface.
 export const apiLimiter = rateLimit({ ...baseOptions, windowMs: 60 * 1000, limit: 300 })
+
+// ── Admin Control Centre limiters ────────────────────────────────────────────
+// Credential endpoints for ADMINISTRATORS: tighter than the candidate authLimiter
+// window because admin brute force is a higher-value target (plan §8).
+export const adminAuthLimiter = rateLimit({ ...baseOptions, windowMs: 60 * 1000, limit: 5 })
+
+// Authenticated admin plane: generous for console use, hostile to scraping.
+export const adminApiLimiter = rateLimit({ ...baseOptions, windowMs: 60 * 1000, limit: 120 })

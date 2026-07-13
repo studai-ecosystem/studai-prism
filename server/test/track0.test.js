@@ -128,10 +128,12 @@ test('T0 gate: research tables define no PII columns and never reference user_id
   for (const file of files) {
     const sql = await readFile(join(dir, file), 'utf-8')
     // Walk every CREATE TABLE block; v1_* tables are the identity/PII store
-    // and are exempt by design.
+    // and are exempt by design. admin_* tables (migration 0011) are the
+    // ADMINISTRATOR identity plane — operator emails/password hashes, zero
+    // candidate data — exempt for the same reason.
     const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)]
     for (const [, name, body] of tables) {
-      if (name.startsWith('v1_')) continue
+      if (name.startsWith('v1_') || name.startsWith('admin_')) continue
       for (const line of body.split('\n')) {
         assert.ok(
           !FORBIDDEN.test(line),

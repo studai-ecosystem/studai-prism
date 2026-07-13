@@ -60,8 +60,16 @@ test('migration up creates Part C tables, telemetry inserts, down drops them', {
   const al = await query('SELECT count(*)::int AS n FROM audit_log WHERE session_id=$1', [sessionId])
   assert.equal(al.rows[0].n, 1)
 
-  // Down removes the v2 tables.
-  await migrateDown()
+  // Down removes the v2 tables. migrateDown rolls back ONE migration per call
+  // (the most recent), so walk all the way down — this validates every
+  // .down.sql in the chain, not just the newest one.
+  let steps = 0
+  while (steps < 50) {
+    const rolled = await migrateDown()
+    if (!rolled) break
+    steps++
+  }
+  assert.ok(steps > 0, 'at least one migration rolled back')
   const after = await query(
     `SELECT table_name FROM information_schema.tables
      WHERE table_schema='public' AND table_name='items'`,

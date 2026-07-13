@@ -14,6 +14,10 @@ import Verify from './pages/Verify.jsx'
 import Profile from './pages/Profile.jsx'
 import RaterWorkbench from './pages/RaterWorkbench.jsx'
 import Admin from './pages/Admin.jsx'
+import AdminLogin from './pages/admin/AdminLogin.jsx'
+import AdminShell from './pages/admin/AdminShell.jsx'
+import AdminDashboard from './pages/admin/AdminDashboard.jsx'
+import AdminAdmins from './pages/admin/AdminAdmins.jsx'
 import ShellHome from './pages/ShellHome.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
@@ -56,8 +60,15 @@ export default function App() {
       <Route path="/about/careers" element={<Careers />} />
       {/* Internal living style guide (Part A) — admin-token gated in-page. */}
       <Route path="/design-system" element={<DesignSystem />} />
-      {/* Part F — pilot cockpit (admin-token gated in-page, read-only). */}
-      <Route path="/admin" element={<Admin />} />
+      {/* Control Centre — database-backed admin identities + MFA + RBAC.
+          Dark server-side unless PRISM_ADMIN_CONSOLE=true. */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin" element={<AdminShell />}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="admins" element={<AdminAdmins />} />
+      </Route>
+      {/* Legacy pilot cockpit (read-only, x-admin-token) — retires in Phase 6. */}
+      <Route path="/admin/legacy-ops" element={<Admin />} />
       {/* The app launcher — what the desktop shell / installed PWA opens into. */}
       <Route path="/app" element={<ShellHome />} />
       <Route path="/" element={<LandingPage />} />

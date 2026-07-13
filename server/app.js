@@ -22,6 +22,7 @@ import replayRouter from './routes/replay.js'
 import teamfitRouter from './routes/teamfit.js'
 import pilotRouter from './routes/pilot.js'
 import evidenceRouter from './routes/evidence.js'
+import adminRouter from './routes/admin/index.js'
 import { checkModelDriftAtBoot } from './lib/modelDrift.js'
 import {
   isProduction,
@@ -136,6 +137,9 @@ export function buildApp() {
   app.use('/api/pilot', pilotRouter)
   // Phase 3 Stage 4.3: public evidence surfaces (registry-rendered, ceiling-safe).
   app.use('/api/evidence', evidenceRouter)
+  // Super Admin & Product Control Centre (dark: 404 unless PRISM_ADMIN_CONSOLE=true).
+  // Database-backed admin identities + MFA + RBAC; audited mutations only.
+  app.use('/api/admin', adminRouter)
   // Phase 3 Stage 6.1: surface judge-model drift loudly at boot.
   checkModelDriftAtBoot()
 

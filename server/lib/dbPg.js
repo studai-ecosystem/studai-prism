@@ -77,3 +77,9 @@ export function publicUser(user) {
   const { id, email, name, college, year, createdAt } = user
   return { id, email, name, college, year, createdAt }
 }
+
+// Admin Control Centre: aggregate counts only (no records leave the store).
+export async function countUsers() {
+  const r = await query('SELECT COUNT(*) FROM v1_users')
+  return Number(r?.rows?.[0]?.count || 0)
+}
