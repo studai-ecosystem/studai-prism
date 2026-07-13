@@ -55,11 +55,19 @@ const NAV = [
     group: 'Research',
     items: [
       { to: '/admin/studies', label: 'Studies', icon: FlaskConical, permission: 'studies:read' },
+      { to: '/admin/exports', label: 'Research exports', icon: FlaskConical, permission: 'exports:create' },
     ],
   },
   {
     group: 'Credentials',
-    items: [{ label: 'Issued credentials', icon: Award, planned: 'Phase 4' }],
+    items: [{ to: '/admin/credentials', label: 'Issued credentials', icon: Award, permission: 'credentials:read' }],
+  },
+  {
+    group: 'Team simulation',
+    items: [
+      { to: '/admin/teamfit', label: 'Teams & sessions', icon: Users, permission: 'teamfit:read' },
+      { to: '/admin/replays', label: 'Practice replays', icon: ClipboardList, permission: 'replays:read' },
+    ],
   },
   {
     group: 'System',

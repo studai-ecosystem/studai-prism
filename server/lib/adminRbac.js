@@ -84,6 +84,7 @@ export const PERMISSIONS = {
 
   // Team simulation & replay
   'replays:read': 'View practice replays',
+  'replays:flag': 'Flag a practice replay for abuse review',
   'teamfit:read': 'View teams and team-fit sessions',
   'teamfit:manage': 'Create/archive teams, manage consented members',
 
@@ -133,6 +134,7 @@ export const ROLES = {
       'sessions:read', 'sessions:review', 'reports:read', 'reports:resend', 'reports:hold', 'reports:supersede',
       'disputes:read', 'disputes:manage', 'consents:read', 'verifications:read',
       'integrity:read', 'payments:read', 'content:read', 'flags:read', 'system:read',
+      'credentials:read', 'replays:read', 'replays:flag', 'teamfit:read', 'teamfit:manage',
       'exports:create', 'notes:write',
     ],
   },
@@ -142,7 +144,9 @@ export const ROLES = {
     permissions: [
       'dashboard:read', 'users:read', 'sessions:read', 'sessions:review', 'sessions:invalidate',
       'reports:read', 'reports:resend', 'reports:hold', 'disputes:read', 'disputes:manage',
-      'consents:read', 'verifications:read', 'integrity:read', 'integrity:review', 'notes:write',
+      'consents:read', 'verifications:read', 'integrity:read', 'integrity:review',
+      'credentials:read', 'replays:read', 'replays:flag', 'teamfit:read', 'teamfit:manage',
+      'notes:write',
     ],
   },
   psychometric_admin: {
@@ -160,7 +164,7 @@ export const ROLES = {
     description: 'Studies, cohorts, computation, research exports. Assignments and history immutable.',
     permissions: [
       'dashboard:read', 'studies:read', 'studies:manage', 'studies:compute',
-      'sessions:read', 'replays:read', 'exports:create', 'notes:write',
+      'sessions:read', 'replays:read', 'teamfit:read', 'exports:create', 'notes:write',
     ],
   },
   rater_manager: {

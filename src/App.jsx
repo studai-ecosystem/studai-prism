@@ -32,6 +32,10 @@ import AdminRaters from './pages/admin/AdminRaters.jsx'
 import AdminStudies from './pages/admin/AdminStudies.jsx'
 import AdminPrompts from './pages/admin/AdminPrompts.jsx'
 import AdminPsychometrics from './pages/admin/AdminPsychometrics.jsx'
+import AdminCredentials from './pages/admin/AdminCredentials.jsx'
+import AdminReplays from './pages/admin/AdminReplays.jsx'
+import AdminTeamfit from './pages/admin/AdminTeamfit.jsx'
+import AdminExports from './pages/admin/AdminExports.jsx'
 import ShellHome from './pages/ShellHome.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
@@ -98,6 +102,10 @@ export default function App() {
         <Route path="studies" element={<AdminStudies />} />
         <Route path="prompts" element={<AdminPrompts />} />
         <Route path="psychometrics" element={<AdminPsychometrics />} />
+        <Route path="credentials" element={<AdminCredentials />} />
+        <Route path="replays" element={<AdminReplays />} />
+        <Route path="teamfit" element={<AdminTeamfit />} />
+        <Route path="exports" element={<AdminExports />} />
       </Route>
       {/* Legacy pilot cockpit (read-only, x-admin-token) — retires in Phase 6. */}
       <Route path="/admin/legacy-ops" element={<Admin />} />

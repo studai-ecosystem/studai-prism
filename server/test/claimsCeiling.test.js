@@ -70,6 +70,11 @@ test('CLAIMS CEILING: no public surface carries a claim above the registry-backe
     // RaterWorkbench is the token-gated internal rating tool — an operator
     // surface (it must show κ to raters), not a public/buyer surface.
     if (f.includes('RaterWorkbench')) continue
+    // The admin Control Centre (src/pages/admin, MFA + RBAC gated, dark in
+    // production without PRISM_ADMIN_CONSOLE) is likewise an operator surface:
+    // it must NAME certified artifacts and dark features to administer them.
+    // Candidates/employers/buyers can never render these pages.
+    if (/[\\/]pages[\\/]admin[\\/]/.test(f)) continue
     const text = visibleText(await readFile(f, 'utf-8'), f)
     for (const [rx, unlock] of BANNED_CLAIMS) {
       const m = text.match(rx)
@@ -91,6 +96,11 @@ test('CLAIMS CEILING: dark features have zero public marketing copy', async () =
     // The briefing language selector is server-gated (renders only when
     // PRISM_LANG serves options) — that is a feature surface, not marketing.
     if (f.includes('Briefing.jsx')) continue
+    // Operator surfaces (see above): the admin console administers dark
+    // features and so must name them; App.jsx carries its route IDENTIFIERS
+    // (e.g. AdminTeamfit) — code, not marketing copy. Public pages stay fully
+    // scanned.
+    if (/[\\/]pages[\\/]admin[\\/]/.test(f) || f.endsWith('App.jsx')) continue
     const text = visibleText(await readFile(f, 'utf-8'), f)
     for (const rx of darkFeatures) {
       assert.ok(!rx.test(text), `dark-feature marketing in ${f}: ${rx}`)

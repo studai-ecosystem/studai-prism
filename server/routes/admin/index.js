@@ -36,6 +36,10 @@ import ratersRouter from './raters.js'
 import studiesRouter from './studies.js'
 import promptsRouter from './prompts.js'
 import psychometricsRouter from './psychometrics.js'
+import credentialsRouter from './credentials.js'
+import replaysRouter from './replays.js'
+import teamfitRouter from './teamfit.js'
+import exportsRouter from './exports.js'
 
 const router = Router()
 
@@ -102,5 +106,10 @@ router.use('/raters', ratersRouter)
 router.use('/studies', studiesRouter)
 router.use('/prompts', promptsRouter)
 router.use('/psychometrics', psychometricsRouter)
+// Phase 4 — credentials & advanced product administration.
+router.use('/credentials', credentialsRouter)
+router.use('/replays', replaysRouter)
+router.use('/teamfit', teamfitRouter)
+router.use('/exports', exportsRouter)
 
 export default router
