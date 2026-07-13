@@ -33,6 +33,14 @@ attachProctorSocket(server)
   .then((io) => { if (io) logger.info('proctor_socket_ready', { path: '/proctor-socket' }) })
   .catch((err) => logger.captureException(err, { msg: 'proctor_socket_failed' }))
 
+// Control Centre Phase 3: OPTIONAL prompt-registry runtime (default OFF —
+// prompts stay file-based). When PRISM_ADMIN_PROMPT_REGISTRY=true, prime the
+// engine prompt cache from the database's production versions at boot.
+import('./lib/promptRegistry.js')
+  .then(({ primePromptRegistry }) => primePromptRegistry())
+  .then((r) => { if (r?.enabled) logger.info('prompt_registry_runtime', r) })
+  .catch((err) => logger.captureException(err, { msg: 'prompt_registry_prime_failed' }))
+
 // Prism v2 (MASA-2) Phase 0: when telemetry is enabled (PRISM_V2_TELEMETRY +
 // DATABASE_URL), idempotently backfill the item bank so per-turn item_responses
 // can link to a probe item. No-op otherwise — v1 boots unchanged. Never fatal.

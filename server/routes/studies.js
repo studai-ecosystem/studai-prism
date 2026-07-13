@@ -161,7 +161,7 @@ router.get('/irr', requireAdmin, async (_req, res) => {
 // ── Rater: training flow (IRR gate) ──────────────────────────────────────────
 router.get('/rater/me', requireRater, async (req, res) => {
   const answered = await query('SELECT COUNT(*)::int AS n FROM rater_training_answers WHERE rater_id = $1', [req.rater.rater_id])
-  const total = await query('SELECT COUNT(*)::int AS n FROM rater_training_refs')
+  const total = await query(`SELECT COUNT(*)::int AS n FROM rater_training_refs WHERE status = 'active'`)
   res.json({
     handle: req.rater.handle,
     status: req.rater.status,
@@ -176,7 +176,8 @@ router.get('/rater/me', requireRater, async (req, res) => {
 router.get('/rater/training/next', requireRater, async (req, res) => {
   const r = await query(
     `SELECT ref_id, transcript, rubric_version FROM rater_training_refs
-      WHERE ref_id NOT IN (SELECT ref_id FROM rater_training_answers WHERE rater_id = $1)
+      WHERE status = 'active'
+        AND ref_id NOT IN (SELECT ref_id FROM rater_training_answers WHERE rater_id = $1)
       ORDER BY created_at LIMIT 1`,
     [req.rater.rater_id],
   )
@@ -194,13 +195,15 @@ router.post('/rater/training/:refId', requireRater, async (req, res) => {
       [randomUUID(), req.rater.rater_id, req.params.refId, JSON.stringify(levels)],
     )
     // When every training transcript is answered, evaluate the IRR gate.
+    // Retired/draft references are excluded from both the answer set and the
+    // total (Control Centre Phase 3 training-reference lifecycle).
     const rows = await query(
       `SELECT a.levels AS answer, t.reference_levels AS reference
          FROM rater_training_answers a JOIN rater_training_refs t ON t.ref_id = a.ref_id
-        WHERE a.rater_id = $1 ORDER BY t.created_at`,
+        WHERE a.rater_id = $1 AND t.status = 'active' ORDER BY t.created_at`,
       [req.rater.rater_id],
     )
-    const total = await query('SELECT COUNT(*)::int AS n FROM rater_training_refs')
+    const total = await query(`SELECT COUNT(*)::int AS n FROM rater_training_refs WHERE status = 'active'`)
     let gate = null
     if ((rows?.rows?.length || 0) >= (total?.rows?.[0]?.n || Infinity)) {
       gate = evaluateTrainingKappa(

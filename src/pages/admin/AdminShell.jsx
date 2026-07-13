@@ -22,7 +22,7 @@ const NAV = [
     items: [
       { to: '/admin/candidates', label: 'Candidates', icon: Users, permission: 'users:read' },
       { to: '/admin/admins', label: 'Administrators', icon: Users, permission: 'admins:read' },
-      { label: 'Raters', icon: Users, planned: 'Phase 3' },
+      { to: '/admin/raters', label: 'Raters', icon: Users, permission: 'raters:read' },
     ],
   },
   {
@@ -45,9 +45,16 @@ const NAV = [
   {
     group: 'Psychometrics',
     items: [
-      { label: 'Calibration runs', icon: FlaskConical, planned: 'Phase 3' },
-      { label: 'Scenario & item bank', icon: FlaskConical, planned: 'Phase 3' },
-      { label: 'Prompt registry', icon: FlaskConical, planned: 'Phase 3' },
+      { to: '/admin/psychometrics', label: 'Dashboards', icon: FlaskConical, permission: 'psychometrics:read' },
+      { to: '/admin/calibrations', label: 'Calibration runs', icon: FlaskConical, permission: 'calibrations:read' },
+      { to: '/admin/bank', label: 'Scenario & item bank', icon: FlaskConical, permission: 'scenarios:read' },
+      { to: '/admin/prompts', label: 'Prompt registry', icon: FlaskConical, permission: 'prompts:read' },
+    ],
+  },
+  {
+    group: 'Research',
+    items: [
+      { to: '/admin/studies', label: 'Studies', icon: FlaskConical, permission: 'studies:read' },
     ],
   },
   {

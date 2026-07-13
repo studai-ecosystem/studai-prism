@@ -26,6 +26,12 @@ import AdminReports, { AdminReportDetail } from './pages/admin/AdminReports.jsx'
 import AdminDisputes, { AdminDisputeDetail } from './pages/admin/AdminDisputes.jsx'
 import AdminPayments from './pages/admin/AdminPayments.jsx'
 import AdminRecords from './pages/admin/AdminRecords.jsx'
+import AdminBank from './pages/admin/AdminBank.jsx'
+import AdminCalibrations from './pages/admin/AdminCalibrations.jsx'
+import AdminRaters from './pages/admin/AdminRaters.jsx'
+import AdminStudies from './pages/admin/AdminStudies.jsx'
+import AdminPrompts from './pages/admin/AdminPrompts.jsx'
+import AdminPsychometrics from './pages/admin/AdminPsychometrics.jsx'
 import ShellHome from './pages/ShellHome.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
@@ -86,6 +92,12 @@ export default function App() {
         <Route path="consents" element={<AdminRecords mode="consents" />} />
         <Route path="verifications" element={<AdminRecords mode="verifications" />} />
         <Route path="integrity" element={<AdminRecords mode="integrity" />} />
+        <Route path="bank" element={<AdminBank />} />
+        <Route path="calibrations" element={<AdminCalibrations />} />
+        <Route path="raters" element={<AdminRaters />} />
+        <Route path="studies" element={<AdminStudies />} />
+        <Route path="prompts" element={<AdminPrompts />} />
+        <Route path="psychometrics" element={<AdminPsychometrics />} />
       </Route>
       {/* Legacy pilot cockpit (read-only, x-admin-token) — retires in Phase 6. */}
       <Route path="/admin/legacy-ops" element={<Admin />} />

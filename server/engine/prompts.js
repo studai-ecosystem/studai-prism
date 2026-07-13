@@ -17,6 +17,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const PROMPTS_DIR = join(__dirname, '..', 'prompts')
 const _cache = new Map()
 
+// Control Centre Phase 3: when PRISM_ADMIN_PROMPT_REGISTRY=true the registry
+// primes this cache from the database at boot (lib/promptRegistry.js). Entries
+// use the same keys as the file loader, so callers are unaffected. Flag off →
+// this is never called and prompts remain purely file-based (audit C15).
+export function primeCache(entries) {
+  for (const [key, value] of entries) _cache.set(key, value)
+}
+
 // 'avatar_system.v1' + 'hi' → 'avatar_system.hi.v1' (variant naming per spec:
 // {name}.{lang}.v{n}.md). English ('en', empty) → the base name unchanged.
 export function variantName(name, language) {

@@ -30,6 +30,12 @@ import disputesRouter from './disputes.js'
 import paymentsRouter from './payments.js'
 import recordsRouter from './records.js'
 import searchRouter from './search.js'
+import bankRouter from './bank.js'
+import calibrationsRouter from './calibrations.js'
+import ratersRouter from './raters.js'
+import studiesRouter from './studies.js'
+import promptsRouter from './prompts.js'
+import psychometricsRouter from './psychometrics.js'
 
 const router = Router()
 
@@ -89,5 +95,12 @@ router.use('/disputes', disputesRouter)
 router.use('/payments', paymentsRouter)
 router.use('/records', recordsRouter)
 router.use('/search', searchRouter)
+// Phase 3 — scientific administration.
+router.use('/bank', bankRouter)
+router.use('/calibrations', calibrationsRouter)
+router.use('/raters', ratersRouter)
+router.use('/studies', studiesRouter)
+router.use('/prompts', promptsRouter)
+router.use('/psychometrics', psychometricsRouter)
 
 export default router
