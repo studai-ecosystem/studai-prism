@@ -23,6 +23,13 @@ import logger from '../../lib/logger.js'
 import authRouter from './auth.js'
 import adminsRouter from './admins.js'
 import dashboardRouter from './dashboard.js'
+import usersRouter from './users.js'
+import sessionsRouter from './sessions.js'
+import reportsRouter from './reports.js'
+import disputesRouter from './disputes.js'
+import paymentsRouter from './payments.js'
+import recordsRouter from './records.js'
+import searchRouter from './search.js'
 
 const router = Router()
 
@@ -74,5 +81,13 @@ router.use((req, res, next) => {
 })
 router.use('/admins', adminsRouter)
 router.use('/dashboard', dashboardRouter)
+// Phase 2 — core product administration.
+router.use('/users', usersRouter)
+router.use('/sessions', sessionsRouter)
+router.use('/reports', reportsRouter)
+router.use('/disputes', disputesRouter)
+router.use('/payments', paymentsRouter)
+router.use('/records', recordsRouter)
+router.use('/search', searchRouter)
 
 export default router

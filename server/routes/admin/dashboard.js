@@ -9,6 +9,7 @@ import logger from '../../lib/logger.js'
 import { query } from '../../db/pool.js'
 import { requirePermission } from '../../lib/adminAuth.js'
 import { countUsers } from '../../lib/db.js'
+import { listReports, listDisputes, listEntitlements } from '../../lib/store.js'
 import { runSentinels } from '../../lib/sentinels.js'
 import { modelDriftStatus } from '../../lib/modelDrift.js'
 
@@ -28,6 +29,7 @@ router.get('/', requirePermission('dashboard:read'), async (req, res) => {
       activeStudies, qualifiedRaters, doubleRated,
       pendingApprovals, adminsActive, recentAdminEvents,
       breakGlassOpen,
+      reportsTotal, disputesOpen, entitlementsUnconsumed,
     ] = await Promise.all([
       countUsers().catch(() => null),
       count('SELECT COUNT(*) FROM assessment_timeline WHERE is_synthetic = FALSE'),
@@ -47,6 +49,9 @@ router.get('/', requirePermission('dashboard:read'), async (req, res) => {
            FROM admin_audit_events ORDER BY created_at DESC LIMIT 15`,
       ).then((r) => r?.rows || []).catch(() => []),
       count(`SELECT COUNT(*) FROM admin_incidents WHERE kind = 'break_glass' AND status = 'open'`),
+      listReports({ page: 1, pageSize: 1 }).then((r) => r.total).catch(() => null),
+      listDisputes({ status: 'open', page: 1, pageSize: 1 }).then((r) => r.total).catch(() => null),
+      listEntitlements({ consumed: false, page: 1, pageSize: 1 }).then((r) => r.total).catch(() => null),
     ])
 
     res.json({
@@ -58,6 +63,9 @@ router.get('/', requirePermission('dashboard:read'), async (req, res) => {
         ratersQualified: qualifiedRaters,
         doubleRatedSessions: doubleRated,
         adminsActive,
+        reportsTotal,
+        disputesOpen,
+        entitlementsUnconsumed,
       },
       pending: { approvals: pendingApprovals, breakGlassIncidents: breakGlassOpen },
       recentAdminActivity: recentAdminEvents,

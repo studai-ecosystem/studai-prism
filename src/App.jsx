@@ -18,6 +18,14 @@ import AdminLogin from './pages/admin/AdminLogin.jsx'
 import AdminShell from './pages/admin/AdminShell.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import AdminAdmins from './pages/admin/AdminAdmins.jsx'
+import AdminCandidates from './pages/admin/AdminCandidates.jsx'
+import AdminCandidateDetail from './pages/admin/AdminCandidateDetail.jsx'
+import AdminSessions from './pages/admin/AdminSessions.jsx'
+import AdminSessionDetail from './pages/admin/AdminSessionDetail.jsx'
+import AdminReports, { AdminReportDetail } from './pages/admin/AdminReports.jsx'
+import AdminDisputes, { AdminDisputeDetail } from './pages/admin/AdminDisputes.jsx'
+import AdminPayments from './pages/admin/AdminPayments.jsx'
+import AdminRecords from './pages/admin/AdminRecords.jsx'
 import ShellHome from './pages/ShellHome.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
@@ -66,6 +74,18 @@ export default function App() {
       <Route path="/admin" element={<AdminShell />}>
         <Route index element={<AdminDashboard />} />
         <Route path="admins" element={<AdminAdmins />} />
+        <Route path="candidates" element={<AdminCandidates />} />
+        <Route path="candidates/:id" element={<AdminCandidateDetail />} />
+        <Route path="sessions" element={<AdminSessions />} />
+        <Route path="sessions/:id" element={<AdminSessionDetail />} />
+        <Route path="reports" element={<AdminReports />} />
+        <Route path="reports/:sessionId" element={<AdminReportDetail />} />
+        <Route path="disputes" element={<AdminDisputes />} />
+        <Route path="disputes/:sessionId" element={<AdminDisputeDetail />} />
+        <Route path="payments" element={<AdminPayments />} />
+        <Route path="consents" element={<AdminRecords mode="consents" />} />
+        <Route path="verifications" element={<AdminRecords mode="verifications" />} />
+        <Route path="integrity" element={<AdminRecords mode="integrity" />} />
       </Route>
       {/* Legacy pilot cockpit (read-only, x-admin-token) — retires in Phase 6. */}
       <Route path="/admin/legacy-ops" element={<Admin />} />

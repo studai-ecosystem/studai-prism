@@ -15,6 +15,8 @@ function rowToUser(row) {
     year: row.year || '',
     passwordHash: row.password_hash,
     candidateId: row.candidate_id || null,
+    accountState: row.account_state || 'active',
+    tokenVersion: row.token_version != null ? Number(row.token_version) : 0,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
   }
 }
@@ -82,4 +84,49 @@ export function publicUser(user) {
 export async function countUsers() {
   const r = await query('SELECT COUNT(*) FROM v1_users')
   return Number(r?.rows?.[0]?.count || 0)
+}
+
+// Admin Control Centre (Phase 2): twin of dbJson.listUsers.
+export async function listUsers({ q, page, pageSize } = {}) {
+  const p = Math.max(1, Number(page) || 1)
+  const size = Math.max(1, Math.min(100, Number(pageSize) || 25))
+  const params = []
+  let clause = ''
+  if (q) {
+    params.push(`%${String(q).toLowerCase()}%`, String(q))
+    clause = `WHERE email LIKE $1 OR LOWER(name) LIKE $1 OR id = $2 OR candidate_id::text = $2`
+  }
+  const total = await query(`SELECT COUNT(*) FROM v1_users ${clause}`, params)
+  const r = await query(
+    `SELECT * FROM v1_users ${clause} ORDER BY created_at DESC LIMIT ${size} OFFSET ${(p - 1) * size}`,
+    params,
+  )
+  return {
+    rows: (r?.rows || []).map(rowToUser),
+    total: Number(total?.rows?.[0]?.count || 0),
+    page: p,
+    pageSize: size,
+  }
+}
+
+// Admin-only account controls — twin of dbJson.updateUserAccount.
+export async function updateUserAccount(id, { accountState, passwordHash, bumpTokenVersion } = {}) {
+  const user = await findUserById(id)
+  if (!user) throw new Error('USER_NOT_FOUND')
+  if (accountState === 'active' || accountState === 'suspended') {
+    await query('UPDATE v1_users SET account_state = $2 WHERE id = $1', [id, accountState])
+    user.accountState = accountState
+  }
+  if (typeof passwordHash === 'string' && passwordHash) {
+    await query('UPDATE v1_users SET password_hash = $2 WHERE id = $1', [id, passwordHash])
+    user.passwordHash = passwordHash
+  }
+  if (bumpTokenVersion) {
+    const r = await query(
+      'UPDATE v1_users SET token_version = token_version + 1 WHERE id = $1 RETURNING token_version',
+      [id],
+    )
+    user.tokenVersion = Number(r?.rows?.[0]?.token_version ?? (user.tokenVersion || 0) + 1)
+  }
+  return user
 }

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   ShieldCheck, LayoutDashboard, Users, ClipboardList, FlaskConical, Award,
-  Settings2, ScrollText, LogOut, Loader2, TerminalSquare, AlertTriangle,
+  Settings2, ScrollText, LogOut, Loader2, TerminalSquare, AlertTriangle, Search,
 } from 'lucide-react'
 import { bootstrapAdminSession, currentAdmin, adminLogout, adminHasPermission, adminFetch } from '../../lib/adminApi.js'
 
@@ -20,17 +20,26 @@ const NAV = [
   {
     group: 'People',
     items: [
+      { to: '/admin/candidates', label: 'Candidates', icon: Users, permission: 'users:read' },
       { to: '/admin/admins', label: 'Administrators', icon: Users, permission: 'admins:read' },
-      { label: 'Candidates', icon: Users, planned: 'Phase 2' },
       { label: 'Raters', icon: Users, planned: 'Phase 3' },
     ],
   },
   {
     group: 'Assessments',
     items: [
-      { label: 'Sessions', icon: ClipboardList, planned: 'Phase 2' },
-      { label: 'Reports', icon: ClipboardList, planned: 'Phase 2' },
-      { label: 'Disputes', icon: ClipboardList, planned: 'Phase 2' },
+      { to: '/admin/sessions', label: 'Sessions', icon: ClipboardList, permission: 'sessions:read' },
+      { to: '/admin/reports', label: 'Reports', icon: ClipboardList, permission: 'reports:read' },
+      { to: '/admin/disputes', label: 'Disputes', icon: ClipboardList, permission: 'disputes:read' },
+      { to: '/admin/consents', label: 'Consent', icon: ClipboardList, permission: 'consents:read' },
+      { to: '/admin/verifications', label: 'Verification', icon: ClipboardList, permission: 'verifications:read' },
+      { to: '/admin/integrity', label: 'Proctoring events', icon: ClipboardList, permission: 'integrity:read' },
+    ],
+  },
+  {
+    group: 'Commerce',
+    items: [
+      { to: '/admin/payments', label: 'Payments', icon: ClipboardList, permission: 'payments:read' },
     ],
   },
   {
@@ -212,8 +221,100 @@ export default function AdminShell() {
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
       <main className="flex-1 min-w-0 overflow-x-hidden">
+        <GlobalSearch />
         <Outlet />
       </main>
+    </div>
+  )
+}
+
+// ── Global search — one query across every entity the role may see ──────────
+function GlobalSearch() {
+  const navigate = useNavigate()
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const boxRef = useRef(null)
+
+  useEffect(() => {
+    const close = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setResults(null) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+
+  const search = async (e) => {
+    e.preventDefault()
+    if (q.trim().length < 3) { setError('Type at least 3 characters.'); return }
+    setBusy(true)
+    setError('')
+    try {
+      const r = await adminFetch(`/api/admin/search?q=${encodeURIComponent(q.trim())}`)
+      setResults(r.results)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const go = (path) => { setResults(null); setQ(''); navigate(path) }
+
+  return (
+    <div className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-6 py-2 relative" ref={boxRef}>
+      <form onSubmit={search} className="flex items-center gap-2 max-w-xl">
+        <Search size={14} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
+        <input
+          aria-label="Global search"
+          placeholder="Search candidates, sessions, payments, credentials, disputes…"
+          className="flex-1 bg-transparent font-sans text-[13px] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-muted)]"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        {busy && <Loader2 size={13} className="animate-spin text-[var(--color-ink-muted)]" aria-hidden="true" />}
+      </form>
+      {error && <p className="mt-1 font-mono text-[10px] text-[var(--color-danger)]">{error}</p>}
+      {results && (
+        <div className="absolute left-6 right-6 top-full z-20 mt-1 max-w-xl rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] shadow-lg p-2 max-h-96 overflow-y-auto">
+          {Object.entries(results).every(([, v]) => !v?.length) && (
+            <p className="p-2 font-sans text-[13px] text-[var(--color-ink-muted)]">No results you have permission to see.</p>
+          )}
+          {(results.users || []).map((u) => (
+            <button key={u.id} type="button" onClick={() => go(`/admin/candidates/${u.id}`)}
+              className="w-full text-left p-2 rounded-[6px] hover:bg-[var(--color-paper)] font-sans text-[13px] text-[var(--color-ink)]">
+              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">candidate</span>
+              {u.name || u.email} <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{u.email}</span>
+            </button>
+          ))}
+          {(results.sessions || []).map((s) => (
+            <button key={s.sessionId} type="button" onClick={() => go(`/admin/sessions/${s.sessionId}`)}
+              className="w-full text-left p-2 rounded-[6px] hover:bg-[var(--color-paper)] font-sans text-[13px] text-[var(--color-ink)]">
+              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">session</span>
+              <span className="font-mono text-[12px]">{s.sessionId.slice(0, 18)}…</span> {s.scenarioId || ''}
+            </button>
+          ))}
+          {(results.payments || []).map((p) => (
+            <button key={p.sessionId} type="button" onClick={() => go('/admin/payments')}
+              className="w-full text-left p-2 rounded-[6px] hover:bg-[var(--color-paper)] font-sans text-[13px] text-[var(--color-ink)]">
+              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">payment</span>
+              <span className="font-mono text-[12px]">{p.paymentId || p.sessionId}</span> · {p.mode}
+            </button>
+          ))}
+          {(results.disputes || []).map((d) => (
+            <button key={d.sessionId} type="button" onClick={() => go(`/admin/disputes/${d.sessionId}`)}
+              className="w-full text-left p-2 rounded-[6px] hover:bg-[var(--color-paper)] font-sans text-[13px] text-[var(--color-ink)]">
+              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">dispute</span>
+              <span className="font-mono text-[12px]">{d.sessionId.slice(0, 18)}…</span> · {d.status}
+            </button>
+          ))}
+          {(results.credentials || []).map((c) => (
+            <div key={c.credential_id} className="p-2 font-sans text-[13px] text-[var(--color-ink)]">
+              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">credential</span>
+              <span className="font-mono text-[12px]">{String(c.credential_id).slice(0, 18)}…</span> · {c.status}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -46,3 +46,16 @@ export const getVerification = impl.getVerification
 export const recordDeviceLink = impl.recordDeviceLink
 export const getDeviceLink = impl.getDeviceLink
 export const eraseSession = impl.eraseSession
+
+// Admin Control Centre (Phase 2): list/search projections + admin lifecycle
+// helpers. Same twin discipline — identical signatures both backends.
+export const listSessions = impl.listSessions
+export const listReports = impl.listReports
+export const listDisputes = impl.listDisputes
+export const setDisputeStatus = impl.setDisputeStatus
+export const listEntitlements = impl.listEntitlements
+export const findEntitlementByRef = impl.findEntitlementByRef
+export const revokeEntitlement = impl.revokeEntitlement
+export const listConsents = impl.listConsents
+export const listVerifications = impl.listVerifications
+export const listEventsFiltered = impl.listEventsFiltered

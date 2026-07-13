@@ -315,3 +315,160 @@ export async function eraseSession(sessionId) {
   await writeDB(db)
   return removed
 }
+
+// ── Admin Control Centre list/search surface (Phase 2) ───────────────────────
+// Read-only projections with server-side pagination. Same signatures as the
+// storePg twin. Page sizes are clamped by the admin routes (≤100); volumes at
+// pilot scale make full-scan-then-slice acceptable for the JSON backend.
+
+function paginate(rows, page = 1, pageSize = 25) {
+  const p = Math.max(1, Number(page) || 1)
+  const size = Math.max(1, Math.min(100, Number(pageSize) || 25))
+  return { rows: rows.slice((p - 1) * size, p * size), total: rows.length, page: p, pageSize: size }
+}
+
+// Sessions, newest first. Light projection — never the transcript.
+export async function listSessions({ q, userId, status, scenarioId, page, pageSize } = {}) {
+  const db = await readDB()
+  let rows = Object.values(db.sessions).filter(Boolean)
+  if (userId) rows = rows.filter((s) => s.userId === userId)
+  if (scenarioId) rows = rows.filter((s) => s.scenarioId === scenarioId)
+  if (status === 'active') rows = rows.filter((s) => !s.completedAt)
+  if (status === 'completed') rows = rows.filter((s) => Boolean(s.completedAt))
+  if (q) {
+    const needle = String(q).toLowerCase()
+    rows = rows.filter(
+      (s) => String(s.sessionId).toLowerCase().includes(needle) ||
+             String(s.userEmail || '').toLowerCase().includes(needle),
+    )
+  }
+  rows.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0))
+  const { rows: pageRows, ...meta } = paginate(rows, page, pageSize)
+  return {
+    ...meta,
+    rows: pageRows.map((s) => ({
+      sessionId: s.sessionId,
+      scenarioId: s.scenarioId || null,
+      userId: s.userId || null,
+      userEmail: s.userEmail || null,
+      language: s.language || 'en',
+      exchangeCount: s.exchangeCount ?? null,
+      startedAt: s.startedAt || null,
+      completedAt: s.completedAt || null,
+    })),
+  }
+}
+
+// Reports, newest first. Light projection — scores summary only.
+export async function listReports({ q, userId, minOverall, maxOverall, page, pageSize } = {}) {
+  const db = await readDB()
+  let rows = Object.values(db.reports).filter(Boolean)
+  if (userId) rows = rows.filter((r) => r.userId === userId)
+  if (typeof minOverall === 'number') rows = rows.filter((r) => (r.scores?.overall ?? -1) >= minOverall)
+  if (typeof maxOverall === 'number') rows = rows.filter((r) => (r.scores?.overall ?? 101) <= maxOverall)
+  if (q) {
+    const needle = String(q).toLowerCase()
+    rows = rows.filter((r) => String(r.sessionId).toLowerCase().includes(needle))
+  }
+  rows.sort((a, b) => new Date(b.issuedAt || 0) - new Date(a.issuedAt || 0))
+  const { rows: pageRows, ...meta } = paginate(rows, page, pageSize)
+  return {
+    ...meta,
+    rows: pageRows.map((r) => ({
+      sessionId: r.sessionId,
+      userId: r.userId || null,
+      overall: r.scores?.overall ?? null,
+      reliability: r.reliability?.level || r.reliability?.reliability || null,
+      scenario: r.scenario?.title || r.scenario || null,
+      language: r.scoring?.language || 'en',
+      flaggedForReview: Boolean(r.flaggedForReview),
+      issuedAt: r.issuedAt || null,
+    })),
+  }
+}
+
+export async function listDisputes({ status, page, pageSize } = {}) {
+  const db = await readDB()
+  let rows = Object.values(db.disputes).filter(Boolean)
+  if (status) rows = rows.filter((d) => d.status === status)
+  rows.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
+  return paginate(rows, page, pageSize)
+}
+
+// Coarse 3-state sync target for the admin dispute workflow. The candidate's
+// statement (reason/contact) is never modified here.
+export async function setDisputeStatus(sessionId, status) {
+  if (!['open', 'in_review', 'resolved'].includes(status)) throw new Error('BAD_DISPUTE_STATUS')
+  const db = await readDB()
+  const existing = db.disputes[sessionId]
+  if (!existing) return null
+  existing.status = status
+  await writeDB(db)
+  return existing
+}
+
+export async function listEntitlements({ q, mode, consumed, page, pageSize } = {}) {
+  const db = await readDB()
+  let rows = Object.values(db.payments).filter(Boolean)
+  if (mode) rows = rows.filter((p) => p.mode === mode)
+  if (consumed === true || consumed === false) rows = rows.filter((p) => Boolean(p.consumed) === consumed)
+  if (q) {
+    const needle = String(q).toLowerCase()
+    rows = rows.filter(
+      (p) => String(p.sessionId).toLowerCase().includes(needle) ||
+             String(p.paymentId || '').toLowerCase().includes(needle) ||
+             String(p.orderId || '').toLowerCase().includes(needle),
+    )
+  }
+  rows.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+  return paginate(rows, page, pageSize)
+}
+
+export async function findEntitlementByRef(ref) {
+  if (!ref) return null
+  const db = await readDB()
+  return (
+    Object.values(db.payments).find(
+      (p) => p && (p.paymentId === ref || p.orderId === ref || p.sessionId === ref),
+    ) || null
+  )
+}
+
+// Revoking an UNUSED entitlement reuses the existing consumption semantics
+// (/start refuses consumed entitlements), plus an explicit marker for audit.
+export async function revokeEntitlement(sessionId, reason) {
+  const db = await readDB()
+  const ent = db.payments[sessionId]
+  if (!ent) return { ok: false, error: 'NOT_FOUND' }
+  if (ent.consumed) return { ok: false, error: 'ALREADY_CONSUMED' }
+  ent.consumed = true
+  ent.revoked = true
+  ent.revokedReason = String(reason || '')
+  ent.revokedAt = new Date().toISOString()
+  await writeDB(db)
+  return { ok: true, entitlement: ent }
+}
+
+export async function listConsents({ page, pageSize } = {}) {
+  const db = await readDB()
+  const rows = Object.values(db.consents).filter(Boolean)
+  rows.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
+  return paginate(rows, page, pageSize)
+}
+
+export async function listVerifications({ status, page, pageSize } = {}) {
+  const db = await readDB()
+  let rows = Object.values(db.verifications).filter(Boolean)
+  if (status) rows = rows.filter((v) => v.status === status)
+  rows.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
+  return paginate(rows, page, pageSize)
+}
+
+export async function listEventsFiltered({ sessionId, type, page, pageSize } = {}) {
+  const db = await readDB()
+  let rows = db.events
+  if (sessionId) rows = rows.filter((e) => e.sessionId === sessionId)
+  if (type) rows = rows.filter((e) => e.type === type)
+  rows = [...rows].sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
+  return paginate(rows, page, pageSize)
+}

@@ -13,8 +13,21 @@ const JWT_EXPIRES_IN = '30d'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+// tv = token version (Control Centre Phase 2). Admin-triggered candidate
+// session revocation / suspension / password reset bumps user.tokenVersion;
+// tokens minted before the bump fail the strict check below. Tokens issued
+// before this field existed carry no tv — treated as 0, matching the store
+// default, so existing sessions stay valid until an administrator acts.
 function signToken(user) {
-  return jwt.sign({ sub: user.id, email: user.email }, getJwtSecret(), { expiresIn: JWT_EXPIRES_IN })
+  return jwt.sign(
+    { sub: user.id, email: user.email, tv: user.tokenVersion || 0 },
+    getJwtSecret(),
+    { expiresIn: JWT_EXPIRES_IN },
+  )
+}
+
+function tokenVersionValid(payload, user) {
+  return (payload.tv || 0) === (user.tokenVersion || 0)
 }
 
 // ── POST /api/auth/register ──────────────────────────────────────────────────
@@ -71,6 +84,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' })
     }
 
+    // Admin-suspended accounts cannot sign in (Control Centre Phase 2).
+    if (user.accountState === 'suspended') {
+      return res.status(403).json({ error: 'This account is suspended. Contact support@studai.one.' })
+    }
+
     const token = signToken(user)
     res.json({ token, user: publicUser(user) })
   } catch (err) {
@@ -98,6 +116,12 @@ router.get('/me', async (req, res) => {
     const user = await findUserById(payload.sub)
     if (!user) {
       return res.status(401).json({ error: 'Account not found.' })
+    }
+    if (!tokenVersionValid(payload, user)) {
+      return res.status(401).json({ error: 'Session revoked. Please sign in again.' })
+    }
+    if (user.accountState === 'suspended') {
+      return res.status(403).json({ error: 'This account is suspended. Contact support@studai.one.' })
     }
 
     res.json({ user: publicUser(user) })
@@ -127,6 +151,17 @@ router.patch('/me', async (req, res) => {
     const { name, college, year } = req.body || {}
     if (typeof name === 'string' && !name.trim()) {
       return res.status(400).json({ error: 'Name cannot be empty.' })
+    }
+
+    const current = await findUserById(payload.sub)
+    if (!current) {
+      return res.status(401).json({ error: 'Account not found.' })
+    }
+    if (!tokenVersionValid(payload, current)) {
+      return res.status(401).json({ error: 'Session revoked. Please sign in again.' })
+    }
+    if (current.accountState === 'suspended') {
+      return res.status(403).json({ error: 'This account is suspended. Contact support@studai.one.' })
     }
 
     let user

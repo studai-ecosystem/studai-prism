@@ -80,3 +80,35 @@ export async function sendReportEmail({ to, pdfBuffer, meta = {} }) {
   })
   return true
 }
+
+// Control Centre Phase 2: admin-triggered report resend. The server does not
+// hold a rendered PDF (the PDF is built in the candidate's browser), so this
+// sends a secure LINK to the report instead. Recipient is ALWAYS the account
+// email on record — callers must never pass an arbitrary address (audit C10).
+export async function sendReportLinkEmail({ to, name, reportUrl }) {
+  const transport = await getTransport()
+  if (!transport) throw new Error('mail_not_configured')
+
+  const fromAddress = process.env.MAIL_FROM || process.env.SMTP_USER
+  const fromName = process.env.MAIL_FROM_NAME || 'StudAI Prism'
+  const who = name || 'there'
+
+  await transport.sendMail({
+    from: `"${fromName}" <${fromAddress}>`,
+    to,
+    subject: 'Your Prism Score Report',
+    text:
+      `Hi ${who},\n\n` +
+      `As requested, here is the link to view and download your Prism Score Report:\n\n` +
+      `${reportUrl}\n\n` +
+      `If you did not request this, you can ignore this email.\n\n— StudAI Prism`,
+    html:
+      `<div style="font-family:Arial,Helvetica,sans-serif;color:#1A1A2E;line-height:1.6">` +
+      `<p>Hi ${who},</p>` +
+      `<p>As requested, here is the link to view and download your <strong>Prism Score Report</strong>:</p>` +
+      `<p><a href="${reportUrl}">${reportUrl}</a></p>` +
+      `<p style="color:#7A7F8C;font-size:13px;margin-top:24px">If you did not request this, you can ignore this email.<br/>— StudAI Prism</p>` +
+      `</div>`,
+  })
+  return true
+}

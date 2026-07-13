@@ -347,3 +347,249 @@ export async function eraseSession(sessionId) {
   if ((dl?.rowCount || 0) > 0) removed = true
   return removed
 }
+
+// ── Admin Control Centre list/search surface (Phase 2) ───────────────────────
+// Twin of the storeJson implementations: identical signatures and row shapes.
+
+function pageArgs(page, pageSize) {
+  const p = Math.max(1, Number(page) || 1)
+  const size = Math.max(1, Math.min(100, Number(pageSize) || 25))
+  return { p, size, offset: (p - 1) * size }
+}
+
+export async function listSessions({ q, userId, status, scenarioId, page, pageSize } = {}) {
+  const { p, size, offset } = pageArgs(page, pageSize)
+  const where = []
+  const params = []
+  if (userId) { params.push(userId); where.push(`user_id = $${params.length}`) }
+  if (scenarioId) { params.push(scenarioId); where.push(`scenario_id = $${params.length}`) }
+  if (status === 'active') where.push('completed_at IS NULL')
+  if (status === 'completed') where.push('completed_at IS NOT NULL')
+  if (q) {
+    params.push(`%${String(q).toLowerCase()}%`)
+    where.push(`(LOWER(session_id) LIKE $${params.length} OR LOWER(COALESCE(user_email,'')) LIKE $${params.length})`)
+  }
+  const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const total = await query(`SELECT COUNT(*) FROM v1_sessions ${clause}`, params)
+  const r = await query(
+    `SELECT session_id, scenario_id, user_id, user_email, data->>'language' AS language,
+            (data->>'exchangeCount')::int AS exchange_count, started_at, completed_at
+       FROM v1_sessions ${clause}
+      ORDER BY started_at DESC NULLS LAST LIMIT ${size} OFFSET ${offset}`,
+    params,
+  )
+  return {
+    total: Number(total?.rows?.[0]?.count || 0),
+    page: p,
+    pageSize: size,
+    rows: (r?.rows || []).map((row) => ({
+      sessionId: row.session_id,
+      scenarioId: row.scenario_id || null,
+      userId: row.user_id || null,
+      userEmail: row.user_email || null,
+      language: row.language || 'en',
+      exchangeCount: row.exchange_count ?? null,
+      startedAt: row.started_at != null ? Number(row.started_at) : null,
+      completedAt: row.completed_at != null ? Number(row.completed_at) : null,
+    })),
+  }
+}
+
+export async function listReports({ q, userId, minOverall, maxOverall, page, pageSize } = {}) {
+  const { p, size, offset } = pageArgs(page, pageSize)
+  const where = []
+  const params = []
+  if (userId) { params.push(userId); where.push(`user_id = $${params.length}`) }
+  if (typeof minOverall === 'number') { params.push(minOverall); where.push(`overall >= $${params.length}`) }
+  if (typeof maxOverall === 'number') { params.push(maxOverall); where.push(`overall <= $${params.length}`) }
+  if (q) { params.push(`%${String(q).toLowerCase()}%`); where.push(`LOWER(session_id) LIKE $${params.length}`) }
+  const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const total = await query(`SELECT COUNT(*) FROM v1_reports ${clause}`, params)
+  const r = await query(
+    `SELECT session_id, user_id, overall, issued_at, report FROM v1_reports ${clause}
+      ORDER BY issued_at DESC LIMIT ${size} OFFSET ${offset}`,
+    params,
+  )
+  return {
+    total: Number(total?.rows?.[0]?.count || 0),
+    page: p,
+    pageSize: size,
+    rows: (r?.rows || []).map((row) => {
+      const rep = row.report || {}
+      return {
+        sessionId: row.session_id,
+        userId: row.user_id || null,
+        overall: row.overall != null ? Number(row.overall) : null,
+        reliability: rep.reliability?.level || rep.reliability?.reliability || null,
+        scenario: rep.scenario?.title || rep.scenario || null,
+        language: rep.scoring?.language || 'en',
+        flaggedForReview: Boolean(rep.flaggedForReview),
+        issuedAt: row.issued_at instanceof Date ? row.issued_at.toISOString() : row.issued_at,
+      }
+    }),
+  }
+}
+
+export async function listDisputes({ status, page, pageSize } = {}) {
+  const { p, size, offset } = pageArgs(page, pageSize)
+  const params = []
+  let clause = ''
+  if (status) { params.push(status); clause = 'WHERE status = $1' }
+  const total = await query(`SELECT COUNT(*) FROM v1_disputes ${clause}`, params)
+  const r = await query(
+    `SELECT session_id, reason, contact, status, at FROM v1_disputes ${clause}
+      ORDER BY at DESC LIMIT ${size} OFFSET ${offset}`,
+    params,
+  )
+  return {
+    total: Number(total?.rows?.[0]?.count || 0),
+    page: p,
+    pageSize: size,
+    rows: (r?.rows || []).map((row) => ({
+      sessionId: row.session_id,
+      reason: row.reason,
+      contact: row.contact,
+      status: row.status,
+      at: row.at instanceof Date ? row.at.toISOString() : row.at,
+    })),
+  }
+}
+
+export async function setDisputeStatus(sessionId, status) {
+  if (!['open', 'in_review', 'resolved'].includes(status)) throw new Error('BAD_DISPUTE_STATUS')
+  const r = await query(
+    'UPDATE v1_disputes SET status = $2 WHERE session_id = $1 RETURNING session_id, reason, contact, status, at',
+    [sessionId, status],
+  )
+  const row = r?.rows?.[0]
+  if (!row) return null
+  return {
+    sessionId: row.session_id, reason: row.reason, contact: row.contact,
+    status: row.status, at: row.at instanceof Date ? row.at.toISOString() : row.at,
+  }
+}
+
+export async function listEntitlements({ q, mode, consumed, page, pageSize } = {}) {
+  const { p, size, offset } = pageArgs(page, pageSize)
+  const where = []
+  const params = []
+  if (mode) { params.push(mode); where.push(`mode = $${params.length}`) }
+  if (consumed === true || consumed === false) { params.push(consumed); where.push(`consumed = $${params.length}`) }
+  if (q) {
+    params.push(`%${String(q).toLowerCase()}%`)
+    where.push(`(LOWER(session_id) LIKE $${params.length} OR LOWER(COALESCE(payment_id,'')) LIKE $${params.length} OR LOWER(COALESCE(order_id,'')) LIKE $${params.length})`)
+  }
+  const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const total = await query(`SELECT COUNT(*) FROM v1_payments ${clause}`, params)
+  const r = await query(
+    `SELECT * FROM v1_payments ${clause} ORDER BY created_at DESC LIMIT ${size} OFFSET ${offset}`,
+    params,
+  )
+  return {
+    total: Number(total?.rows?.[0]?.count || 0),
+    page: p,
+    pageSize: size,
+    rows: (r?.rows || []).map((row) => ({
+      sessionId: row.session_id,
+      paymentId: row.payment_id,
+      orderId: row.order_id,
+      amount: row.amount,
+      mode: row.mode,
+      consumed: row.consumed,
+      createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+    })),
+  }
+}
+
+export async function findEntitlementByRef(ref) {
+  if (!ref) return null
+  const r = await query(
+    'SELECT * FROM v1_payments WHERE payment_id = $1 OR order_id = $1 OR session_id = $1 LIMIT 1',
+    [ref],
+  )
+  const row = r?.rows?.[0]
+  if (!row) return null
+  return {
+    sessionId: row.session_id, paymentId: row.payment_id, orderId: row.order_id,
+    amount: row.amount, mode: row.mode, consumed: row.consumed,
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+  }
+}
+
+export async function revokeEntitlement(sessionId, reason) {
+  const existing = await getEntitlement(sessionId)
+  if (!existing) return { ok: false, error: 'NOT_FOUND' }
+  if (existing.consumed) return { ok: false, error: 'ALREADY_CONSUMED' }
+  // v1_payments has no revocation columns — consumption is the enforcement
+  // (/start refuses consumed entitlements); the audit trail carries the reason.
+  await query('UPDATE v1_payments SET consumed = true WHERE session_id = $1', [sessionId])
+  return {
+    ok: true,
+    entitlement: {
+      ...existing, consumed: true, revoked: true,
+      revokedReason: String(reason || ''), revokedAt: new Date().toISOString(),
+    },
+  }
+}
+
+export async function listConsents({ page, pageSize } = {}) {
+  const { p, size, offset } = pageArgs(page, pageSize)
+  const total = await query('SELECT COUNT(*) FROM v1_consents')
+  const r = await query(
+    `SELECT session_id, scopes, meta, at FROM v1_consents ORDER BY at DESC LIMIT ${size} OFFSET ${offset}`,
+  )
+  return {
+    total: Number(total?.rows?.[0]?.count || 0),
+    page: p,
+    pageSize: size,
+    rows: (r?.rows || []).map((row) => ({
+      sessionId: row.session_id,
+      scopes: row.scopes || [],
+      meta: row.meta || {},
+      at: row.at instanceof Date ? row.at.toISOString() : row.at,
+    })),
+  }
+}
+
+export async function listVerifications({ status, page, pageSize } = {}) {
+  const { p, size, offset } = pageArgs(page, pageSize)
+  const params = []
+  let clause = ''
+  if (status) { params.push(status); clause = `WHERE data->>'status' = $1` }
+  const total = await query(`SELECT COUNT(*) FROM v1_verifications ${clause}`, params)
+  const r = await query(
+    `SELECT data FROM v1_verifications ${clause} ORDER BY at DESC LIMIT ${size} OFFSET ${offset}`,
+    params,
+  )
+  return {
+    total: Number(total?.rows?.[0]?.count || 0),
+    page: p,
+    pageSize: size,
+    rows: (r?.rows || []).map((row) => row.data),
+  }
+}
+
+export async function listEventsFiltered({ sessionId, type, page, pageSize } = {}) {
+  const { p, size, offset } = pageArgs(page, pageSize)
+  const where = []
+  const params = []
+  if (sessionId) { params.push(sessionId); where.push(`session_id = $${params.length}`) }
+  if (type) { params.push(type); where.push(`type = $${params.length}`) }
+  const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const total = await query(`SELECT COUNT(*) FROM v1_events ${clause}`, params)
+  const r = await query(
+    `SELECT session_id, type, meta, at FROM v1_events ${clause} ORDER BY at DESC LIMIT ${size} OFFSET ${offset}`,
+    params,
+  )
+  return {
+    total: Number(total?.rows?.[0]?.count || 0),
+    page: p,
+    pageSize: size,
+    rows: (r?.rows || []).map((row) => ({
+      sessionId: row.session_id,
+      type: row.type,
+      meta: row.meta || {},
+      at: row.at instanceof Date ? row.at.toISOString() : row.at,
+    })),
+  }
+}

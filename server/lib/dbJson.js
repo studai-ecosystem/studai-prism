@@ -94,3 +94,37 @@ export async function countUsers() {
   const db = await readDB()
   return db.users.length
 }
+
+// Admin Control Centre (Phase 2): paginated candidate list with substring
+// search on name/email. Returns raw records — the admin route masks PII
+// according to the caller's permissions before anything leaves the server.
+export async function listUsers({ q, page, pageSize } = {}) {
+  const db = await readDB()
+  let rows = db.users
+  if (q) {
+    const needle = String(q).toLowerCase()
+    rows = rows.filter(
+      (u) => u.email.includes(needle) ||
+             (u.name || '').toLowerCase().includes(needle) ||
+             u.id === q || u.candidateId === q,
+    )
+  }
+  rows = [...rows].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+  const p = Math.max(1, Number(page) || 1)
+  const size = Math.max(1, Math.min(100, Number(pageSize) || 25))
+  return { rows: rows.slice((p - 1) * size, p * size), total: rows.length, page: p, pageSize: size }
+}
+
+// Admin-only account controls. accountState: 'active' | 'suspended'.
+// bumpTokenVersion invalidates outstanding JWTs on strict-checked endpoints
+// (auth /me); passwordHash supports the operator-assisted reset flow.
+export async function updateUserAccount(id, { accountState, passwordHash, bumpTokenVersion } = {}) {
+  const db = await readDB()
+  const user = db.users.find((u) => u.id === id)
+  if (!user) throw new Error('USER_NOT_FOUND')
+  if (accountState === 'active' || accountState === 'suspended') user.accountState = accountState
+  if (typeof passwordHash === 'string' && passwordHash) user.passwordHash = passwordHash
+  if (bumpTokenVersion) user.tokenVersion = (user.tokenVersion || 0) + 1
+  await writeDB(db)
+  return user
+}

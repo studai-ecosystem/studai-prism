@@ -19,3 +19,5 @@ export const createUser = impl.createUser
 export const updateUser = impl.updateUser
 export const publicUser = impl.publicUser
 export const countUsers = impl.countUsers
+export const listUsers = impl.listUsers
+export const updateUserAccount = impl.updateUserAccount
