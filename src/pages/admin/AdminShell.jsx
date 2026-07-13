@@ -70,10 +70,16 @@ const NAV = [
     ],
   },
   {
+    group: 'Content',
+    items: [
+      { to: '/admin/content', label: 'Blog · Careers · Applications', icon: ScrollText, permission: 'content:read' },
+    ],
+  },
+  {
     group: 'System',
     items: [
-      { label: 'Feature flags', icon: Settings2, planned: 'Phase 5' },
-      { label: 'Jobs & health', icon: Settings2, planned: 'Phase 5' },
+      { to: '/admin/flags', label: 'Feature flags', icon: Settings2, permission: 'flags:read' },
+      { to: '/admin/system', label: 'Health · Models · Jobs', icon: Settings2, permission: 'system:read' },
     ],
   },
   {

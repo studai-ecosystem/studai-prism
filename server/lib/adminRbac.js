@@ -102,6 +102,7 @@ export const PERMISSIONS = {
   // System
   'system:read': 'View integration/system health (booleans only, never secrets)',
   'jobs:manage': 'Retry/cancel background jobs (idempotent operations only)',
+  'models:manage': 'Maintain AI model registry metadata (never API keys)',
 
   // Privacy & governance
   'privacy:read': 'View privacy requests and retention rules',

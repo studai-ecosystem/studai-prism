@@ -130,10 +130,13 @@ test('T0 gate: research tables define no PII columns and never reference user_id
     // Walk every CREATE TABLE block; v1_* tables are the identity/PII store
     // and are exempt by design. admin_* tables (migration 0011) are the
     // ADMINISTRATOR identity plane — operator emails/password hashes, zero
-    // candidate data — exempt for the same reason.
+    // candidate data — exempt for the same reason. job_applications and
+    // content_* (migration 0015) are the hiring/CMS plane: applicant PII is
+    // their purpose (retention-deletable) and they never join research data.
     const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)]
     for (const [, name, body] of tables) {
-      if (name.startsWith('v1_') || name.startsWith('admin_')) continue
+      if (name.startsWith('v1_') || name.startsWith('admin_') ||
+          name.startsWith('content_') || name === 'job_applications') continue
       for (const line of body.split('\n')) {
         assert.ok(
           !FORBIDDEN.test(line),

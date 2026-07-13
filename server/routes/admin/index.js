@@ -40,6 +40,9 @@ import credentialsRouter from './credentials.js'
 import replaysRouter from './replays.js'
 import teamfitRouter from './teamfit.js'
 import exportsRouter from './exports.js'
+import contentRouter from './content.js'
+import flagsRouter from './flags.js'
+import systemRouter from './system.js'
 
 const router = Router()
 
@@ -111,5 +114,9 @@ router.use('/credentials', credentialsRouter)
 router.use('/replays', replaysRouter)
 router.use('/teamfit', teamfitRouter)
 router.use('/exports', exportsRouter)
+// Phase 5 — CMS & system administration.
+router.use('/content', contentRouter)
+router.use('/flags', flagsRouter)
+router.use('/system', systemRouter)
 
 export default router
