@@ -43,6 +43,8 @@ import exportsRouter from './exports.js'
 import contentRouter from './content.js'
 import flagsRouter from './flags.js'
 import systemRouter from './system.js'
+import privacyRouter from './privacy.js'
+import auditRouter from './audit.js'
 
 const router = Router()
 
@@ -118,5 +120,8 @@ router.use('/exports', exportsRouter)
 router.use('/content', contentRouter)
 router.use('/flags', flagsRouter)
 router.use('/system', systemRouter)
+// Phase 6 — privacy & enterprise governance.
+router.use('/privacy', privacyRouter)
+router.use('/audit', auditRouter)
 
 export default router

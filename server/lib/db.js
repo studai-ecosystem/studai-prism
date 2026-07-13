@@ -21,3 +21,4 @@ export const publicUser = impl.publicUser
 export const countUsers = impl.countUsers
 export const listUsers = impl.listUsers
 export const updateUserAccount = impl.updateUserAccount
+export const deleteUser = impl.deleteUser

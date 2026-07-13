@@ -16,6 +16,7 @@ import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
 import logger from '../lib/logger.js'
 import { query, isDbConfigured } from '../db/pool.js'
+import { legacyAdminGuard } from '../lib/adminAuth.js'
 import { auditLog } from '../lib/telemetry.js'
 import {
   isTeamfitEnabled, TEAMFIT_CONSENT_SCOPE, verifyTeamConsent, composeTwins,
@@ -27,14 +28,15 @@ import { createCompletion, MODEL, buildAvatarSystemPrompt, SCENARIOS } from './a
 
 const router = Router()
 
-// Invisible without the flag; admin-token gated beyond that (dark B2B surface).
+// Invisible without the flag; beyond that: console session (teamfit:manage)
+// OR legacy token (Phase 6 migration; retired via PRISM_ADMIN_TOKEN_DISABLED).
+const adminGuard = legacyAdminGuard('teamfit:manage')
 router.use((req, res, next) => {
   if (!isTeamfitEnabled()) return res.status(404).json({ error: 'Not found' })
-  const expected = process.env.ADMIN_TOKEN
-  if (!expected) return res.status(503).json({ error: 'teamfit disabled (set ADMIN_TOKEN)' })
-  if (req.get('x-admin-token') !== expected) return res.status(401).json({ error: 'unauthorized' })
-  if (!isDbConfigured()) return res.status(503).json({ error: 'no database configured' })
-  next()
+  adminGuard(req, res, () => {
+    if (!isDbConfigured()) return res.status(503).json({ error: 'no database configured' })
+    next()
+  })
 })
 
 const liveTeamfits = new Map()

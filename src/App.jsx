@@ -39,6 +39,8 @@ import AdminExports from './pages/admin/AdminExports.jsx'
 import AdminContent from './pages/admin/AdminContent.jsx'
 import AdminFlags from './pages/admin/AdminFlags.jsx'
 import AdminSystem from './pages/admin/AdminSystem.jsx'
+import AdminPrivacy from './pages/admin/AdminPrivacy.jsx'
+import AdminAudit from './pages/admin/AdminAudit.jsx'
 import ShellHome from './pages/ShellHome.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
@@ -112,6 +114,8 @@ export default function App() {
         <Route path="content" element={<AdminContent />} />
         <Route path="flags" element={<AdminFlags />} />
         <Route path="system" element={<AdminSystem />} />
+        <Route path="privacy" element={<AdminPrivacy />} />
+        <Route path="audit" element={<AdminAudit />} />
       </Route>
       {/* Legacy pilot cockpit (read-only, x-admin-token) — retires in Phase 6. */}
       <Route path="/admin/legacy-ops" element={<Admin />} />

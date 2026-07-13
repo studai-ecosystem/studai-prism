@@ -106,8 +106,10 @@ export const PERMISSIONS = {
 
   // Privacy & governance
   'privacy:read': 'View privacy requests and retention rules',
+  'privacy:create': 'Open a privacy request on behalf of a candidate',
   'privacy:manage': 'Operate privacy request workflow (dry-runs, corrections)',
   'privacy:execute': 'Execute approved erasures (dual-approved)',
+  'retention:manage': 'Set documented data-retention rules',
   'audit:read': 'Search and export the admin audit trail',
   'exports:create': 'Create data exports (every export is ledgered)',
   'notes:write': 'Add internal notes to operational entities',
@@ -201,7 +203,7 @@ export const ROLES = {
     title: 'Privacy Administrator',
     description: 'Data-subject requests, consent, retention, privacy incidents.',
     permissions: [
-      'dashboard:read', 'privacy:read', 'privacy:manage', 'privacy:execute',
+      'dashboard:read', 'privacy:read', 'privacy:create', 'privacy:manage', 'privacy:execute',
       'consents:read', 'users:read', 'users:read_pii', 'verifications:read', 'verifications:read_pii',
       'replays:read', 'audit:read', 'notes:write',
     ],
@@ -209,7 +211,7 @@ export const ROLES = {
   support_admin: {
     title: 'Support Administrator',
     description: 'Candidate search, limited account details, routine issues. No evidence or research data.',
-    permissions: ['dashboard:read', 'users:read', 'reports:resend', 'disputes:read', 'notes:write'],
+    permissions: ['dashboard:read', 'users:read', 'reports:resend', 'disputes:read', 'privacy:create', 'notes:write'],
   },
   auditor: {
     title: 'Auditor',

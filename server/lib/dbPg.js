@@ -130,3 +130,9 @@ export async function updateUserAccount(id, { accountState, passwordHash, bumpTo
   }
   return user
 }
+
+// Privacy erasure (Phase 6) — twin of dbJson.deleteUser.
+export async function deleteUser(id) {
+  const r = await query('DELETE FROM v1_users WHERE id = $1', [id])
+  return (r?.rowCount || 0) > 0
+}

@@ -1569,24 +1569,25 @@ router.get('/velocity', async (req, res) => {
 })
 
 // Admin variant for the dark demo + support: same view for any candidate_id.
+// Phase 6 migration: console session (sessions:read) OR legacy token.
 router.get('/velocity/:candidateId', async (req, res) => {
   if (!isVelocityEnabled()) return res.status(404).json({ error: 'Not found' })
-  const expected = process.env.ADMIN_TOKEN
-  if (!expected) return res.status(503).json({ error: 'velocity admin disabled (set ADMIN_TOKEN)' })
-  if (req.get('x-admin-token') !== expected) return res.status(401).json({ error: 'unauthorized' })
-  try {
-    const { query: pgQuery, isDbConfigured: dbOk } = await import('../db/pool.js')
-    if (!dbOk()) return res.status(503).json({ error: 'not available' })
-    const r = await pgQuery(
-      'SELECT attempt_no, scale_version, final_theta, completed_at, is_synthetic FROM assessment_timeline WHERE candidate_id = $1 ORDER BY attempt_no',
-      [req.params.candidateId],
-    )
-    if (!r?.rows?.length) return res.status(404).json({ error: 'unknown candidate' })
-    res.json(velocityView(r.rows))
-  } catch (err) {
-    logger.captureException(err, { msg: 'velocity_admin_failed', requestId: req.requestId })
-    res.status(500).json({ error: 'Failed to compute trajectory' })
-  }
+  const { legacyAdminGuard } = await import('../lib/adminAuth.js')
+  legacyAdminGuard('sessions:read')(req, res, async () => {
+    try {
+      const { query: pgQuery, isDbConfigured: dbOk } = await import('../db/pool.js')
+      if (!dbOk()) return res.status(503).json({ error: 'not available' })
+      const r = await pgQuery(
+        'SELECT attempt_no, scale_version, final_theta, completed_at, is_synthetic FROM assessment_timeline WHERE candidate_id = $1 ORDER BY attempt_no',
+        [req.params.candidateId],
+      )
+      if (!r?.rows?.length) return res.status(404).json({ error: 'unknown candidate' })
+      res.json(velocityView(r.rows))
+    } catch (err) {
+      logger.captureException(err, { msg: 'velocity_admin_failed', requestId: req.requestId })
+      res.status(500).json({ error: 'Failed to compute trajectory' })
+    }
+  })
 })
 
 // ── Calibration prompt (shown before the live assessment) ────────────────────
@@ -1816,26 +1817,27 @@ router.delete('/candidate-data', async (req, res) => {
 // ── POST /api/assessment/human-rating ────────────────────────────────────────
 // Records a human double-rating into human_ratings (the gold anchor set that
 // feeds conformal calibration + Channel B training). Admin/rater use only —
-// guarded by the X-Admin-Token header matching ADMIN_TOKEN. Requires the v2
-// telemetry DB. Body: { sessionId, raterId, scores:{dim:0-100}, rubricVersion }.
+// Phase 6 migration: console session (raters:manage) OR legacy shared token.
+// Requires the v2 telemetry DB.
+// Body: { sessionId, raterId, scores:{dim:0-100}, rubricVersion }.
 router.post('/human-rating', async (req, res) => {
-  if (!process.env.ADMIN_TOKEN || req.get('x-admin-token') !== process.env.ADMIN_TOKEN) {
-    return res.status(403).json({ error: 'Forbidden' })
-  }
-  const { sessionId, raterId, scores, rubricVersion } = req.body || {}
-  if (!sessionId || !raterId || !scores || typeof scores !== 'object') {
-    return res.status(400).json({ error: 'sessionId, raterId, scores required' })
-  }
-  try {
-    const { recordHumanRatings } = await import('../scoring/humanRatings.js')
-    const n = await recordHumanRatings({ sessionId, raterId, scores, rubricVersion: rubricVersion || 'v1' })
-    if (n === null) return res.status(503).json({ error: 'Telemetry DB not configured.' })
-    auditLog('human_rating_recorded', sessionId, { raterId, dims: Object.keys(scores).length })
-    res.json({ ok: true, recorded: n })
-  } catch (err) {
-    logger.captureException(err, { msg: 'human_rating_failed', requestId: req.requestId })
-    res.status(500).json({ error: 'Failed to record human rating' })
-  }
+  const { legacyAdminGuard } = await import('../lib/adminAuth.js')
+  legacyAdminGuard('raters:manage')(req, res, async () => {
+    const { sessionId, raterId, scores, rubricVersion } = req.body || {}
+    if (!sessionId || !raterId || !scores || typeof scores !== 'object') {
+      return res.status(400).json({ error: 'sessionId, raterId, scores required' })
+    }
+    try {
+      const { recordHumanRatings } = await import('../scoring/humanRatings.js')
+      const n = await recordHumanRatings({ sessionId, raterId, scores, rubricVersion: rubricVersion || 'v1' })
+      if (n === null) return res.status(503).json({ error: 'Telemetry DB not configured.' })
+      auditLog('human_rating_recorded', sessionId, { raterId, dims: Object.keys(scores).length })
+      res.json({ ok: true, recorded: n })
+    } catch (err) {
+      logger.captureException(err, { msg: 'human_rating_failed', requestId: req.requestId })
+      res.status(500).json({ error: 'Failed to record human rating' })
+    }
+  })
 })
 
 export default router

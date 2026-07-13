@@ -433,3 +433,83 @@ export async function consumeApproval(action, entityId) {
   )
   return r?.rows?.[0] || null
 }
+
+// ── Legacy plane migration (Control Centre Phase 6) ─────────────────────────
+// The pre-console planes (/api/pilot, /api/psychometrics, admin halves of
+// studies/credentials/teamfit, admin velocity) historically authenticated
+// with the shared x-admin-token. This guard migrates them:
+//
+//   1. A CONSOLE SESSION (Bearer access token) with the router's permission
+//      is accepted — attributable, revocable, MFA-backed.
+//   2. The legacy x-admin-token still works (now compared in constant time —
+//      closing the Phase 1 gap analysis' G1 timing finding) UNLESS the
+//      operator sets PRISM_ADMIN_TOKEN_DISABLED=true. After console adoption
+//      that flag retires the shared token everywhere at once; emergency
+//      access then goes through the break-glass account, which is fully
+//      audited — not through an anonymous header.
+//
+// Legacy-token requests are audited (admin_legacy_token_used) so adoption is
+// measurable before the switch-off.
+export function isLegacyAdminTokenDisabled() {
+  return process.env.PRISM_ADMIN_TOKEN_DISABLED === 'true'
+}
+
+function legacyTokenMatches(given) {
+  const expected = process.env.ADMIN_TOKEN
+  if (!expected || !given) return false
+  const a = Buffer.from(String(given))
+  const b = Buffer.from(String(expected))
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
+export function legacyAdminGuard(permission) {
+  return async (req, res, next) => {
+    try {
+      // Path 1: console session.
+      const header = req.get('authorization') || ''
+      if (header.startsWith('Bearer ')) {
+        return requireAdminAuth(req, res, () => {
+          if (!hasPermission(req.admin, permission)) {
+            return res.status(403).json({ error: `missing permission: ${permission}`, code: 'FORBIDDEN' })
+          }
+          next()
+        })
+      }
+      // Path 2: legacy shared token (until the operator disables it).
+      const given = req.get('x-admin-token')
+      if (given) {
+        if (isLegacyAdminTokenDisabled()) {
+          return res.status(401).json({
+            error: 'The shared admin token is retired on this deployment (PRISM_ADMIN_TOKEN_DISABLED). Sign in to the admin console.',
+            code: 'LEGACY_TOKEN_RETIRED',
+          })
+        }
+        if (legacyTokenMatches(given)) {
+          query(
+            `INSERT INTO admin_audit_events (action, entity_type, entity_id, ip, user_agent, request_id)
+             VALUES ('admin_legacy_token_used', 'legacy_plane', $1, $2, $3, $4)`,
+            [`${req.baseUrl}${req.path}`.slice(0, 200), req.ip || null,
+             req.get('user-agent')?.slice(0, 200) || null, req.requestId || null],
+          ).catch(() => {})
+          return next()
+        }
+        return res.status(401).json({ error: 'unauthorized' })
+      }
+      if (!process.env.ADMIN_TOKEN && !isDbConfiguredSafe()) {
+        return res.status(503).json({ error: 'admin plane disabled (no ADMIN_TOKEN and no admin console database)' })
+      }
+      return res.status(401).json({ error: 'unauthorized' })
+    } catch (err) {
+      logger.captureException(err, { msg: 'legacy_admin_guard_failed', requestId: req.requestId })
+      res.status(500).json({ error: 'Internal server error' })
+    }
+  }
+}
+
+function isDbConfiguredSafe() {
+  try {
+    return Boolean(process.env.DATABASE_URL)
+  } catch {
+    return false
+  }
+}

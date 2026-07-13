@@ -11,6 +11,7 @@
 import { Router } from 'express'
 import logger from '../lib/logger.js'
 import { query, isDbConfigured } from '../db/pool.js'
+import { legacyAdminGuard } from '../lib/adminAuth.js'
 import { auditLog } from '../lib/telemetry.js'
 import { runSentinels } from '../lib/sentinels.js'
 import { TRAINING_KAPPA_THRESHOLD } from '../lib/studies.js'
@@ -21,12 +22,14 @@ import { FLAG_MAP, checkFlag } from '../lib/flagMap.js'
 
 const router = Router()
 
+// Phase 6 migration: accepts a console session (psychometrics:read) OR the
+// legacy shared token (timing-safe; retired via PRISM_ADMIN_TOKEN_DISABLED).
+const adminGuard = legacyAdminGuard('psychometrics:read')
 function requireAdmin(req, res, next) {
-  const expected = process.env.ADMIN_TOKEN
-  if (!expected) return res.status(503).json({ error: 'pilot panel disabled (set ADMIN_TOKEN)' })
-  if (req.get('x-admin-token') !== expected) return res.status(401).json({ error: 'unauthorized' })
-  if (!isDbConfigured()) return res.status(503).json({ error: 'no database configured' })
-  next()
+  adminGuard(req, res, () => {
+    if (!isDbConfigured()) return res.status(503).json({ error: 'no database configured' })
+    next()
+  })
 }
 router.use(requireAdmin)
 

@@ -128,3 +128,14 @@ export async function updateUserAccount(id, { accountState, passwordHash, bumpTo
   await writeDB(db)
   return user
 }
+
+// Privacy erasure (Phase 6): removes the account record itself. Only the
+// dual-approved erasure workflow calls this — session data goes through the
+// eraseSession/eraseTelemetry cascade first.
+export async function deleteUser(id) {
+  const db = await readDB()
+  const before = db.users.length
+  db.users = db.users.filter((u) => u.id !== id)
+  await writeDB(db)
+  return db.users.length < before
+}

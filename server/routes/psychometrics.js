@@ -11,15 +11,17 @@
 import { Router } from 'express'
 import logger from '../lib/logger.js'
 import { query, isDbConfigured } from '../db/pool.js'
+import { legacyAdminGuard } from '../lib/adminAuth.js'
 
 const router = Router()
 
+// Phase 6 migration: console session (psychometrics:read) OR legacy token.
+const adminGuard = legacyAdminGuard('psychometrics:read')
 function requireAdmin(req, res, next) {
-  const expected = process.env.ADMIN_TOKEN
-  if (!expected) return res.status(503).json({ error: 'psychometrics dashboard disabled (set ADMIN_TOKEN)' })
-  if (req.get('x-admin-token') !== expected) return res.status(401).json({ error: 'unauthorized' })
-  if (!isDbConfigured()) return res.status(503).json({ error: 'no database configured' })
-  next()
+  adminGuard(req, res, () => {
+    if (!isDbConfigured()) return res.status(503).json({ error: 'no database configured' })
+    next()
+  })
 }
 
 const RUN_TYPES = ['irt', 'rasch', 'equate', 'reliability', 'dif', 'conformal', 'channelB_train']

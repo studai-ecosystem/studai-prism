@@ -85,8 +85,8 @@ const NAV = [
   {
     group: 'Governance',
     items: [
-      { label: 'Audit logs', icon: ScrollText, planned: 'Phase 6' },
-      { label: 'Privacy requests', icon: ScrollText, planned: 'Phase 6' },
+      { to: '/admin/audit', label: 'Audit trail', icon: ScrollText, permission: 'audit:read' },
+      { to: '/admin/privacy', label: 'Privacy requests', icon: ScrollText, permission: 'privacy:read' },
       { to: '/admin/legacy-ops', label: 'Legacy cockpit', icon: TerminalSquare },
     ],
   },

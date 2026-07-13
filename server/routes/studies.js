@@ -11,6 +11,7 @@ import { Router } from 'express'
 import { randomUUID, createHash } from 'node:crypto'
 import logger from '../lib/logger.js'
 import { query, isDbConfigured } from '../db/pool.js'
+import { legacyAdminGuard } from '../lib/adminAuth.js'
 import { DIMENSION_KEYS } from '../lib/sharedConstants.js'
 import { quadraticWeightedKappa, kappaFromLevelMaps } from '../lib/kappa.js'
 import {
@@ -26,12 +27,14 @@ const router = Router()
 
 const sha256 = (s) => createHash('sha256').update(String(s)).digest('hex')
 
+// Phase 6 migration: console session (studies:manage — this half mutates) OR
+// legacy token (timing-safe; retired via PRISM_ADMIN_TOKEN_DISABLED).
+const adminGuard = legacyAdminGuard('studies:manage')
 function requireAdmin(req, res, next) {
-  const expected = process.env.ADMIN_TOKEN
-  if (!expected) return res.status(503).json({ error: 'study runner disabled (set ADMIN_TOKEN)' })
-  if (req.get('x-admin-token') !== expected) return res.status(401).json({ error: 'unauthorized' })
-  if (!isDbConfigured()) return res.status(503).json({ error: 'no database configured' })
-  next()
+  adminGuard(req, res, () => {
+    if (!isDbConfigured()) return res.status(503).json({ error: 'no database configured' })
+    next()
+  })
 }
 
 async function requireRater(req, res, next) {
