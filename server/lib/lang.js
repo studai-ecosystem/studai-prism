@@ -13,13 +13,13 @@ export const SUPPORTED_LANGUAGES = {
   en: {
     label: 'English',
     nativeLabel: 'English',
-    asr: 'en', // Whisper ISO-639-1 hint
+    asr: 'en', // ASR language hint
     scoringStatus: 'calibrated',
   },
   'hi-en': {
     label: 'Hinglish',
     nativeLabel: 'Hinglish (Hindi + English mix)',
-    asr: null, // code-switched speech — let Whisper auto-detect rather than force a script
+    asr: null, // code-switched speech — let ASR auto-detect rather than force a script
     scoringStatus: 'provisional_uncalibrated',
   },
   hi: {
@@ -54,7 +54,7 @@ export function scoringStatusFor(language) {
   return SUPPORTED_LANGUAGES[language]?.scoringStatus || 'provisional_uncalibrated'
 }
 
-// Whisper language hint for a session language (null = auto-detect).
+// Speech-to-text language hint for a session language (null = auto-detect).
 export function asrHintFor(language) {
   return SUPPORTED_LANGUAGES[language]?.asr ?? null
 }

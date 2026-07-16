@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { modalLevel, modalLevelsForTurn, recencyWeight, aggregateDimensionScores } from '../scoring/aggregate.js'
 import { quantile, buildConformal, intervalFor, ciNeedsReview } from '../scoring/conformal.js'
 import { maxDimensionGap, reconcile } from '../scoring/reconciler.js'
@@ -173,5 +174,11 @@ test('runDualScorer: big disagreement runs ONE re-eval pass then queues review',
   } finally {
     Math.random = origRandom
   }
+})
+
+test('assessment audits dual-scorer fallback without logging provider messages', async () => {
+  const source = await readFile(new URL('../routes/assessment.js', import.meta.url), 'utf8')
+  assert.match(source, /auditLog\('dual_scorer_fallback', sessionId/)
+  assert.doesNotMatch(source, /dual_scorer_failed[^\n]+err\?\.message/)
 })
 

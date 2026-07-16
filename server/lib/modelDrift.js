@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import logger from './logger.js'
 import { auditLog } from './telemetry.js'
+import { aiProvider, judgeModel } from '../services/ai/modelRouter.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FINGERPRINT_PATH = join(__dirname, '..', 'scoring', 'judge-fingerprint.json')
@@ -37,12 +38,19 @@ export function isDriftHardGate() {
 
 export function modelDriftStatus() {
   const fp = judgeFingerprint()
-  const liveDeployment = process.env.AZURE_OPENAI_DEPLOYMENT || null
-  const drifted = Boolean(liveDeployment && liveDeployment !== fp.deployment)
+  const anchoredModelId = fp.modelId || fp.deployment
+  const liveModelId = judgeModel()
+  const provider = aiProvider()
+  const drifted = provider !== fp.provider || liveModelId !== anchoredModelId
   return {
     status: drifted ? (isDriftHardGate() ? 'DRIFT_BLOCKING' : 'DRIFT_DETECTED') : 'anchored',
-    anchoredDeployment: fp.deployment,
-    liveDeployment,
+    provider,
+    anchoredProvider: fp.provider,
+    anchoredModelId,
+    liveModelId,
+    // Backward-compatible response aliases for existing admin clients.
+    anchoredDeployment: anchoredModelId,
+    liveDeployment: liveModelId,
     anchorRunId: fp.anchorRunId,
     anchoredAt: fp.anchoredAt,
     hardGate: isDriftHardGate(),
@@ -55,9 +63,9 @@ export function checkModelDriftAtBoot() {
   const s = modelDriftStatus()
   if (s.status !== 'anchored') {
     logger.captureException(new Error('judge model drift detected'), {
-      msg: 'model_drift', anchored: s.anchoredDeployment, live: s.liveDeployment, hardGate: s.hardGate,
+      msg: 'model_drift', anchored: s.anchoredModelId, live: s.liveModelId, hardGate: s.hardGate,
     })
-    auditLog('model_drift_detected', null, { anchored: s.anchoredDeployment, live: s.liveDeployment, hardGate: s.hardGate })
+    auditLog('model_drift_detected', null, { anchored: s.anchoredModelId, live: s.liveModelId, hardGate: s.hardGate })
   }
   return s
 }
@@ -68,7 +76,7 @@ export function assertJudgeAnchoredForIssuance() {
   const s = modelDriftStatus()
   if (s.status === 'DRIFT_BLOCKING') {
     throw new Error(
-      `credential issuance blocked: judge deployment '${s.liveDeployment}' is not the anchored '${s.anchoredDeployment}' — run the anchor re-score + conformal recalibration, update judge-fingerprint.json, then reissue`,
+      `credential issuance blocked: judge model '${s.liveModelId}' is not the anchored '${s.anchoredModelId}' — run the anchor re-score + conformal recalibration, update judge-fingerprint.json, then reissue`,
     )
   }
 }

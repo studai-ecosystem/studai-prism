@@ -23,8 +23,9 @@ import {
   sanitizeObservations, assertNoNumericFit,
 } from '../lib/teamfit.js'
 import { sanitizeCandidateText, INJECTION_GUARD } from '../lib/promptSecurity.js'
-import { renderPrompt } from '../engine/prompts.js'
-import { createCompletion, MODEL, buildAvatarSystemPrompt, SCENARIOS } from './assessment.js'
+import { renderPrompt } from '../services/ai/promptManager.js'
+import { conversationModel, createCompletion } from '../services/ai/index.js'
+import { buildAvatarSystemPrompt, SCENARIOS } from './assessment.js'
 
 const router = Router()
 
@@ -97,7 +98,7 @@ router.post('/session', async (req, res) => {
     const teamfitId = randomUUID()
 
     const opening = await createCompletion({
-      model: MODEL(),
+      model: conversationModel(),
       max_completion_tokens: 350,
       temperature: 0.8,
       response_format: { type: 'json_object' },
@@ -105,7 +106,7 @@ router.post('/session', async (req, res) => {
         { role: 'system', content: buildAvatarSystemPrompt(scenario, 1) },
         { role: 'user', content: 'Begin the scenario now. The FIRST twin opens: explain the situation simply and ask the candidate one friendly question about how they would start working with this team on it. Return the single message in the messages array.' },
       ],
-    })
+    }, { task: 'teamfit' })
     const raw = opening.choices[0].message.content
     const history = [{ role: 'assistant', content: raw }]
     liveTeamfits.set(teamfitId, { teamId, scenario, history, turns: 0 })
@@ -139,7 +140,7 @@ router.post('/message', async (req, res) => {
   try {
     const updatedHistory = [...live.history, { role: 'user', content: `[Candidate]: ${message}` }]
     const response = await createCompletion({
-      model: MODEL(),
+      model: conversationModel(),
       max_completion_tokens: 350,
       temperature: 0.85,
       response_format: { type: 'json_object' },
@@ -147,7 +148,7 @@ router.post('/message', async (req, res) => {
         { role: 'system', content: buildAvatarSystemPrompt(live.scenario, live.turns % 2 === 0 ? 1 : 2) },
         ...updatedHistory,
       ],
-    })
+    }, { task: 'teamfit' })
     const raw = response.choices[0].message.content
     live.history = [...updatedHistory, { role: 'assistant', content: raw }]
     live.turns += 1
@@ -180,7 +181,7 @@ router.post('/observations', async (req, res) => {
       .map((p) => `- ${p.name}: ${p.personality}`)
       .join('\n')
     const response = await createCompletion({
-      model: MODEL(),
+      model: conversationModel(),
       max_completion_tokens: 900,
       temperature: 0.3,
       response_format: { type: 'json_object' },
@@ -188,7 +189,7 @@ router.post('/observations', async (req, res) => {
         { role: 'system', content: renderPrompt('teamfit_observer.v1', { PERSONAS: personas, TRANSCRIPT: transcript, INJECTION_GUARD }) },
         { role: 'user', content: 'Produce the observations JSON now.' },
       ],
-    })
+    }, { task: 'teamfit' })
     const clean = sanitizeObservations(JSON.parse(response.choices[0].message.content))
     assertNoNumericFit(clean) // structural guarantee, throws on violation
     await query(

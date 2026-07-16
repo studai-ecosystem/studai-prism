@@ -35,12 +35,26 @@ const post = (path, body, headers = {}) =>
 
 const tokenFor = (id, email) => jwt.sign({ sub: id, email }, process.env.JWT_SECRET)
 
+const BEDROCK_PRODUCTION_ENV = {
+  AI_PROVIDER: 'aws-bedrock',
+  AWS_REGION: 'ap-south-1',
+  BEDROCK_PRIMARY_MODEL: 'global.anthropic.claude-sonnet-5',
+  BEDROCK_CONVERSATION_MODEL: 'mistral.mistral-large-3-675b-instruct',
+  BEDROCK_FAST_MODEL: 'mistral.ministral-3-14b-instruct',
+  BEDROCK_FALLBACK_MODEL: 'global.amazon.nova-2-lite-v1:0',
+  BEDROCK_EMBEDDING_MODEL: 'amazon.titan-embed-text-v2:0',
+  BEDROCK_MULTIMODAL_MODEL: 'mistral.mistral-large-3-675b-instruct',
+  BEDROCK_STT_MODEL: 'mistral.voxtral-mini-3b-2507',
+  BEDROCK_ALLOW_GLOBAL_INFERENCE: 'true',
+}
+
 // ── C8: JWT hard-fail in production ──────────────────────────────────────────
 test('C8: startup check throws in production without JWT_SECRET', () => {
-  const oldEnv = process.env.NODE_ENV
-  const oldSecret = process.env.JWT_SECRET
+  const saved = new Map()
+  for (const key of ['NODE_ENV', 'JWT_SECRET', ...Object.keys(BEDROCK_PRODUCTION_ENV)]) saved.set(key, process.env[key])
   try {
     process.env.NODE_ENV = 'production'
+    Object.assign(process.env, BEDROCK_PRODUCTION_ENV)
     delete process.env.JWT_SECRET
     assert.throws(() => assertProductionSecrets(), /JWT_SECRET/)
     assert.throws(() => getJwtSecret(), /JWT_SECRET/)
@@ -48,8 +62,45 @@ test('C8: startup check throws in production without JWT_SECRET', () => {
     assert.doesNotThrow(() => assertProductionSecrets())
     assert.equal(getJwtSecret(), 'a-real-secret')
   } finally {
-    process.env.NODE_ENV = oldEnv
-    process.env.JWT_SECRET = oldSecret
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+})
+
+test('AI security: production requires explicit global routing and temporary AWS credentials', () => {
+  const saved = new Map()
+  for (const key of ['NODE_ENV', 'JWT_SECRET', ...Object.keys(BEDROCK_PRODUCTION_ENV), 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_BEARER_TOKEN_BEDROCK']) {
+    saved.set(key, process.env[key])
+  }
+  try {
+    process.env.NODE_ENV = 'production'
+    process.env.JWT_SECRET = 'a-real-secret'
+    Object.assign(process.env, BEDROCK_PRODUCTION_ENV)
+    delete process.env.BEDROCK_ALLOW_GLOBAL_INFERENCE
+    assert.throws(() => assertProductionSecrets(), /global Bedrock inference/)
+
+    process.env.BEDROCK_ALLOW_GLOBAL_INFERENCE = 'true'
+    process.env.BEDROCK_PRIMARY_MODEL = 'not-a-bedrock-model-id'
+    assert.throws(() => assertProductionSecrets(), /invalid Bedrock model ID/)
+    process.env.BEDROCK_PRIMARY_MODEL = BEDROCK_PRODUCTION_ENV.BEDROCK_PRIMARY_MODEL
+
+    process.env.AWS_BEARER_TOKEN_BEDROCK = 'never-log-this'
+    assert.throws(() => assertProductionSecrets(), /long-lived Bedrock API key/)
+    delete process.env.AWS_BEARER_TOKEN_BEDROCK
+
+    process.env.AWS_ACCESS_KEY_ID = 'static-key-id'
+  process.env.AWS_SECRET_ACCESS_KEY = 'static-secret'
+    delete process.env.AWS_SESSION_TOKEN
+  assert.throws(() => assertProductionSecrets(), /incomplete AWS environment credentials/)
+    process.env.AWS_SESSION_TOKEN = 'temporary-session-token'
+    assert.doesNotThrow(() => assertProductionSecrets())
+  } finally {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
   }
 })
 

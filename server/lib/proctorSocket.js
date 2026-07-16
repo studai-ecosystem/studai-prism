@@ -7,7 +7,7 @@
 // system check and proctoring can confirm a phone is connected.
 //
 // socket.io is loaded lazily so the app still boots if it isn't installed (the
-// phone-link step then degrades to "skip", like the Whisper STT fallback).
+// phone-link step then degrades to "skip", like the server STT fallback).
 
 import logger from './logger.js'
 import { recordDeviceLink } from './store.js'

@@ -7,10 +7,10 @@
 // 2024). We also run each judge under position-SWAPPED rubrics (the five
 // dimensions presented in different orders) to neutralise ordering effects.
 //
-// On a single Azure deployment the "panel" is realised as distinct judge
+// On a single Bedrock model the "panel" is realised as distinct judge
 // PERSONAS at different temperatures + dimension-order swaps. When real extra
 // model families are configured via PRISM_JUDGE_MODELS (a comma-separated list
-// of additional Azure deployment names), they are folded in automatically — so
+// of additional Bedrock model IDs), they are folded in automatically — so
 // the architecture is a true multi-family PoLL the moment a second model exists.
 
 const DIMENSION_KEYS = [
@@ -74,7 +74,7 @@ export function sampleCount() {
 // Build the panel plan: an array of independent judge-run specs. assessment.js
 // executes one LLM completion per spec, then the aggregator votes across them.
 //
-//   defaultModel — the primary Azure deployment name.
+//   defaultModel — the pinned primary Bedrock model ID.
 export function buildPanelPlan(defaultModel) {
   const models = [defaultModel, ...extraModels()]
   const total = sampleCount()

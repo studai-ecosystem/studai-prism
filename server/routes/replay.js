@@ -19,7 +19,8 @@ import { isReplayEnabled, loadMoments, truncateHistoryForReplay, loadReplayHisto
 import { sanitizeCandidateText } from '../lib/promptSecurity.js'
 import { microRateTurn } from '../engine/microRater.js'
 import { resolveLanguage } from '../lib/lang.js'
-import { createCompletion, MODEL, buildAvatarSystemPrompt, SCENARIOS } from './assessment.js'
+import { conversationModel, createCompletion, fastModel } from '../services/ai/index.js'
+import { buildAvatarSystemPrompt, SCENARIOS } from './assessment.js'
 
 const router = Router()
 
@@ -112,7 +113,7 @@ router.post('/message', async (req, res) => {
     const avatarSystem = buildAvatarSystemPrompt(live.scenario, 1, live.language)
     const updatedHistory = [...live.history, { role: 'user', content: `[Candidate]: ${message}` }]
     const response = await createCompletion({
-      model: MODEL(),
+      model: conversationModel(),
       max_completion_tokens: 350,
       temperature: 0.85,
       response_format: { type: 'json_object' },
@@ -121,13 +122,13 @@ router.post('/message', async (req, res) => {
         { role: 'system', content: 'PRACTICE REPLAY: the candidate is retrying this moment. Respond in character to their new answer; be natural, then gently move the scene forward.' },
         ...updatedHistory,
       ],
-    })
+    }, { task: 'replay' })
     const raw = response.choices[0].message.content
     const parsed = JSON.parse(raw)
 
     // Practice-only per-dimension feedback (micro levels). Clearly labeled;
     // stored ONLY in the practice ledger.
-    const practiceLevels = await microRateTurn(message, { createCompletion, model: MODEL(), language: live.language })
+    const practiceLevels = await microRateTurn(message, { createCompletion, model: fastModel(), language: live.language })
 
     live.history = [...updatedHistory, { role: 'assistant', content: raw }]
     live.turns += 1

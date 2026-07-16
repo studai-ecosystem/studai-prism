@@ -45,7 +45,7 @@ export default function AIEvaluation() {
           </h2>
           <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
             Prism scores are produced by a panel of large-language-model
-            evaluators running on Microsoft Azure OpenAI Service. Your full
+            evaluators accessed through Amazon Bedrock. Your full
             conversation is scored several times by independent judge passes
             with different judging personas and rubric orderings; your score on
             each dimension is the median of the panel, and the level of

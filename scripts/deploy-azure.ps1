@@ -90,7 +90,7 @@ if (Test-Path $envFile) {
   }
   Write-Host "Loaded secrets from server/.env"
 } else {
-  Write-Host "WARNING: server/.env not found - set AZURE_OPENAI_* and JWT_SECRET manually in the portal." -ForegroundColor Yellow
+  Write-Host "WARNING: server/.env not found - configure AWS Bedrock IAM/env settings and JWT_SECRET in App Service." -ForegroundColor Yellow
 }
 
 az webapp config appsettings set --name $AppName --resource-group $ResourceGroup --settings $settings --output none

@@ -94,9 +94,9 @@ test('T3.1: voice path keeps audio in memory only — no disk writes anywhere', 
   const route = await readFile(join(__dirname, '..', 'routes', 'assessment.js'), 'utf-8')
   assert.ok(route.includes('multer.memoryStorage()'), 'transcribe upload must use memoryStorage')
   assert.ok(!route.includes('diskStorage'), 'no multer diskStorage')
-  const whisper = await readFile(join(__dirname, '..', 'lib', 'openaiWhisper.js'), 'utf-8')
+  const speechToText = await readFile(join(__dirname, '..', 'services', 'ai', 'speechToTextService.js'), 'utf-8')
   for (const banned of ['writeFile', 'createWriteStream', 'appendFile']) {
-    assert.ok(!whisper.includes(banned), `openaiWhisper.js must not persist audio (${banned})`)
+    assert.ok(!speechToText.includes(banned), `speechToTextService.js must not persist audio (${banned})`)
   }
   // Client meter derives timing from loudness only — never records/uploads.
   const meter = await readFile(join(__dirname, '..', '..', 'src', 'lib', 'turnSignals.js'), 'utf-8')

@@ -12,17 +12,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // ── Stage 6.1: drift detection + escalation semantics ────────────────────────
 test('S6.1: drift is anchored/detected/blocking exactly per the escalation rule', () => {
-  const saved = process.env.AZURE_OPENAI_DEPLOYMENT
+  const saved = process.env.BEDROCK_PRIMARY_MODEL
+  const savedProvider = process.env.AI_PROVIDER
   const savedHard = process.env.PRISM_DRIFT_HARD
   try {
     const fp = judgeFingerprint()
-    assert.ok(fp.deployment && fp.escalationRule, 'fingerprint pins deployment + rule')
-    process.env.AZURE_OPENAI_DEPLOYMENT = fp.deployment
+    assert.ok(fp.provider === 'aws-bedrock' && fp.modelId && fp.escalationRule, 'fingerprint pins provider + model + rule')
+    process.env.AI_PROVIDER = fp.provider
+    process.env.BEDROCK_PRIMARY_MODEL = fp.modelId
     delete process.env.PRISM_DRIFT_HARD
     assert.equal(modelDriftStatus().status, 'anchored')
     assert.doesNotThrow(assertJudgeAnchoredForIssuance)
     // Drifted, soft era: detected, surfaced, NOT blocking.
-    process.env.AZURE_OPENAI_DEPLOYMENT = 'gpt-6-new'
+    process.env.BEDROCK_PRIMARY_MODEL = 'test.new-judge-model'
     assert.equal(modelDriftStatus().status, 'DRIFT_DETECTED')
     assert.doesNotThrow(assertJudgeAnchoredForIssuance, 'pre-calibration: surface, never block')
     // Drifted, hard gate (post-calibration-v1): issuance BLOCKS.
@@ -30,8 +32,10 @@ test('S6.1: drift is anchored/detected/blocking exactly per the escalation rule'
     assert.equal(modelDriftStatus().status, 'DRIFT_BLOCKING')
     assert.throws(assertJudgeAnchoredForIssuance, /issuance blocked/)
   } finally {
-    if (saved === undefined) delete process.env.AZURE_OPENAI_DEPLOYMENT
-    else process.env.AZURE_OPENAI_DEPLOYMENT = saved
+    if (saved === undefined) delete process.env.BEDROCK_PRIMARY_MODEL
+    else process.env.BEDROCK_PRIMARY_MODEL = saved
+    if (savedProvider === undefined) delete process.env.AI_PROVIDER
+    else process.env.AI_PROVIDER = savedProvider
     if (savedHard === undefined) delete process.env.PRISM_DRIFT_HARD
     else process.env.PRISM_DRIFT_HARD = savedHard
   }

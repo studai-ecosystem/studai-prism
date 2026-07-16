@@ -12,7 +12,7 @@ process.env.DATA_DIR = process.env.DATA_DIR || mkdtempSync(join(tmpdir(), 'prism
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-for-voice-suite'
 
 import { SCENARIOS } from '../routes/assessment.js'
-import { isTtsEnabled, escapeSsml, buildSsml } from '../lib/azureSpeech.js'
+import { buildPollyRequest, isTextToSpeechEnabled } from '../services/ai/textToSpeechService.js'
 import { rankVoices, voiceGender, assignCastVoices } from '../../src/lib/voice.js'
 
 const { buildApp } = await import('../app.js')
@@ -56,7 +56,7 @@ test('VOICE: tts-status reports disabled and /speech is 404 while the flag is da
 })
 
 test('VOICE: flag on but session unknown / text unspoken → honest rejections, no synth call', () =>
-  withEnv({ PRISM_TTS_NEURAL: 'true', AZURE_SPEECH_KEY: 'test-key', AZURE_SPEECH_REGION: 'centralindia' }, async () => {
+  withEnv({ PRISM_TTS_NEURAL: 'true', POLLY_TTS_ENABLED: 'true' }, async () => {
     const missing = await fetch(`${base}/api/assessment/speech`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -137,7 +137,7 @@ test('APP: the Windows installer is published at /download', async () => {
 
 // ── cast metadata ────────────────────────────────────────────────────────────
 
-test('VOICE: every ACTIVE scenario participant carries tts metadata (gender + azure voice)', () => {
+test('VOICE: every ACTIVE scenario participant carries provider-neutral Polly metadata', () => {
   const active = SCENARIOS.filter((s) => !s.retired)
   assert.equal(active.length, 8, 'frozen bank stays at 8 active scenarios')
   for (const s of active) {
@@ -145,10 +145,12 @@ test('VOICE: every ACTIVE scenario participant carries tts metadata (gender + az
     for (const p of s.participants) {
       assert.ok(p.tts, `${s.id}/${p.name} has tts metadata`)
       assert.ok(['male', 'female'].includes(p.tts.gender), `${s.id}/${p.name} gender declared`)
-      assert.match(p.tts.azureVoice, /^en-IN-[A-Za-z]+Neural$/, `${s.id}/${p.name} uses an Indian-English neural voice`)
+      assert.match(p.tts.voiceId, /^[A-Za-z]+$/, `${s.id}/${p.name} uses a valid Polly voice id`)
+      assert.equal(p.tts.engine, 'neural', `${s.id}/${p.name} uses Polly neural synthesis`)
+      assert.match(p.tts.languageCode, /^en-(IN|GB|US)$/, `${s.id}/${p.name} uses an English voice`)
     }
     // Distinct voices within a scenario — three people must not share a voice.
-    const voices = s.participants.map((p) => p.tts.azureVoice)
+    const voices = s.participants.map((p) => p.tts.voiceId)
     assert.equal(new Set(voices).size, 3, `${s.id} cast voices are distinct`)
   }
 })
@@ -194,21 +196,21 @@ test('VOICE: cast assignment is deterministic, gender-matched and distinct', () 
   assert.equal(new Set(names).size, 3, 'three distinct voices assigned')
 })
 
-// ── server flag + SSML safety ────────────────────────────────────────────────
+// ── server flag + synthesis safety ──────────────────────────────────────────
 
 test('VOICE: PRISM_TTS_NEURAL is dark by default', () => {
   assert.notEqual(process.env.PRISM_TTS_NEURAL, 'true', 'flag must not be on in the test env')
-  assert.equal(isTtsEnabled(), false)
+  assert.equal(isTextToSpeechEnabled(), false)
 })
 
-test('VOICE: SSML builder escapes injection and rejects bogus voice names', () => {
-  const ssml = buildSsml('<script>alert("x")</script> & more', 'en-IN-NeerjaNeural')
-  assert.ok(!ssml.includes('<script>'), 'tags escaped')
-  assert.ok(ssml.includes('&lt;script&gt;'), 'escaped form present')
-  assert.ok(ssml.includes('&amp; more'))
-  const bad = buildSsml('hello', '"><voice name="evil')
-  assert.ok(bad.includes('en-IN-NeerjaNeural'), 'invalid voice falls back to the default')
-  assert.equal(escapeSsml(`a'b"c`), 'a&apos;b&quot;c')
+test('VOICE: Polly uses plain text and rejects bogus voice names', () => {
+  const request = buildPollyRequest('<script>alert("x")</script> & more', {
+    voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN',
+  })
+  assert.equal(request.TextType, 'text', 'candidate-controlled markup is never interpreted as SSML')
+  assert.equal(request.Text, '<script>alert("x")</script> & more')
+  const bad = buildPollyRequest('hello', { voiceId: '"><voice name="evil' })
+  assert.equal(bad.VoiceId, 'Kajal', 'invalid voice falls back to the default')
 })
 
 // ── PWA manifest ─────────────────────────────────────────────────────────────

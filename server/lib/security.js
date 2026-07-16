@@ -6,6 +6,7 @@
 
 import { rateLimit } from 'express-rate-limit'
 import logger from './logger.js'
+import { aiProvider, allowedModelIds } from '../services/ai/modelRouter.js'
 
 export function isProduction() {
   return process.env.NODE_ENV === 'production'
@@ -37,11 +38,42 @@ export function getJwtSecret() {
 export function assertProductionSecrets() {
   if (!isProduction()) return
   const missing = []
-  if (!process.env.JWT_SECRET) missing.push('JWT_SECRET')
+  for (const key of [
+    'JWT_SECRET',
+    'AI_PROVIDER',
+    'BEDROCK_PRIMARY_MODEL',
+    'BEDROCK_CONVERSATION_MODEL',
+    'BEDROCK_FAST_MODEL',
+    'BEDROCK_FALLBACK_MODEL',
+    'BEDROCK_EMBEDDING_MODEL',
+    'BEDROCK_MULTIMODAL_MODEL',
+    'BEDROCK_STT_MODEL',
+  ]) {
+    if (!process.env[key]) missing.push(key)
+  }
+  if (!process.env.AWS_REGION && !process.env.AWS_DEFAULT_REGION) missing.push('AWS_REGION')
   if (missing.length) {
     throw new Error(
       `Refusing to start in production: missing required secret(s): ${missing.join(', ')} (audit C8).`,
     )
+  }
+  if (aiProvider() !== 'aws-bedrock') {
+    throw new Error('Refusing to start in production: AI_PROVIDER must be aws-bedrock.')
+  }
+  const modelIdPattern = /^(?:arn:aws[a-z-]*:bedrock:|(?:global|us|eu|jp|au)\.|[a-z0-9-]+\.)[A-Za-z0-9._:/-]+$/
+  const invalidModelIds = [...allowedModelIds()].filter((modelId) => !modelIdPattern.test(modelId))
+  if (invalidModelIds.length) {
+    throw new Error(`Refusing to start in production: invalid Bedrock model ID(s): ${invalidModelIds.join(', ')}.`)
+  }
+  if ([...allowedModelIds()].some((modelId) => modelId.startsWith('global.')) && process.env.BEDROCK_ALLOW_GLOBAL_INFERENCE !== 'true') {
+    throw new Error('Refusing to start in production: global Bedrock inference requires BEDROCK_ALLOW_GLOBAL_INFERENCE=true after data-residency approval.')
+  }
+  if (process.env.AWS_BEARER_TOKEN_BEDROCK) {
+    throw new Error('Refusing to start in production with a long-lived Bedrock API key; use an IAM role or federated temporary credentials.')
+  }
+  const envCredentialParts = [process.env.AWS_ACCESS_KEY_ID, process.env.AWS_SECRET_ACCESS_KEY, process.env.AWS_SESSION_TOKEN]
+  if (envCredentialParts.some(Boolean) && !envCredentialParts.every(Boolean)) {
+    throw new Error('Refusing to start in production with incomplete AWS environment credentials; use an IAM role or a complete temporary STS credential set.')
   }
 }
 
@@ -73,7 +105,7 @@ const baseOptions = {
 // Brute-force guard for credential endpoints: 5 attempts/min/IP.
 export const authLimiter = rateLimit({ ...baseOptions, windowMs: 60 * 1000, limit: 5 })
 
-// Whisper transcription is the main cost-abuse vector: 20/min/IP comfortably
+// Server transcription is the main cost-abuse vector: 20/min/IP comfortably
 // covers one candidate answering questions, not a script farming STT.
 export const transcribeLimiter = rateLimit({ ...baseOptions, windowMs: 60 * 1000, limit: 20 })
 

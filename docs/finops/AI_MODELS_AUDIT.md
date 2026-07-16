@@ -1,5 +1,9 @@
 # StudAI Prism — AI Models Audit, Provider Matrix & Routing Strategy
 
+> Historical pre-migration baseline (2026-07-08). Runtime cloud AI moved to
+> Amazon Bedrock on 2026-07-16. See `../../AI_ARCHITECTURE.md` and
+> `../../MIGRATION_REPORT.md` for current architecture and pricing.
+
 All prices pulled from the Azure Retail Prices API (`prices.azure.com`, service **Foundry Models** / Cognitive Services, USD) on 2026-07-08. All deployments verified with `az cognitiveservices account deployment list` against the live account.
 
 ## 1. Deployed models (account `studai-openai-286274596`, rg `studai-one-platform`, eastus)

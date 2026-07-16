@@ -1,5 +1,9 @@
 # StudAI Prism — System Architecture (as built)
 
+> Historical pre-migration topology (2026-07-08). The web host remains Azure,
+> but the cloud AI plane moved to Amazon Bedrock/Polly on 2026-07-16. See
+> `../../AI_ARCHITECTURE.md` for the current topology.
+
 Every claim below is anchored to the codebase at commit `8f91e45` or to a live Azure query on 2026-07-08.
 
 ## 1. Topology

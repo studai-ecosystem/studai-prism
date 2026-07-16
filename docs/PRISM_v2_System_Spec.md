@@ -1,5 +1,10 @@
 # PRISM v2 — System Specification & GitHub Copilot Build Plan
 
+> Implementation note (2026-07-16): cloud AI inference now uses the centralized
+> Amazon Bedrock/Polly layer described in `../AI_ARCHITECTURE.md`. Provider names
+> below describe the original design baseline; psychometric requirements remain
+> authoritative.
+
 **StudAI One · Confidential · June 2026**
 **Codename: MASA-2 (Multi-stage Adaptive Skill Assessment, v2)**
 **Companion to: Prism v2 Research Blueprint (deep research report)**

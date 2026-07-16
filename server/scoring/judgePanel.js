@@ -11,24 +11,13 @@
 // caller beyond a final "all judges failed" — the route catches that.
 
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
 import { DIMENSIONS, SCORER } from './dualScorerConfig.js'
 import { modalLevelsForTurn } from './aggregate.js'
 import { query } from '../db/pool.js'
 import { isTelemetryEnabled } from '../lib/telemetry.js'
 import { wrapCandidateTurn, INJECTION_GUARD } from '../lib/promptSecurity.js'
 import logger from '../lib/logger.js'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const _promptCache = new Map()
-function loadPrompt(name) {
-  if (_promptCache.has(name)) return _promptCache.get(name)
-  const text = readFileSync(join(__dirname, '..', 'prompts', `${name}.md`), 'utf8')
-  _promptCache.set(name, text)
-  return text
-}
+import { loadPrompt } from '../services/ai/promptManager.js'
 
 const VALID = new Set([0, 1, 2, 3, 4])
 function normalizeLevels(raw) {
@@ -77,7 +66,7 @@ async function oneVote(ctx, turnText, model, { swapped = false, paraphrased = fa
           { role: 'user', content: userMsg },
         ],
       },
-      { retries: 2 },
+      { retries: 2, task: 'judge_turn' },
     )
     const raw = completion?.choices?.[0]?.message?.content
     return raw ? normalizeLevels(JSON.parse(raw)) : null

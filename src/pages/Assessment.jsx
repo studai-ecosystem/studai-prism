@@ -326,10 +326,10 @@ export default function Assessment() {
   // link-phone step; if present, the test requires the phone to stay connected.
   const [phonePairCode] = useState(() => recallPairCode(params.get('session')))
   const [phoneLinked, setPhoneLinked] = useState(false)
-  // Speech-to-text mode: 'whisper' (server) when configured, else 'webspeech'
+  // Speech-to-text mode: 'bedrock' (server) when configured, else 'webspeech'
   // (browser live dictation) so the spoken test still works without an API key.
-  const [sttMode, setSttMode] = useState('whisper')
-  // Neural persona voices (PRISM_TTS_NEURAL): server-proxied Azure Speech when
+  const [sttMode, setSttMode] = useState('bedrock')
+  // Neural persona voices (PRISM_TTS_NEURAL): server-proxied Amazon Polly when
   // the flag is lit; otherwise the persona-mapped browser voices. Either way
   // each participant speaks with their OWN voice — never one robot for all.
   const [neuralTts, setNeuralTts] = useState(false)
@@ -492,14 +492,14 @@ export default function Assessment() {
     return () => window.removeEventListener('pagehide', onPageHide)
   }, [phonePairCode])
 
-  // Detect whether server-side Whisper STT is available. If not, the spoken
+  // Detect whether server-side Bedrock STT is available. If not, the spoken
   // answer flow falls back to the browser's live dictation so the test still
   // works without an OpenAI key.
   useEffect(() => {
     let cancelled = false
     fetch('/api/assessment/stt-status')
       .then((r) => (r.ok ? r.json() : { enabled: false }))
-      .then((d) => { if (!cancelled) setSttMode(d.enabled ? 'whisper' : 'webspeech') })
+      .then((d) => { if (!cancelled) setSttMode(d.enabled ? 'bedrock' : 'webspeech') })
       .catch(() => { if (!cancelled) setSttMode('webspeech') })
     return () => { cancelled = true }
   }, [])
@@ -957,7 +957,7 @@ export default function Assessment() {
     sendText(input)
   }, [input, listening, sendText])
 
-  // ── Voice answer: record → upload → Whisper transcript → send ───────────────
+  // ── Voice answer: record → upload → Bedrock transcript → send ───────────────
   const handleRecordingStop = useCallback(async () => {
     const chunks = audioChunksRef.current
     audioChunksRef.current = []
@@ -1032,13 +1032,13 @@ export default function Assessment() {
     setRecording(false)
   }, [])
 
-  // Unified primary "speak your answer" control. Uses server Whisper when it is
+  // Unified primary "speak your answer" control. Uses server Bedrock STT when it is
   // configured; otherwise falls back to the browser's live dictation and
   // auto-sends the recognised text when the candidate stops — so the spoken
   // test works even without an OpenAI key.
   const startVoiceAnswer = useCallback(async () => {
     if (loading || submitting || initialising || transcribing) return
-    if (sttMode === 'whisper') return startRecording()
+    if (sttMode === 'bedrock') return startRecording()
     const recognition = recognitionRef.current
     if (!recognition) {
       setNotice('Voice input is not supported in this browser. Please type your answer.')
@@ -1060,14 +1060,14 @@ export default function Assessment() {
   }, [sttMode, loading, submitting, initialising, transcribing, startRecording])
 
   const stopVoiceAnswer = useCallback(() => {
-    if (sttMode === 'whisper') return stopRecording()
+    if (sttMode === 'bedrock') return stopRecording()
     const recognition = recognitionRef.current
     answerModeRef.current = false
     listeningIntentRef.current = false
     try { recognition?.stop() } catch { /* ignore */ }
     setRecording(false)
     // Let the final recognition result settle, then open the review window on
-    // the spoken answer (same commit semantics as the Whisper path).
+    // the spoken answer (same commit semantics as the server STT path).
     setTimeout(() => {
       const text = (voiceAnswerRef.current || '').trim()
       voiceAnswerRef.current = ''
@@ -1434,8 +1434,8 @@ export default function Assessment() {
           </button>
 
           {/* Optional browser dictation into the text box (only useful as a
-              separate control when Whisper does the primary capture). */}
-          {voiceSupported && sttMode === 'whisper' && (
+                separate control when server STT does the primary capture). */}
+              {voiceSupported && sttMode === 'bedrock' && (
             <button
               onClick={toggleVoice}
               disabled={loading || submitting || initialising || recording || transcribing}

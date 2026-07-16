@@ -1,5 +1,8 @@
 # AI Provider Matrix — StudAI Prism
 
+> Historical provider decision (2026-07-08), superseded by the Amazon Bedrock
+> migration documented in `../../AI_ARCHITECTURE.md`.
+
 The full provider comparison and the stay-on-Azure decision live in [AI_MODELS_AUDIT.md](AI_MODELS_AUDIT.md) §4 (single source of truth).
 
 Decision summary:

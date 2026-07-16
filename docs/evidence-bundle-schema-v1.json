@@ -64,7 +64,9 @@
       "properties": {
         "promptVersions": { "type": "array", "items": { "type": "string" }, "description": "Versioned prompt files governing scoring at issuance." },
         "flagsActive": { "type": "object", "description": "PRISM_* feature flags at issuance (secret-named keys excluded)." },
-        "judgeDeployment": { "type": ["string", "null"], "description": "Azure OpenAI deployment name used by the judge panel." }
+        "aiProvider": { "type": "string", "description": "Cloud AI gateway used for scoring." },
+        "judgeModel": { "type": "string", "description": "Pinned foundation-model or inference-profile ID used by the judge panel." },
+        "judgeDeployment": { "type": ["string", "null"], "description": "Backward-compatible alias carrying the pinned judge model ID." }
       }
     }
   }

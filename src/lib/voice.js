@@ -7,7 +7,7 @@
 // voices, including Indian-English) and assigns each scenario persona a
 // deterministic, distinct voice matched to their gender.
 //
-// Layer 2 (optional, flagged PRISM_TTS_NEURAL): server-proxied Azure Speech
+// Layer 2 (optional, flagged PRISM_TTS_NEURAL): server-proxied Amazon Polly
 // neural audio — the client asks /api/assessment/tts-status and, when enabled,
 // fetches audio per message from /api/assessment/speech, falling back to
 // Layer 1 on any error.

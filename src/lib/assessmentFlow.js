@@ -16,7 +16,7 @@ export const DURATION_SECONDS = ASSESSMENT_MINUTES * 60
 
 // Spoken question types for the voice-only test. The candidate hears the avatar
 // ask the question (TTS) and answers by speaking into the mic; the audio is
-// transcribed server-side (Whisper) and fed into the AI loop. `answerSeconds`
+// transcribed server-side through Bedrock and fed into the AI loop. `answerSeconds`
 // is the suggested speaking window the UI can enforce per type (null = open).
 export const SPOKEN_QUESTION_TYPES = {
   speaking:  { id: 'speaking',  label: 'Speaking',  answerSeconds: null, hint: 'Speak your answer naturally.' },

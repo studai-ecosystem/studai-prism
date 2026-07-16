@@ -19,12 +19,21 @@ import logger from '../../lib/logger.js'
 import { query } from '../../db/pool.js'
 import { requirePermission } from '../../lib/adminAuth.js'
 import { adminAudit } from '../../lib/adminAudit.js'
-import { isWhisperEnabled } from '../../lib/openaiWhisper.js'
-import { isTtsEnabled } from '../../lib/azureSpeech.js'
 import { isMailEnabled } from '../../lib/mailer.js'
 import { getPublicKeyInfo, isGlassBoxEnabled } from '../../lib/credentials.js'
 import { modelDriftStatus } from '../../lib/modelDrift.js'
 import { randomUUID } from 'node:crypto'
+import {
+  aiProvider,
+  awsRegion,
+  conversationModel,
+  fastModel,
+  isSpeechToTextEnabled,
+  isTextToSpeechEnabled,
+  judgeModel,
+  policyFor,
+  speechToTextModel,
+} from '../../services/ai/index.js'
 
 const router = Router()
 
@@ -54,13 +63,15 @@ router.get('/health', requirePermission('system:read'), async (req, res) => {
         environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
       },
       postgres,
-      azureOpenAI: {
-        configured: Boolean(process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT),
-        deployment: process.env.AZURE_OPENAI_DEPLOYMENT || null,
+      bedrock: {
+        configured: aiProvider() === 'aws-bedrock',
+        region: awsRegion(),
+        model: judgeModel(),
+        authentication: 'AWS default credential provider chain',
         driftStatus: drift.status,
       },
-      speechToText: { configured: isWhisperEnabled() },
-      textToSpeech: { configured: isTtsEnabled(), flag: process.env.PRISM_TTS_NEURAL === 'true' },
+      speechToText: { configured: isSpeechToTextEnabled(), provider: 'aws-bedrock', model: speechToTextModel() },
+      textToSpeech: { configured: isTextToSpeechEnabled(), provider: 'amazon-polly', flag: process.env.PRISM_TTS_NEURAL === 'true' },
       email: { configured: isMailEnabled() },
       razorpay: {
         configured: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
@@ -90,10 +101,17 @@ router.get('/models', requirePermission('system:read'), async (req, res) => {
     const drift = modelDriftStatus()
     res.json({
       live: {
-        judgeDeployment: process.env.AZURE_OPENAI_DEPLOYMENT || null,
+        provider: aiProvider(),
+        region: awsRegion(),
+        judgeModel: judgeModel(),
+        judgeDeployment: judgeModel(),
+        conversationModel: conversationModel(),
+        fastModel: fastModel(),
+        fallbackModel: policyFor('conversation').fallbackModelId,
         judgeModels: process.env.PRISM_JUDGE_MODELS || null,
         judgeSamples: Number(process.env.PRISM_JUDGE_SAMPLES) || 5,
-        microRaterModel: process.env.PRISM_MICRO_RATER_MODEL || null,
+        microRaterModel: fastModel(),
+        anchoredModel: drift.anchoredModelId,
         anchoredDeployment: drift.anchoredDeployment,
         driftStatus: drift.status,
       },

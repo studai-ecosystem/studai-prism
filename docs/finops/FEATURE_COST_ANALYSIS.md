@@ -1,5 +1,9 @@
 # StudAI Prism — Feature Cost Analysis (per request, per session, all math shown)
 
+> Historical Azure AI cost baseline (2026-07-08). Current Bedrock model rates
+> and projected costs are documented in `../../AI_ARCHITECTURE.md` and
+> `../../MIGRATION_REPORT.md`.
+
 Prices: gpt-5.4 Global $2.50/1M input, $15.00/1M output, $0.25/1M cached input; Whisper $0.006/min; neural TTS $16/1M chars (S0). Sources in AI_MODELS_AUDIT.md. Token masses measured from the prompt files in `server/prompts/` and call parameters in `server/routes/assessment.js`.
 
 ## 1. The session model (assumptions, stated)

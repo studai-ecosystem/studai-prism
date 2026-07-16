@@ -24,6 +24,7 @@ import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCALE_VERSION, SCORE_VALIDITY_MONTHS
 import { activeFlagSnapshot } from './telemetry.js'
 import { assertJudgeAnchoredForIssuance } from './modelDrift.js'
 import logger from './logger.js'
+import { aiProvider, judgeModel } from '../services/ai/modelRouter.js'
 
 export function isGlassBoxEnabled() {
   return process.env.PRISM_GLASS_BOX === 'true' && Boolean(process.env.PRISM_CREDENTIAL_SIGNING_KEY) && isDbConfigured()
@@ -148,7 +149,10 @@ export async function assembleEvidenceBundle(sessionId) {
     provenance: {
       promptVersions: activePromptVersions(),
       flagsActive: activeFlagSnapshot(),
-      judgeDeployment: process.env.AZURE_OPENAI_DEPLOYMENT || null,
+      aiProvider: aiProvider(),
+      judgeModel: judgeModel(),
+      // Retained for evidence-bundle-v1 compatibility; now carries a model ID.
+      judgeDeployment: judgeModel(),
     },
   }
 }

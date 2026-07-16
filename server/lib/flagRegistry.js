@@ -34,7 +34,7 @@ export const FLAG_CATALOGUE = [
   { key: 'PRISM_ADMIN_CONSOLE', risk: 'medium', owner: 'engineering', description: 'This admin control centre.', dataGate: 'DATABASE_URL + migration 0011 + seeded super admin' },
   { key: 'PRISM_ADMIN_PROMPT_REGISTRY', risk: 'high', owner: 'psychometrics', description: 'Prompt runtime served from the DB registry instead of files.', dataGate: 'registry seeded; drift report clean' },
   { key: 'PRISM_CMS_DB', risk: 'medium', owner: 'content', description: 'Public content served from the DB CMS instead of content.json.', dataGate: 'CMS seeded from content.json' },
-  { key: 'PRISM_TTS_NEURAL', risk: 'low', owner: 'engineering', description: 'Azure neural voices for personas.', dataGate: 'AZURE_SPEECH_KEY/REGION' },
+  { key: 'PRISM_TTS_NEURAL', risk: 'low', owner: 'engineering', description: 'Amazon Polly neural voices for personas.', dataGate: 'POLLY_TTS_ENABLED + IAM polly:SynthesizeSpeech' },
   { key: 'PRISM_PG_STORE', risk: 'high', owner: 'engineering', description: 'v1 store on PostgreSQL instead of JSON files.', dataGate: 'staging smoke of the full candidate flow (audit C13 runbook)' },
   { key: 'PRISM_DUMMY_PAYMENTS', risk: 'medium', owner: 'business', description: 'Trial mode: free dummy entitlements instead of Razorpay.', dataGate: 'business decision only' },
   { key: 'PRISM_SKIP_VERIFICATION', risk: 'medium', owner: 'business', description: 'Trial mode: bypass identity verification steps (consent never skipped).', dataGate: 'business decision only' },

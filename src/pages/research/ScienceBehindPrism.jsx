@@ -49,7 +49,7 @@ const steps = [
   },
   {
     num: '2',
-    text: 'A panel of AI evaluators (Azure OpenAI) analyses reasoning, tone, structure, and adaptability',
+    text: 'A panel of AI evaluators (Amazon Bedrock) analyses reasoning, structure, evidence, and adaptability',
   },
   {
     num: '3',

@@ -1,8 +1,10 @@
 {
-  "deployment": "gpt-5.4",
-  "apiVersion": "2025-04-01-preview",
-  "anchoredAt": "2026-07-05",
+  "provider": "aws-bedrock",
+  "modelId": "global.anthropic.claude-sonnet-5",
+  "api": "Converse",
+  "sdkVersion": "3.1088.0",
+  "anchoredAt": "2026-07-16",
   "anchorRunId": null,
-  "note": "Pre-calibration era: gpt-5.4 is the deployment that has scored every session to date. anchorRunId stays null until the first anchor re-score exists.",
-  "escalationRule": "When calibration-run v1 freezes: (1) set PRISM_DRIFT_HARD=true in prod; (2) any judge deployment change must shadow re-score the fixed anchor set (rater training refs + golden transcripts) and pass conformal recalibration; (3) only then update this file (new deployment + anchorRunId of the re-score) in the same commit as the config change. A drifted judge cannot mint credentials under the hard gate."
+  "note": "Bedrock migration anchor. No real production calibration run exists yet; Claude Sonnet 5 must pass the fixed transcript shadow comparison before paid or externally verified scoring is enabled.",
+  "escalationRule": "Before paid or externally verified scoring: shadow-score the fixed anchor set against the previous GPT-5.4 outputs and human references. When calibration-run v1 freezes: (1) set PRISM_DRIFT_HARD=true in production; (2) any judge model change must shadow re-score the fixed anchor set and pass conformal recalibration; (3) only then update provider/modelId and anchorRunId in this file in the same commit. A drifted judge cannot mint credentials under the hard gate."
 }

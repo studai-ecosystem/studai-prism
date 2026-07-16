@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { query } from '../db/pool.js'
-import { primeCache } from '../engine/prompts.js'
+import { primeCache } from '../services/ai/promptManager.js'
 import logger from './logger.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))

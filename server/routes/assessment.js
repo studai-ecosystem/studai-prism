@@ -1,13 +1,20 @@
 import { Router } from 'express'
 import { json as expressJson } from 'express'
-import OpenAI from 'openai'
 import jwt from 'jsonwebtoken'
 import multer from 'multer'
 import { v4 as uuidv4 } from 'uuid'
 import logger from '../lib/logger.js'
 import { sessionCache } from '../lib/sessionCache.js'
-import { isWhisperEnabled, transcribeAudio } from '../lib/openaiWhisper.js'
-import { isTtsEnabled, synthesizeSpeech } from '../lib/azureSpeech.js'
+import {
+  conversationModel,
+  createCompletion,
+  fastModel,
+  isSpeechToTextEnabled,
+  isTextToSpeechEnabled,
+  judgeModel,
+  synthesizeSpeech,
+  transcribeAudio,
+} from '../services/ai/index.js'
 import { isMailEnabled, sendReportEmail } from '../lib/mailer.js'
 import {
   getEntitlement,
@@ -49,7 +56,7 @@ import { EvidenceLedger } from '../engine/evidenceLedger.js'
 import { microRateTurn, normalizeLevels } from '../engine/microRater.js'
 import { selectProbe, stopDecision, isPressureEnabled } from '../engine/probeSelector.js'
 import { anchorsToTheta, heuristicTheta, thetaToTier } from '../engine/entryEstimator.js'
-import { loadPrompt, loadPromptJson, renderPrompt } from '../engine/prompts.js'
+import { loadPrompt, loadPromptJson, renderPrompt } from '../services/ai/promptManager.js'
 import { sanitizeCandidateText, INJECTION_GUARD } from '../lib/promptSecurity.js'
 import { isDualScorerEnabled, runDualScorer } from '../scoring/dualScorer.js'
 import { equateScore, isEquatingEnabled } from '../scoring/equating.js'
@@ -82,27 +89,6 @@ function getAuthUser(req) {
 
 // Hard wall-clock limit for a session (server-enforced, mirrors the 30-min UI timer).
 const SESSION_LIMIT_MS = 35 * 60 * 1000 // 30 min + 5 min grace for network/scoring
-
-// ── Resilient chat completion — retry transient failures with backoff ─────────
-// Exported for the Track 5 practice/teamfit surfaces — same client, same
-// retry discipline, zero scoring authority.
-export async function createCompletion(params, { retries = 2 } = {}) {
-  let lastErr
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      return await getClient().chat.completions.create(params)
-    } catch (err) {
-      lastErr = err
-      const status = err?.status || err?.response?.status
-      // Don't retry client errors (4xx except 429).
-      if (status && status < 500 && status !== 429) break
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt)))
-      }
-    }
-  }
-  throw lastErr
-}
 
 function clampScore(n) {
   const v = Math.round(Number(n))
@@ -142,23 +128,6 @@ async function computePercentile(overall) {
   return Math.round((below / all.length) * 100)
 }
 
-// Lazy init — env vars are loaded by dotenv in index.js but ES module
-// imports are hoisted, so we must defer client creation to first use.
-let _openai = null
-function getClient() {
-  if (!_openai) {
-    _openai = new OpenAI({
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      baseURL: `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}`,
-      defaultQuery: { 'api-version': process.env.AZURE_OPENAI_API_VERSION || '2025-04-01-preview' },
-      defaultHeaders: { 'api-key': process.env.AZURE_OPENAI_API_KEY },
-    })
-  }
-  return _openai
-}
-const MODEL = () => process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5.4'
-export { MODEL }
-
 // ── Live session cache (pluggable: in-memory by default, Redis when REDIS_URL set) ─
 // Stores { scenario, exchangeCount, history } for the active chat; every turn is
 // also durably persisted via store.js, so this is purely a hot cache.
@@ -189,9 +158,9 @@ export const SCENARIOS = [
     title: 'The Group Project',
     context: `You are a final-year student leading a 4-person group project that is due in 3 days. It counts for 40% of your grade. One teammate has done almost no work and keeps making excuses. Another teammate wants to just do that person's part for them to be safe. You still have your own part left to finish too. Everyone is stressed and the group chat is getting tense.`,
     participants: [
-      { name: 'Aditya', role: 'The Hardworking Teammate', personality: 'Stressed and a bit angry. Wants to remove the slacker from the group or report them. Will ask you what you are actually going to do about it.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
-      { name: 'Sneha', role: 'The Peacemaker Teammate', personality: 'Avoids conflict. Just wants to cover the missing work quietly so the grade is safe. Worried about hurting feelings.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
-      { name: 'Ravi', role: 'The Quiet Teammate', personality: 'Mostly stays silent and just listens. Speaks only rarely, to say how the team is feeling or whether a plan seems fair to everyone.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
+      { name: 'Aditya', role: 'The Hardworking Teammate', personality: 'Stressed and a bit angry. Wants to remove the slacker from the group or report them. Will ask you what you are actually going to do about it.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
+      { name: 'Sneha', role: 'The Peacemaker Teammate', personality: 'Avoids conflict. Just wants to cover the missing work quietly so the grade is safe. Worried about hurting feelings.', tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
+      { name: 'Ravi', role: 'The Quiet Teammate', personality: 'Mostly stays silent and just listens. Speaks only rarely, to say how the team is feeling or whether a plan seems fair to everyone.', tts: { gender: 'male', voiceId: 'Matthew', engine: 'neural', languageCode: 'en-US' } },
     ],
   },
   {
@@ -201,9 +170,9 @@ export const SCENARIOS = [
     title: 'The Fest Budget',
     context: `You are the coordinator for your college fest. You have ₹50,000 left and two days to go. The music club wants more money for a better sound system. The food stalls say they will pull out unless they get a bigger share. If you spend on one, the other gets less. Students are already excited and tickets are sold, so the event cannot flop.`,
     participants: [
-      { name: 'Karthik', role: 'Music Club Head', personality: 'Passionate about the show. Believes a great sound system is what people will remember. Will push hard for the bigger budget.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
-      { name: 'Divya', role: 'Food Stall Organiser', personality: 'Practical. Says hungry people leave early and blame the organisers. Threatens to reduce stalls if her budget is cut.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
-      { name: 'Prof. Nair', role: 'Faculty Advisor', personality: 'Observes quietly in the background. Speaks only rarely, to remind everyone of safety rules or that the budget is fixed.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
+      { name: 'Karthik', role: 'Music Club Head', personality: 'Passionate about the show. Believes a great sound system is what people will remember. Will push hard for the bigger budget.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
+      { name: 'Divya', role: 'Food Stall Organiser', personality: 'Practical. Says hungry people leave early and blame the organisers. Threatens to reduce stalls if her budget is cut.', tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
+      { name: 'Prof. Nair', role: 'Faculty Advisor', personality: 'Observes quietly in the background. Speaks only rarely, to remind everyone of safety rules or that the budget is fixed.', tts: { gender: 'male', voiceId: 'Matthew', engine: 'neural', languageCode: 'en-US' } },
     ],
   },
   {
@@ -239,9 +208,9 @@ export const SCENARIOS = [
     title: 'The Delayed Launch',
     context: `You are the Product Manager at FinTrack, a growing fintech startup. Your mobile app was due to launch this quarter, but engineering says they need 6 more weeks. Your top enterprise client — accounting for 30% of revenue — has threatened to leave if the app is not live within 2 weeks. Marketing has already announced the launch date and there is social media buzz building.`,
     participants: [
-      { name: 'Rohan Mehta', role: 'CTO', personality: 'Protective of engineering quality, concerned about technical debt if rushed. Will push back strongly on unrealistic timelines but is open to creative solutions.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
-      { name: 'Ananya Singh', role: 'Chief Revenue Officer', personality: 'Laser-focused on client retention and revenue. Willing to make bold promises to keep the client. Impatient with technical excuses.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
-      { name: 'Priya Menon', role: 'Customer Success Lead', personality: 'Mostly listens. Speaks only rarely, to flag how the client is actually feeling on the ground.', tts: { gender: 'female', azureVoice: 'en-IN-AashiNeural' } },
+      { name: 'Rohan Mehta', role: 'CTO', personality: 'Protective of engineering quality, concerned about technical debt if rushed. Will push back strongly on unrealistic timelines but is open to creative solutions.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
+      { name: 'Ananya Singh', role: 'Chief Revenue Officer', personality: 'Laser-focused on client retention and revenue. Willing to make bold promises to keep the client. Impatient with technical excuses.', tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
+      { name: 'Priya Menon', role: 'Customer Success Lead', personality: 'Mostly listens. Speaks only rarely, to flag how the client is actually feeling on the ground.', tts: { gender: 'female', voiceId: 'Amy', engine: 'neural', languageCode: 'en-GB' } },
     ],
   },
   {
@@ -251,9 +220,9 @@ export const SCENARIOS = [
     title: 'The Ethical AI Decision',
     context: `You are a Strategy Consultant advising RetailCo, a major retail chain that wants to implement an AI hiring system to filter 50,000 applicants per quarter. Your analysis shows that the model, trained on historical data, has statistically significant bias against certain demographic groups. The client wants full deployment in 3 weeks. Delaying could cost RetailCo ₹2 crore in manual screening costs.`,
     participants: [
-      { name: 'Vikram Nair', role: 'CEO, RetailCo', personality: 'Results-driven, skeptical of bias claims, sees this as over-engineering a problem. Puts business efficiency above all.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
-      { name: 'Dr. Meera Patel', role: 'Independent AI Ethics Researcher', personality: 'Principled, data-driven. Will cite specific evidence of bias and potential legal risks. Advocates for a phased, fair approach.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
-      { name: 'Arvind Rao', role: 'Legal Counsel', personality: 'Observes quietly. Speaks only rarely, to note a real legal or compliance risk that no one has raised.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
+      { name: 'Vikram Nair', role: 'CEO, RetailCo', personality: 'Results-driven, skeptical of bias claims, sees this as over-engineering a problem. Puts business efficiency above all.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
+      { name: 'Dr. Meera Patel', role: 'Independent AI Ethics Researcher', personality: 'Principled, data-driven. Will cite specific evidence of bias and potential legal risks. Advocates for a phased, fair approach.', tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
+      { name: 'Arvind Rao', role: 'Legal Counsel', personality: 'Observes quietly. Speaks only rarely, to note a real legal or compliance risk that no one has raised.', tts: { gender: 'male', voiceId: 'Matthew', engine: 'neural', languageCode: 'en-US' } },
     ],
   },
   {
@@ -263,9 +232,9 @@ export const SCENARIOS = [
     title: 'The Team Restructure',
     context: `You are the newly appointed VP of Product at TechCorp. After a difficult quarter with 40% revenue decline, leadership has asked you to restructure your 30-person product team, potentially eliminating 8 positions. You must present a plan to the CEO in 2 days. Several team members have heard rumours and morale is fragile. The remaining team must still deliver on a major roadmap commitment.`,
     participants: [
-      { name: 'Arjun Kapoor', role: 'CEO', personality: 'Expects decisive action, clear business reasoning, and minimal disruption to delivery. Will challenge you hard on the business case and people decisions.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
-      { name: 'Shreya Bansal', role: 'Senior Product Lead', personality: "Represents the team's concerns, deeply worried about morale and fairness. Will ask hard questions about process and which roles are cut.", tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
-      { name: 'Nisha Gupta', role: 'HR Business Partner', personality: 'Mostly listens. Speaks only rarely, to flag a fairness or process concern for the affected staff.', tts: { gender: 'female', azureVoice: 'en-IN-AashiNeural' } },
+      { name: 'Arjun Kapoor', role: 'CEO', personality: 'Expects decisive action, clear business reasoning, and minimal disruption to delivery. Will challenge you hard on the business case and people decisions.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
+      { name: 'Shreya Bansal', role: 'Senior Product Lead', personality: "Represents the team's concerns, deeply worried about morale and fairness. Will ask hard questions about process and which roles are cut.", tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
+      { name: 'Nisha Gupta', role: 'HR Business Partner', personality: 'Mostly listens. Speaks only rarely, to flag a fairness or process concern for the affected staff.', tts: { gender: 'female', voiceId: 'Amy', engine: 'neural', languageCode: 'en-GB' } },
     ],
   },
   {
@@ -275,9 +244,9 @@ export const SCENARIOS = [
     title: 'The Supplier Crisis',
     context: `You are the Operations Manager at a mid-sized electronics manufacturer in Pune. Your key component supplier in Shenzhen has missed delivery — production stops in 6 hours without the parts. You have three options: air-freight the components at 4x cost, find an alternate supplier who can deliver in 72 hours but whose quality is unproven, or halt the production line and absorb the delay penalty with your biggest OEM client.`,
     participants: [
-      { name: 'Priya Desai', role: 'Head of Procurement', personality: 'Focused on cost and supplier relationships. Strongly opposed to using an unvetted supplier. Will push back on the air-freight cost.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
-      { name: 'Sandeep Rao', role: 'OEM Client Relationship Manager', personality: 'Represents the client\'s interest. Escalating urgently. The client will impose ₹40 lakh penalty if the production target is missed this quarter.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
-      { name: 'Ramesh Iyer', role: 'Plant Floor Supervisor', personality: 'Observes quietly. Speaks only rarely, to note what is actually possible on the production line right now.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
+      { name: 'Priya Desai', role: 'Head of Procurement', personality: 'Focused on cost and supplier relationships. Strongly opposed to using an unvetted supplier. Will push back on the air-freight cost.', tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
+      { name: 'Sandeep Rao', role: 'OEM Client Relationship Manager', personality: 'Represents the client\'s interest. Escalating urgently. The client will impose ₹40 lakh penalty if the production target is missed this quarter.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
+      { name: 'Ramesh Iyer', role: 'Plant Floor Supervisor', personality: 'Observes quietly. Speaks only rarely, to note what is actually possible on the production line right now.', tts: { gender: 'male', voiceId: 'Matthew', engine: 'neural', languageCode: 'en-US' } },
     ],
   },
   {
@@ -326,9 +295,9 @@ export const SCENARIOS = [
     title: 'The Brand Crisis',
     context: `You are the Marketing Director at a fast-growing D2C skincare brand. A food safety YouTuber with 2 million subscribers has posted a video claiming your bestselling moisturiser contains a harmful chemical — based on a lab test he conducted. The claim is disputed by your R&D team, but the video has 800,000 views in 12 hours. Stock is moving off shelves in two major retail chains. Your PR agency says you have a 4-hour window to respond before the news cycle picks it up.`,
     participants: [
-      { name: 'Ritu Sharma', role: 'CEO', personality: "Wants to act fast. Concerned about brand equity. Willing to pull the product temporarily to show accountability, even without confirmed evidence.", tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
-      { name: 'Dr. Anand Pillai', role: 'Head of R&D', personality: "Confident the product is safe. Strongly opposed to pulling it — believes that's an admission of guilt and sets a bad precedent. Wants to wait for official lab verification.", tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
-      { name: 'Sneha Iyer', role: 'PR Agency Lead', personality: 'Observes quietly. Speaks only rarely, to note how the public mood is shifting online.', tts: { gender: 'female', azureVoice: 'en-IN-AashiNeural' } },
+      { name: 'Ritu Sharma', role: 'CEO', personality: "Wants to act fast. Concerned about brand equity. Willing to pull the product temporarily to show accountability, even without confirmed evidence.", tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
+      { name: 'Dr. Anand Pillai', role: 'Head of R&D', personality: "Confident the product is safe. Strongly opposed to pulling it — believes that's an admission of guilt and sets a bad precedent. Wants to wait for official lab verification.", tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
+      { name: 'Sneha Iyer', role: 'PR Agency Lead', personality: 'Observes quietly. Speaks only rarely, to note how the public mood is shifting online.', tts: { gender: 'female', voiceId: 'Amy', engine: 'neural', languageCode: 'en-GB' } },
     ],
   },
   {
@@ -338,9 +307,9 @@ export const SCENARIOS = [
     title: 'The Clinic Backlog',
     context: `You manage a busy community health clinic in Nagpur. This morning 3 staff called in sick and 60 patients are waiting. A walk-in elderly patient looks seriously unwell but has no appointment, while patients with booked slots are already angry about the delay. You have two doctors available instead of the usual four, and the pharmacy queue is also building up.`,
     participants: [
-      { name: 'Nurse Latha', role: 'Senior Duty Nurse', personality: 'Practical and calm. Worried about patient safety and staff burnout. Will push you to set a clear priority rule for who is seen first.', tts: { gender: 'female', azureVoice: 'en-IN-NeerjaNeural' } },
-      { name: 'Mr. Joshi', role: 'Waiting Patient with Appointment', personality: 'Frustrated. Booked his slot a week ago and feels skipping him is unfair. Will challenge any decision to see walk-ins before him.', tts: { gender: 'male', azureVoice: 'en-IN-PrabhatNeural' } },
-      { name: 'Dr. Kamat', role: 'Duty Doctor', personality: 'Mostly listens. Speaks only rarely, to flag a real patient-safety concern.', tts: { gender: 'male', azureVoice: 'en-IN-KunalNeural' } },
+      { name: 'Nurse Latha', role: 'Senior Duty Nurse', personality: 'Practical and calm. Worried about patient safety and staff burnout. Will push you to set a clear priority rule for who is seen first.', tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
+      { name: 'Mr. Joshi', role: 'Waiting Patient with Appointment', personality: 'Frustrated. Booked his slot a week ago and feels skipping him is unfair. Will challenge any decision to see walk-ins before him.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
+      { name: 'Dr. Kamat', role: 'Duty Doctor', personality: 'Mostly listens. Speaks only rarely, to flag a real patient-safety concern.', tts: { gender: 'male', voiceId: 'Matthew', engine: 'neural', languageCode: 'en-US' } },
     ],
   },
   {
@@ -578,7 +547,7 @@ router.post('/start', async (req, res) => {
     const avatarSystem = buildAvatarSystemPrompt(scenario, 1, language) // Avatar 1 for opening
 
     const response = await createCompletion({
-      model: MODEL(),
+      model: conversationModel(),
       max_completion_tokens: 350,
       temperature: 0.8,
       response_format: { type: 'json_object' },
@@ -586,7 +555,7 @@ router.post('/start', async (req, res) => {
         { role: 'system', content: avatarSystem },
         { role: 'user', content: openingPrompt },
       ],
-    })
+    }, { task: 'opening' })
 
     const raw = response.choices[0].message.content
     const parsed = JSON.parse(raw)
@@ -735,7 +704,7 @@ router.post('/message', async (req, res) => {
   if (executive) {
     // Rehydrate the ledger, micro-rate this turn, fold it in, pick the probe.
     ledger = EvidenceLedger.from(session._persisted?.ledger)
-    const rated = await microRateTurn(message, { createCompletion, model: MODEL(), language })
+    const rated = await microRateTurn(message, { createCompletion, model: fastModel(), language })
     // Fallback when the rater is unavailable: derive coarse levels from the
     // interpretable signals so the ledger still advances (never blocks).
     microLevels = rated || levelsFromSignals(signals)
@@ -795,12 +764,12 @@ router.post('/message', async (req, res) => {
       ...updatedHistory,
     ]
     const response = await createCompletion({
-      model: MODEL(),
+      model: conversationModel(),
       max_completion_tokens: 350,
       temperature: 0.85,
       response_format: { type: 'json_object' },
       messages: promptMessages,
-    })
+    }, { task: 'conversation' })
 
     const raw = response.choices[0].message.content
     const parsed = JSON.parse(raw)
@@ -959,7 +928,7 @@ router.post('/evaluate', async (req, res) => {
     // (and across extra model families when PRISM_JUDGE_MODELS is set), then the
     // aggregator takes the median per dimension and measures judge disagreement
     // to produce an uncertainty band + a "flag for human review" signal.
-    const plan = buildPanelPlan(MODEL())
+    const plan = buildPanelPlan(judgeModel())
     // Track 4.1: judge prompt language variant — same rubric semantics, with
     // language-fairness rules + feedback in the candidate's language.
     const evalLanguage = resolveLanguage(session._persisted?.language)
@@ -981,7 +950,7 @@ router.post('/evaluate', async (req, res) => {
             },
             { role: 'user', content: 'Evaluate the candidate now. Return only valid JSON.' },
           ],
-        }).then((r) => ({ spec, raw: r.choices[0].message.content })),
+        }, { task: 'judge_full' }).then((r) => ({ spec, raw: r.choices[0].message.content })),
       ),
     )
 
@@ -1010,19 +979,33 @@ router.post('/evaluate', async (req, res) => {
       }
     }
 
+    const failedResults = settled.filter((r) => r.status !== 'fulfilled')
+    const failedCalls = failedResults.length
+    const malformed = settled.length - failedCalls - samples.length
+    const failureCodes = [...new Set(failedResults.map((r) => r.reason?.code || r.reason?.name || 'unknown'))].slice(0, 5)
+
     if (!samples.length) {
-      auditLog('judge_panel_failures', sessionId, { planned: plan.length, surviving: 0, fatal: true })
+      auditLog('judge_panel_failures', sessionId, {
+        planned: plan.length,
+        failedCalls,
+        malformed,
+        surviving: 0,
+        errors: malformed ? [...failureCodes, 'malformed_response'].slice(0, 5) : failureCodes,
+        fatal: true,
+      })
       throw new Error('All panel judges failed to return a usable score')
     }
 
     // Audit every score-affecting panel event (audit C16): call failures and
     // malformed samples change the effective panel size, so they are logged
     // even though the flow tolerates them.
-    const failedCalls = settled.filter((r) => r.status !== 'fulfilled').length
-    const malformed = settled.length - failedCalls - samples.length
     if (failedCalls || malformed) {
       auditLog('judge_panel_failures', sessionId, {
-        planned: plan.length, failedCalls, malformed, surviving: samples.length,
+        planned: plan.length,
+        failedCalls,
+        malformed,
+        surviving: samples.length,
+        errors: malformed ? [...failureCodes, 'malformed_response'].slice(0, 5) : failureCodes,
       })
     }
 
@@ -1043,6 +1026,7 @@ router.post('/evaluate', async (req, res) => {
     // position-swap delta and the review flag — the full "why this score".
     auditLog('aggregation', sessionId, {
       samples: samples.length,
+      models: [...new Set(samples.map((sample) => sample._meta?.model).filter(Boolean))],
       agreement: aggregated?.reliability?.agreement ?? null,
       positionSwapDelta: aggregated?.reliability?.positionSwapDelta ?? null,
       perDimensionBand: aggregated?.reliability?.perDimensionBand ?? null,
@@ -1130,7 +1114,7 @@ router.post('/evaluate', async (req, res) => {
           asrConfidence: 1,
         }))
         const dual = await runDualScorer(
-          { createCompletion, modelA: MODEL(), modelB: process.env.PRISM_JUDGE_MODEL_B || MODEL() },
+          { createCompletion, modelA: judgeModel(), modelB: process.env.PRISM_JUDGE_MODEL_B || judgeModel() },
           turns,
           report.scores, // v1 shadow scores → reconciliation reference
         )
@@ -1156,7 +1140,9 @@ router.post('/evaluate', async (req, res) => {
           unstableTurns: dual.meta.unstableTurns,
         })
       } catch (err) {
-        logger.warn('dual_scorer_failed', { error: err?.message, detail: 'falling back to v1 panel report' })
+        const reason = err?.code || err?.name || 'unknown'
+        logger.warn('dual_scorer_failed', { reason, fallback: 'v1_panel' })
+        auditLog('dual_scorer_fallback', sessionId, { reason, fallback: 'v1_panel' })
       }
     }
 
@@ -1294,19 +1280,19 @@ router.get('/verify-identity/:sessionId', async (req, res) => {
 })
 
 // ── GET /api/assessment/stt-status ───────────────────────────────────────────
-// Lets the client know whether server-side Whisper transcription is available
-// so it can choose the voice-answer path (record→Whisper) or fall back to the
+// Lets the client know whether server-side Bedrock transcription is available
+// so it can choose the voice-answer path or fall back to the
 // browser's live dictation when no key is configured.
 router.get('/stt-status', (_req, res) => {
-  res.json({ enabled: isWhisperEnabled() })
+  res.json({ enabled: isSpeechToTextEnabled() })
 })
 
 // ── GET /api/assessment/tts-status ────────────────────────────────────────────
 // PRISM_TTS_NEURAL (ops flag, default off): neural persona voices via the
-// server's Azure Speech proxy. When dark, the room uses the browser's own
+// server's Amazon Polly proxy. When dark, the room uses the browser's own
 // voices (still persona-mapped client-side) — nothing breaks, nothing leaks.
 router.get('/tts-status', (_req, res) => {
-  res.json({ enabled: isTtsEnabled(), provider: isTtsEnabled() ? 'azure-speech' : null })
+  res.json({ enabled: isTextToSpeechEnabled(), provider: isTextToSpeechEnabled() ? 'amazon-polly' : null })
 })
 
 // ── POST /api/assessment/speech ───────────────────────────────────────────────
@@ -1331,7 +1317,7 @@ function takeSpeechToken(sessionId) {
 }
 
 router.post('/speech', async (req, res) => {
-  if (!isTtsEnabled()) return res.status(404).json({ error: 'Not enabled' })
+  if (!isTextToSpeechEnabled()) return res.status(404).json({ error: 'Not enabled' })
   const { sessionId, text, speaker } = req.body || {}
   if (!sessionId || !text || !speaker) {
     return res.status(400).json({ error: 'sessionId, speaker and text required' })
@@ -1365,7 +1351,7 @@ router.post('/speech', async (req, res) => {
     // Voice comes from the frozen cast map — never from the request.
     const scenario = SCENARIOS.find((s) => s.id === session.scenarioId)
     const participant = scenario?.participants?.find((p) => p.name === speaker)
-    const voice = participant?.tts?.azureVoice || 'en-IN-NeerjaNeural'
+    const voice = participant?.tts || { voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' }
 
     const audio = await synthesizeSpeech(text, voice)
     res.type('audio/mpeg').send(audio)
@@ -1384,12 +1370,12 @@ router.get('/languages', (_req, res) => {
 
 // ── POST /api/assessment/transcribe ──────────────────────────────────────────
 // Speech-to-text for the voice-only test. Accepts a single audio file (field
-// name "audio"), transcribes it via OpenAI Whisper, and returns the text. The
+// name "audio"), transcribes it via Bedrock Voxtral, and returns the text. The
 // audio is held in memory and discarded immediately after transcription — it is
 // never written to disk or persisted. The caller then sends the transcript to
 // /message exactly as if it had been typed.
 router.post('/transcribe', audioUpload.single('audio'), async (req, res) => {
-  if (!isWhisperEnabled()) {
+  if (!isSpeechToTextEnabled()) {
     // No server-side STT configured — signal the client to fall back to the
     // browser's built-in dictation instead of failing the answer outright.
     return res.status(503).json({ error: 'Voice transcription is not configured.', fallback: 'webspeech' })
@@ -1399,7 +1385,7 @@ router.post('/transcribe', audioUpload.single('audio'), async (req, res) => {
   }
   try {
     const filename = req.file.originalname || 'answer.webm'
-    // Track 4.1: pass the session's language as the ASR hint (null = Whisper
+    // Track 4.1: pass the session's language as the ASR hint (null = model
     // auto-detect, used for code-switched Hinglish). Language + per-turn ASR
     // confidence are recorded with the turn via /message telemetry.
     const asrSession = req.body?.sessionId ? await getSession(req.body.sessionId) : null
@@ -1637,7 +1623,7 @@ router.post('/calibrate', async (req, res) => {
         // Score the writing sample on the 4 micro-anchors → θ₀ (and tier from θ).
         const completion = await createCompletion(
           {
-            model: MODEL(),
+            model: fastModel(),
             messages: [
               { role: 'system', content: loadPrompt('entry_estimator.v1') },
               { role: 'user', content: sanitizeCandidateText(answer, 2000) },
@@ -1646,7 +1632,7 @@ router.post('/calibrate', async (req, res) => {
             max_completion_tokens: 60,
             response_format: { type: 'json_object' },
           },
-          { retries: 1 },
+          { retries: 1, task: 'entry_estimator' },
         )
         const parsed = JSON.parse(completion?.choices?.[0]?.message?.content || '{}')
         const est = anchorsToTheta(parsed)
@@ -1656,7 +1642,7 @@ router.post('/calibrate', async (req, res) => {
       } else {
         const completion = await createCompletion(
           {
-            model: MODEL(),
+            model: fastModel(),
             messages: [
               {
                 role: 'system',
@@ -1669,7 +1655,7 @@ router.post('/calibrate', async (req, res) => {
             temperature: 0.2,
             max_completion_tokens: 8,
           },
-          { retries: 1 },
+          { retries: 1, task: 'calibration' },
         )
         const raw = (completion?.choices?.[0]?.message?.content || '').toLowerCase()
         const match = DIFFICULTY_TIERS.find((t) => raw.includes(t))

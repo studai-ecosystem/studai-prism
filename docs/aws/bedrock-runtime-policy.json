@@ -1,0 +1,39 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokeApprovedInRegionModels",
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": [
+        "arn:aws:bedrock:ap-south-1::foundation-model/mistral.mistral-large-3-675b-instruct",
+        "arn:aws:bedrock:ap-south-1::foundation-model/mistral.ministral-3-14b-instruct",
+        "arn:aws:bedrock:ap-south-1::foundation-model/mistral.voxtral-mini-3b-2507",
+        "arn:aws:bedrock:ap-south-1::foundation-model/amazon.titan-embed-text-v2:0"
+      ]
+    },
+    {
+      "Sid": "InvokeApprovedGlobalProfiles",
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": [
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-5",
+        "arn:aws:bedrock:*::foundation-model/amazon.nova-2-lite-v1:0",
+        "arn:aws:bedrock:ap-south-1:REPLACE_AWS_ACCOUNT_ID:inference-profile/global.anthropic.claude-sonnet-5",
+        "arn:aws:bedrock:ap-south-1:REPLACE_AWS_ACCOUNT_ID:inference-profile/global.amazon.nova-2-lite-v1:0"
+      ]
+    },
+    {
+      "Sid": "ApplyApprovedGuardrail",
+      "Effect": "Allow",
+      "Action": "bedrock:ApplyGuardrail",
+      "Resource": "arn:aws:bedrock:ap-south-1:REPLACE_AWS_ACCOUNT_ID:guardrail/REPLACE_GUARDRAIL_ID"
+    },
+    {
+      "Sid": "SynthesizeAuthorizedPersonaLines",
+      "Effect": "Allow",
+      "Action": "polly:SynthesizeSpeech",
+      "Resource": "*"
+    }
+  ]
+}

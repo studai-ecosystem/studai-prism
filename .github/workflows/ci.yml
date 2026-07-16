@@ -29,7 +29,7 @@ jobs:
         # The pinned judge deployment file must parse and carry the escalation
         # rule; config changes touching the deployment must update it in the
         # same commit (enforced by review + the runtime drift guard).
-        run: node -e "const f=require('./server/scoring/judge-fingerprint.json'); if(!f.deployment||!f.escalationRule) throw new Error('judge-fingerprint.json incomplete')"
+        run: node -e "const f=require('./server/scoring/judge-fingerprint.json'); const p=require('./server/package.json'); if(f.provider!=='aws-bedrock'||!f.modelId||!f.escalationRule||p.dependencies['@aws-sdk/client-bedrock-runtime']!==f.sdkVersion) throw new Error('judge fingerprint/SDK pin incomplete')"
 
   calibration:
     runs-on: ubuntu-latest

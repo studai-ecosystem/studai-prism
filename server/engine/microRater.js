@@ -6,7 +6,7 @@
 // or fail the conversation: on any error/timeout it returns null and the caller
 // falls back to the interpretable behavioral-feature signals.
 
-import { loadPrompt } from './prompts.js'
+import { loadPrompt } from '../services/ai/promptManager.js'
 import { DIMENSIONS } from './executiveConfig.js'
 import { wrapCandidateTurn, INJECTION_GUARD } from '../lib/promptSecurity.js'
 
@@ -48,7 +48,7 @@ export async function microRateTurn(candidateText, ctx) {
           { role: 'user', content: wrapCandidateTurn(text, 2000) },
         ],
       },
-      { retries: 1 },
+      { retries: 1, task: 'micro_rater' },
     )
     const rawContent = completion?.choices?.[0]?.message?.content
     if (!rawContent) return null

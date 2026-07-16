@@ -247,7 +247,7 @@ test('Phase 5 CMS/flags/system end-to-end', { skip }, async (t) => {
 
   // ── Model registry + job cancel ────────────────────────────────────────────
   const model = await call('POST', '/api/admin/system/models', superA, {
-    provider: 'azure-openai', deployment: `p5-test-${randomUUID().slice(0, 6)}`,
+    provider: 'aws-bedrock', deployment: `p5-test-${randomUUID().slice(0, 6)}`,
     purpose: 'e2e metadata row', costPerMtokIn: 2.5, costPerMtokOut: 15,
   })
   assert.equal(model.status, 201)
