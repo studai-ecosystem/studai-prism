@@ -44,7 +44,6 @@ function wait(ms) {
 async function sendOnce(client, command, timeoutMs) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
-  timer.unref?.()
   try {
     return await client.send(command, { abortSignal: controller.signal })
   } catch (error) {
