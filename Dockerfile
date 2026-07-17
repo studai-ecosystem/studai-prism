@@ -7,6 +7,7 @@ RUN npm ci --ignore-scripts
 COPY index.html postcss.config.js tailwind.config.js vite.config.js ./
 COPY public ./public
 COPY src ./src
+COPY server/lib/sharedConstants.js ./server/lib/sharedConstants.js
 RUN npm run build
 
 FROM node:22.17.0-bookworm-slim AS runtime
