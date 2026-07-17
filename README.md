@@ -189,16 +189,18 @@ verified scoring.
 
 ## Deployment
 
-The current application host remains Azure App Service; only the cloud AI plane
-has migrated. For that topology, use AWS IAM Roles Anywhere or workload identity
-federation so the default credential chain receives temporary credentials. Do
-not store long-lived AWS access keys in App Service settings.
+The current public host remains Azure App Service until DNS cutover. A parallel
+AWS production target is defined in [docs/aws/DEPLOYMENT.md](docs/aws/DEPLOYMENT.md):
+ECS Fargate in private subnets, encrypted EFS persistence, the shared production
+ALB, AWS Secrets Manager, and task-role credentials. Deployment runs through a
+manual GitHub Actions workflow using repo-scoped OIDC; no long-lived AWS key is
+stored in GitHub or App Service.
 
-After configuring AWS federation and the environment variables above, use the
-existing serial prebuilt-zip deployment process in `scripts/`. Verify the live
-bundle hash, health endpoint, admin Bedrock health panel, and one synthetic
-assessment. Do not enable paid/external scoring until the shadow agreement gate
-in [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md) passes.
+For the existing Azure host, keep using its serial prebuilt-ZIP process. For AWS,
+dispatch `.github/workflows/deploy-aws.yml` with `scripts/deploy-aws.ps1`. Verify
+the health endpoint, startup secret metadata, admin Bedrock health panel, and one
+synthetic assessment. Do not enable paid/external scoring until the shadow
+agreement gate in [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md) passes.
 
 For a future single-cloud topology, deploy the Node service to ECS Fargate behind
 an ALB with a task role, move the v1 store to PostgreSQL, and keep calibration

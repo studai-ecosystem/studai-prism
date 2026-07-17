@@ -1,0 +1,407 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: StudAI Prism production service on ECS Fargate with EFS and shared ALB routing.
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: Immutable ECR image URI including tag.
+  RuntimeSecretArn:
+    Type: String
+    Description: ARN of the AWS Secrets Manager JSON runtime configuration.
+  Hostname:
+    Type: String
+    Default: prism-aws.studai.one
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-019b712076f7e2a78
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Default: subnet-02d20668e6b7cdbce,subnet-01256399d95a5fcf0,subnet-03f9a7d1ac4bb416a
+  LoadBalancerArn:
+    Type: String
+    Default: arn:aws:elasticloadbalancing:ap-south-1:158346964832:loadbalancer/app/studai-prod-alb/a790e1e3c84c671e
+  LoadBalancerSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Default: sg-0b40b4c41a5f05773
+  HttpListenerArn:
+    Type: String
+    Default: arn:aws:elasticloadbalancing:ap-south-1:158346964832:listener/app/studai-prod-alb/a790e1e3c84c671e/38538b715682cec7
+  CertificateArn:
+    Type: String
+    Default: arn:aws:acm:ap-south-1:158346964832:certificate/eec35e1a-807c-4a03-8c9c-0e983b2caee2
+  DesiredCount:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 1
+
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: studai-prism-prod
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Application
+          Value: studai-prism
+        - Key: Environment
+          Value: production
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/studai-prism-prod
+      RetentionInDays: 30
+      Tags:
+        - Key: Application
+          Value: studai-prism
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: studai-prism-prod-execution
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Application
+          Value: studai-prism
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: studai-prism-prod-task
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PrismRuntimeLeastPrivilege
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadRuntimeConfiguration
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref RuntimeSecretArn
+              - Sid: InvokeApprovedInRegionModels
+                Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource:
+                  - arn:aws:bedrock:ap-south-1::foundation-model/mistral.mistral-large-3-675b-instruct
+                  - arn:aws:bedrock:ap-south-1::foundation-model/mistral.ministral-3-14b-instruct
+                  - arn:aws:bedrock:ap-south-1::foundation-model/mistral.voxtral-mini-3b-2507
+                  - arn:aws:bedrock:ap-south-1::foundation-model/amazon.titan-embed-text-v2:0
+              - Sid: InvokeApprovedGlobalProfiles
+                Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource:
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/global.anthropic.claude-sonnet-5
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/global.amazon.nova-2-lite-v1:0
+                  - arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-5
+                  - arn:aws:bedrock:*::foundation-model/amazon.nova-2-lite-v1:0
+              - Sid: SynthesizeAuthorizedPersonaLines
+                Effect: Allow
+                Action: polly:SynthesizeSpeech
+                Resource: '*'
+              - Sid: MountPrismData
+                Effect: Allow
+                Action:
+                  - elasticfilesystem:ClientMount
+                  - elasticfilesystem:ClientWrite
+                Resource: !GetAtt FileSystem.Arn
+                Condition:
+                  StringEquals:
+                    elasticfilesystem:AccessPointArn: !GetAtt AccessPoint.Arn
+      Tags:
+        - Key: Application
+          Value: studai-prism
+
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow the shared ALB to reach Prism tasks.
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3001
+          ToPort: 3001
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroupId
+      Tags:
+        - Key: Name
+          Value: studai-prism-prod-tasks
+        - Key: Application
+          Value: studai-prism
+
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow Prism tasks to mount the Prism EFS filesystem.
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref TaskSecurityGroup
+      Tags:
+        - Key: Name
+          Value: studai-prism-prod-efs
+        - Key: Application
+          Value: studai-prism
+
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BackupPolicy:
+        Status: ENABLED
+      Encrypted: true
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+        - TransitionToPrimaryStorageClass: AFTER_1_ACCESS
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+      FileSystemTags:
+        - Key: Name
+          Value: studai-prism-prod-data
+        - Key: Application
+          Value: studai-prism
+
+  AccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref FileSystem
+      PosixUser:
+        Uid: '1000'
+        Gid: '1000'
+      RootDirectory:
+        Path: /prism
+        CreationInfo:
+          OwnerUid: '1000'
+          OwnerGid: '1000'
+          Permissions: '0770'
+      AccessPointTags:
+        - Key: Name
+          Value: studai-prism-prod
+
+  MountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [0, !Ref PrivateSubnetIds]
+      SecurityGroups: [!Ref EfsSecurityGroup]
+
+  MountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [1, !Ref PrivateSubnetIds]
+      SecurityGroups: [!Ref EfsSecurityGroup]
+
+  MountTargetC:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Select [2, !Ref PrivateSubnetIds]
+      SecurityGroups: [!Ref EfsSecurityGroup]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 3001
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VpcId
+      HealthCheckEnabled: true
+      HealthCheckPath: /api/health
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      Matcher:
+        HttpCode: '200'
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
+      Tags:
+        - Key: Application
+          Value: studai-prism
+
+  HttpsIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref LoadBalancerSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+      Description: HTTPS for shared production ALB.
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancerArn
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: '404'
+            ContentType: text/plain
+            MessageBody: Not found
+
+  HttpsHostRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 410
+      Conditions:
+        - Field: host-header
+          HostHeaderConfig:
+            Values: [!Ref Hostname]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  HttpHostRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpListenerArn
+      Priority: 410
+      Conditions:
+        - Field: host-header
+          HostHeaderConfig:
+            Values: [!Ref Hostname]
+      Actions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: '443'
+            Host: '#{host}'
+            Path: '/#{path}'
+            Query: '#{query}'
+            StatusCode: HTTP_301
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: studai-prism-prod
+      Cpu: '512'
+      Memory: '1024'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      Volumes:
+        - Name: prism-data
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref FileSystem
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref AccessPoint
+              IAM: ENABLED
+      ContainerDefinitions:
+        - Name: prism
+          Image: !Ref ImageUri
+          Essential: true
+          PortMappings:
+            - ContainerPort: 3001
+              Protocol: tcp
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: PORT
+              Value: '3001'
+            - Name: AWS_SECRETS_MANAGER_SECRET_ID
+              Value: !Ref RuntimeSecretArn
+            - Name: AWS_SECRETS_MANAGER_REGION
+              Value: !Ref AWS::Region
+            - Name: AWS_SECRETS_MANAGER_REQUIRED
+              Value: 'true'
+          MountPoints:
+            - SourceVolume: prism-data
+              ContainerPath: /home/data/prism
+              ReadOnly: false
+          LinuxParameters:
+            InitProcessEnabled: true
+          StopTimeout: 30
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: prism
+      Tags:
+        - Key: Application
+          Value: studai-prism
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - HttpsHostRule
+      - HttpHostRule
+      - MountTargetA
+      - MountTargetB
+      - MountTargetC
+    Properties:
+      ServiceName: web
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref DesiredCount
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      HealthCheckGracePeriodSeconds: 120
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 0
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      LoadBalancers:
+        - ContainerName: prism
+          ContainerPort: 3001
+          TargetGroupArn: !Ref TargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups: [!Ref TaskSecurityGroup]
+          Subnets: !Ref PrivateSubnetIds
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      Tags:
+        - Key: Application
+          Value: studai-prism
+        - Key: Environment
+          Value: production
+
+Outputs:
+  ClusterName:
+    Value: !Ref Cluster
+  ServiceName:
+    Value: !GetAtt Service.Name
+  ServiceUrl:
+    Value: !Sub https://${Hostname}
+  FileSystemId:
+    Value: !Ref FileSystem
+  TargetGroupArn:
+    Value: !Ref TargetGroup

@@ -1,0 +1,126 @@
+name: Deploy AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      hostname:
+        description: Public hostname routed by the shared production ALB
+        required: true
+        default: prism-aws.studai.one
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: studai-prism-aws-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: '158346964832'
+  ECR_REPOSITORY: prod/prism
+  STACK_NAME: studai-prism-prod
+  RUNTIME_SECRET_ID: /studai/prism/aws-prod/runtime
+  DEPLOY_ROLE_ARN: arn:aws:iam::158346964832:role/studai-prism-github-deploy
+  CLOUDFORMATION_ROLE_ARN: arn:aws:iam::158346964832:role/studai-prism-cloudformation-execution
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out committed source
+        uses: actions/checkout@v4
+
+      - name: Configure temporary AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: prism-github-${{ github.run_id }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push immutable image
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_tag="${GITHUB_SHA::12}"
+          image_uri="${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY}:${image_tag}"
+          if aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$image_tag" >/dev/null 2>&1; then
+            echo "Image already exists for $image_tag; reusing it."
+          else
+            docker build --pull --provenance=false --tag "$image_uri" .
+            docker push "$image_uri"
+          fi
+          echo "uri=$image_uri" >> "$GITHUB_OUTPUT"
+
+      - name: Validate CloudFormation
+        run: >-
+          aws cloudformation validate-template
+          --template-body file://infra/aws/prism-ecs.yml
+          >/dev/null
+
+      - name: Deploy Fargate service
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_arn="$(aws secretsmanager describe-secret \
+            --secret-id "$RUNTIME_SECRET_ID" \
+            --query ARN \
+            --output text)"
+          aws cloudformation deploy \
+            --stack-name "$STACK_NAME" \
+            --template-file infra/aws/prism-ecs.yml \
+            --role-arn "$CLOUDFORMATION_ROLE_ARN" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              "ImageUri=${{ steps.image.outputs.uri }}" \
+              "RuntimeSecretArn=$secret_arn" \
+              "Hostname=${{ inputs.hostname }}" \
+            --tags \
+              Application=studai-prism \
+              Environment=production \
+              ManagedBy=github-actions \
+            --no-fail-on-empty-changeset
+
+      - name: Wait for service stability
+        run: >-
+          aws ecs wait services-stable
+          --cluster studai-prism-prod
+          --services web
+
+      - name: Verify health through the ALB
+        shell: bash
+        run: |
+          set -euo pipefail
+          alb_dns="$(aws elbv2 describe-load-balancers \
+            --names studai-prod-alb \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)"
+          alb_ip="$(getent ahostsv4 "$alb_dns" | awk 'NR==1 { print $1 }')"
+          curl --fail --show-error --silent \
+            --retry 12 --retry-all-errors --retry-delay 10 \
+            --resolve "${{ inputs.hostname }}:443:$alb_ip" \
+            "https://${{ inputs.hostname }}/api/health"
+
+      - name: Deployment summary
+        shell: bash
+        run: |
+          {
+            echo '## AWS deployment'
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Image: \`${{ steps.image.outputs.uri }}\`"
+            echo "- URL: https://${{ inputs.hostname }}"
+            echo '- ECS service: `studai-prism-prod/web`'
+          } >> "$GITHUB_STEP_SUMMARY"
