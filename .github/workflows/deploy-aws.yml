@@ -70,19 +70,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          aws ecr wait image-scan-complete \
-            --repository-name "$ECR_REPOSITORY" \
-            --image-id "imageTag=${{ steps.image.outputs.tag }}"
-          critical="$(aws ecr describe-image-scan-findings \
-            --repository-name "$ECR_REPOSITORY" \
-            --image-id "imageTag=${{ steps.image.outputs.tag }}" \
-            --query 'imageScanFindings.findingSeverityCounts.CRITICAL || `0`' \
-            --output text)"
-          high="$(aws ecr describe-image-scan-findings \
-            --repository-name "$ECR_REPOSITORY" \
-            --image-id "imageTag=${{ steps.image.outputs.tag }}" \
-            --query 'imageScanFindings.findingSeverityCounts.HIGH || `0`' \
-            --output text)"
+          scan_json=''
+          scan_status='PENDING'
+          for attempt in {1..36}; do
+            if scan_json="$(aws ecr describe-image-scan-findings \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-id "imageTag=${{ steps.image.outputs.tag }}" \
+              --output json 2>/dev/null)"; then
+              scan_status="$(jq -r '.imageScanStatus.status // "PENDING"' <<< "$scan_json")"
+              if [[ "$scan_status" == 'COMPLETE' ]]; then break; fi
+              if [[ "$scan_status" == 'FAILED' ]]; then
+                echo 'Refusing deployment: ECR image scan failed.'
+                exit 1
+              fi
+            fi
+            sleep 5
+          done
+          if [[ "$scan_status" != 'COMPLETE' ]]; then
+            echo "Refusing deployment: ECR image scan timed out ($scan_status)."
+            exit 1
+          fi
+          critical="$(jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0' <<< "$scan_json")"
+          high="$(jq -r '.imageScanFindings.findingSeverityCounts.HIGH // 0' <<< "$scan_json")"
           echo "critical=$critical" >> "$GITHUB_OUTPUT"
           echo "high=$high" >> "$GITHUB_OUTPUT"
           if (( critical > 0 )); then
