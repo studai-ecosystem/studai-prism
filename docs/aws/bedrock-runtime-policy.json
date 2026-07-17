@@ -2,6 +2,12 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "ReadPrismRuntimeConfiguration",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:ap-south-1:REPLACE_AWS_ACCOUNT_ID:secret:/studai/prism/prod/runtime-*"
+    },
+    {
       "Sid": "InvokeApprovedInRegionModels",
       "Effect": "Allow",
       "Action": "bedrock:InvokeModel",

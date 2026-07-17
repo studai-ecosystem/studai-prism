@@ -36,6 +36,9 @@ const post = (path, body, headers = {}) =>
 const tokenFor = (id, email) => jwt.sign({ sub: id, email }, process.env.JWT_SECRET)
 
 const BEDROCK_PRODUCTION_ENV = {
+  AWS_SECRETS_MANAGER_SECRET_ID: '/studai/prism/prod/runtime',
+  AWS_SECRETS_MANAGER_REGION: 'ap-south-1',
+  AWS_SECRETS_MANAGER_REQUIRED: 'true',
   AI_PROVIDER: 'aws-bedrock',
   AWS_REGION: 'ap-south-1',
   BEDROCK_PRIMARY_MODEL: 'global.anthropic.claude-sonnet-5',
@@ -71,7 +74,7 @@ test('C8: startup check throws in production without JWT_SECRET', () => {
 
 test('AI security: production requires explicit global routing and temporary AWS credentials', () => {
   const saved = new Map()
-  for (const key of ['NODE_ENV', 'JWT_SECRET', ...Object.keys(BEDROCK_PRODUCTION_ENV), 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_BEARER_TOKEN_BEDROCK']) {
+  for (const key of ['NODE_ENV', 'JWT_SECRET', ...Object.keys(BEDROCK_PRODUCTION_ENV), 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_BEARER_TOKEN_BEDROCK', 'AWS_AZURE_FEDERATED_ROLE_ARN', 'AWS_AZURE_FEDERATED_AUDIENCE']) {
     saved.set(key, process.env[key])
   }
   try {
@@ -95,6 +98,14 @@ test('AI security: production requires explicit global routing and temporary AWS
     delete process.env.AWS_SESSION_TOKEN
   assert.throws(() => assertProductionSecrets(), /incomplete AWS environment credentials/)
     process.env.AWS_SESSION_TOKEN = 'temporary-session-token'
+    assert.doesNotThrow(() => assertProductionSecrets())
+
+    delete process.env.AWS_ACCESS_KEY_ID
+    delete process.env.AWS_SECRET_ACCESS_KEY
+    delete process.env.AWS_SESSION_TOKEN
+    process.env.AWS_AZURE_FEDERATED_ROLE_ARN = 'arn:aws:iam::123456789012:role/prism-runtime'
+    assert.throws(() => assertProductionSecrets(), /role and audience/)
+    process.env.AWS_AZURE_FEDERATED_AUDIENCE = 'api://prism-runtime'
     assert.doesNotThrow(() => assertProductionSecrets())
   } finally {
     for (const [key, value] of saved) {

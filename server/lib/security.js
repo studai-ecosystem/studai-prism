@@ -40,6 +40,7 @@ export function assertProductionSecrets() {
   const missing = []
   for (const key of [
     'JWT_SECRET',
+    'AWS_SECRETS_MANAGER_SECRET_ID',
     'AI_PROVIDER',
     'BEDROCK_PRIMARY_MODEL',
     'BEDROCK_CONVERSATION_MODEL',
@@ -70,6 +71,17 @@ export function assertProductionSecrets() {
   }
   if (process.env.AWS_BEARER_TOKEN_BEDROCK) {
     throw new Error('Refusing to start in production with a long-lived Bedrock API key; use an IAM role or federated temporary credentials.')
+  }
+  const azureRoleArn = process.env.AWS_AZURE_FEDERATED_ROLE_ARN
+  const azureAudience = process.env.AWS_AZURE_FEDERATED_AUDIENCE
+  if (Boolean(azureRoleArn) !== Boolean(azureAudience)) {
+    throw new Error('Refusing to start in production: Azure federation role and audience must be configured together.')
+  }
+  if (azureRoleArn && !/^arn:aws:iam::\d{12}:role\/[A-Za-z0-9+=,.@_/-]+$/.test(azureRoleArn)) {
+    throw new Error('Refusing to start in production: invalid Azure-federated AWS role ARN.')
+  }
+  if (azureAudience && !azureAudience.startsWith('api://')) {
+    throw new Error('Refusing to start in production: invalid Azure federation audience.')
   }
   const envCredentialParts = [process.env.AWS_ACCESS_KEY_ID, process.env.AWS_SECRET_ACCESS_KEY, process.env.AWS_SESSION_TOKEN]
   if (envCredentialParts.some(Boolean) && !envCredentialParts.every(Boolean)) {

@@ -4,6 +4,7 @@ import {
   InvokeModelCommand,
 } from '@aws-sdk/client-bedrock-runtime'
 import logger from '../../lib/logger.js'
+import { awsClientConfig } from '../../config/awsCredentials.js'
 import { awsRegion } from './modelRouter.js'
 
 const clients = new Map()
@@ -18,7 +19,7 @@ export class AiTimeoutError extends Error {
 
 export function runtimeClient(region = awsRegion()) {
   if (!clients.has(region)) {
-    clients.set(region, new BedrockRuntimeClient({ region, maxAttempts: 1 }))
+    clients.set(region, new BedrockRuntimeClient(awsClientConfig({ region, maxAttempts: 1 })))
   }
   return clients.get(region)
 }

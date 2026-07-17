@@ -50,6 +50,40 @@ The AWS SDK default credential provider chain is used. Production should use an
 IAM role or federated temporary credentials. Prism refuses to start in
 production with a Bedrock bearer API key or a long-lived access key.
 
+## Runtime Secrets
+
+Production application settings are stored as one JSON object in AWS Secrets
+Manager. The server retrieves `AWSCURRENT` before importing modules that read
+`process.env`; secret values override duplicate host settings. Production fails
+closed when retrieval or validation fails. Logs include only the loaded key
+count and secret version ID.
+
+The host retains runtime mode, temporary AWS identity configuration, and these
+bootstrap settings:
+
+```dotenv
+AWS_SECRETS_MANAGER_SECRET_ID=/studai/prism/prod/runtime
+AWS_SECRETS_MANAGER_REGION=ap-south-1
+AWS_SECRETS_MANAGER_REQUIRED=true
+AWS_AZURE_FEDERATED_ROLE_ARN=arn:aws:iam::123456789012:role/studai-prism-azure-aws-runtime
+AWS_AZURE_FEDERATED_AUDIENCE=api://00000000-0000-0000-0000-000000000000
+```
+
+Do not put `NODE_ENV`, `PORT`, Azure managed-identity endpoint/header values,
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, session tokens, role settings,
+profiles, or the bootstrap settings inside the JSON payload. The loader rejects
+those keys to preserve fail-closed startup and prevent circular or long-lived
+credentials.
+The same hydration runs for `npm run migrate`, `npm run seed:items`, and
+`npm run seed:admin`.
+
+On Azure App Service, the server requests a managed-identity token for the
+configured audience and exchanges it with AWS STS using
+`AssumeRoleWithWebIdentity`. The returned one-hour credentials are cached and
+refreshed before expiry, then shared by Secrets Manager, Bedrock, and Polly.
+`IDENTITY_ENDPOINT` and `IDENTITY_HEADER` are supplied by App Service and must
+not be copied into the JSON secret.
+
 ## Bedrock Configuration
 
 Required production settings:
@@ -100,6 +134,7 @@ Start from [docs/aws/bedrock-runtime-policy.json](docs/aws/bedrock-runtime-polic
 Replace the account ID and guardrail ID placeholders, remove unused model ARNs,
 and validate the result with IAM Access Analyzer. The runtime needs:
 
+- `secretsmanager:GetSecretValue` for `/studai/prism/prod/runtime` only
 - `bedrock:InvokeModel` for the configured models/inference profiles
 - `bedrock:ApplyGuardrail` only when a Bedrock Guardrail is configured
 - `polly:SynthesizeSpeech` only when Polly TTS is enabled

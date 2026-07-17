@@ -1,4 +1,5 @@
 import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly'
+import { awsClientConfig } from '../../config/awsCredentials.js'
 import logger from '../../lib/logger.js'
 import { awsRegion } from './modelRouter.js'
 
@@ -6,7 +7,9 @@ const clients = new Map()
 const ENGINES = new Set(['standard', 'neural', 'long-form', 'generative'])
 
 function pollyClient(region = awsRegion()) {
-  if (!clients.has(region)) clients.set(region, new PollyClient({ region, maxAttempts: 3 }))
+  if (!clients.has(region)) {
+    clients.set(region, new PollyClient(awsClientConfig({ region, maxAttempts: 3 })))
+  }
   return clients.get(region)
 }
 
