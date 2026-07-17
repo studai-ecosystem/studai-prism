@@ -32,6 +32,9 @@ OIDC. No long-lived AWS or registry credential is stored in GitHub.
 The script dispatches the manual `Deploy AWS` workflow. The workflow builds and
 pushes a commit-tagged image, validates the CloudFormation template, deploys the
 stack, waits for ECS stability, and checks the health endpoint through the ALB.
+The final container runs as non-root on Distroless Node 22. ECR scans every
+immutable image and the workflow refuses to deploy when any critical finding is
+present.
 
 ## DNS
 

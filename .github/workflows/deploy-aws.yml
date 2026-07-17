@@ -63,6 +63,32 @@ jobs:
             docker push "$image_uri"
           fi
           echo "uri=$image_uri" >> "$GITHUB_OUTPUT"
+          echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce critical image scan gate
+        id: scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecr wait image-scan-complete \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-id "imageTag=${{ steps.image.outputs.tag }}"
+          critical="$(aws ecr describe-image-scan-findings \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-id "imageTag=${{ steps.image.outputs.tag }}" \
+            --query 'imageScanFindings.findingSeverityCounts.CRITICAL || `0`' \
+            --output text)"
+          high="$(aws ecr describe-image-scan-findings \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-id "imageTag=${{ steps.image.outputs.tag }}" \
+            --query 'imageScanFindings.findingSeverityCounts.HIGH || `0`' \
+            --output text)"
+          echo "critical=$critical" >> "$GITHUB_OUTPUT"
+          echo "high=$high" >> "$GITHUB_OUTPUT"
+          if (( critical > 0 )); then
+            echo "Refusing deployment: ECR found $critical critical vulnerabilities."
+            exit 1
+          fi
 
       - name: Validate CloudFormation
         run: >-
@@ -121,6 +147,7 @@ jobs:
             echo
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Image: \`${{ steps.image.outputs.uri }}\`"
+            echo "- ECR scan: ${{ steps.scan.outputs.critical }} critical, ${{ steps.scan.outputs.high }} high"
             echo "- URL: https://${{ inputs.hostname }}"
             echo '- ECS service: `studai-prism-prod/web`'
           } >> "$GITHUB_STEP_SUMMARY"

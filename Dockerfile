@@ -10,25 +10,25 @@ COPY src ./src
 COPY server/lib/sharedConstants.js ./server/lib/sharedConstants.js
 RUN npm run build
 
-FROM node:22.17.0-bookworm-slim AS runtime
-
-ENV NODE_ENV=production \
-    PORT=3001
-
+FROM node:22.17.0-bookworm-slim AS runtime-deps
 WORKDIR /app/server
 COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-COPY server ./
+RUN mkdir -p /home/data/prism
+
+FROM gcr.io/distroless/nodejs22-debian12:nonroot AS runtime
+
+ENV NODE_ENV=production \
+    PORT=3001
+
 WORKDIR /app
-COPY --from=client-build /app/dist ./dist
+COPY --from=runtime-deps --chown=65532:65532 /app/server/node_modules ./server/node_modules
+COPY --chown=65532:65532 server ./server
+COPY --from=client-build --chown=65532:65532 /app/dist ./dist
+COPY --from=runtime-deps --chown=65532:65532 /home/data/prism /home/data/prism
 
-RUN mkdir -p /home/data/prism && chown -R node:node /app /home/data/prism
-
-USER node
+USER 65532:65532
 EXPOSE 3001
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3001/api/health').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))"
-
-CMD ["node", "server/index.js"]
+CMD ["server/index.js"]
