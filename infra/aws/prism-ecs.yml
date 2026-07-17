@@ -111,10 +111,10 @@ Resources:
                 Action:
                   - elasticfilesystem:ClientMount
                   - elasticfilesystem:ClientWrite
-                Resource: !GetAtt FileSystem.Arn
+                Resource: !Sub arn:aws:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${FileSystem}
                 Condition:
                   StringEquals:
-                    elasticfilesystem:AccessPointArn: !GetAtt AccessPoint.Arn
+                    elasticfilesystem:AccessPointArn: !Sub arn:aws:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:access-point/${AccessPoint}
       Tags:
         - Key: Application
           Value: studai-prism
