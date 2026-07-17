@@ -242,6 +242,16 @@ Resources:
       CidrIp: 0.0.0.0/0
       Description: HTTPS for shared production ALB.
 
+  HttpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref LoadBalancerSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: 0.0.0.0/0
+      Description: HTTP for host-specific redirects on the shared production ALB.
+
   HttpsListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
