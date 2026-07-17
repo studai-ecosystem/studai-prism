@@ -17,6 +17,9 @@ and invokes only the approved Bedrock models and Polly.
 - Desired tasks: one. Do not scale above one until the PostgreSQL operational
   store and shared Redis session cache are enabled.
 
+The CloudWatch log group is pre-provisioned and retained outside CloudFormation
+because the AWS organization policy denies log-group deletion.
+
 ## Deploy
 
 GitHub Actions builds only the committed source and authenticates to AWS through

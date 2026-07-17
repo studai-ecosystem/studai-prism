@@ -49,15 +49,6 @@ Resources:
         - Key: Environment
           Value: production
 
-  LogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: /ecs/studai-prism-prod
-      RetentionInDays: 30
-      Tags:
-        - Key: Application
-          Value: studai-prism
-
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -348,7 +339,7 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Ref LogGroup
+              awslogs-group: /ecs/studai-prism-prod
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: prism
       Tags:
