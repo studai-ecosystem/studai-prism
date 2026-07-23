@@ -29,6 +29,10 @@ Parameters:
     Default: 1
     MinValue: 1
     MaxValue: 1
+  DbSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Default: sg-03c2935c3e032c7a3
+    Description: Security group protecting the Prism RDS instance.
 
 Resources:
   Cluster:
@@ -145,6 +149,16 @@ Resources:
           Value: studai-prism-prod-efs
         - Key: Application
           Value: studai-prism
+
+  DbIngressFromTasks:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DbSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref TaskSecurityGroup
+      Description: Postgres from Prism ECS tasks.
 
   FileSystem:
     Type: AWS::EFS::FileSystem
