@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       hostname:
-        description: Public hostname routed by the shared production ALB
+        description: Comma-separated public hostnames routed by the shared production ALB (first is canonical)
         required: true
-        default: prism-aws.studai.one
+        default: prism.studai.one,prism-aws.studai.one
         type: string
 
 permissions:
@@ -143,10 +143,13 @@ jobs:
             --query 'LoadBalancers[0].DNSName' \
             --output text)"
           alb_ip="$(getent ahostsv4 "$alb_dns" | awk 'NR==1 { print $1 }')"
-          curl --fail --show-error --silent \
-            --retry 12 --retry-all-errors --retry-delay 10 \
-            --resolve "${{ inputs.hostname }}:443:$alb_ip" \
-            "https://${{ inputs.hostname }}/api/health"
+          IFS=',' read -ra hosts <<< "${{ inputs.hostname }}"
+          for host in "${hosts[@]}"; do
+            curl --fail --show-error --silent \
+              --retry 12 --retry-all-errors --retry-delay 10 \
+              --resolve "${host}:443:$alb_ip" \
+              "https://${host}/api/health"
+          done
 
       - name: Deployment summary
         shell: bash
@@ -157,6 +160,6 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Image: \`${{ steps.image.outputs.uri }}\`"
             echo "- ECR scan: ${{ steps.scan.outputs.critical }} critical, ${{ steps.scan.outputs.high }} high"
-            echo "- URL: https://${{ inputs.hostname }}"
+            echo "- Hostnames: ${{ inputs.hostname }}"
             echo '- ECS service: `studai-prism-prod/web`'
           } >> "$GITHUB_STEP_SUMMARY"

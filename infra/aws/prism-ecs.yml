@@ -9,8 +9,9 @@ Parameters:
     Type: String
     Description: ARN of the AWS Secrets Manager JSON runtime configuration.
   Hostname:
-    Type: String
-    Default: prism-aws.studai.one
+    Type: CommaDelimitedList
+    Description: Public hostnames routed by the shared production ALB (first entry is canonical).
+    Default: prism.studai.one,prism-aws.studai.one
   VpcId:
     Type: AWS::EC2::VPC::Id
     Default: vpc-019b712076f7e2a78
@@ -276,7 +277,7 @@ Resources:
       Conditions:
         - Field: host-header
           HostHeaderConfig:
-            Values: [!Ref Hostname]
+            Values: !Ref Hostname
       Actions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
@@ -289,7 +290,7 @@ Resources:
       Conditions:
         - Field: host-header
           HostHeaderConfig:
-            Values: [!Ref Hostname]
+            Values: !Ref Hostname
       Actions:
         - Type: redirect
           RedirectConfig:
@@ -401,7 +402,9 @@ Outputs:
   ServiceName:
     Value: !GetAtt Service.Name
   ServiceUrl:
-    Value: !Sub https://${Hostname}
+    Value: !Sub
+      - https://${PrimaryHost}
+      - PrimaryHost: !Select [0, !Ref Hostname]
   FileSystemId:
     Value: !Ref FileSystem
   TargetGroupArn:
