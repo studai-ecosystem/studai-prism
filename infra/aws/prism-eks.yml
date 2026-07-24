@@ -1,0 +1,162 @@
+# StudAI Prism on EKS (StudAI-Prod-EKS-Cluster).
+#
+# Conventions match the other StudAI namespaces: ALB ingress group
+# "studai-prod" on the shared k8s ALB with the wildcard *.studai.one
+# certificate. The pod hydrates its configuration from AWS Secrets Manager
+# (/studai/prism/aws-prod/runtime) through the studai-prism IRSA service
+# account, mounts the SAME EFS access point as the former ECS service so the
+# JSON store carries over, and reaches the Prism RDS instance through the
+# node security group rule owned outside this manifest.
+#
+# Prism is a single-writer application (JSON file store): replicas MUST be 1
+# and the rollout strategy is Recreate so two pods never share the store.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: prism-data
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: fs-0ef078727a5ba4347::fsap-044dc830bda9436c5
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prism-data
+  namespace: prism
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: prism-data
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prism
+  namespace: prism
+  labels:
+    app: prism
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: prism
+  template:
+    metadata:
+      labels:
+        app: prism
+    spec:
+      serviceAccountName: studai-prism
+      containers:
+        - name: prism
+          image: 158346964832.dkr.ecr.ap-south-1.amazonaws.com/prod/prism:69363a6e6b9a
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3001
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3001"
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: /studai/prism/aws-prod/runtime
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /home/data/prism
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: prism-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prism
+  namespace: prism
+  labels:
+    app: prism
+spec:
+  type: ClusterIP
+  selector:
+    app: prism
+  ports:
+    - port: 80
+      targetPort: 3001
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prism
+  namespace: prism
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: studai-prod
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:158346964832:certificate/eec35e1a-807c-4a03-8c9c-0e983b2caee2
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+spec:
+  rules:
+    - host: prism.studai.one
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prism
+                port:
+                  number: 80
+    - host: prismprodtesting.studai.one
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prism
+                port:
+                  number: 80
