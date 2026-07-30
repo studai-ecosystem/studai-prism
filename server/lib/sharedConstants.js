@@ -52,6 +52,11 @@ export const REASSESSMENT_DAYS = 90
 // scores across different scale versions are not directly comparable.
 export const SCALE_VERSION = 'prism-scale-v1'
 
+// Entitlement modes whose sessions are REAL candidates (calibration-eligible).
+// 'paid' = direct purchase; 'invite' = admin-issued group assessment link
+// (college cohorts). Everything else (dummy/dev/admin_grant) stays synthetic.
+export const REAL_ENTITLEMENT_MODES = ['paid', 'invite']
+
 // Consent copy version. Bump whenever the wording or scope set in
 // src/pages/Briefing.jsx CONSENT_ITEMS changes; recorded with every consent
 // and stamped onto the session record (audit finding C5).

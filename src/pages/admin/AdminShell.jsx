@@ -40,6 +40,7 @@ const NAV = [
     group: 'Commerce',
     items: [
       { to: '/admin/payments', label: 'Payments', icon: ClipboardList, permission: 'payments:read' },
+      { to: '/admin/invites', label: 'Group invites', icon: ClipboardList, permission: 'invites:read' },
     ],
   },
   {

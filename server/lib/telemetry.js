@@ -325,6 +325,10 @@ export async function eraseTelemetry(sessionId) {
     ['practice_replays', 'source_session_id'],
     ['teamfit_sessions', 'candidate_session_id'],
     ['team_members', 'member_session_id'],
+    // Group invites: the redemption row maps a person to this session —
+    // right-to-erasure removes it (the invite's used_count is NOT given back;
+    // the seat was genuinely consumed).
+    ['invite_redemptions', 'session_id'],
     ['audit_log', 'session_id'],
   ]) {
     const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId]).catch(() => null)

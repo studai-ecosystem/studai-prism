@@ -28,6 +28,7 @@ import sessionsRouter from './sessions.js'
 import reportsRouter from './reports.js'
 import disputesRouter from './disputes.js'
 import paymentsRouter from './payments.js'
+import invitesRouter from './invites.js'
 import recordsRouter from './records.js'
 import searchRouter from './search.js'
 import bankRouter from './bank.js'
@@ -102,6 +103,7 @@ router.use('/sessions', sessionsRouter)
 router.use('/reports', reportsRouter)
 router.use('/disputes', disputesRouter)
 router.use('/payments', paymentsRouter)
+router.use('/invites', invitesRouter)
 router.use('/records', recordsRouter)
 router.use('/search', searchRouter)
 // Phase 3 — scientific administration.

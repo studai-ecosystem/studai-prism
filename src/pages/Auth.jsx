@@ -38,9 +38,13 @@ export default function Auth() {
 
   // Already signed in? There is nothing to do here — continue into the
   // funnel instead of asking the user to log in again (every "Get Assessed"
-  // entry point funnels through this guard).
+  // entry point funnels through this guard). An in-flight invite link wins
+  // over the paid flow — the candidate came here to claim a seat.
   useEffect(() => {
-    if (isAuthenticated()) navigate('/payment', { replace: true })
+    if (isAuthenticated()) {
+      const invite = sessionStorage.getItem('prismInviteToken')
+      navigate(invite ? `/invite/${invite}` : '/payment', { replace: true })
+    }
   }, [navigate])
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -71,10 +75,11 @@ export default function Auth() {
 
     action
       .then(() => {
-        // Paid flow: send the user to checkout. Payment mints the sessionId
-        // (via Razorpay verify or the dev-session endpoint) and then continues
-        // into identity verification + proctoring.
-        navigate('/payment')
+        // An in-flight invite returns the candidate to their claimed seat;
+        // otherwise the paid flow continues into checkout, which mints the
+        // sessionId and then identity verification + proctoring.
+        const invite = sessionStorage.getItem('prismInviteToken')
+        navigate(invite ? `/invite/${invite}` : '/payment')
       })
       .catch((err) => setError(err.message || 'Something went wrong. Please try again.'))
       .finally(() => setSubmitting(false))

@@ -52,6 +52,10 @@ export const PERMISSIONS = {
   'payments:revoke': 'Revoke an unused entitlement with reason',
   'payments:refund': 'Operate the refund workflow',
 
+  // Group assessment invite links (college cohorts)
+  'invites:read': 'View invite links, usage and redemption rosters',
+  'invites:manage': 'Create and revoke group assessment invite links',
+
   // Assessment content
   'scenarios:read': 'View the scenario bank and lifecycle state',
   'scenarios:manage': 'Scenario lifecycle actions (freeze-aware; never hard delete)',
@@ -138,6 +142,7 @@ export const ROLES = {
       'disputes:read', 'disputes:manage', 'consents:read', 'verifications:read',
       'integrity:read', 'payments:read', 'content:read', 'flags:read', 'system:read',
       'credentials:read', 'replays:read', 'replays:flag', 'teamfit:read', 'teamfit:manage',
+      'invites:read', 'invites:manage',
       'exports:create', 'notes:write',
     ],
   },
@@ -149,6 +154,7 @@ export const ROLES = {
       'reports:read', 'reports:resend', 'reports:hold', 'disputes:read', 'disputes:manage',
       'consents:read', 'verifications:read', 'integrity:read', 'integrity:review',
       'credentials:read', 'replays:read', 'replays:flag', 'teamfit:read', 'teamfit:manage',
+      'invites:read', 'invites:manage',
       'notes:write',
     ],
   },
@@ -188,7 +194,7 @@ export const ROLES = {
     description: 'Payments, entitlements, refunds, reconciliation, revenue reports.',
     permissions: [
       'dashboard:read', 'payments:read', 'payments:grant', 'payments:revoke', 'payments:refund',
-      'users:read', 'exports:create', 'notes:write',
+      'users:read', 'invites:read', 'exports:create', 'notes:write',
     ],
   },
   content_admin: {

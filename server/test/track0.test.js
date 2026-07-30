@@ -133,10 +133,15 @@ test('T0 gate: research tables define no PII columns and never reference user_id
     // candidate data — exempt for the same reason. job_applications and
     // content_* (migration 0015) are the hiring/CMS plane: applicant PII is
     // their purpose (retention-deletable) and they never join research data.
+    // invite_redemptions (migration 0017) is the COMMERCE plane, the invite
+    // twin of v1_payments: it maps a redeemer to their minted session so
+    // seats are one-per-person; it is in the erasure cascade and never joins
+    // research tables.
     const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)]
     for (const [, name, body] of tables) {
       if (name.startsWith('v1_') || name.startsWith('admin_') ||
-          name.startsWith('content_') || name === 'job_applications') continue
+          name.startsWith('content_') || name === 'job_applications' ||
+          name === 'invite_redemptions') continue
       for (const line of body.split('\n')) {
         assert.ok(
           !FORBIDDEN.test(line),

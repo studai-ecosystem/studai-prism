@@ -151,6 +151,44 @@ router.post('/dev-session', async (req, res) => {
   res.json({ sessionId })
 })
 
+// ── POST /api/payment/invite/redeem ──────────────────────────────────────────
+// A signed-in candidate redeems a group assessment invite link (minted by an
+// administrator). Idempotent per candidate per invite — revisiting the link
+// returns the SAME session. Mode 'invite' entitlements are REAL candidates
+// (college cohorts), so their sessions are not synthetic-flagged.
+router.post('/invite/redeem', async (req, res) => {
+  const authUser = getAuthUser(req)
+  if (!authUser) return res.status(401).json({ error: 'Sign in to use an invite link.' })
+  const { token } = req.body || {}
+  if (!token || typeof token !== 'string' || token.length > 128) {
+    return res.status(400).json({ error: 'Invalid invite link.' })
+  }
+  try {
+    const { redeemInvite, isInvitesAvailable } = await import('../lib/invites.js')
+    if (!isInvitesAvailable()) {
+      return res.status(503).json({ error: 'Invites are not available right now.' })
+    }
+    const result = await redeemInvite(token, { userId: authUser.id, userEmail: authUser.email })
+    logger.info('payment_invite_redeemed', {
+      sessionId: result.sessionId,
+      alreadyRedeemed: result.alreadyRedeemed,
+      requestId: req.requestId,
+    })
+    res.json({ sessionId: result.sessionId, alreadyRedeemed: result.alreadyRedeemed })
+  } catch (err) {
+    const codes = {
+      INVITE_NOT_FOUND: 404,
+      INVITE_REVOKED: 410,
+      INVITE_EXPIRED: 410,
+      INVITE_NOT_STARTED: 409,
+      INVITE_EXHAUSTED: 409,
+    }
+    if (codes[err.code]) return res.status(codes[err.code]).json({ error: err.message, code: err.code })
+    logger.captureException(err, { msg: 'payment_invite_redeem_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Could not redeem this invite. Please try again.' })
+  }
+})
+
 // ── GET /api/payment/licence ───────────────────────────────────────────────────
 // The app launcher's licence check: is this signed-in candidate resuming an
 // in-progress assessment, starting fresh, or in need of a purchase? Honest
