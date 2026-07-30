@@ -6,7 +6,7 @@
 // network-first with a cache fallback so a flaky connection can still paint
 // the shell. No offline assessment: the room requires the server, honestly.
 
-const CACHE = 'prism-shell-v1'
+const CACHE = 'prism-shell-v2' // bump on releases that must invalidate stale clients
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -37,6 +37,15 @@ self.addEventListener('fetch', (event) => {
         }
         return res
       })
-      .catch(() => caches.match(req).then((hit) => hit || caches.match('/'))),
+      .catch(() =>
+        caches.match(req).then((hit) => {
+          if (hit) return hit
+          // The shell fallback is ONLY valid for page navigations. Serving
+          // index.html for a failed asset request hands HTML to a script/style
+          // slot and breaks the page layout — assets must fail honestly.
+          if (req.mode === 'navigate') return caches.match('/')
+          return Response.error()
+        }),
+      ),
   )
 })
