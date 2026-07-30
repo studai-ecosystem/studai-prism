@@ -1,0 +1,91 @@
+name: Build Image
+
+# Build-only: pushes the immutable image to ECR and gates on the scan.
+# Deployment to EKS (kubectl set image) is a separate, deliberate step —
+# the legacy ECS stack must stay at desired-count 0.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: studai-prism-image-build
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: prod/prism
+  DEPLOY_ROLE_ARN: arn:aws:iam::158346964832:role/studai-prism-github-deploy
+
+jobs:
+  build:
+    name: Build and push
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out committed source
+        uses: actions/checkout@v4
+
+      - name: Configure temporary AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: prism-image-${{ github.run_id }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push immutable image
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_tag="${GITHUB_SHA::12}"
+          image_uri="${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY}:${image_tag}"
+          if aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=$image_tag" >/dev/null 2>&1; then
+            echo "Image already exists for $image_tag; reusing it."
+          else
+            docker build --pull --provenance=false --tag "$image_uri" .
+            docker push "$image_uri"
+          fi
+          echo "uri=$image_uri" >> "$GITHUB_OUTPUT"
+          echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce critical image scan gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          scan_json=''
+          scan_status='PENDING'
+          for attempt in {1..36}; do
+            if scan_json="$(aws ecr describe-image-scan-findings \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-id "imageTag=${{ steps.image.outputs.tag }}" \
+              --output json 2>/dev/null)"; then
+              scan_status="$(jq -r '.imageScanStatus.status // "PENDING"' <<< "$scan_json")"
+              if [[ "$scan_status" == 'COMPLETE' ]]; then break; fi
+              if [[ "$scan_status" == 'FAILED' ]]; then
+                echo 'Refusing release: ECR image scan failed.'
+                exit 1
+              fi
+            fi
+            sleep 5
+          done
+          if [[ "$scan_status" != 'COMPLETE' ]]; then
+            echo "Refusing release: ECR image scan timed out ($scan_status)."
+            exit 1
+          fi
+          critical="$(jq -r '.imageScanFindings.findingSeverityCounts.CRITICAL // 0' <<< "$scan_json")"
+          if (( critical > 0 )); then
+            echo "Refusing release: ECR found $critical critical vulnerabilities."
+            exit 1
+          fi
+          echo "Image ${{ steps.image.outputs.uri }} is clean."
