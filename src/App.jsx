@@ -42,6 +42,8 @@ import AdminSystem from './pages/admin/AdminSystem.jsx'
 import AdminPrivacy from './pages/admin/AdminPrivacy.jsx'
 import AdminAudit from './pages/admin/AdminAudit.jsx'
 import ShellHome from './pages/ShellHome.jsx'
+import InviteRedeem from './pages/InviteRedeem.jsx'
+import AdminInvites from './pages/admin/AdminInvites.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
 import AIEvaluation from './pages/research/AIEvaluation.jsx'
@@ -51,6 +53,7 @@ import AboutStudAI from './pages/about/AboutStudAI.jsx'
 import Mission from './pages/about/Mission.jsx'
 import Careers from './pages/about/Careers.jsx'
 import DesignSystem from './pages/DesignSystem.jsx'
+import { PrivacyPolicy, TermsOfService, RefundPolicy, SecurityPage, ContactPage } from './pages/legal/LegalPages.jsx'
 import { isAuthenticated } from './lib/session.js'
 
 // Gate funnel pages behind a (mock) authenticated session.
@@ -81,6 +84,12 @@ export default function App() {
       <Route path="/about" element={<AboutStudAI />} />
       <Route path="/about/mission" element={<Mission />} />
       <Route path="/about/careers" element={<Careers />} />
+      {/* Legal & policy pages — public, required for payment verification. */}
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
+      <Route path="/refund-policy" element={<RefundPolicy />} />
+      <Route path="/security" element={<SecurityPage />} />
+      <Route path="/contact" element={<ContactPage />} />
       {/* Internal living style guide (Part A) — admin-token gated in-page. */}
       <Route path="/design-system" element={<DesignSystem />} />
       {/* Control Centre — database-backed admin identities + MFA + RBAC.
@@ -98,6 +107,7 @@ export default function App() {
         <Route path="disputes" element={<AdminDisputes />} />
         <Route path="disputes/:sessionId" element={<AdminDisputeDetail />} />
         <Route path="payments" element={<AdminPayments />} />
+        <Route path="invites" element={<AdminInvites />} />
         <Route path="consents" element={<AdminRecords mode="consents" />} />
         <Route path="verifications" element={<AdminRecords mode="verifications" />} />
         <Route path="integrity" element={<AdminRecords mode="integrity" />} />
@@ -121,6 +131,7 @@ export default function App() {
       <Route path="/admin/legacy-ops" element={<Admin />} />
       {/* The app launcher — what the desktop shell / installed PWA opens into. */}
       <Route path="/app" element={<ShellHome />} />
+      <Route path="/invite/:token" element={<InviteRedeem />} />
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Auth />} />
       <Route path="/register" element={<Auth />} />

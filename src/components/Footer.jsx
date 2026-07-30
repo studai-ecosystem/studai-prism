@@ -13,12 +13,13 @@ const companyLinks = [
   { label: 'About StudAI One', href: 'https://studaione.com/about', external: true },
   { label: 'Careers', href: 'https://studaione.com/careers', external: true },
   { label: 'Press', href: 'https://studaione.com/press', external: true },
-  { label: 'Contact', href: 'mailto:hello@studaione.com' },
+  { label: 'Contact', href: '/contact' },
 ]
 
 const legalLinks = [
   { label: 'Privacy Policy', href: '/privacy' },
   { label: 'Terms of Service', href: '/terms' },
+  { label: 'Refund Policy', href: '/refund-policy' },
   { label: 'Security', href: '/security' },
 ]
 
