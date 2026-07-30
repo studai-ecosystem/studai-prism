@@ -33,7 +33,13 @@ try {
       versionId: status.versionId,
     }))
   }
-  await import(pathToFileURL(join(SERVER_ROOT, target)).href)
+  // The target scripts gate their CLI behaviour on `argv[1] === <own path>`;
+  // when imported through this wrapper argv[1] is the wrapper itself and the
+  // script silently does nothing. Hand over argv so the target believes it is
+  // the entry point (its own CLI args follow the target name).
+  const targetPath = join(SERVER_ROOT, target)
+  process.argv = [process.argv[0], targetPath, ...process.argv.slice(3)]
+  await import(pathToFileURL(targetPath).href)
 } catch (error) {
   console.error(JSON.stringify({
     level: 'error',
