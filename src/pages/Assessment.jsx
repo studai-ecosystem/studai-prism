@@ -852,14 +852,50 @@ export default function Assessment() {
     if (submitting) return
     setSubmitting(true)
 
+    // Scoring can outlive load-balancer timeouts, so the server may answer
+    // 202 (scoring continues server-side) and we poll for the finished report.
+    // 'idle' means the server restarted mid-scoring — re-submit (idempotent).
+    const pollForReport = async () => {
+      const deadline = Date.now() + 6 * 60 * 1000
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 3000))
+        let data
+        try {
+          const res = await fetch(`/api/assessment/evaluate-status/${sessionId}`)
+          if (!res.ok) continue
+          data = await res.json()
+        } catch {
+          continue // transient network blip — keep polling
+        }
+        if (data.status === 'complete') return data.report
+        if (data.status === 'failed') throw new Error('Evaluation failed')
+        if (data.status === 'idle') {
+          const retry = await fetch('/api/assessment/evaluate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId }),
+          })
+          if (retry.ok && retry.status !== 202) return await retry.json()
+          if (!retry.ok && retry.status !== 202) throw new Error('Evaluation failed')
+        }
+      }
+      throw new Error('Evaluation timed out')
+    }
+
     try {
       const res = await fetch('/api/assessment/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       })
-      if (!res.ok) throw new Error('Evaluation failed')
-      const data = await res.json()
+      let data
+      if (res.status === 202) {
+        data = await pollForReport()
+      } else if (res.ok) {
+        data = await res.json()
+      } else {
+        throw new Error('Evaluation failed')
+      }
       // Test is over — tell the phone to switch its camera off.
       endProctorSession()
       navigate(`/score?session=${sessionId}`, { state: { report: data } })

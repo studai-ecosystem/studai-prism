@@ -51,6 +51,15 @@ async function start() {
     logger.info('server_listening', { url: `http://localhost:${PORT}` })
   })
 
+  // Behind a load balancer: keep-alive must OUTLIVE the LB idle timeout (ALB
+  // default 60s) or the LB reuses a socket the app just closed → intermittent
+  // 502s. Long scoring requests must not be cut by Node's own header/request
+  // timers either — /evaluate's fast-path + poll design keeps individual
+  // responses short, but these guards make the server honest regardless.
+  server.keepAliveTimeout = 185000
+  server.headersTimeout = 190000
+  server.requestTimeout = 0
+
   // Attach the phone-proctor signalling socket (degrades gracefully if socket.io
   // isn't installed).
   attachProctorSocket(server)

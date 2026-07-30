@@ -45,7 +45,7 @@ import { emptyEvidence, accumulateEvidence, decideDirector } from '../lib/direct
 import { buildPanelPlan } from '../lib/judgePanel.js'
 import { aggregateSamples } from '../lib/scoreAggregator.js'
 import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession, recordTimelineEntry, activeFlagSnapshot, eraseTelemetry, recordSessionTranscript, summarizeSessionBehavior, recordBehavioralFeatures, isDbConfigured as telemetryDbConfigured } from '../lib/telemetry.js'
-import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, SCALE_VERSION } from '../lib/sharedConstants.js'
+import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, SCALE_VERSION, REAL_ENTITLEMENT_MODES } from '../lib/sharedConstants.js'
 import { getJwtSecret } from '../lib/security.js'
 import { ensureCandidateId } from '../lib/identity.js'
 import { configuredGapDays, reassessmentBlock } from '../lib/eligibility.js'
@@ -888,6 +888,16 @@ router.post('/message', async (req, res) => {
 })
 
 // ── POST /api/assessment/evaluate ─────────────────────────────────────────────
+// The judge panel can take 60-90s worst-case — longer than load-balancer idle
+// timeouts (the shared ALB kills idle connections at 60s). Scoring therefore
+// runs as a server-side job: if it finishes within the fast-path window the
+// response carries the report as before; otherwise the client gets 202 and
+// polls GET /evaluate-status/:sessionId. The job registry also deduplicates
+// concurrent submits (auto-submit racing a manual submit scores once).
+const EVALUATE_FAST_WAIT_MS = Number(process.env.PRISM_EVALUATE_FAST_WAIT_MS) || 20000
+const evaluationJobs = new Map() // sessionId -> Promise<savedReport>
+const evaluationFailures = new Map() // sessionId -> { at, code }
+
 router.post('/evaluate', async (req, res) => {
   const { sessionId } = req.body
   if (!sessionId) return res.status(400).json({ error: 'sessionId required' })
@@ -896,9 +906,62 @@ router.post('/evaluate', async (req, res) => {
   const existing = await getReport(sessionId)
   if (existing) return res.json(existing)
 
-  const session = await loadSession(sessionId)
-  if (!session) return res.status(404).json({ error: 'Session not found or expired' })
+  let job = evaluationJobs.get(sessionId)
+  if (!job) {
+    const session = await loadSession(sessionId)
+    if (!session) return res.status(404).json({ error: 'Session not found or expired' })
+    evaluationFailures.delete(sessionId)
+    job = runEvaluation({ sessionId, session, requestId: req.requestId })
+    evaluationJobs.set(sessionId, job)
+    job.then(
+      () => {
+        evaluationJobs.delete(sessionId)
+        evaluationFailures.delete(sessionId)
+      },
+      (err) => {
+        evaluationJobs.delete(sessionId)
+        evaluationFailures.set(sessionId, { at: Date.now(), code: err?.code || err?.name || 'evaluation_failed' })
+        logger.captureException(err, { msg: 'assessment_evaluate_failed', sessionId, requestId: req.requestId })
+      },
+    )
+  }
 
+  let fastTimer
+  const outcome = await Promise.race([
+    job.then(
+      (saved) => ({ saved }),
+      () => ({ failed: true }),
+    ),
+    new Promise((resolve) => {
+      fastTimer = setTimeout(() => resolve({ pending: true }), EVALUATE_FAST_WAIT_MS)
+    }),
+  ])
+  clearTimeout(fastTimer)
+
+  if (outcome.saved) return res.json(outcome.saved)
+  if (outcome.failed) return res.status(500).json({ error: 'Evaluation failed' })
+  return res.status(202).json({ status: 'scoring' })
+})
+
+// ── GET /api/assessment/evaluate-status/:sessionId ───────────────────────────
+// Poll target for the 202 path above. 'idle' means no job is running and no
+// report exists (e.g. the process restarted mid-scoring) — the client should
+// re-POST /evaluate, which is idempotent and restarts scoring safely.
+router.get('/evaluate-status/:sessionId', async (req, res) => {
+  const { sessionId } = req.params
+  const report = await getReport(sessionId)
+  if (report) return res.json({ status: 'complete', report })
+  if (evaluationJobs.has(sessionId)) return res.json({ status: 'scoring' })
+  if (evaluationFailures.has(sessionId)) return res.json({ status: 'failed' })
+  const persisted = await getSession(sessionId)
+  if (persisted) return res.json({ status: 'idle' })
+  return res.status(404).json({ error: 'Session not found' })
+})
+
+// Runs the full scoring pipeline for one session and returns the persisted
+// report. Body unchanged from the original inline handler — every audit row,
+// clamp, equating step and credential issuance is identical.
+async function runEvaluation({ sessionId, session, requestId }) {
   const { scenario, history } = session
 
   // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): mark submission.
@@ -922,8 +985,7 @@ router.post('/evaluate', async (req, res) => {
     .join('\n\n')
 
   try {
-    // ── Panel of LLM Evaluators (PoLL) + position-swap + multi-sample vote ────
-    // Replaces the old single low-temperature scoring call. We draw N samples
+    // ── Panel of LLM Evaluators (PoLL) + position-swap + multi-sample vote ────    // Replaces the old single low-temperature scoring call. We draw N samples
     // across judge personas / temperatures / position-swapped rubric orderings
     // (and across extra model families when PRISM_JUDGE_MODELS is set), then the
     // aggregator takes the median per dimension and measures judge disagreement
@@ -1157,9 +1219,11 @@ router.post('/evaluate', async (req, res) => {
     await sessions.delete(sessionId)
 
     // Track 0.2: append this completed assessment to the candidate's timeline
-    // (pseudonymous). Dummy/dev sessions are marked synthetic (RULE 3) so they
-    // can never enter calibration or growth models.
+    // (pseudonymous). Dummy/dev/admin-grant sessions are marked synthetic
+    // (RULE 3) so they can never enter calibration or growth models. Paid AND
+    // invite (college cohort) sessions are REAL candidates.
     const entitlementRec = await getEntitlement(sessionId)
+    const isRealCandidate = REAL_ENTITLEMENT_MODES.includes(entitlementRec?.mode || 'paid')
     recordTimelineEntry({
       sessionId,
       candidateId: persisted?.candidateId || null,
@@ -1168,7 +1232,7 @@ router.post('/evaluate', async (req, res) => {
       calibrationRunId: null, // stamped once a frozen equating run exists
       consentVersion: persisted?.consentVersion || null,
       flagsActive: activeFlagSnapshot(),
-      isSynthetic: (entitlementRec?.mode || 'paid') !== 'paid',
+      isSynthetic: !isRealCandidate,
       language: evalLanguage,
       // Track 1.1: the growth-curve measurement point (per-dimension θ + SE).
       finalTheta: thetaFromReport(report),
@@ -1179,7 +1243,7 @@ router.post('/evaluate', async (req, res) => {
     recordSessionTranscript({
       sessionId,
       scenarioKey: scenario.id,
-      isSynthetic: (entitlementRec?.mode || 'paid') !== 'paid',
+      isSynthetic: !isRealCandidate,
       turns: history.map((m) => {
         if (m.role === 'user') {
           return { speaker: 'candidate', text: String(m.content).replace('[Candidate]: ', '') }
@@ -1223,16 +1287,16 @@ router.post('/evaluate', async (req, res) => {
           auditLog('credential_issued', sessionId, { credentialId: issued.credentialId, keyId: issued.keyId })
         }
       } catch (err) {
-        logger.captureException(err, { msg: 'credential_issue_failed', requestId: req.requestId })
+        logger.captureException(err, { msg: 'credential_issue_failed', requestId })
       }
     }
 
-    res.json(saved)
+    return saved
   } catch (err) {
-    logger.captureException(err, { msg: 'assessment_evaluate_failed', requestId: req.requestId })
-    res.status(500).json({ error: 'Evaluation failed' })
+    logger.captureException(err, { msg: 'assessment_evaluate_failed', requestId })
+    throw err
   }
-})
+}
 
 // ── POST /api/assessment/verify-identity ─────────────────────────────────────
 // Records the result of the pre-test document check. OCR + name matching are
