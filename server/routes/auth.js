@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import logger from '../lib/logger.js'
 import { getJwtSecret } from '../lib/security.js'
-import { findUserByEmail, findUserById, createUser, updateUser, publicUser } from '../lib/db.js'
+import { findUserByEmail, findUserById, createUser, updateUser, updateUserAccount, publicUser } from '../lib/db.js'
 
 const router = Router()
 
@@ -178,6 +178,60 @@ router.patch('/me', async (req, res) => {
   } catch (err) {
     logger.captureException(err, { msg: 'auth_me_patch_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to update profile.' })
+  }
+})
+
+// ── POST /api/auth/change-password ───────────────────────────────────────────
+// Requires the CURRENT password (a stolen token alone cannot rotate the
+// credential). Bumps tokenVersion so every other session is signed out, and
+// returns a fresh token so this session stays signed in.
+router.post('/change-password', async (req, res) => {
+  try {
+    const header = req.headers.authorization || ''
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null
+    if (!token) {
+      return res.status(401).json({ error: 'Not authenticated.' })
+    }
+
+    let payload
+    try {
+      payload = jwt.verify(token, getJwtSecret())
+    } catch {
+      return res.status(401).json({ error: 'Invalid or expired token.' })
+    }
+
+    const { currentPassword, newPassword } = req.body || {}
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new password are required.' })
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters.' })
+    }
+
+    const user = await findUserById(payload.sub)
+    if (!user) {
+      return res.status(401).json({ error: 'Account not found.' })
+    }
+    if (!tokenVersionValid(payload, user)) {
+      return res.status(401).json({ error: 'Session revoked. Please sign in again.' })
+    }
+    if (user.accountState === 'suspended') {
+      return res.status(403).json({ error: 'This account is suspended. Contact support@studai.one.' })
+    }
+
+    const ok = await bcrypt.compare(String(currentPassword), user.passwordHash)
+    if (!ok) {
+      return res.status(401).json({ error: 'Current password is incorrect.' })
+    }
+
+    const passwordHash = await bcrypt.hash(String(newPassword), 10)
+    const updated = await updateUserAccount(user.id, { passwordHash, bumpTokenVersion: true })
+
+    logger.info('password_changed', { userId: user.id })
+    res.json({ token: signToken(updated), user: publicUser(updated) })
+  } catch (err) {
+    logger.captureException(err, { msg: 'auth_change_password_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Failed to change password.' })
   }
 })
 

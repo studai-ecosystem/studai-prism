@@ -103,7 +103,7 @@ export function buildApp() {
   // Broad API rate-limit safety net + targeted limits on abuse-prone endpoints
   // (C7). Order matters: specific limiters run before the routers.
   app.use('/api/', apiLimiter)
-  app.use(['/api/auth/login', '/api/auth/register'], authLimiter)
+  app.use(['/api/auth/login', '/api/auth/register', '/api/auth/change-password'], authLimiter)
   app.use('/api/assessment/transcribe', transcribeLimiter)
   app.use('/api/assessment/event', eventLimiter)
   app.use('/api/assessment/send-report', sendReportLimiter)
@@ -148,11 +148,23 @@ export function buildApp() {
 
   // ── Static frontend (production single-origin deploys) ──────────────────
   if (SERVE_FRONTEND) {
-    app.use(express.static(DIST_DIR))
+    app.use(express.static(DIST_DIR, {
+      setHeaders: (res, filePath) => {
+        // Vite content-hashes everything under /assets — safe to cache forever.
+        // The HTML shell, service worker and manifest must always revalidate
+        // or clients keep painting a stale bundle after a deploy.
+        if (/[\\/]assets[\\/]/.test(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+        } else if (/(?:index\.html|sw\.js|manifest\.webmanifest)$/.test(filePath)) {
+          res.setHeader('Cache-Control', 'no-cache')
+        }
+      },
+    }))
     // SPA fallback: any non-API GET serves index.html so client-side routes
     // (/briefing, /m/:pairCode, /verify/:id, ...) survive hard refreshes.
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api/') || req.path.startsWith('/proctor-socket')) return next()
+      res.setHeader('Cache-Control', 'no-cache')
       res.sendFile(join(DIST_DIR, 'index.html'))
     })
     logger.info('serving_frontend', { dir: DIST_DIR })

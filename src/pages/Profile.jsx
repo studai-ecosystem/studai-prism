@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Award, Calendar, FileText, ChevronRight, ClipboardList, Pencil, Loader2 } from 'lucide-react'
+import { Award, Calendar, FileText, ChevronRight, ClipboardList, Pencil, Loader2, KeyRound, ShieldAlert, PlayCircle } from 'lucide-react'
 import PageLayout from '../components/PageLayout.jsx'
-import { getUser, getToken, updateProfile } from '../lib/session.js'
+import { getUser, getToken, updateProfile, clearUser, setToken } from '../lib/session.js'
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional']
 
@@ -60,6 +60,66 @@ export default function Profile() {
   const [form, setForm] = useState({ name: '', college: '', year: '' })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+
+  // Licence state — powers the "resume your assessment" banner.
+  const [licence, setLicence] = useState(null)
+
+  // Change-password card state.
+  const [pwOpen, setPwOpen] = useState(false)
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwMsg, setPwMsg] = useState(null) // { ok, text }
+
+  // Danger-zone state.
+  const [dangerOpen, setDangerOpen] = useState(false)
+  const [dangerText, setDangerText] = useState('')
+  const [dangerBusy, setDangerBusy] = useState(false)
+  const [dangerError, setDangerError] = useState(null)
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (pwForm.next !== pwForm.confirm) {
+      setPwMsg({ ok: false, text: 'New passwords do not match.' })
+      return
+    }
+    setPwBusy(true)
+    setPwMsg(null)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to change password.')
+      if (data.token) setToken(data.token) // other sessions are revoked; this one continues
+      setPwForm({ current: '', next: '', confirm: '' })
+      setPwMsg({ ok: true, text: 'Password changed. Other signed-in devices were signed out.' })
+    } catch (err) {
+      setPwMsg({ ok: false, text: err.message })
+    } finally {
+      setPwBusy(false)
+    }
+  }
+
+  const handleDeleteData = async () => {
+    if (dangerText !== 'DELETE') return
+    setDangerBusy(true)
+    setDangerError(null)
+    try {
+      const res = await fetch('/api/assessment/candidate-data', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getToken()}` },
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Deletion failed. Contact support@studaione.com.')
+      clearUser()
+      navigate('/', { replace: true })
+    } catch (err) {
+      setDangerError(err.message)
+      setDangerBusy(false)
+    }
+  }
 
   const openEditor = () => {
     setForm({
@@ -119,6 +179,11 @@ export default function Profile() {
         setError(e.message)
         setLoading(false)
       })
+    // Non-blocking: pending-assessment banner data.
+    fetch('/api/payment/licence', { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (active && data) setLicence(data) })
+      .catch(() => {})
     return () => {
       active = false
     }
@@ -229,6 +294,23 @@ export default function Profile() {
           )}
         </div>
 
+        {/* Pending assessment — resume where you left off */}
+        {licence?.pendingSessionId && (
+          <div className="mb-8 rounded-xl border border-[var(--color-accent)] bg-white p-5 flex items-center gap-4">
+            <PlayCircle size={28} className="text-[var(--color-accent)] flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[15px] font-semibold text-[var(--color-ink)]">You have an assessment in progress</p>
+              <p className="text-[13px] text-[var(--color-ink-muted)] mt-0.5">Your licence is still valid — pick up where you left off.</p>
+            </div>
+            <button
+              onClick={() => navigate('/briefing')}
+              className="px-4 py-2 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-[var(--color-accent)] cursor-pointer hover:brightness-105 transition flex-shrink-0"
+            >
+              Resume
+            </button>
+          </div>
+        )}
+
         {/* Test history */}
         <div className="flex items-center gap-2 mb-4">
           <ClipboardList size={18} className="text-[var(--color-accent)]" />
@@ -313,6 +395,117 @@ export default function Profile() {
             })}
           </div>
         )}
+
+        {/* Account security */}
+        <div className="flex items-center gap-2 mt-12 mb-4">
+          <KeyRound size={18} className="text-[var(--color-accent)]" />
+          <h2 className="text-lg font-bold text-[var(--color-ink)]">Account security</h2>
+        </div>
+        <div className="rounded-xl border border-[var(--color-line)] bg-white p-6">
+          {!pwOpen ? (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-[14px] text-[var(--color-ink-muted)]">Change the password you sign in with.</p>
+              <button
+                onClick={() => { setPwOpen(true); setPwMsg(null) }}
+                className="px-4 py-2 rounded-lg font-semibold text-sm text-[var(--color-ink)] border border-[var(--color-line)] bg-[var(--color-paper)] cursor-pointer hover:bg-[var(--color-line)] transition flex-shrink-0"
+              >
+                Change password
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleChangePassword} className="max-w-md flex flex-col gap-3">
+              {['current', 'next', 'confirm'].map((k) => (
+                <label key={k} className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-[var(--color-ink-muted)]">
+                    {k === 'current' ? 'Current password' : k === 'next' ? 'New password (min 6 characters)' : 'Confirm new password'}
+                  </span>
+                  <input
+                    type="password"
+                    required
+                    minLength={k === 'current' ? 1 : 6}
+                    value={pwForm[k]}
+                    onChange={(e) => setPwForm((f) => ({ ...f, [k]: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--color-line)] bg-white text-[15px] text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20"
+                  />
+                </label>
+              ))}
+              {pwMsg && (
+                <p className="text-[13px]" style={{ color: pwMsg.ok ? 'var(--color-success)' : 'var(--color-danger)' }}>{pwMsg.text}</p>
+              )}
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  type="submit"
+                  disabled={pwBusy}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-[var(--color-accent)] cursor-pointer hover:brightness-105 transition disabled:opacity-60"
+                >
+                  {pwBusy && <Loader2 size={14} className="animate-spin" />}
+                  Update password
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPwOpen(false)}
+                  disabled={pwBusy}
+                  className="px-4 py-2 rounded-lg font-semibold text-sm text-[var(--color-ink-muted)] bg-[var(--color-paper)] cursor-pointer hover:bg-[var(--color-line)] transition disabled:opacity-60"
+                >
+                  Close
+                </button>
+              </div>
+            </form>
+          )}
+          {pwMsg?.ok && !pwOpen && (
+            <p className="mt-3 text-[13px] text-[var(--color-success)]">{pwMsg.text}</p>
+          )}
+        </div>
+
+        {/* Danger zone — right to erasure */}
+        <div className="flex items-center gap-2 mt-12 mb-4">
+          <ShieldAlert size={18} className="text-[var(--color-danger)]" />
+          <h2 className="text-lg font-bold text-[var(--color-ink)]">Delete my data</h2>
+        </div>
+        <div className="rounded-xl border border-[var(--color-danger)] bg-white p-6">
+          <p className="text-[14px] text-[var(--color-ink-muted)] leading-relaxed">
+            Permanently erase your assessments, reports, credentials and associated telemetry.
+            Issued credentials stop verifying. This cannot be undone.
+          </p>
+          {!dangerOpen ? (
+            <button
+              onClick={() => { setDangerOpen(true); setDangerText(''); setDangerError(null) }}
+              className="mt-4 px-4 py-2 rounded-lg font-semibold text-sm text-[var(--color-danger)] border border-[var(--color-danger)] bg-white cursor-pointer hover:bg-[var(--color-danger-surface)] transition"
+            >
+              Delete my assessment data
+            </button>
+          ) : (
+            <div className="mt-4 max-w-md">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-[var(--color-ink-muted)]">Type DELETE to confirm</span>
+                <input
+                  type="text"
+                  value={dangerText}
+                  onChange={(e) => setDangerText(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--color-danger)] bg-white text-[15px] text-[var(--color-ink)] focus:outline-none"
+                />
+              </label>
+              {dangerError && <p className="mt-2 text-[13px] text-[var(--color-danger)]">{dangerError}</p>}
+              <div className="flex items-center gap-2 mt-3">
+                <button
+                  onClick={handleDeleteData}
+                  disabled={dangerText !== 'DELETE' || dangerBusy}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm text-white bg-[var(--color-danger)] cursor-pointer transition disabled:opacity-40"
+                >
+                  {dangerBusy && <Loader2 size={14} className="animate-spin" />}
+                  Erase everything
+                </button>
+                <button
+                  onClick={() => setDangerOpen(false)}
+                  disabled={dangerBusy}
+                  className="px-4 py-2 rounded-lg font-semibold text-sm text-[var(--color-ink-muted)] bg-[var(--color-paper)] cursor-pointer hover:bg-[var(--color-line)] transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
     </PageLayout>
   )

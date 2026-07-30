@@ -17,6 +17,11 @@ export function getToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
 
+// Replace the stored token (e.g. after a password change re-issues one).
+export function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token)
+}
+
 function persist(token, user) {
   const safe = {
     name: user.name || '',

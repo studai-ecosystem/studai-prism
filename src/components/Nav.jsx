@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import PrismLogo from './ui/PrismLogo.jsx'
-import { isAuthenticated } from '../lib/session.js'
+import { isAuthenticated, clearUser } from '../lib/session.js'
 
 const navLinks = [
   { label: 'How it works', href: '#how-it-works' },
@@ -83,6 +83,12 @@ export default function Nav({ onGetAssessed, activeHref }) {
   const closeMobile = () => {
     setMobileOpen(false)
     setMobileAccordion(null)
+  }
+
+  const handleSignOut = () => {
+    clearUser()
+    closeMobile()
+    navigate('/')
   }
 
   return (
@@ -207,12 +213,20 @@ export default function Nav({ onGetAssessed, activeHref }) {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
             {isAuthenticated() && (
-              <Link
-                to="/profile"
-                className="text-[14px] font-medium text-[var(--color-ink)] no-underline hover:text-[var(--color-accent)] transition"
-              >
-                My Profile
-              </Link>
+              <>
+                <Link
+                  to="/profile"
+                  className="text-[14px] font-medium text-[var(--color-ink)] no-underline hover:text-[var(--color-accent)] transition"
+                >
+                  My Profile
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="text-[14px] font-medium text-[var(--color-ink-muted)] bg-transparent cursor-pointer hover:text-[var(--color-ink)] transition"
+                >
+                  Sign out
+                </button>
+              </>
             )}
             <button
               onClick={onGetAssessed}
@@ -330,6 +344,24 @@ export default function Nav({ onGetAssessed, activeHref }) {
           >
             Get Assessed
           </button>
+
+          {isAuthenticated() && (
+            <>
+              <Link
+                to="/profile"
+                onClick={closeMobile}
+                className="mt-3 w-full py-3 rounded-lg font-semibold text-base text-center text-[var(--color-ink)] border border-[var(--color-line)] no-underline"
+              >
+                My Profile
+              </Link>
+              <button
+                onClick={handleSignOut}
+                className="mt-2 w-full py-3 rounded-lg font-semibold text-base text-[var(--color-ink-muted)] bg-transparent border border-[var(--color-line)]"
+              >
+                Sign out
+              </button>
+            </>
+          )}
         </div>
       </div>
     </>
