@@ -14,6 +14,7 @@ import logger from '../../lib/logger.js'
 import { requirePermission } from '../../lib/adminAuth.js'
 import { adminAudit } from '../../lib/adminAudit.js'
 import { createInvite, listInvites, getInvite, listRedemptions, revokeInvite } from '../../lib/invites.js'
+import { getReport } from '../../lib/store.js'
 
 const router = Router()
 
@@ -30,7 +31,19 @@ router.get('/:id', requirePermission('invites:read'), async (req, res) => {
   try {
     const invite = await getInvite(req.params.id)
     if (!invite) return res.status(404).json({ error: 'Invite not found.' })
-    res.json({ invite, redemptions: await listRedemptions(invite.inviteId) })
+    // Roster rows carry the assessment outcome so an operator can see, per
+    // redeemer, whether the assessment was completed and jump to the report.
+    const redemptions = await Promise.all(
+      (await listRedemptions(invite.inviteId)).map(async (r) => {
+        const report = await getReport(r.sessionId).catch(() => null)
+        return {
+          ...r,
+          reportReady: Boolean(report),
+          overall: report?.scores?.overall ?? null,
+        }
+      }),
+    )
+    res.json({ invite, redemptions })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_invite_detail_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Internal server error' })

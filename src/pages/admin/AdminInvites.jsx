@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
 import { PageHeader, ErrorNotice, Notice, Pill, btn, field, mono } from './ui.jsx'
 
@@ -184,7 +185,7 @@ export default function AdminInvites() {
             <table className="w-full text-sm mt-3">
               <thead>
                 <tr className="text-left border-b border-[var(--color-line)]">
-                  {['Candidate', 'Session', 'Redeemed'].map((h) => (
+                  {['Candidate', 'Assessment', 'Score', 'Redeemed'].map((h) => (
                     <th key={h} className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{h}</th>
                   ))}
                 </tr>
@@ -193,7 +194,14 @@ export default function AdminInvites() {
                 {detail.redemptions.map((r) => (
                   <tr key={r.redemptionId} className="border-b border-[var(--color-line)] last:border-0">
                     <td className="px-3 py-2">{r.userEmail || '—'}</td>
-                    <td className={`px-3 py-2 ${mono} text-[12px]`}>{r.sessionId}</td>
+                    <td className="px-3 py-2">
+                      {r.reportReady ? (
+                        <Link to={`/admin/reports/${r.sessionId}`} className="underline text-[13px]">View report</Link>
+                      ) : (
+                        <span className="text-[12px] text-[var(--color-ink-muted)]">not completed yet</span>
+                      )}
+                    </td>
+                    <td className={`px-3 py-2 ${mono} tabular-nums`}>{r.overall ?? '—'}</td>
                     <td className="px-3 py-2 text-[12px] text-[var(--color-ink-muted)]">{fmt(r.redeemedAt)}</td>
                   </tr>
                 ))}
