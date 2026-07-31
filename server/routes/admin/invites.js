@@ -53,7 +53,7 @@ router.post('/', requirePermission('invites:manage'), async (req, res) => {
         maxUses: maxUses ?? 10,
         startsAt: startsAt || null,
         expiresAt,
-        createdBy: req.admin.adminId,
+        createdBy: req.admin.id,
       })
     } catch (err) {
       if (['INVALID_MAX_USES', 'INVALID_EXPIRY', 'INVALID_WINDOW'].includes(err.code)) {

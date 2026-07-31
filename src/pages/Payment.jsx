@@ -156,7 +156,7 @@ export default function Payment() {
                 <p className="font-sans font-semibold text-sm text-[var(--color-ink)]">30-minute Prism Assessment</p>
                 <p className="font-sans text-xs text-[var(--color-ink-muted)] mt-0.5">One-time · Score valid {SCORE_VALIDITY_MONTHS} months</p>
               </div>
-              <p className="font-serif text-2xl text-[var(--color-ink)]">$10</p>
+              <p className="font-serif text-2xl text-[var(--color-ink)]">₹499</p>
             </div>
 
             <ul className="px-6 py-5 flex flex-col gap-3">
@@ -170,7 +170,7 @@ export default function Payment() {
 
             <div className="px-6 py-4 border-t border-[var(--color-line)] flex items-center justify-between bg-white">
               <span className="font-sans text-sm font-semibold text-[var(--color-ink)]">Total</span>
-              <span className="font-sans text-sm font-semibold text-[var(--color-ink)]">$10</span>
+              <span className="font-sans text-sm font-semibold text-[var(--color-ink)]">₹499</span>
             </div>
           </div>
 
@@ -186,7 +186,7 @@ export default function Payment() {
             whileTap={loading ? {} : { scale: 0.98 }}
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={15} />}
-            {loading ? 'Starting…' : dummyMode ? 'Continue (free preview)' : 'Pay $10 & Continue'}
+            {loading ? 'Starting…' : dummyMode ? 'Continue (free preview)' : 'Pay ₹499 & Continue'}
           </motion.button>
 
           {dummyMode ? (

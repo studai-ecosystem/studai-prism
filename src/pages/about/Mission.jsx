@@ -3,7 +3,7 @@ import PageLayout, { PageHeading } from '../../components/PageLayout.jsx'
 const pillars = [
   {
     name: 'Accessible',
-    desc: '$10 puts skill verification within reach of every student.',
+    desc: '₹499 puts skill verification within reach of every student.',
   },
   {
     name: 'Trustworthy',

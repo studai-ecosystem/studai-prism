@@ -9,7 +9,8 @@ import { getJwtSecret } from '../lib/security.js'
 
 const router = Router()
 
-const PRICE_PAISE = 1000 // $10 (in cents)
+const PRICE_PAISE = 49900 // ₹499 in paise (INR — the live Razorpay account settles in INR)
+const PRICE_CURRENCY = 'INR'
 
 // Dummy-payments mode (PRISM_DUMMY_PAYMENTS=true): checkout is bypassed and a
 // free session entitlement is minted instead — INCLUDING in production. Used
@@ -54,7 +55,7 @@ router.get('/config', (_req, res) => {
     enabled: Boolean(!dummy && RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
     keyId: dummy ? null : RAZORPAY_KEY_ID || null,
     amount: PRICE_PAISE,
-    currency: 'USD',
+    currency: PRICE_CURRENCY,
     devSessionAvailable: dummy || process.env.NODE_ENV !== 'production',
     dummyMode: dummy,
     skipVerification: isSkipVerification(),
@@ -66,7 +67,7 @@ router.post('/create-order', async (req, res) => {
   try {
     const order = await getRazorpay().orders.create({
       amount: PRICE_PAISE, // always use server-side amount
-      currency: 'USD',
+      currency: PRICE_CURRENCY,
       receipt: `prism_${uuidv4()}`,
       notes: { product: 'Prism AI Assessment' },
     })
