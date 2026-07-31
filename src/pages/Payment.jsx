@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ShieldCheck, Clock, Layers, BadgeCheck, Lock, Loader2 } from 'lucide-react'
-import { getUser } from '../lib/session.js'
+import { getUser, getToken } from '../lib/session.js'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
 import { SCORE_VALIDITY_MONTHS } from '../../server/lib/sharedConstants.js'
 
@@ -71,6 +71,32 @@ export default function Payment() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [dummyMode, setDummyMode] = useState(false)
+  const [coupon, setCoupon] = useState('')
+  const [couponBusy, setCouponBusy] = useState(false)
+  const [couponError, setCouponError] = useState(null)
+
+  // A valid coupon/invite code claims a free seat minted by an administrator
+  // and skips checkout entirely — same funnel from there on.
+  const handleApplyCoupon = async () => {
+    const code = coupon.trim()
+    if (!code || couponBusy) return
+    setCouponBusy(true)
+    setCouponError(null)
+    try {
+      const res = await fetch('/api/payment/invite/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ token: code }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'This code is not valid.')
+      const cfg = await fetch('/api/payment/config').then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
+      navigate(cfg.skipVerification ? `/briefing?session=${data.sessionId}` : `/verify-identity?session=${data.sessionId}`)
+    } catch (err) {
+      setCouponError(err.message)
+      setCouponBusy(false)
+    }
+  }
 
   // Surface test/dummy mode so nobody thinks a real charge happens (the server
   // decides the mode — the client only displays it).
@@ -198,6 +224,33 @@ export default function Payment() {
               Secure payment via Razorpay. You’ll proceed to the assessment briefing.
             </p>
           )}
+
+          {/* Coupon / invite code */}
+          <div className="mt-6 rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] p-4">
+            <p className="font-sans text-xs font-semibold text-[var(--color-ink-muted)] uppercase tracking-wide">Have a coupon or invite code?</p>
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                value={coupon}
+                onChange={(e) => setCoupon(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyCoupon() } }}
+                placeholder="e.g. msw"
+                className="flex-1 px-3 py-2 rounded-lg border border-[var(--color-line)] bg-white font-sans text-sm text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-accent)]"
+              />
+              <button
+                type="button"
+                onClick={handleApplyCoupon}
+                disabled={couponBusy || !coupon.trim()}
+                className="px-4 py-2 rounded-lg font-sans font-semibold text-sm text-[var(--color-ink)] border border-[var(--color-line)] bg-white cursor-pointer hover:bg-[var(--color-paper)] transition disabled:opacity-50 flex items-center gap-2"
+              >
+                {couponBusy && <Loader2 size={14} className="animate-spin" />}
+                Apply
+              </button>
+            </div>
+            {couponError && (
+              <p className="font-sans text-xs text-[var(--color-danger)] mt-2">{couponError}</p>
+            )}
+          </div>
         </motion.div>
       </div>
     </div>

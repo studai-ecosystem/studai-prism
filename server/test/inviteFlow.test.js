@@ -61,6 +61,17 @@ test('invite creation validates seat counts and windows before touching storage'
   )
 })
 
+test('coupon codes are validated before touching storage', async () => {
+  const future = new Date(Date.now() + 3600e3).toISOString()
+  for (const bad of ['ab', 'has space', 'sneaky!code', '-leading', 'x'.repeat(33)]) {
+    await assert.rejects(
+      () => createInvite({ maxUses: 10, expiresAt: future, createdBy: 'x', code: bad }),
+      (err) => err.code === 'INVALID_CODE',
+      `code "${bad}" must be rejected`,
+    )
+  }
+})
+
 test('invite redemption requires authentication', async () => {
   const res = await fetch(`${base}/api/payment/invite/redeem`, {
     method: 'POST',

@@ -23,7 +23,11 @@ export function isInvitesAvailable() {
 
 // ── Admin operations ─────────────────────────────────────────────────────────
 
-export async function createInvite({ label = '', maxUses = 10, startsAt = null, expiresAt, createdBy }) {
+// Custom coupon codes (e.g. "msw") are stored lowercase so candidates can
+// type them in any case; random link tokens stay case-sensitive.
+const CODE_RE = /^[a-z0-9][a-z0-9-]{2,31}$/
+
+export async function createInvite({ label = '', maxUses = 10, startsAt = null, expiresAt, createdBy, code = null }) {
   const uses = Number(maxUses)
   if (!Number.isInteger(uses) || uses < 1 || uses > 100) {
     throw Object.assign(new Error('maxUses must be an integer between 1 and 100'), { code: 'INVALID_MAX_USES' })
@@ -36,14 +40,32 @@ export async function createInvite({ label = '', maxUses = 10, startsAt = null, 
   if (Number.isNaN(start.getTime()) || expiry <= start) {
     throw Object.assign(new Error('the window must end after it starts'), { code: 'INVALID_WINDOW' })
   }
+  let token
+  if (code !== null) {
+    token = String(code).trim().toLowerCase()
+    if (!CODE_RE.test(token)) {
+      throw Object.assign(
+        new Error('A coupon code must be 3-32 characters: letters, digits and dashes.'),
+        { code: 'INVALID_CODE' },
+      )
+    }
+  } else {
+    token = randomBytes(24).toString('base64url')
+  }
 
   const inviteId = randomUUID()
-  const token = randomBytes(24).toString('base64url')
-  await query(
-    `INSERT INTO assessment_invites (invite_id, token_hash, label, max_uses, starts_at, expires_at, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [inviteId, hashToken(token), String(label).slice(0, 200), uses, start.toISOString(), expiry.toISOString(), createdBy],
-  )
+  try {
+    await query(
+      `INSERT INTO assessment_invites (invite_id, token_hash, label, max_uses, starts_at, expires_at, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [inviteId, hashToken(token), String(label).slice(0, 200), uses, start.toISOString(), expiry.toISOString(), createdBy],
+    )
+  } catch (err) {
+    if (err?.code === '23505') {
+      throw Object.assign(new Error('This code is already in use.'), { code: 'CODE_TAKEN' })
+    }
+    throw err
+  }
   const invite = await getInvite(inviteId)
   return { invite, token }
 }
@@ -112,7 +134,12 @@ export async function redeemInvite(token, { userId, userEmail }) {
   const pool = getPool()
   if (!pool) throw Object.assign(new Error('invites unavailable'), { code: 'NO_DB' })
 
-  const found = await query('SELECT * FROM assessment_invites WHERE token_hash = $1', [hashToken(token)])
+  // Exact match first (random link tokens are case-sensitive); fall back to
+  // the lowercase form so typed coupon codes work in any case.
+  let found = await query('SELECT * FROM assessment_invites WHERE token_hash = $1', [hashToken(token)])
+  if (!found?.rows?.length) {
+    found = await query('SELECT * FROM assessment_invites WHERE token_hash = $1', [hashToken(String(token).trim().toLowerCase())])
+  }
   const row = found?.rows?.[0]
   if (!row) throw Object.assign(new Error('This invite link is not valid.'), { code: 'INVITE_NOT_FOUND' })
 

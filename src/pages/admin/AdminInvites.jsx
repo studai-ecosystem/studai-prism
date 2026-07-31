@@ -20,7 +20,7 @@ export default function AdminInvites() {
   const [notice, setNotice] = useState('')
   const [creating, setCreating] = useState(false)
   const [createdLink, setCreatedLink] = useState(null) // { url, invite }
-  const [form, setForm] = useState({ label: '', maxUses: 10, expiresAt: '' })
+  const [form, setForm] = useState({ label: '', maxUses: 10, expiresAt: '', code: '' })
   const [detail, setDetail] = useState(null) // { invite, redemptions }
   const canManage = adminHasPermission('invites:manage')
 
@@ -43,11 +43,12 @@ export default function AdminInvites() {
           label: form.label,
           maxUses: Number(form.maxUses),
           expiresAt: new Date(form.expiresAt).toISOString(),
+          code: form.code.trim() || undefined,
         }),
       })
-      setCreatedLink({ url: `${window.location.origin}${r.path}`, invite: r.invite })
+      setCreatedLink({ url: `${window.location.origin}${r.path}`, invite: r.invite, code: form.code.trim() || null })
       setCreating(false)
-      setForm({ label: '', maxUses: 10, expiresAt: '' })
+      setForm({ label: '', maxUses: 10, expiresAt: '', code: '' })
       reload()
     } catch (err) { setError(err.message) }
   }
@@ -104,6 +105,7 @@ export default function AdminInvites() {
           </div>
           <p className="text-[12px] text-[var(--color-ink-muted)] mt-2">
             {createdLink.invite.label} · {createdLink.invite.maxUses} seats · closes {fmt(createdLink.invite.expiresAt)}
+            {createdLink.code ? ` · coupon code: ${createdLink.code.toLowerCase()} (works on the payment page too)` : ''}
           </p>
         </div>
       )}
@@ -125,6 +127,12 @@ export default function AdminInvites() {
             <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Link closes at</span>
             <input className={field} type="datetime-local" required value={form.expiresAt}
               onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Custom coupon code (optional, e.g. msw)</span>
+            <input className={field} value={form.code} maxLength={32}
+              onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+              placeholder="leave empty for a random link" />
           </label>
           <div>
             <button type="submit" className={btn}>Create link</button>

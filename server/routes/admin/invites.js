@@ -39,7 +39,7 @@ router.get('/:id', requirePermission('invites:read'), async (req, res) => {
 
 router.post('/', requirePermission('invites:manage'), async (req, res) => {
   try {
-    const { label, maxUses, startsAt, expiresAt } = req.body || {}
+    const { label, maxUses, startsAt, expiresAt, code } = req.body || {}
     if (!label || !String(label).trim()) {
       return res.status(400).json({ error: 'A label is required (e.g. the college and batch).' })
     }
@@ -54,10 +54,14 @@ router.post('/', requirePermission('invites:manage'), async (req, res) => {
         startsAt: startsAt || null,
         expiresAt,
         createdBy: req.admin.id,
+        code: code ? String(code) : null,
       })
     } catch (err) {
-      if (['INVALID_MAX_USES', 'INVALID_EXPIRY', 'INVALID_WINDOW'].includes(err.code)) {
+      if (['INVALID_MAX_USES', 'INVALID_EXPIRY', 'INVALID_WINDOW', 'INVALID_CODE'].includes(err.code)) {
         return res.status(400).json({ error: err.message })
+      }
+      if (err.code === 'CODE_TAKEN') {
+        return res.status(409).json({ error: err.message })
       }
       throw err
     }
