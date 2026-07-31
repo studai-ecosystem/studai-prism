@@ -1,10 +1,10 @@
 {
   "provider": "aws-bedrock",
-  "modelId": "global.anthropic.claude-sonnet-5",
+  "modelId": "mistral.mistral-large-3-675b-instruct",
   "api": "Converse",
   "sdkVersion": "3.1088.0",
-  "anchoredAt": "2026-07-16",
+  "anchoredAt": "2026-07-31",
   "anchorRunId": null,
-  "note": "Bedrock migration anchor. No real production calibration run exists yet; Claude Sonnet 5 must pass the fixed transcript shadow comparison before paid or externally verified scoring is enabled.",
+  "note": "Re-anchored from global.anthropic.claude-sonnet-5: Anthropic models are sales-gated on AWS account 158346964832 (AccessDeniedException, 'contact AWS Sales') — every judge invocation failed in production. Mistral Large 3 is the strongest model available to the account and is in-region (ap-south-1). No real production calibration run exists yet, so this pre-calibration re-anchor is permitted; the shadow-comparison escalation rule below still applies before paid/externally-verified scoring claims.",
   "escalationRule": "Before paid or externally verified scoring: shadow-score the fixed anchor set against the previous GPT-5.4 outputs and human references. When calibration-run v1 freezes: (1) set PRISM_DRIFT_HARD=true in production; (2) any judge model change must shadow re-score the fixed anchor set and pass conformal recalibration; (3) only then update provider/modelId and anchorRunId in this file in the same commit. A drifted judge cannot mint credentials under the hard gate."
 }

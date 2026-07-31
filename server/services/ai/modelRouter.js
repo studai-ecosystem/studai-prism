@@ -1,5 +1,7 @@
 const DEFAULT_MODELS = Object.freeze({
-  primary: 'global.anthropic.claude-sonnet-5',
+  // Judge: Mistral Large 3 — Anthropic models are sales-gated on this AWS
+  // account (AccessDeniedException at invoke). Must match judge-fingerprint.json.
+  primary: 'mistral.mistral-large-3-675b-instruct',
   conversation: 'mistral.mistral-large-3-675b-instruct',
   fast: 'mistral.ministral-3-14b-instruct',
   fallback: 'global.amazon.nova-2-lite-v1:0',
