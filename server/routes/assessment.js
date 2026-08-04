@@ -156,6 +156,7 @@ export const SCENARIOS = [
     difficulty: 'foundational',
     domain: 'College Life',
     title: 'The Group Project',
+    yourRole: 'The project lead — your teammates look to you to decide what the group does next.',
     context: `You are a final-year student leading a 4-person group project that is due in 3 days. It counts for 40% of your grade. One teammate has done almost no work and keeps making excuses. Another teammate wants to just do that person's part for them to be safe. You still have your own part left to finish too. Everyone is stressed and the group chat is getting tense.`,
     participants: [
       { name: 'Aditya', role: 'The Hardworking Teammate', personality: 'Stressed and a bit angry. Wants to remove the slacker from the group or report them. Will ask you what you are actually going to do about it.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
@@ -168,6 +169,7 @@ export const SCENARIOS = [
     difficulty: 'foundational',
     domain: 'College Life',
     title: 'The Fest Budget',
+    yourRole: 'The fest coordinator — the final call on how the remaining ₹50,000 is spent is yours.',
     context: `You are the coordinator for your college fest. You have ₹50,000 left and two days to go. The music club wants more money for a better sound system. The food stalls say they will pull out unless they get a bigger share. If you spend on one, the other gets less. Students are already excited and tickets are sold, so the event cannot flop.`,
     participants: [
       { name: 'Karthik', role: 'Music Club Head', personality: 'Passionate about the show. Believes a great sound system is what people will remember. Will push hard for the bigger budget.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
@@ -206,6 +208,7 @@ export const SCENARIOS = [
     difficulty: 'intermediate',
     domain: 'Technology & Product',
     title: 'The Delayed Launch',
+    yourRole: 'The Product Manager at FinTrack — both sides expect you to find a way forward on the launch.',
     context: `You are the Product Manager at FinTrack, a growing fintech startup. Your mobile app was due to launch this quarter, but engineering says they need 6 more weeks. Your top enterprise client — accounting for 30% of revenue — has threatened to leave if the app is not live within 2 weeks. Marketing has already announced the launch date and there is social media buzz building.`,
     participants: [
       { name: 'Rohan Mehta', role: 'CTO', personality: 'Protective of engineering quality, concerned about technical debt if rushed. Will push back strongly on unrealistic timelines but is open to creative solutions.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
@@ -218,6 +221,7 @@ export const SCENARIOS = [
     difficulty: 'advanced',
     domain: 'Technology & Product',
     title: 'The Ethical AI Decision',
+    yourRole: 'The Strategy Consultant — RetailCo is paying for your recommendation on the AI rollout.',
     context: `You are a Strategy Consultant advising RetailCo, a major retail chain that wants to implement an AI hiring system to filter 50,000 applicants per quarter. Your analysis shows that the model, trained on historical data, has statistically significant bias against certain demographic groups. The client wants full deployment in 3 weeks. Delaying could cost RetailCo ₹2 crore in manual screening costs.`,
     participants: [
       { name: 'Vikram Nair', role: 'CEO, RetailCo', personality: 'Results-driven, skeptical of bias claims, sees this as over-engineering a problem. Puts business efficiency above all.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
@@ -230,6 +234,7 @@ export const SCENARIOS = [
     difficulty: 'advanced',
     domain: 'Business & Management',
     title: 'The Team Restructure',
+    yourRole: 'The new VP of Product — the restructure plan and its people decisions are yours to make.',
     context: `You are the newly appointed VP of Product at TechCorp. After a difficult quarter with 40% revenue decline, leadership has asked you to restructure your 30-person product team, potentially eliminating 8 positions. You must present a plan to the CEO in 2 days. Several team members have heard rumours and morale is fragile. The remaining team must still deliver on a major roadmap commitment.`,
     participants: [
       { name: 'Arjun Kapoor', role: 'CEO', personality: 'Expects decisive action, clear business reasoning, and minimal disruption to delivery. Will challenge you hard on the business case and people decisions.', tts: { gender: 'male', voiceId: 'Brian', engine: 'neural', languageCode: 'en-GB' } },
@@ -242,6 +247,7 @@ export const SCENARIOS = [
     difficulty: 'intermediate',
     domain: 'Operations & Supply Chain',
     title: 'The Supplier Crisis',
+    yourRole: 'The Operations Manager — the call on how to keep production running is yours.',
     context: `You are the Operations Manager at a mid-sized electronics manufacturer in Pune. Your key component supplier in Shenzhen has missed delivery — production stops in 6 hours without the parts. You have three options: air-freight the components at 4x cost, find an alternate supplier who can deliver in 72 hours but whose quality is unproven, or halt the production line and absorb the delay penalty with your biggest OEM client.`,
     participants: [
       { name: 'Priya Desai', role: 'Head of Procurement', personality: 'Focused on cost and supplier relationships. Strongly opposed to using an unvetted supplier. Will push back on the air-freight cost.', tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
@@ -293,6 +299,7 @@ export const SCENARIOS = [
     difficulty: 'intermediate',
     domain: 'Sales & Marketing',
     title: 'The Brand Crisis',
+    yourRole: "The Marketing Director — you own the company's public response in the next 4 hours.",
     context: `You are the Marketing Director at a fast-growing D2C skincare brand. A food safety YouTuber with 2 million subscribers has posted a video claiming your bestselling moisturiser contains a harmful chemical — based on a lab test he conducted. The claim is disputed by your R&D team, but the video has 800,000 views in 12 hours. Stock is moving off shelves in two major retail chains. Your PR agency says you have a 4-hour window to respond before the news cycle picks it up.`,
     participants: [
       { name: 'Ritu Sharma', role: 'CEO', personality: "Wants to act fast. Concerned about brand equity. Willing to pull the product temporarily to show accountability, even without confirmed evidence.", tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
@@ -305,6 +312,7 @@ export const SCENARIOS = [
     difficulty: 'foundational',
     domain: 'Healthcare',
     title: 'The Clinic Backlog',
+    yourRole: 'The clinic manager — you decide who is seen first and how the morning is run.',
     context: `You manage a busy community health clinic in Nagpur. This morning 3 staff called in sick and 60 patients are waiting. A walk-in elderly patient looks seriously unwell but has no appointment, while patients with booked slots are already angry about the delay. You have two doctors available instead of the usual four, and the pharmacy queue is also building up.`,
     participants: [
       { name: 'Nurse Latha', role: 'Senior Duty Nurse', personality: 'Practical and calm. Worried about patient safety and staff burnout. Will push you to set a clear priority rule for who is seen first.', tts: { gender: 'female', voiceId: 'Kajal', engine: 'neural', languageCode: 'en-IN' } },
@@ -360,20 +368,32 @@ const DIFFICULTY_TIERS = ['foundational', 'intermediate', 'advanced']
 // historical sessions/reports keep working.
 export const ACTIVE_SCENARIOS = SCENARIOS.filter((s) => !s.retired)
 
-// Tier-aware scenario selection. Falls back gracefully when a tier has no
-// scenarios (returns any random scenario) so the flow never breaks.
-// `excludeIds` are scenarios the candidate has already been served — they are
-// skipped so a repeat attempt gets a fresh problem. If every scenario in the
-// pool has been seen, the exclusion is dropped (so the flow never breaks).
+// Tier-aware scenario selection. The calibrated tier sets the candidate's
+// NEAR-TIER pool (their own tier plus the adjacent one) rather than a strict
+// filter — cohort feedback 2026-08 showed a strict tier gate served the same
+// 3 foundational scenarios to an entire class, and it also starved the other
+// frozen-bank items of calibration responses. Extremes stay gated:
+// foundational candidates never draw 'advanced', and vice versa.
+// `excludeIds` are scenarios the candidate has already been served — unseen
+// scenarios in the pool are preferred, then unseen anywhere in the active
+// bank, and only then a repeat (so the flow never breaks).
+const NEAR_TIER_POOLS = {
+  foundational: ['foundational', 'intermediate'],
+  intermediate: ['foundational', 'intermediate', 'advanced'],
+  advanced: ['intermediate', 'advanced'],
+}
+
 export function pickScenario(tier, excludeIds = []) {
   let pool = ACTIVE_SCENARIOS
   if (tier && DIFFICULTY_TIERS.includes(tier)) {
-    const tiered = ACTIVE_SCENARIOS.filter((s) => s.difficulty === tier)
-    if (tiered.length) pool = tiered
+    const tiers = NEAR_TIER_POOLS[tier] || [tier]
+    const near = ACTIVE_SCENARIOS.filter((s) => tiers.includes(s.difficulty))
+    if (near.length) pool = near
   }
   const exclude = new Set(excludeIds)
-  const unseen = pool.filter((s) => !exclude.has(s.id))
-  const choices = unseen.length ? unseen : pool
+  const unseenPool = pool.filter((s) => !exclude.has(s.id))
+  const unseenBank = ACTIVE_SCENARIOS.filter((s) => !exclude.has(s.id))
+  const choices = unseenPool.length ? unseenPool : (unseenBank.length ? unseenBank : pool)
   return choices[Math.floor(Math.random() * choices.length)]
 }
 
@@ -386,17 +406,63 @@ export function pickScenario(tier, excludeIds = []) {
 
 const AVATAR_INSTRUCTIONS = loadPromptJson('avatar_styles.v1')
 
-function buildAvatarSystemPrompt(scenario, avatarStyle, language = 'en') {
+// ── Candidate personalization (cohort feedback 2026-08) ─────────────────────
+// The Briefing screen collects the candidate's name and a chosen character;
+// both now reach the avatar prompt so the room addresses the candidate
+// personally. SECURITY: the name is candidate-authored and lands inside a
+// system prompt — it is sanitized to letters/spaces/'.- only and capped at 40
+// chars. The character resolves against this server-side map (mirror of
+// src/lib/characters.jsx); free-text traits from the client are never used.
+const CANDIDATE_CHARACTERS = {
+  priya: { name: 'Priya', trait: 'The Creator', description: 'always finds another way' },
+  meera: { name: 'Meera', trait: 'The Communicator', description: 'clear and composed always' },
+  sara: { name: 'Sara', trait: 'The Leader', description: 'owns every room she enters' },
+  nisha: { name: 'Nisha', trait: 'The Empath', description: 'reads the room instantly' },
+  arjun: { name: 'Arjun', trait: 'The Analyst', description: 'thinks before he speaks' },
+  ravi: { name: 'Ravi', trait: 'The Bold One', description: 'never backs down' },
+  dev: { name: 'Dev', trait: 'The Strategist', description: 'always three steps ahead' },
+  aadi: { name: 'Aadi', trait: 'The Innovator', description: 'breaks rules to make new ones' },
+}
+
+export function sanitizeCandidateName(raw) {
+  if (typeof raw !== 'string') return null
+  const t = raw
+    .replace(/[^\p{L}\p{M} .'-]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40)
+    .trim()
+  return t || null
+}
+
+function buildCandidateLine({ candidateName = null, characterId = null } = {}) {
+  const character = characterId && Object.hasOwn(CANDIDATE_CHARACTERS, characterId)
+    ? CANDIDATE_CHARACTERS[characterId]
+    : null
+  if (!candidateName && !character) return ''
+  const lines = ['THE CANDIDATE YOU ARE TALKING TO:']
+  if (candidateName) {
+    lines.push(`- Their name is ${candidateName}. Greet them by name at the start and use their first name naturally now and then — not on every turn.`)
+  }
+  if (character) {
+    lines.push(`- They chose to be represented in this room as "${character.trait}" (${character.description}). If it fits naturally, you may nod to that style once or twice — never mock it or bring it up repeatedly.`)
+  }
+  return lines.join('\n')
+}
+
+function buildAvatarSystemPrompt(scenario, avatarStyle, language = 'en', personalization = {}) {
   const [p1, p2, p3] = scenario.participants
   const observerLine = p3
     ? `- MOSTLY LISTENS — ${p3.name} (${p3.role}): ${p3.personality}\n   ${p3.name} is an observer. They stay SILENT almost the whole time. They speak only very rarely — at most once or twice in the entire conversation — and only a single short line. On nearly every turn, ${p3.name} says NOTHING.`
     : ''
-  // Template lives in server/prompts/avatar_system.v1.md (audit C15) — includes
-  // the C14 rule that candidate messages are untrusted in-role answers.
-  // Track 4.1: a language variant (avatar_system.{lang}.v1.md) prepends the
+  // Template lives in server/prompts/avatar_system.v2.md (audit C15) — includes
+  // the C14 rule that candidate messages are untrusted in-role answers, the
+  // strengthened continuity rules, and the candidate personalization block.
+  // Track 4.1: a language variant (avatar_system.{lang}.v2.md) prepends the
   // language-of-session directive; scenario content stays canonical English.
-  return renderPrompt('avatar_system.v1', {
+  return renderPrompt('avatar_system.v2', {
     SCENARIO_CONTEXT: scenario.context,
+    CANDIDATE_LINE: buildCandidateLine(personalization),
     P1_NAME: p1.name,
     P1_ROLE: p1.role,
     P1_PERSONALITY: p1.personality,
@@ -454,6 +520,15 @@ export function buildScoringPrompt(scenario, transcript, opts = {}) {
 router.post('/start', async (req, res) => {
   const { sessionId } = req.body
   if (!sessionId) return res.status(400).json({ error: 'sessionId required' })
+
+  // Candidate personalization (cohort feedback 2026-08): the name typed on the
+  // Briefing screen and the chosen character now reach the avatar prompt.
+  // Both are UNTRUSTED — the name is sanitized hard (it lands in a system
+  // prompt) and the character resolves against the server-side map only.
+  const candidateName = sanitizeCandidateName(req.body.candidateName)
+  const characterId = typeof req.body.characterId === 'string' && Object.hasOwn(CANDIDATE_CHARACTERS, req.body.characterId)
+    ? req.body.characterId
+    : null
 
   // Paid-session gate — refuse to serve assessment content without a valid
   // entitlement (created by payment verification or a dev/dummy session).
@@ -544,7 +619,8 @@ router.post('/start', async (req, res) => {
   const openingPrompt = loadPrompt('opening_turn.v1', language).trim()
 
   try {
-    const avatarSystem = buildAvatarSystemPrompt(scenario, 1, language) // Avatar 1 for opening
+    const personalization = { candidateName, characterId }
+    const avatarSystem = buildAvatarSystemPrompt(scenario, 1, language, personalization) // Avatar 1 for opening
 
     const response = await createCompletion({
       model: conversationModel(),
@@ -566,7 +642,7 @@ router.post('/start', async (req, res) => {
     ]
 
     // Fast cache for live turns…
-    await sessions.set(sessionId, { scenario, exchangeCount: 0, history, evidence: emptyEvidence() })
+    await sessions.set(sessionId, { scenario, exchangeCount: 0, history, evidence: emptyEvidence(), candidateName, characterId })
     // …plus durable persistence so a restart/disconnect doesn't lose the session.
     // The session record carries the consent version the candidate accepted
     // (audit C5) so every issued score is traceable to exact consent wording.
@@ -584,6 +660,8 @@ router.post('/start', async (req, res) => {
       userId: authUser?.id || null,
       userEmail: authUser?.email || null,
       candidateId: candidateId || null,
+      candidateName,
+      characterId,
       studyArm: studyArm || null,
       language,
       consentVersion: consentRecord?.meta?.consentVersion || null,
@@ -594,6 +672,10 @@ router.post('/start', async (req, res) => {
     // scenario-selection decision and the opening AI turn in the audit trail.
     auditLog('scenario_selected', sessionId, { scenarioId: scenario.id, tier })
     auditLog('ai_turn', sessionId, { exchange: 0, opening: true, scenarioId: scenario.id })
+    if (candidateName || characterId) {
+      // Personalization changes the avatar prompt — audited (no PII: booleans + id only).
+      auditLog('personalization_set', sessionId, { hasName: Boolean(candidateName), characterId })
+    }
 
     // Expose non-sensitive scenario meta so the client can render the
     // Scenario Card overlay during the staged flow.
@@ -605,6 +687,7 @@ router.post('/start', async (req, res) => {
         title: scenario.title,
         domain: scenario.domain,
         context: scenario.context,
+        yourRole: scenario.yourRole || null,
         participants: scenario.participants.map((p) => ({ name: p.name, role: p.role })),
       },
     })
@@ -632,6 +715,8 @@ async function loadSession(sessionId) {
     exchangeCount: persisted.exchangeCount || 0,
     history: persisted.history,
     evidence: persisted.evidence || emptyEvidence(),
+    candidateName: persisted.candidateName || null,
+    characterId: persisted.characterId || null,
   }
   await sessions.set(sessionId, revived)
   return { ...revived, _persisted: persisted }
@@ -671,7 +756,7 @@ router.post('/message', async (req, res) => {
     return res.status(410).json({ error: 'Session time limit reached. Please submit for scoring.' })
   }
 
-  const { scenario, history, exchangeCount } = session
+  const { scenario, history, exchangeCount, candidateName = null, characterId = null } = session
   const nextExchangeCount = exchangeCount + 1
   // Track 6.2: a study arm on the session overrides the global executive flag.
   const sessionArm = session._persisted?.studyArm || null
@@ -749,7 +834,7 @@ router.post('/message', async (req, res) => {
     avatarStyle = d.avatarStyle
     directive = d.directive
   }
-  const avatarSystem = buildAvatarSystemPrompt(scenario, avatarStyle, language)
+  const avatarSystem = buildAvatarSystemPrompt(scenario, avatarStyle, language, { candidateName, characterId })
 
   // Append candidate's message
   const updatedHistory = [
@@ -782,6 +867,8 @@ router.post('/message', async (req, res) => {
       history: newHistory,
       exchangeCount: nextExchangeCount,
       evidence,
+      candidateName,
+      characterId,
     })
     // …and persist every exchange so a disconnect can't lose progress.
     const prevTokens = session._persisted?.tokensUsed || 0

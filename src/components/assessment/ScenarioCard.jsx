@@ -1,13 +1,14 @@
 import { motion } from 'framer-motion'
-import { Briefcase, Users, X, Timer } from 'lucide-react'
+import { Briefcase, Users, X, Timer, UserCheck, MessagesSquare } from 'lucide-react'
 
 // Scenario briefing — the opening beat of the room. The candidate absorbs the
-// situation and cast before the clock starts; dismissing it begins the
-// assessment. Design-system room-dark surfaces; the accent marks the moment
-// measurement begins.
+// situation, their own role, and the cast before the clock starts; dismissing
+// it begins the assessment. Design-system room-dark surfaces; the accent marks
+// the moment measurement begins.
 export default function ScenarioCard({ scenario, onDismiss }) {
   if (!scenario) return null
-  const { title, domain, context, participants = [] } = scenario
+  const { title, domain, context, yourRole, participants = [] } = scenario
+  const lead = participants[0]?.name || null
 
   return (
     <motion.div
@@ -39,6 +40,24 @@ export default function ScenarioCard({ scenario, onDismiss }) {
 
         {/* Context */}
         <div className="px-6 py-5">
+          {yourRole && (
+            <div className="mb-4 p-3.5 rounded-[var(--radius-md)] bg-[var(--color-room)] border border-[var(--color-accent-bright)]/40">
+              <div className="flex items-center gap-2 mb-1.5">
+                <UserCheck size={13} className="text-[var(--color-accent-bright)]" aria-hidden="true" />
+                <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-accent-bright)]">
+                  Your role
+                </span>
+              </div>
+              <p className="font-sans text-sm font-semibold text-[var(--color-ink)] leading-relaxed">{yourRole}</p>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 mb-2">
+            <Briefcase size={13} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
+            <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+              The situation
+            </span>
+          </div>
           <p className="font-sans text-sm text-[var(--color-ink)] leading-[1.7]">{context}</p>
 
           <p className="mt-4 p-3.5 rounded-[var(--radius-md)] bg-[var(--color-room)] border border-[var(--color-room-line)] font-sans text-xs text-[var(--color-ink-muted)] leading-relaxed">
@@ -69,6 +88,21 @@ export default function ScenarioCard({ scenario, onDismiss }) {
               </ul>
             </div>
           )}
+
+          {/* How the conversation works — sets expectations before the first turn */}
+          <div className="mt-5">
+            <div className="flex items-center gap-2 mb-2">
+              <MessagesSquare size={13} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
+              <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+                How this works
+              </span>
+            </div>
+            <p className="font-sans text-xs text-[var(--color-ink-muted)] leading-relaxed">
+              {lead ? `${lead} leads the discussion and asks you one question at a time.` : 'The panel asks you one question at a time.'}{' '}
+              Answer by speaking or typing — take a moment to think first.
+              New details will come up as the conversation goes; there's no script to follow.
+            </p>
+          </div>
         </div>
 
         {/* Footer */}

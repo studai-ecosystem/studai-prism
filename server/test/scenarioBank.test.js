@@ -38,12 +38,46 @@ test('C11: pickScenario never serves a retired scenario (500 draws, all tiers)',
 })
 
 test('C11: pickScenario respects exclusions within the active pool', () => {
-  const foundational = ACTIVE_SCENARIOS.filter((s) => s.difficulty === 'foundational').map((s) => s.id)
-  const excludeAllButOne = foundational.slice(0, -1)
-  const remaining = foundational[foundational.length - 1]
+  // Near-tier pools (cohort feedback 2026-08): a foundational candidate draws
+  // from foundational + intermediate. Excluding all but one of that pool must
+  // deterministically serve the remaining scenario.
+  const nearPool = ACTIVE_SCENARIOS
+    .filter((s) => ['foundational', 'intermediate'].includes(s.difficulty))
+    .map((s) => s.id)
+  const excludeAllButOne = nearPool.slice(0, -1)
+  const remaining = nearPool[nearPool.length - 1]
   for (let i = 0; i < 50; i++) {
     assert.equal(pickScenario('foundational', excludeAllButOne).id, remaining)
   }
+})
+
+test('near-tier pools: foundational never draws advanced (and vice versa) while unseen remain', () => {
+  for (let i = 0; i < 200; i++) {
+    assert.notEqual(pickScenario('foundational').difficulty, 'advanced')
+    assert.notEqual(pickScenario('advanced').difficulty, 'foundational')
+  }
+})
+
+test('near-tier pools: a foundational candidate can be served intermediate scenarios', () => {
+  const seen = new Set()
+  for (let i = 0; i < 400; i++) seen.add(pickScenario('foundational').difficulty)
+  assert.ok(seen.has('foundational') && seen.has('intermediate'))
+})
+
+test('exhausted near-tier pool falls back bank-wide before repeating', () => {
+  // A foundational candidate who has seen all 6 near-tier scenarios gets the
+  // unseen advanced ones next — never an immediate repeat.
+  const nearIds = ACTIVE_SCENARIOS
+    .filter((s) => ['foundational', 'intermediate'].includes(s.difficulty))
+    .map((s) => s.id)
+  for (let i = 0; i < 50; i++) {
+    const s = pickScenario('foundational', nearIds)
+    assert.equal(s.difficulty, 'advanced', `expected an unseen advanced scenario, got ${s.id}`)
+  }
+  // Only when the WHOLE bank is seen does the pool allow repeats.
+  const allIds = ACTIVE_SCENARIOS.map((s) => s.id)
+  const repeat = pickScenario('foundational', allIds)
+  assert.ok(nearIds.includes(repeat.id), 'repeats come from the candidate\u2019s own near-tier pool')
 })
 
 test('C11: retired scenarios remain resolvable for historical sessions', () => {

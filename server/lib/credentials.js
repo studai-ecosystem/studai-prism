@@ -63,7 +63,7 @@ export function getPublicKeyInfo() {
 // The prompt set that governs scoring at issuance time — versioned files, so
 // the credential records exactly which rubric text produced the result.
 function activePromptVersions() {
-  const base = ['judge_full.v1', 'avatar_system.v1', 'avatar_styles.v1', 'dimension_rubric.v1', 'opening_turn.v1', 'calibration_tier.v1']
+  const base = ['judge_full.v1', 'avatar_system.v2', 'avatar_styles.v1', 'dimension_rubric.v1', 'opening_turn.v1', 'calibration_tier.v1']
   if (process.env.PRISM_V2_EXECUTIVE === 'true') base.push('entry_estimator.v1', 'micro_rater.v1')
   if (process.env.PRISM_V2_DUAL_SCORER === 'true') base.push('judge_turn.v1')
   return base.sort()

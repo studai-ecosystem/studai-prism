@@ -803,13 +803,24 @@ export default function Assessment() {
       .catch(() => setMediaAllowed(false))
     try {
       const token = getToken()
+      // Personalization (cohort feedback): the name + character chosen on the
+      // Briefing screen now reach the server so the avatars can address the
+      // candidate personally. Server sanitizes both — best-effort here.
+      let characterId
+      try { characterId = JSON.parse(localStorage.getItem('prismCharacter') || 'null')?.id } catch { characterId = undefined }
+      const candidateName = (localStorage.getItem('prismUserName') || '').trim().slice(0, 40)
       const res = await fetch('/api/assessment/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ sessionId, language: localStorage.getItem('prismLanguage') || 'en' }),
+        body: JSON.stringify({
+          sessionId,
+          language: localStorage.getItem('prismLanguage') || 'en',
+          ...(candidateName ? { candidateName } : {}),
+          ...(characterId ? { characterId } : {}),
+        }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -943,13 +954,24 @@ export default function Assessment() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/assessment/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, message: text, telemetry }),
-      })
+      // Connectivity feedback (cohort feedback): if the reply is taking
+      // unusually long, say so — a silent wait reads as "it broke".
+      const slowTimer = setTimeout(() => {
+        setNotice('Slow connection — your answer was sent and the panel is still replying. Please wait…')
+      }, 12000)
+      let res
+      try {
+        res = await fetch('/api/assessment/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, message: text, telemetry }),
+        })
+      } finally {
+        clearTimeout(slowTimer)
+      }
       if (!res.ok) throw new Error('Failed to get AI response')
       const data = await res.json()
+      setNotice(null)
       setMessages((prev) => [...prev, { type: 'ai', messages: data.messages, isNew: true }])
       turnTrackerRef.current.promptShown() // next answer's clock starts now
     } catch (e) {
@@ -1665,14 +1687,16 @@ export default function Assessment() {
             </span>
           )}
           {mediaAllowed === false && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--color-room)]/85 rounded-[var(--radius-md)]">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--color-room)]/85 rounded-[var(--radius-md)] px-2 text-center">
               <VideoOff size={18} className="text-[var(--color-danger)]" aria-hidden="true" />
               <span className="font-mono text-[10px] text-[var(--color-danger)]">Camera blocked</span>
+              <span className="font-sans text-[9px] leading-tight text-[var(--color-ink-muted)]">Click the camera icon in your address bar to allow, then reload.</span>
             </div>
           )}
           {mediaAllowed === null && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-room)]/70 rounded-[var(--radius-md)]">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-[var(--color-room)]/70 rounded-[var(--radius-md)] px-2 text-center">
               <div className="w-5 h-5 border-2 border-[var(--color-room-ink)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              <span className="font-sans text-[9px] leading-tight text-[var(--color-ink-muted)]">Click “Allow” in the browser pop-up — camera &amp; mic are used only for exam integrity.</span>
             </div>
           )}
         </div>
@@ -1689,7 +1713,7 @@ export default function Assessment() {
           </button>
           <span className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1">
             {mediaAllowed === true ? <Video size={10} aria-hidden="true" /> : <VideoOff size={10} className="text-[var(--color-danger)]" aria-hidden="true" />}
-            {mediaAllowed === true ? 'Camera recording' : mediaAllowed === false ? 'Camera blocked' : 'Camera starting…'}
+            {mediaAllowed === true ? 'Camera recording' : mediaAllowed === false ? 'Camera blocked — allow in address bar' : 'Camera starting — click Allow'}
           </span>
           <span className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1">
             {mediaAllowed === true ? (
