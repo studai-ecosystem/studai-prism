@@ -1,5 +1,6 @@
 import { Linkedin, Twitter } from 'lucide-react'
 import PrismLogo from './ui/PrismLogo.jsx'
+import { PILOT_NOTICE, NOT_SOLE_BASIS_POLICY } from '../../server/lib/sharedConstants.js'
 
 const productLinks = [
   { label: 'How it works', href: '#how-it-works' },
@@ -119,13 +120,19 @@ export default function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 pt-6 border-t border-[var(--color-line)] flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-          <p className="font-sans text-xs text-[var(--color-ink-muted)]">
-            © 2026 Studai Edutech Private Limited · CIN U85500TN2024PTC168744 · Chennai, India
+        <div className="mt-12 pt-6 border-t border-[var(--color-line)] flex flex-col gap-3">
+          {/* Charter §2: pilot positioning — visible on every marketing page. */}
+          <p className="font-sans text-xs text-[var(--color-ink-muted)] max-w-3xl">
+            {PILOT_NOTICE} {NOT_SOLE_BASIS_POLICY}
           </p>
-          <p className="font-sans text-xs text-[var(--color-ink-muted)]">
-            Built in Chennai. In production across India and APAC.
-          </p>
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <p className="font-sans text-xs text-[var(--color-ink-muted)]">
+              © 2026 Studai Edutech Private Limited · CIN U85500TN2024PTC168744 · Chennai, India
+            </p>
+            <p className="font-sans text-xs text-[var(--color-ink-muted)]">
+              Built in Chennai. In production across India and APAC.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

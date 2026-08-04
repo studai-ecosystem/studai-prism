@@ -91,12 +91,13 @@ router.get('/:sessionId', requirePermission('disputes:read'), async (req, res) =
       workflow,
       allowedTransitions: DISPUTE_TRANSITIONS[workflow.state] || [],
       related: {
+        // Charter §6: no composite in ordinary operational views.
         report: report ? {
-          overall: report.scores?.overall ?? null,
+          reportReady: true,
           reliability: report.reliability?.level || null,
           flaggedForReview: Boolean(report.flaggedForReview),
           issuedAt: report.issuedAt,
-          correction: report.correction || null,
+          corrected: Boolean(report.correction),
         } : null,
         integrityEventCount: events.length,
       },

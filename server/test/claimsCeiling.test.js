@@ -36,11 +36,25 @@ const BANNED_CLAIMS = [
   [/90% coverage(?! target)/i, 'conformal coverage validated on held-out pairs'],
   [/tamper-?proof|blockchain|regulator-approved/i, 'NEVER (claim discipline, Track 2.5)'],
   [/scientifically proven|clinically/i, 'NEVER (no such registry category)'],
+  // ── Charter MASTER-2026-08-04 §7.4 terminology floor ───────────────────
+  [/verified skills/i, 'NEVER (§7.4: say "evidence profile" or "demonstrated behaviour")'],
+  [/independently verified credential/i, 'NEVER (§7.4: say "cryptographically verifiable Prism report")'],
+  [/(high|moderate|low) reliability|score reliability|reliability label|reliability of (the )?(ai )?judge/i, 'NEVER (§7.4: judge agreement is "AI panel consistency")'],
+  [/confidence band/i, 'NEVER (§7.4: say "AI panel variation interval")'],
+  // §17: no session-count unlock in external material — evidence gates are
+  // study-specific, power-informed and preregistered.
+  [/300 sessions/i, 'NEVER (§17: power-informed, preregistered gates only)'],
 ]
 
 // Public surfaces: everything a candidate/employer/buyer can read.
+// Charter §7.4 (Phase 0 finding): candidate-facing SERVER copy is public too —
+// the report emails in lib/mailer.js carried "certified" + the composite while
+// only src/** was scanned. Server-side candidate-visible templates are now in
+// the scan set permanently.
+const SERVER_PUBLIC_COPY = [join(ROOT, 'server', 'lib', 'mailer.js')]
+
 async function publicFiles() {
-  const files = [join(ROOT, 'index.html'), join(ROOT, 'server', 'data', 'content.json')]
+  const files = [join(ROOT, 'index.html'), join(ROOT, 'server', 'data', 'content.json'), ...SERVER_PUBLIC_COPY]
   const walk = async (dir) => {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const p = join(dir, entry.name)

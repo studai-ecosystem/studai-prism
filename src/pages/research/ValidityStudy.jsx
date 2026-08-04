@@ -36,11 +36,11 @@ const scoringSteps = [
   },
   {
     title: 'Median vote per dimension',
-    desc: 'Your score on each dimension is the median across the panel — robust to any single outlier judge. The overall score is a weighted average using the exact weights below, recomputed and range-checked on the server.',
+    desc: 'Your score on each dimension is the median across the panel — robust to any single outlier judge. Reports are profile-first: each dimension is reported separately, recomputed and range-checked on the server; no overall composite is issued during the pilot.',
   },
   {
     title: 'Agreement is measured, not assumed',
-    desc: 'We measure how much the judges disagreed. Low agreement produces a lower reliability label on your report and can flag the result for human review — you can also request human review of any result.',
+    desc: 'We measure how much the judges disagreed. Low agreement produces a lower AI panel consistency label on your report and can flag the result for human review — you can also request human review of any result.',
   },
 ]
 
@@ -66,10 +66,13 @@ export default function ValidityStudy() {
             observable behaviours, every score is produced by a multi-judge
             panel with measured agreement, and every scoring decision is
             logged. A formal validation study — human co-rated sessions, item
-            calibration and published reliability statistics — is in progress
+            calibration and published agreement statistics — is in progress
             and has not yet been completed. Until it is published, Prism
-            reports carry an explicit reliability label instead of statistical
-            claims we cannot yet back.
+            reports carry an explicit AI panel consistency label instead of
+            statistical claims we cannot yet back. Critical Thinking and
+            Problem Solving are reported as separate dimensions; that
+            distinction is provisional pending factor evidence from the
+            validation programme.
           </p>
         </div>
       </section>
@@ -95,8 +98,9 @@ export default function ValidityStudy() {
           Scoring weights
         </h2>
         <p className="text-[var(--color-ink-muted)] text-center max-w-2xl mx-auto mb-12">
-          Your overall Prism Score is a weighted average of the five dimension
-          scores. These are the exact weights used by the scoring engine.
+          Each dimension is scored 0–100 and weighted for internal research and
+          calibration exactly as below. During the pilot, reports are
+          profile-first — the weighted composite is not shown on new reports.
         </p>
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden max-w-4xl mx-auto">
           <table className="w-full text-left border-collapse">
@@ -132,7 +136,8 @@ export default function ValidityStudy() {
         </div>
       </section>
 
-      {/* Section 4 — Score bands (mirrors the bands shown on the score report) */}
+      {/* Section 4 — Score bands (per-dimension reading guide; legacy reports
+          also used these bands for their overall score) */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
         <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
           Score bands

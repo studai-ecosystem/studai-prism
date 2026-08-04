@@ -24,6 +24,7 @@ export const FLAG_CATALOGUE = [
   { key: 'PRISM_V2_EQUATING', risk: 'high', owner: 'psychometrics', description: 'Per-scenario score equating.', dataGate: 'flip-check: frozen+applied equate run' },
   { key: 'PRISM_V2_EARLY_STOP', risk: 'high', owner: 'psychometrics', description: 'Adaptive early-stop rule.', dataGate: 'flip-check: executive engine preconditions' },
   { key: 'PRISM_PRESSURE', risk: 'high', owner: 'psychometrics', description: 'Pressure probes (executive-only).', dataGate: 'flip-check: adversarial study result' },
+  { key: 'PRISM_STANDARDIZED_CORE', risk: 'high', owner: 'psychometrics', description: 'Standardized assessment core (charter §8): versioned anchor probes delivered verbatim at fixed exchanges, per-dimension evidence floors, adaptivity only after the floor.', dataGate: 'charter Phase 6 release decision — human flip (HA-020); AI & Digital Fluency reports Insufficient evidence until this is live' },
   { key: 'PRISM_LANG', risk: 'high', owner: 'product', description: 'Multilingual assessment (hi/hi-en/ta), provisional scoring.', dataGate: 'flip-check: DIF adequately powered per language' },
   { key: 'PRISM_VELOCITY', risk: 'high', owner: 'product', description: 'Skill-velocity growth trajectories.', dataGate: 'flip-check: test-retest reliability per dimension' },
   { key: 'PRISM_REPLAY', risk: 'high', owner: 'product', description: 'Practice replay (formative only).', dataGate: 'flip-check: glass-box + isolation re-verified' },

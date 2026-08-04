@@ -24,6 +24,7 @@ import { auditLog } from '../../lib/telemetry.js'
 import {
   listSessions, getSession, getReport, getEntitlement, getConsent, getEvents, getDispute,
 } from '../../lib/store.js'
+import { toOperationalReport } from '../../lib/reportPolicy.js'
 import { getLatestCredential } from '../../lib/credentials.js'
 
 const router = Router()
@@ -79,13 +80,14 @@ router.get('/', requirePermission('sessions:read'), async (req, res) => {
       page, pageSize,
     })
     const overlay = await overlayFor(result.rows.map((s) => s.sessionId))
-    // Report overall per listed session (single fetch per row is fine at ≤100).
+    // Report COMPLETION state per listed session (single fetch per row is fine
+    // at ≤100). Charter §6: no composite in ordinary operational views.
     const rows = []
     for (const s of result.rows) {
       const report = await getReport(s.sessionId)
       rows.push({
         ...s,
-        overall: report?.scores?.overall ?? null,
+        reportReady: Boolean(report),
         flaggedForReview: Boolean(report?.flaggedForReview),
         admin: overlay[s.sessionId] || null,
       })
@@ -163,15 +165,19 @@ router.get('/:id', requirePermission('sessions:read'), async (req, res) => {
         flagsActive: timeline?.flags_active || null,
         isSynthetic: timeline?.is_synthetic ?? null,
       },
-      report: report ? {
-        overall: report.scores?.overall ?? null,
-        scores: report.scores || null,
-        reliability: report.reliability || null,
-        percentile: report.percentile ?? null,
-        flaggedForReview: Boolean(report.flaggedForReview),
-        issuedAt: report.issuedAt || null,
-        correction: report.correction || null,
-      } : null,
+      // Charter §6: ordinary operational-admin views carry per-dimension
+      // scores only — the composite (and its percentile) stays internal.
+      report: report ? (() => {
+        const ops = toOperationalReport(report)
+        return {
+          scores: ops.scores || null,
+          insufficientEvidence: ops.insufficientEvidence || [],
+          reliability: ops.reliability || null,
+          flaggedForReview: Boolean(ops.flaggedForReview),
+          issuedAt: ops.issuedAt || null,
+          correction: ops.correction || null,
+        }
+      })() : null,
       conversation,
       entitlement,
       consent,

@@ -1,0 +1,37 @@
+{
+  "version": "anchor-probes-v1",
+  "description": "Charter §8 standardized assessment core — versioned anchor probes. Wording is FROZEN for this version: probes are appended verbatim by the server (never generated, never templated), so every candidate receives byte-identical anchor wording regardless of candidate name, avatar choice, scenario or conversational style. Changing any probe requires a new version file (prompt law).",
+  "policy": {
+    "minResponseWords": 5,
+    "minOpportunitiesPerDimension": 1,
+    "schedule": [
+      { "exchange": 1, "dimension": "communication" },
+      { "exchange": 2, "dimension": "criticalThinking" },
+      { "exchange": 3, "dimension": "collaboration" },
+      { "exchange": 4, "dimension": "problemSolving" },
+      { "exchange": 5, "dimension": "aiDigitalFluency" }
+    ]
+  },
+  "probes": {
+    "communication": {
+      "id": "anchor-communication-v1",
+      "text": "Before we go further — in two or three sentences, how would you sum up where things stand right now, so everyone in the room is on the same page?"
+    },
+    "criticalThinking": {
+      "id": "anchor-criticalThinking-v1",
+      "text": "One more thing — what is the single most important piece of information we still don't have here, and how would having it change what you do?"
+    },
+    "collaboration": {
+      "id": "anchor-collaboration-v1",
+      "text": "Setting your own view aside for a moment — what do you think the person who most disagrees with you here actually needs, and how would you respond to that?"
+    },
+    "problemSolving": {
+      "id": "anchor-problemSolving-v1",
+      "text": "If you had to commit to one concrete first step right now, what would it be — and what would you deliberately leave for later?"
+    },
+    "aiDigitalFluency": {
+      "id": "anchor-aiDigitalFluency-v1",
+      "text": "Suppose you had an AI assistant available to you right now for this situation. What would you ask it to do, and what would you personally double-check before acting on what it gives you?"
+    }
+  }
+}

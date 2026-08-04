@@ -121,7 +121,9 @@ router.get('/:sessionId/verify', async (req, res) => {
                 id: `urn:uuid:${req.params.sessionId}`, // pseudonymous session id — never identity
                 evidenceBundle: view, // disclosure-appropriate view of the signed bundle
                 bundleHash: credential.bundle_hash,
-                schema: 'https://prism.studai.one/docs/evidence-bundle-schema-v1.json',
+                // v1 bundles (legacy, immutable) reference the frozen v1 schema;
+                // v2 bundles (profile-first, charter §6) reference the v2 schema.
+                schema: `https://prism.studai.one/docs/evidence-bundle-schema-${bundle.schema === 'evidence-bundle-v1' ? 'v1' : 'v2'}.json`,
               },
               proof: {
                 type: 'Ed25519Signature2020',

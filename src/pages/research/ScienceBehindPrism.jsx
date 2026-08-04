@@ -19,9 +19,9 @@ const dimensions = [
   },
   {
     num: '03',
-    name: 'Collaboration',
+    name: 'Collaborative Behaviour',
     measures:
-      'How you handle disagreement, listen, adapt, and find common ground.',
+      'Behaviour demonstrated while responding to other participants in a simulated workplace interaction — handling disagreement, listening, adapting.',
     inConversation: 'Avatar 2 pushes back hard. Do you shut down or engage?',
   },
   {

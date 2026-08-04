@@ -108,7 +108,7 @@ export default function DesignSystem() {
           </div>
           <p style={{ marginTop: 'var(--space-6)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', maxWidth: '64ch' }}>
             Usage rules: <strong>accent is reserved for measurement moments</strong> (evidence threads,
-            confidence bands, live speaking state). Reliability colors never appear without their icon
+            AI panel variation intervals, live speaking state). Status colors never appear without their icon
             and label — status is never conveyed by color alone.
           </p>
         </Section>
@@ -157,9 +157,9 @@ export default function DesignSystem() {
             />
             <EvidenceThread
               id="ds-ci"
-              claim={<span style={{ fontSize: 'var(--text-lg)', fontVariantNumeric: 'tabular-nums' }}>68–76 · confidence band</span>}
+              claim={<span style={{ fontSize: 'var(--text-lg)', fontVariantNumeric: 'tabular-nums' }}>68–76 · AI panel variation interval</span>}
               sourceLabel="Calibration"
-              source={<>Provisional band. A validated 90%-coverage interval replaces this after the first frozen conformal calibration — the report will say which one you are seeing.</>}
+              source={<>Provisional interval. A validated 90%-coverage interval replaces this after the first frozen conformal calibration — the report will say which one you are seeing.</>}
             />
             <EvidenceThread
               id="ds-claim"

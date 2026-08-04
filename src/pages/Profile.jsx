@@ -40,12 +40,12 @@ function ordinalSuffix(n) {
   }
 }
 
-// Resolve a sensible national percentile. A stored value of 0 means there was
-// no meaningful comparison pool yet, so approximate from the overall score.
-function resolvePercentile(stored, overall) {
+// National percentile: server-computed values ONLY (audit C19 / charter §6).
+// A stored value of 0/absent means there is no meaningful comparison pool —
+// render nothing rather than approximate a rank from the score.
+function resolvePercentile(stored) {
   if (typeof stored === 'number' && stored > 0) return stored
-  if (typeof overall !== 'number') return null
-  return Math.max(1, Math.min(99, Math.round(overall * 0.95)))
+  return null
 }
 
 export default function Profile() {
@@ -349,7 +349,7 @@ export default function Profile() {
           <div className="rounded-xl border border-[var(--color-line)] bg-white overflow-hidden divide-y divide-[var(--color-paper)]">
             {history.map((row) => {
               const band = scoreBand(row.overall)
-              const pct = resolvePercentile(row.percentile, row.overall)
+              const pct = resolvePercentile(row.percentile)
               return (
                 <Link
                   key={row.sessionId}

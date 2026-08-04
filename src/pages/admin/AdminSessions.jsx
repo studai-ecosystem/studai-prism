@@ -37,7 +37,7 @@ export default function AdminSessions() {
           { key: 'userEmail', label: 'Candidate', className: 'font-mono text-[12px]' },
           { key: 'language', label: 'Lang', className: 'font-mono text-[11px]' },
           { key: 'exchangeCount', label: 'Turns', className: 'tabular-nums' },
-          { key: 'overall', label: 'Score', render: (s) => s.overall ?? '—', className: 'tabular-nums' },
+          { key: 'reportReady', label: 'Report', render: (s) => (s.reportReady ? 'ready' : '—'), className: 'font-mono text-[11px]' },
           {
             key: 'state', label: 'State',
             render: (s) => (

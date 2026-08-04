@@ -216,8 +216,8 @@ export default function AdminCandidateDetail() {
                 <Link to={`/admin/reports/${r.sessionId}`} className="font-mono text-[12px] text-[var(--color-accent)] underline">
                   {r.sessionId.slice(0, 13)}…
                 </Link>
-                <span className="font-display text-lg text-[var(--color-ink)] tabular-nums">{r.overall ?? '—'}</span>
-                {r.correction && <Pill tone="warn">corrected v{r.correction.version}</Pill>}
+                <span className="font-sans text-[12px] text-[var(--color-ink-muted)]">{r.scenario || 'report issued'}</span>
+                {r.corrected && <Pill tone="warn">corrected</Pill>}
                 {r.flaggedForReview && <Pill tone="warn">flagged</Pill>}
                 <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{when(r.issuedAt)}</span>
               </div>

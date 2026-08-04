@@ -46,23 +46,25 @@ export function FlagGate({ feature, children, fallback = null }) {
 }
 
 // ── ReliabilityLabel ─────────────────────────────────────────────────────────
+// Charter §7.4: judge-panel agreement is presented as "AI panel consistency"
+// — never "reliability", which overclaims a psychometric property.
 const RELIABILITY = {
   high: {
-    label: 'High reliability',
-    tooltip: 'The evaluation panel agreed closely on your performance.',
+    label: 'High AI panel consistency',
+    tooltip: 'The AI evaluation panel agreed closely on your performance.',
     Icon: ShieldCheck,
     color: 'var(--color-reliability-high)',
     surface: 'var(--color-success-surface)',
   },
   moderate: {
-    label: 'Moderate reliability',
-    tooltip: 'The panel mostly agreed; small differences remain.',
+    label: 'Moderate AI panel consistency',
+    tooltip: 'The AI panel mostly agreed; small differences remain.',
     Icon: HelpCircle,
     color: 'var(--color-reliability-moderate)',
     surface: 'var(--color-warn-surface)',
   },
   low: {
-    label: 'Low agreement — eligible for human review',
+    label: 'Low AI panel agreement — eligible for human review',
     tooltip: 'This result is eligible for human review at no cost to you.',
     Icon: AlertTriangle,
     color: 'var(--color-reliability-low)',
@@ -108,7 +110,7 @@ export function ConfidenceBand({ ci, max = 100 }) {
       </div>
       <p style={{ marginTop: 'var(--space-2)', color: 'var(--color-ink-muted)' }}>
         <span style={{ color: 'var(--color-ink)', fontVariantNumeric: 'tabular-nums' }}>{low}–{high}</span>
-        {' '}confidence band{ci.provisional ? ' · provisional until the first calibration study' : ' · 90% coverage target'}
+        {' '}AI panel variation interval{ci.provisional ? ' · provisional until the first calibration study' : ' · 90% coverage target'}
       </p>
     </div>
   )

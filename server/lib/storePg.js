@@ -124,7 +124,11 @@ export async function updateSession(sessionId, patch = {}) {  const existing = a
 // ── Reports ──────────────────────────────────────────────────────────────────
 export async function saveReport(sessionId, report) {
   const rec = { sessionId, ...report, issuedAt: new Date().toISOString() }
-  const overall = typeof rec?.scores?.overall === 'number' ? rec.scores.overall : null
+  // Denormalized composite column (internal research/calibration index):
+  // profile-first reports keep it in composite.value; legacy in scores.overall.
+  const overall = typeof rec?.composite?.value === 'number'
+    ? rec.composite.value
+    : typeof rec?.scores?.overall === 'number' ? rec.scores.overall : null
   await query(
     `INSERT INTO v1_reports (session_id, user_id, overall, report, issued_at)
      VALUES ($1,$2,$3,$4,$5)
@@ -395,18 +399,19 @@ export async function listSessions({ q, userId, status, scenarioId, page, pageSi
   }
 }
 
-export async function listReports({ q, userId, minOverall, maxOverall, page, pageSize } = {}) {
+// Charter §6: the composite never appears in this ordinary-operational
+// projection and cannot be filtered on (the denormalized column remains an
+// internal research/calibration index only).
+export async function listReports({ q, userId, page, pageSize } = {}) {
   const { p, size, offset } = pageArgs(page, pageSize)
   const where = []
   const params = []
   if (userId) { params.push(userId); where.push(`user_id = $${params.length}`) }
-  if (typeof minOverall === 'number') { params.push(minOverall); where.push(`overall >= $${params.length}`) }
-  if (typeof maxOverall === 'number') { params.push(maxOverall); where.push(`overall <= $${params.length}`) }
   if (q) { params.push(`%${String(q).toLowerCase()}%`); where.push(`LOWER(session_id) LIKE $${params.length}`) }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const total = await query(`SELECT COUNT(*) FROM v1_reports ${clause}`, params)
   const r = await query(
-    `SELECT session_id, user_id, overall, issued_at, report FROM v1_reports ${clause}
+    `SELECT session_id, user_id, issued_at, report FROM v1_reports ${clause}
       ORDER BY issued_at DESC LIMIT ${size} OFFSET ${offset}`,
     params,
   )
@@ -419,7 +424,6 @@ export async function listReports({ q, userId, minOverall, maxOverall, page, pag
       return {
         sessionId: row.session_id,
         userId: row.user_id || null,
-        overall: row.overall != null ? Number(row.overall) : null,
         reliability: rep.reliability?.level || rep.reliability?.reliability || null,
         scenario: rep.scenario?.title || rep.scenario || null,
         language: rep.scoring?.language || 'en',

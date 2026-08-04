@@ -15,6 +15,7 @@
 //   MAIL_FROM_NAME  optional display name, defaults to "StudAI Prism"
 
 import logger from './logger.js'
+import { PILOT_NOTICE, NOT_SOLE_BASIS_POLICY } from './sharedConstants.js'
 
 let _transport = null
 let _loadAttempted = false
@@ -45,7 +46,11 @@ async function getTransport() {
 // Send the score report PDF as an attachment.
 //   to        — recipient email
 //   pdfBuffer — Node Buffer of the PDF
-//   meta      — { name, overall, filename }
+//   meta      — { name, filename }
+// Charter §6: report emails NEVER carry the composite score. Charter §7.4:
+// no "certified" claims — the report is a cryptographically verifiable Prism
+// report. Charter §2: every report email carries the pilot notice and the
+// not-sole-basis policy.
 // Returns true on success; throws on a hard SMTP failure.
 export async function sendReportEmail({ to, pdfBuffer, meta = {} }) {
   const transport = await getTransport()
@@ -54,27 +59,24 @@ export async function sendReportEmail({ to, pdfBuffer, meta = {} }) {
   const fromAddress = process.env.MAIL_FROM || process.env.SMTP_USER
   const fromName = process.env.MAIL_FROM_NAME || 'StudAI Prism'
   const name = meta.name || 'there'
-  const overall = typeof meta.overall === 'number' ? meta.overall : null
   const filename = meta.filename || 'Prism-Score-Report.pdf'
-
-  const scoreLine = overall !== null ? `Your Prism Score is <strong>${overall}/100</strong>.` : ''
 
   await transport.sendMail({
     from: `"${fromName}" <${fromAddress}>`,
     to,
-    subject: 'Your Prism Score Report',
+    subject: 'Your Prism Report',
     text:
       `Hi ${name},\n\n` +
-      `Thanks for completing your Prism AI Skills Assessment. ` +
-      `${overall !== null ? `Your Prism Score is ${overall}/100. ` : ''}` +
-      `Your full certified report is attached as a PDF.\n\n` +
+      `Thanks for completing your Prism assessment. ` +
+      `Your evidence profile is attached as a PDF.\n\n` +
+      `${PILOT_NOTICE}\n${NOT_SOLE_BASIS_POLICY}\n\n` +
       `— StudAI Prism`,
     html:
       `<div style="font-family:Arial,Helvetica,sans-serif;color:#1A1A2E;line-height:1.6">` +
       `<p>Hi ${name},</p>` +
-      `<p>Thanks for completing your <strong>Prism AI Skills Assessment</strong>. ${scoreLine}</p>` +
-      `<p>Your full certified report is attached as a PDF.</p>` +
-      `<p style="color:#7A7F8C;font-size:13px;margin-top:24px">— StudAI Prism</p>` +
+      `<p>Thanks for completing your <strong>Prism assessment</strong>. Your evidence profile is attached as a PDF.</p>` +
+      `<p style="color:#7A7F8C;font-size:12px;margin-top:24px">${PILOT_NOTICE}<br/>${NOT_SOLE_BASIS_POLICY}</p>` +
+      `<p style="color:#7A7F8C;font-size:13px;margin-top:16px">— StudAI Prism</p>` +
       `</div>`,
     attachments: [{ filename, content: pdfBuffer, contentType: 'application/pdf' }],
   })
@@ -96,18 +98,20 @@ export async function sendReportLinkEmail({ to, name, reportUrl }) {
   await transport.sendMail({
     from: `"${fromName}" <${fromAddress}>`,
     to,
-    subject: 'Your Prism Score Report',
+    subject: 'Your Prism Report',
     text:
       `Hi ${who},\n\n` +
-      `As requested, here is the link to view and download your Prism Score Report:\n\n` +
+      `As requested, here is the link to view and download your Prism report:\n\n` +
       `${reportUrl}\n\n` +
+      `${PILOT_NOTICE}\n${NOT_SOLE_BASIS_POLICY}\n\n` +
       `If you did not request this, you can ignore this email.\n\n— StudAI Prism`,
     html:
       `<div style="font-family:Arial,Helvetica,sans-serif;color:#1A1A2E;line-height:1.6">` +
       `<p>Hi ${who},</p>` +
-      `<p>As requested, here is the link to view and download your <strong>Prism Score Report</strong>:</p>` +
+      `<p>As requested, here is the link to view and download your <strong>Prism report</strong>:</p>` +
       `<p><a href="${reportUrl}">${reportUrl}</a></p>` +
-      `<p style="color:#7A7F8C;font-size:13px;margin-top:24px">If you did not request this, you can ignore this email.<br/>— StudAI Prism</p>` +
+      `<p style="color:#7A7F8C;font-size:12px;margin-top:24px">${PILOT_NOTICE}<br/>${NOT_SOLE_BASIS_POLICY}</p>` +
+      `<p style="color:#7A7F8C;font-size:13px;margin-top:16px">If you did not request this, you can ignore this email.<br/>— StudAI Prism</p>` +
       `</div>`,
   })
   return true

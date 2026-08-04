@@ -16,6 +16,7 @@ import { auditLog } from '../lib/telemetry.js'
 import { runSentinels } from '../lib/sentinels.js'
 import { TRAINING_KAPPA_THRESHOLD } from '../lib/studies.js'
 import { getReport, getConsent } from '../lib/store.js'
+import { compositeOf } from '../lib/reportPolicy.js'
 import { getLatestCredential } from '../lib/credentials.js'
 import { modelDriftStatus } from '../lib/modelDrift.js'
 import { FLAG_MAP, checkFlag } from '../lib/flagMap.js'
@@ -184,13 +185,18 @@ router.get('/incident/:sessionId', async (req, res) => {
       ['tab_switch', 'screenshot_attempt', 'fullscreen_exit', 'paste', 'face_absent', 'multiple_faces', 'looking_away', 'pressure_probe'].includes(e.event_type))
 
     auditLog('incident_file_assembled', sid, { requestedBy: 'admin', events: events?.rows?.length || 0 })
+    // Charter §6: this psychometrics-plane evidence file is THE audited
+    // research surface for the internal composite — access is recorded.
+    if (report && compositeOf(report) !== null) {
+      auditLog('composite_accessed', sid, { surface: 'pilot_incident', permission: 'psychometrics:read' })
+    }
     res.json({
       sessionId: sid,
       assembledAt: new Date().toISOString(),
       note: 'Evidence file for HUMAN review. Nothing in this assembly changes any score or status.',
       timeline: timeline?.rows?.[0] || null,
       consent: consent ? { scopes: consent.scopes, version: consent.meta?.consentVersion, at: consent.at } : null,
-      report: report ? { overall: report.scores?.overall, reliability: report.reliability, reviewStatus: report.reviewStatus || null, scoring: report.scoring || null } : null,
+      report: report ? { overall: compositeOf(report), reliability: report.reliability, reviewStatus: report.reviewStatus || null, scoring: report.scoring || null, insufficientEvidence: report.insufficientEvidence || [] } : null,
       credential: credential ? { credentialId: credential.credential_id, status: credential.status, bundleHash: credential.bundle_hash } : null,
       integrityEvents: integrity,
       decisionTrail: events?.rows || [],

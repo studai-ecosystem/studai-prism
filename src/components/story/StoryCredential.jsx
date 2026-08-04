@@ -11,7 +11,7 @@ import { useClaims } from '../ui/measurement.jsx'
 const CHAIN = [
   { Icon: ShieldCheck, title: 'The conversation', text: 'Your turns, the panel’s reads, and the integrity record — kept together as one evidence bundle.' },
   { Icon: FileSignature, title: 'The signature', text: 'The bundle is hashed and signed by Prism. Change one character anywhere and the signature stops matching.' },
-  { Icon: Globe, title: 'The public page', text: 'Every credential has a verification URL. An employer sees the verdict, the reliability, and — if you choose — the evidence.' },
+  { Icon: Globe, title: 'The public page', text: 'Every credential has a verification URL. An employer sees the verdict, the AI panel consistency, and — if you choose — the evidence.' },
 ]
 
 export default function StoryCredential() {
@@ -56,7 +56,7 @@ export default function StoryCredential() {
               <p className="font-mono text-5xl tabular-nums text-[var(--color-ink)] mb-4">78</p>
               <div className="flex flex-col gap-1.5 font-mono text-[11px] text-[var(--color-ink-muted)]">
                 <span>signature — verifies</span>
-                <span>reliability — shown, never hidden</span>
+                <span>AI panel consistency — shown, never hidden</span>
                 <span>evidence — disclosed on the holder's terms</span>
               </div>
             </div>

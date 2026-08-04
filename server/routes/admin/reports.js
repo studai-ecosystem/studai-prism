@@ -27,6 +27,7 @@ import { requirePermission, consumeApproval } from '../../lib/adminAuth.js'
 import { adminAudit } from '../../lib/adminAudit.js'
 import { auditLog } from '../../lib/telemetry.js'
 import { sanitizeCorrectionScores } from '../../lib/adminProduct.js'
+import { toOperationalReport, isProfileFirstReport, computeInternalComposite, compositeOf } from '../../lib/reportPolicy.js'
 import { listReports, getReport, saveReport } from '../../lib/store.js'
 import { findUserById } from '../../lib/db.js'
 import { isMailEnabled, sendReportLinkEmail } from '../../lib/mailer.js'
@@ -61,14 +62,15 @@ async function nextVersion(sessionId) {
 }
 
 // ── List ─────────────────────────────────────────────────────────────────────
+// Charter §6: composite-range filtering was removed with the composite column
+// — an ordinary operational view must not expose the composite, directly or
+// as a filtering oracle.
 router.get('/', requirePermission('reports:read'), async (req, res) => {
   try {
-    const { q, userId, minOverall, maxOverall, page, pageSize } = req.query
+    const { q, userId, page, pageSize } = req.query
     const result = await listReports({
       q: q ? String(q) : undefined,
       userId: userId ? String(userId) : undefined,
-      minOverall: minOverall != null && minOverall !== '' ? Number(minOverall) : undefined,
-      maxOverall: maxOverall != null && maxOverall !== '' ? Number(maxOverall) : undefined,
       page, pageSize,
     })
     res.json(result)
@@ -84,7 +86,9 @@ router.get('/:sessionId', requirePermission('reports:read'), async (req, res) =>
     const report = await getReport(req.params.sessionId)
     if (!report) return res.status(404).json({ error: 'Report not found.' })
     res.json({
-      report,
+      // Charter §6: ordinary operational serving — composite stripped from
+      // every report shape; per-dimension scores remain for administration.
+      report: toOperationalReport(report),
       versions: await versionsFor(req.params.sessionId),
       delivery: await deliveryState(req.params.sessionId),
       mailEnabled: isMailEnabled(),
@@ -176,9 +180,14 @@ router.post('/:sessionId/supersede', requirePermission('reports:supersede'), asy
     const current = await getReport(req.params.sessionId)
     if (!current) return res.status(404).json({ error: 'Report not found.' })
 
+    // Charter §6/§7.2: corrections preserve the report's shape. Profile-first
+    // reports keep the composite internal and their Insufficient-evidence
+    // dimensions null; legacy reports keep their as-issued shape.
+    const profileFirst = isProfileFirstReport(current)
+    const nullDimensions = profileFirst && Array.isArray(current.insufficientEvidence) ? current.insufficientEvidence : []
     let clean
     try {
-      clean = sanitizeCorrectionScores(scores)
+      clean = sanitizeCorrectionScores(scores, { nullDimensions })
     } catch (err) {
       return res.status(400).json({ error: err.message })
     }
@@ -206,18 +215,33 @@ router.post('/:sessionId/supersede', requirePermission('reports:supersede'), asy
       v = 2
     }
 
-    const corrected = {
-      ...current,
-      scores: clean,
-      correction: {
-        version: v,
-        reason: String(reason).trim(),
-        approvalId: approval.approval_id,
-        correctedAt: new Date().toISOString(),
-        previousOverall: current.scores?.overall ?? null,
-        originallyIssuedAt: current.correction?.originallyIssuedAt || current.issuedAt || null,
-      },
+    const correctedDims = Object.fromEntries(Object.entries(clean).filter(([k]) => k !== 'overall'))
+    const correctionMeta = {
+      version: v,
+      reason: String(reason).trim(),
+      approvalId: approval.approval_id,
+      correctedAt: new Date().toISOString(),
+      originallyIssuedAt: current.correction?.originallyIssuedAt || current.issuedAt || null,
     }
+    const corrected = profileFirst
+      ? {
+          ...current,
+          scores: correctedDims,
+          // Recompute the INTERNAL composite with the issuance arithmetic; the
+          // composite-derived percentile of the old score no longer applies.
+          composite: {
+            ...(current.composite || {}),
+            ...computeInternalComposite(correctedDims),
+            percentile: null,
+            access: 'research',
+          },
+          correction: correctionMeta,
+        }
+      : {
+          ...current,
+          scores: clean,
+          correction: { ...correctionMeta, previousOverall: current.scores?.overall ?? null },
+        }
     delete corrected.sessionId // saveReport re-stamps it
     await saveReport(req.params.sessionId, corrected)
     await query(
@@ -227,10 +251,13 @@ router.post('/:sessionId/supersede', requirePermission('reports:supersede'), asy
     )
 
     // A score changed: decision-trail row in the assessment audit_log too.
+    // The internal audit trail keeps the composite (before/after) — the ops
+    // RESPONSE below does not.
     auditLog('report_superseded', req.params.sessionId, {
       by: 'admin_console',
       approvalId: approval.approval_id,
       before: current.scores,
+      beforeComposite: compositeOf(current),
       after: clean,
       reason: String(reason).trim(),
     })
@@ -239,7 +266,7 @@ router.post('/:sessionId/supersede', requirePermission('reports:supersede'), asy
       before: { scores: current.scores }, after: { scores: clean },
       reason: String(reason).trim(), approvalId: approval.approval_id,
     })
-    res.json({ ok: true, version: v, scores: clean })
+    res.json({ ok: true, version: v, scores: correctedDims })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_report_supersede_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Internal server error' })

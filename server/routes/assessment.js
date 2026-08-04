@@ -52,6 +52,8 @@ import { configuredGapDays, reassessmentBlock } from '../lib/eligibility.js'
 import { assignSteeringArm } from '../lib/studies.js'
 import { isGlassBoxEnabled, issueCredential } from '../lib/credentials.js'
 import { isExecutiveEnabled, isEarlyStopEnabled } from '../engine/executiveConfig.js'
+import { isStandardizedCoreEnabled, anchorDueForExchange, appendAnchorProbe, evaluateEvidenceSufficiency } from '../engine/anchorProbes.js'
+import { compositeOf, finalizeReportForIssuance, toExternalReport } from '../lib/reportPolicy.js'
 import { EvidenceLedger } from '../engine/evidenceLedger.js'
 import { microRateTurn, normalizeLevels } from '../engine/microRater.js'
 import { selectProbe, stopDecision, isPressureEnabled } from '../engine/probeSelector.js'
@@ -792,6 +794,13 @@ router.post('/message', async (req, res) => {
   let challengerTurns = Array.isArray(session._persisted?.challengerTurns) ? [...session._persisted.challengerTurns] : []
   // Track 3.2: pressure moves already deployed this session [{exchange, kind, dimension}].
   let pressureTurns = Array.isArray(session._persisted?.pressureTurns) ? [...session._persisted.pressureTurns] : []
+  // Charter §8 (PRISM_STANDARDIZED_CORE, default OFF): anchor probes already
+  // presented this session, and the one scheduled for THIS exchange (if any).
+  // Anchor turns are FIXED turns: the versioned probe is appended verbatim
+  // server-side and adaptive steering is suppressed until the schedule (the
+  // standardized evidence floor) has been delivered.
+  const anchorRecords = Array.isArray(session._persisted?.anchorProbes) ? [...session._persisted.anchorProbes] : []
+  const anchorDue = isStandardizedCoreEnabled() ? anchorDueForExchange(nextExchangeCount, anchorRecords) : null
 
   if (executive) {
     // Rehydrate the ledger, micro-rate this turn, fold it in, pick the probe.
@@ -803,7 +812,18 @@ router.post('/message', async (req, res) => {
     // interpretable signals so the ledger still advances (never blocks).
     microLevels = rated || levelsFromSignals(signals)
     ledger.applyLevels(microLevels)
+  }
 
+  if (anchorDue) {
+    // Fixed anchor turn (charter §8): the anchor IS the evidence opportunity.
+    // No adaptive directive, no challenger, standard avatar style — the avatar
+    // may vary tone in its generated lead-in only; the probe wording is
+    // appended verbatim below and cannot vary with avatar or candidate.
+    targetDimension = anchorDue.dimension
+    deployChallenger = false
+    avatarStyle = 1
+    directive = null
+  } else if (executive) {
     // Track 3.2 (callback probe material): the candidate's own earlier
     // phrasing — first substantial SANITIZED user turn, quote-safe and short.
     // §5: scrubbed of identity before it can enter a director directive.
@@ -873,7 +893,25 @@ router.post('/message', async (req, res) => {
     const raw = response.choices[0].message.content
     const parsed = JSON.parse(raw)
 
-    const newHistory = [...updatedHistory, { role: 'assistant', content: raw }]
+    // Charter §8: deliver the scheduled anchor probe VERBATIM (appended
+    // deterministically — wording comes only from the versioned bank and can
+    // never vary with candidate, avatar or generated content). Every delivery
+    // writes an audit row; the stored history carries the probe so scoring
+    // transcripts and TTS replay see exactly what the candidate saw.
+    let anchorPresented = null
+    if (anchorDue && appendAnchorProbe(parsed, anchorDue)) {
+      anchorPresented = {
+        exchange: nextExchangeCount,
+        dimension: anchorDue.dimension,
+        probeId: anchorDue.probeId,
+        version: anchorDue.version,
+      }
+      anchorRecords.push(anchorPresented)
+      auditLog('anchor_probe_presented', sessionId, { ...anchorPresented, turnType: 'fixed' })
+    }
+    const finalRaw = anchorPresented ? JSON.stringify(parsed) : raw
+
+    const newHistory = [...updatedHistory, { role: 'assistant', content: finalRaw }]
 
     // Update the live cache (works for both in-memory and Redis backends)…
     await sessions.set(sessionId, {
@@ -898,6 +936,7 @@ router.post('/message', async (req, res) => {
             pressureTurns,
           }
         : {}),
+      ...(isStandardizedCoreEnabled() || anchorRecords.length ? { anchorProbes: anchorRecords } : {}),
       tokensUsed: prevTokens + (response.usage?.total_tokens || 0),
     })
 
@@ -944,12 +983,15 @@ router.post('/message', async (req, res) => {
         }
       }
       const answeredPressure = pressureTurns.find((t) => t.exchange === nextExchangeCount - 1) || null
-      if (!clamped && promptWordCount === null && !answeredPressure) return null
+      // §8 turn marking: this candidate turn answers a fixed anchor probe.
+      const answeredAnchor = anchorRecords.find((t) => t.exchange === nextExchangeCount - 1) || null
+      if (!clamped && promptWordCount === null && !answeredPressure && !answeredAnchor) return null
       return {
         ...(clamped || {}),
         ...(promptWordCount !== null ? { promptWordCount } : {}),
         ...(language !== 'en' ? { language } : {}),
         pressure: answeredPressure ? { kind: answeredPressure.kind, dimension: answeredPressure.dimension } : null,
+        ...(answeredAnchor ? { anchor: { probeId: answeredAnchor.probeId, dimension: answeredAnchor.dimension }, turnType: 'fixed-response' } : {}),
       }
     })()
     recordItemResponse({
@@ -967,7 +1009,11 @@ router.post('/message', async (req, res) => {
       exchange: nextExchangeCount,
       targetDimension,
       challengerDeployed: deployChallenger,
-      ...(executive ? { facet: usedFacets[usedFacets.length - 1], thetaMean: ledger.theta.mean, thetaVar: ledger.theta.var } : {}),
+      // §8: fixed anchor turns vs adaptive steering turns, distinguished in the
+      // decision trail for every exchange.
+      turnType: anchorPresented ? 'fixed' : 'adaptive',
+      ...(executive && !anchorPresented ? { facet: usedFacets[usedFacets.length - 1], thetaMean: ledger.theta.mean, thetaVar: ledger.theta.var } : {}),
+      ...(executive && anchorPresented ? { thetaMean: ledger.theta.mean, thetaVar: ledger.theta.var } : {}),
     })
 
     // Phase 1: persist the θ + coverage snapshot for this exchange.
@@ -1004,8 +1050,10 @@ router.post('/evaluate', async (req, res) => {
   if (!sessionId) return res.status(400).json({ error: 'sessionId required' })
 
   // Idempotent — if already scored, return the stored report.
+  // Charter §6: candidate-facing serving boundary — the internal composite is
+  // stripped from profile-first reports; legacy reports render as issued.
   const existing = await getReport(sessionId)
-  if (existing) return res.json(existing)
+  if (existing) return res.json(toExternalReport(existing))
 
   let job = evaluationJobs.get(sessionId)
   if (!job) {
@@ -1039,7 +1087,7 @@ router.post('/evaluate', async (req, res) => {
   ])
   clearTimeout(fastTimer)
 
-  if (outcome.saved) return res.json(outcome.saved)
+  if (outcome.saved) return res.json(toExternalReport(outcome.saved))
   if (outcome.failed) return res.status(500).json({ error: 'Evaluation failed' })
   return res.status(202).json({ status: 'scoring' })
 })
@@ -1051,7 +1099,7 @@ router.post('/evaluate', async (req, res) => {
 router.get('/evaluate-status/:sessionId', async (req, res) => {
   const { sessionId } = req.params
   const report = await getReport(sessionId)
-  if (report) return res.json({ status: 'complete', report })
+  if (report) return res.json({ status: 'complete', report: toExternalReport(report) })
   if (evaluationJobs.has(sessionId)) return res.json({ status: 'scoring' })
   if (evaluationFailures.has(sessionId)) return res.json({ status: 'failed' })
   const persisted = await getSession(sessionId)
@@ -1318,6 +1366,31 @@ async function runEvaluation({ sessionId, session, requestId }) {
       }
     }
 
+    // ── Charter §7.2 / §8: evidence sufficiency, then §6: profile-first issuance ─
+    // A dimension without its evidence floor reports `Insufficient evidence`
+    // (null — never a fabricated number). AI & Digital Fluency requires the
+    // standardized direct anchor probe UNCONDITIONALLY; the other dimensions
+    // require anchors only under PRISM_STANDARDIZED_CORE. The composite is
+    // then moved to the internal research namespace (report.composite) — new
+    // reports never carry scores.overall; legacy blobs are untouched.
+    const anchorRecords = Array.isArray(session._persisted?.anchorProbes) ? session._persisted.anchorProbes : []
+    const sufficiency = evaluateEvidenceSufficiency({
+      anchorRecords,
+      history,
+      coreEnabled: isStandardizedCoreEnabled(),
+    })
+    finalizeReportForIssuance(report, sufficiency)
+    if (typeof report.composite.value === 'number') {
+      report.composite.percentile = await computePercentile(report.composite.value)
+    }
+    auditLog('evidence_sufficiency', sessionId, {
+      policyVersion: sufficiency.policyVersion,
+      insufficient: sufficiency.insufficient,
+      perDimension: sufficiency.perDimension,
+      compositeBasis: report.composite.basis,
+      weightsRenormalized: report.composite.weightsRenormalized,
+    })
+
     // Link the report to the signed-in user so it appears in their profile
     // history. Falls back to the durable session record (survives restarts).
     const persisted = await getSession(sessionId)
@@ -1369,8 +1442,9 @@ async function runEvaluation({ sessionId, session, requestId }) {
     })
 
     // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): scoring done.
+    // The composite is internal (charter §6) — the audit trail keeps it.
     auditLog('scoring_complete', sessionId, {
-      overall: report.scores?.overall ?? null,
+      overall: compositeOf(report),
       reliability: report.reliability?.label ?? null,
     })
 
@@ -1615,10 +1689,12 @@ router.post('/event', async (req, res) => {
 // ── GET /api/assessment/report/:sessionId ────────────────────────────────────
 // Durable report fetch — lets the result page survive a refresh and powers the
 // public verification view (candidate name is NOT stored here, so none leaks).
+// Charter §6: profile-first reports never expose the internal composite here;
+// legacy reports render exactly as issued.
 router.get('/report/:sessionId', async (req, res) => {
   const report = await getReport(req.params.sessionId)
   if (!report) return res.status(404).json({ error: 'Report not found' })
-  res.json(report)
+  res.json(toExternalReport(report))
 })
 
 // ── GET /api/assessment/mail-status ──────────────────────────────────────────
@@ -1676,7 +1752,7 @@ router.post('/send-report', reportJsonParser, async (req, res) => {
       pdfBuffer,
       meta: {
         name: report?.userName || '',
-        overall: report?.scores?.overall ?? null,
+        // Charter §6: report emails never carry the composite.
         filename: filename || 'Prism-Score-Report.pdf',
       },
     })

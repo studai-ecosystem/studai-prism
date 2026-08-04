@@ -47,13 +47,16 @@ export function thetaFromReport(report) {
     dimensions[dim] = { theta, se }
   }
   let overall
+  const composite = typeof report?.composite?.value === 'number'
+    ? report.composite.value
+    : Number.isFinite(Number(scores.overall)) ? Number(scores.overall) : null
   if (report?.theta && Number.isFinite(report.theta.mean)) {
     // Executive posterior (already on the level scale).
     overall = { theta: +Number(report.theta.mean).toFixed(3), se: +Math.sqrt(Math.max(report.theta.var || 0, SE_FLOOR ** 2)).toFixed(3) }
-  } else if (Number.isFinite(Number(scores.overall))) {
+  } else if (composite !== null) {
     const ses = Object.values(dimensions).map((d) => d.se)
     const meanSe = ses.length ? ses.reduce((s, v) => s + v, 0) / ses.length : SE_DEFAULT
-    overall = { theta: +(Number(scores.overall) / 25).toFixed(3), se: +meanSe.toFixed(3) }
+    overall = { theta: +(composite / 25).toFixed(3), se: +meanSe.toFixed(3) }
   } else {
     return null
   }

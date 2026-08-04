@@ -85,18 +85,17 @@ export default function AdminSessionDetail() {
           <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Scoring</h2>
           {report ? (
             <>
-              <p className="font-display text-3xl text-[var(--color-ink)] tabular-nums">{report.overall ?? '—'}</p>
               <dl className="mt-2 font-sans text-[13px] text-[var(--color-ink)] space-y-0.5">
                 {Object.entries(report.scores || {}).filter(([k]) => k !== 'overall').map(([k, v]) => (
-                  <div key={k} className="flex justify-between"><dt className="text-[var(--color-ink-muted)]">{k}</dt><dd className="tabular-nums">{v}</dd></div>
+                  <div key={k} className="flex justify-between"><dt className="text-[var(--color-ink-muted)]">{k}</dt><dd className="tabular-nums">{v ?? 'insufficient evidence'}</dd></div>
                 ))}
               </dl>
               <p className="mt-2 font-mono text-[11px] text-[var(--color-ink-muted)]">
-                reliability: {report.reliability?.level || '—'} · percentile: {report.percentile ?? 'n/a'}
+                panel consistency: {report.reliability?.level || report.reliability?.label || '—'} · composite: internal (research plane only)
               </p>
               {report.correction && (
                 <p className="mt-1 font-mono text-[11px] text-[var(--color-reliability-moderate)]">
-                  corrected v{report.correction.version} — was {report.correction.previousOverall}. Reason: {report.correction.reason}
+                  corrected v{report.correction.version}. Reason: {report.correction.reason}
                 </p>
               )}
               <p className="mt-2">

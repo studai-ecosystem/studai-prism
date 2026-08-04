@@ -20,7 +20,7 @@
 import { createHash, createPrivateKey, createPublicKey, sign as edSign, verify as edVerify, randomUUID } from 'node:crypto'
 import { query, isDbConfigured } from '../db/pool.js'
 import { getReport, getEvents, getConsent, getSession } from './store.js'
-import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCALE_VERSION, SCORE_VALIDITY_MONTHS, CONSENT_VERSION } from './sharedConstants.js'
+import { DIMENSION_KEYS, SCALE_VERSION, SCORE_VALIDITY_MONTHS, CONSENT_VERSION } from './sharedConstants.js'
 import { activeFlagSnapshot } from './telemetry.js'
 import { assertJudgeAnchoredForIssuance } from './modelDrift.js'
 import logger from './logger.js'
@@ -66,7 +66,24 @@ function activePromptVersions() {
   const base = ['judge_full.v1', 'avatar_system.v3', 'avatar_styles.v1', 'dimension_rubric.v1', 'opening_turn.v1', 'calibration_tier.v1']
   if (process.env.PRISM_V2_EXECUTIVE === 'true') base.push('entry_estimator.v1', 'micro_rater.v1')
   if (process.env.PRISM_V2_DUAL_SCORER === 'true') base.push('judge_turn.v1')
+  if (process.env.PRISM_STANDARDIZED_CORE === 'true') base.push('anchor_probes.v1')
   return base.sort()
+}
+
+// ── evidence-bundle-v2 scores block (charter §6) ────────────────────────
+// New issuance is PROFILE-FIRST: per-dimension scores only. The composite and
+// its derivation arithmetic never enter a newly signed bundle — regardless of
+// the report's shape (a legacy report re-credentialled today still gets a v2
+// bundle). Already-issued v1 bundles are immutable and verify unchanged.
+// A dimension without sufficient evidence is null, listed in
+// insufficientEvidence — never a fabricated number (charter §7.2/§8).
+// Exported for the trust-reporting regression suite.
+export function buildBundleScores(report) {
+  const scores = report?.scores || {}
+  return {
+    dimensions: Object.fromEntries(DIMENSION_KEYS.map((k) => [k, typeof scores[k] === 'number' ? scores[k] : null])),
+    insufficientEvidence: Array.isArray(report?.insufficientEvidence) ? report.insufficientEvidence : [],
+  }
 }
 
 // ── T2.1 evidence bundle assembly ────────────────────────────────────────────
@@ -107,9 +124,8 @@ export async function assembleEvidenceBundle(sessionId) {
     timeline = tl?.rows?.[0] || null
   }
 
-  const scores = report.scores || {}
   return {
-    schema: 'evidence-bundle-v1',
+    schema: 'evidence-bundle-v2',
     sessionId,
     candidateId: session?.candidateId || timeline?.candidate_id || null,
     issued: {
@@ -125,12 +141,7 @@ export async function assembleEvidenceBundle(sessionId) {
       scoringStatus: report.scoring?.status || 'calibrated',
     },
     scenario: report.scenario || null,
-    scores: {
-      overall: scores.overall ?? null,
-      dimensions: Object.fromEntries(DIMENSION_KEYS.map((k) => [k, scores[k] ?? null])),
-      weights: DIMENSION_WEIGHTS,
-      arithmetic: DIMENSION_KEYS.map((k) => ({ dimension: k, score: scores[k] ?? null, weight: DIMENSION_WEIGHTS[k], contribution: scores[k] != null ? +(scores[k] * DIMENSION_WEIGHTS[k]).toFixed(2) : null })),
-    },
+    scores: buildBundleScores(report),
     reliability: report.reliability || null,
     confidenceInterval: report.confidenceInterval || null,
     evidence: report.evidence || null, // per-dimension transcript quotes (disclosure-gated at the API)

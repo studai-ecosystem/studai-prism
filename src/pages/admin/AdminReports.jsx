@@ -29,8 +29,7 @@ export function AdminReports() {
         onRowClick={(r) => navigate(`/admin/reports/${r.sessionId}`)}
         columns={[
           { key: 'sessionId', label: 'Session', render: (r) => `${mono(r.sessionId, 13)}…`, className: 'font-mono text-[12px]' },
-          { key: 'overall', label: 'Overall', className: 'tabular-nums font-display' },
-          { key: 'reliability', label: 'Reliability' },
+          { key: 'reliability', label: 'Panel consistency' },
           { key: 'scenario', label: 'Scenario' },
           { key: 'language', label: 'Lang', className: 'font-mono text-[11px]' },
           {
@@ -106,7 +105,9 @@ export function AdminReportDetail() {
       if (!reason || reason.trim().length < 10) throw new Error('A specific reason (>= 10 characters) is required.')
       return adminFetch(`/api/admin/reports/${sessionId}/supersede`, {
         method: 'POST',
-        body: { scores: Object.fromEntries(Object.entries(draftScores).map(([k, v]) => [k, Number(v)])), reason: reason.trim() },
+        // Empty inputs stay null — an Insufficient-evidence dimension can never
+        // be given a number by a correction (the server enforces this too).
+        body: { scores: Object.fromEntries(Object.entries(draftScores).map(([k, v]) => [k, v === '' || v == null ? null : Number(v)])), reason: reason.trim() },
       })
     }, 'Report superseded — new version recorded.').then(() => setCorrecting(false))
 
@@ -122,19 +123,18 @@ export function AdminReportDetail() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Scores</h2>
-          <p className="font-display text-3xl text-[var(--color-ink)] tabular-nums">{report.scores?.overall ?? '—'}</p>
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Dimension scores</h2>
           <dl className="mt-2 font-sans text-[13px] text-[var(--color-ink)] space-y-0.5">
             {Object.entries(report.scores || {}).filter(([k]) => k !== 'overall').map(([k, v]) => (
-              <div key={k} className="flex justify-between"><dt className="text-[var(--color-ink-muted)]">{k}</dt><dd className="tabular-nums">{v}</dd></div>
+              <div key={k} className="flex justify-between"><dt className="text-[var(--color-ink-muted)]">{k}</dt><dd className="tabular-nums">{v ?? 'insufficient evidence'}</dd></div>
             ))}
           </dl>
           <p className="mt-2 font-mono text-[11px] text-[var(--color-ink-muted)]">
-            reliability {report.reliability?.level || '—'} · percentile {report.percentile ?? 'n/a'}
+            panel consistency {report.reliability?.level || report.reliability?.label || '—'} · composite: internal (research plane only)
           </p>
           {report.correction && (
             <p className="mt-1 font-mono text-[11px] text-[var(--color-reliability-moderate)]">
-              corrected {when(report.correction.correctedAt)} — was {report.correction.previousOverall}. “{report.correction.reason}”
+              corrected {when(report.correction.correctedAt)}. “{report.correction.reason}”
             </p>
           )}
         </section>
@@ -170,8 +170,8 @@ export function AdminReportDetail() {
           {!mailEnabled && <p className="mt-2 font-mono text-[10px] text-[var(--color-ink-muted)]">Resend disabled: SMTP is not configured.</p>}
           <p className="mt-2 font-mono text-[10px] text-[var(--color-ink-muted)] leading-relaxed">
             Supersession requires an approval row (action “supersede_report”, this session id) decided by a
-            DIFFERENT administrator, raised under People → Administrators → Approvals. The overall score is
-            recomputed server-side from the published weights — it cannot be set directly.
+            DIFFERENT administrator, raised under People → Administrators → Approvals. The internal composite is
+            recomputed server-side from the published weights — it cannot be set directly and is not shown here.
           </p>
         </section>
       </div>
@@ -186,7 +186,7 @@ export function AdminReportDetail() {
               <label key={k} className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
                 {k}
                 <input type="number" min="0" max="100" className={`${field} w-full mt-1 tabular-nums`}
-                  value={v} onChange={(e) => setDraftScores({ ...draftScores, [k]: e.target.value })} />
+                  value={v ?? ''} onChange={(e) => setDraftScores({ ...draftScores, [k]: e.target.value })} />
               </label>
             ))}
           </div>
@@ -197,7 +197,8 @@ export function AdminReportDetail() {
           <div className="mt-3 flex items-center gap-3">
             <button type="button" className={btn} onClick={submitCorrection}>Submit correction</button>
             <p className="font-mono text-[10px] text-[var(--color-ink-muted)]">
-              Overall is NOT an input — the server recomputes it from the canonical weights.
+              The composite is NOT an input — the server recomputes it internally from the canonical weights.
+              Dimensions issued as “Insufficient evidence” must stay empty — a correction can never invent a score.
             </p>
           </div>
         </section>

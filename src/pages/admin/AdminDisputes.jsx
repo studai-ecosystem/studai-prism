@@ -132,7 +132,7 @@ export function AdminDisputeDetail() {
             <li>
               {related.report
                 ? <Link className="text-[var(--color-accent)] underline" to={`/admin/reports/${sessionId}`}>
-                    Report — overall {related.report.overall}{related.report.correction ? ` (corrected v${related.report.correction.version})` : ''} →
+                    Report{related.report.corrected ? ' (corrected)' : ''} →
                   </Link>
                 : 'No report issued.'}
             </li>

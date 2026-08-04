@@ -78,7 +78,7 @@ export default function StoryPanel() {
               className="font-sans text-sm text-[var(--color-ink-muted)] text-center max-w-md"
             >
               The divergent read stays in the record. Low agreement lowers the
-              reliability label on your report — and can route it to a person.
+              AI panel consistency label on your report — and can route it to a person.
             </motion.p>
           </div>
         </div>

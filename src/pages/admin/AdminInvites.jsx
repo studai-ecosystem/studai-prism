@@ -185,7 +185,7 @@ export default function AdminInvites() {
             <table className="w-full text-sm mt-3">
               <thead>
                 <tr className="text-left border-b border-[var(--color-line)]">
-                  {['Candidate', 'Assessment', 'Score', 'Redeemed'].map((h) => (
+                  {['Candidate', 'Assessment', 'Redeemed'].map((h) => (
                     <th key={h} className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{h}</th>
                   ))}
                 </tr>
@@ -201,7 +201,6 @@ export default function AdminInvites() {
                         <span className="text-[12px] text-[var(--color-ink-muted)]">not completed yet</span>
                       )}
                     </td>
-                    <td className={`px-3 py-2 ${mono} tabular-nums`}>{r.overall ?? '—'}</td>
                     <td className="px-3 py-2 text-[12px] text-[var(--color-ink-muted)]">{fmt(r.redeemedAt)}</td>
                   </tr>
                 ))}

@@ -10,13 +10,14 @@ import { ShieldCheck, AlertTriangle, Loader2, BadgeCheck, ChevronDown } from 'lu
 import '../design/tokens.css'
 import { EvidenceThread, EvidenceTick, evidenceThreadStyles } from '../components/ui/EvidenceThread.jsx'
 import { ReliabilityLabel, ConfidenceBand, PendingStat } from '../components/ui/measurement.jsx'
+import { DIMENSION_LABELS, PILOT_NOTICE, NOT_SOLE_BASIS_POLICY, INSUFFICIENT_EVIDENCE_LABEL } from '../../server/lib/sharedConstants.js'
 
 const DIMENSIONS = [
-  { key: 'criticalThinking', label: 'Critical Thinking' },
-  { key: 'communication', label: 'Communication' },
-  { key: 'collaboration', label: 'Collaboration' },
-  { key: 'problemSolving', label: 'Problem Solving' },
-  { key: 'aiDigitalFluency', label: 'AI & Digital Fluency' },
+  { key: 'criticalThinking', label: DIMENSION_LABELS.criticalThinking },
+  { key: 'communication', label: DIMENSION_LABELS.communication },
+  { key: 'collaboration', label: DIMENSION_LABELS.collaboration },
+  { key: 'problemSolving', label: DIMENSION_LABELS.problemSolving },
+  { key: 'aiDigitalFluency', label: DIMENSION_LABELS.aiDigitalFluency },
 ]
 
 const BANDS = [
@@ -126,8 +127,12 @@ export default function Verify() {
   }
 
   const { report } = state
-  const overall = report.scores?.overall ?? 0
-  const band = getBand(overall)
+  // Charter §6 — profile-first: new reports carry no composite and this page
+  // renders the evidence profile; legacy reports render as issued.
+  const hasComposite = typeof report.scores?.overall === 'number'
+  const overall = hasComposite ? report.scores.overall : null
+  const band = hasComposite ? getBand(overall) : null
+  const insufficientDims = Array.isArray(report.insufficientEvidence) ? report.insufficientEvidence : []
   const issued = report.issuedAt ? new Date(report.issuedAt) : null
   const issuedStr = issued ? issued.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'
   const evidence = report.evidence || credential?.view?.evidence || {}
@@ -142,31 +147,49 @@ export default function Verify() {
         {/* The instrument card */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-lg)', marginTop: 'var(--space-6)', overflow: 'hidden', boxShadow: 'var(--elevation-raised)' }}>
           <div style={{ padding: 'var(--space-8)', borderBottom: '1px solid var(--color-line)' }}>
-            <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Prism Score</p>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
-              <span style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-3xl)', fontVariantNumeric: 'tabular-nums', lineHeight: 'var(--leading-tight)' }}>{overall}</span>
-              <span style={{ fontFamily: 'var(--font-utility)', color: 'var(--color-ink-muted)' }}>/100</span>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-3)', alignItems: 'center' }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-md)' }}>{band.label}</span>
-              {report.reliability?.label && <ReliabilityLabel level={report.reliability.label} />}
-            </div>
-            <div style={{ marginTop: 'var(--space-4)' }}>
-              <ConfidenceBand ci={report.confidenceInterval} />
-            </div>
-            {typeof report.percentile === 'number' && report.percentile > 0 ? (
-              <p style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)' }}>
-                Outperformed {report.percentile}% of assessed candidates
-              </p>
+            {hasComposite ? (
+              <>
+                <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Prism Score</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
+                  <span style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-3xl)', fontVariantNumeric: 'tabular-nums', lineHeight: 'var(--leading-tight)' }}>{overall}</span>
+                  <span style={{ fontFamily: 'var(--font-utility)', color: 'var(--color-ink-muted)' }}>/100</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-3)', alignItems: 'center' }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-md)' }}>{band.label}</span>
+                  {report.reliability?.label && <ReliabilityLabel level={report.reliability.label} />}
+                </div>
+                <div style={{ marginTop: 'var(--space-4)' }}>
+                  <ConfidenceBand ci={report.confidenceInterval} />
+                </div>
+                {typeof report.percentile === 'number' && report.percentile > 0 ? (
+                  <p style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)' }}>
+                    Outperformed {report.percentile}% of assessed candidates
+                  </p>
+                ) : (
+                  <div style={{ marginTop: 'var(--space-4)' }}>
+                    <PendingStat
+                      label="Percentile"
+                      missing="A percentile appears once enough candidates have completed this assessment for a fair comparison."
+                      arrives="The score is final; the comparison is what's pending."
+                    />
+                  </div>
+                )}
+              </>
             ) : (
-              <div style={{ marginTop: 'var(--space-4)' }}>
-                <PendingStat
-                  label="Percentile"
-                  missing="A percentile appears once enough candidates have completed this assessment for a fair comparison."
-                  arrives="The score is final; the comparison is what's pending."
-                />
-              </div>
+              <>
+                <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Prism evidence profile</p>
+                <p style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', lineHeight: 'var(--leading-base)' }}>
+                  This report is profile-first: five dimensions scored separately from observed
+                  behaviour. No overall composite is issued.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-3)', alignItems: 'center' }}>
+                  {report.reliability?.label && <ReliabilityLabel level={report.reliability.label} />}
+                </div>
+              </>
             )}
+            <p style={{ marginTop: 'var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', lineHeight: 'var(--leading-base)' }}>
+              {PILOT_NOTICE} {NOT_SOLE_BASIS_POLICY}
+            </p>
           </div>
 
           {/* Dimensions */}
@@ -174,7 +197,20 @@ export default function Verify() {
             <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: 'var(--space-4)' }}>Dimension breakdown</p>
             <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
               {DIMENSIONS.map((d) => {
-                const v = report.scores?.[d.key] ?? 0
+                const raw = report.scores?.[d.key]
+                const unscored = typeof raw !== 'number' || insufficientDims.includes(d.key)
+                if (unscored) {
+                  return (
+                    <div key={d.key}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-1)' }}>
+                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>{d.label}</span>
+                        <span style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)' }}>{INSUFFICIENT_EVIDENCE_LABEL}</span>
+                      </div>
+                      <div aria-hidden="true" style={{ height: 5, background: 'var(--color-paper)', border: '1px dashed var(--color-line)', borderRadius: 'var(--radius-full)' }} />
+                    </div>
+                  )
+                }
+                const v = raw
                 return (
                   <div key={d.key}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-1)' }}>

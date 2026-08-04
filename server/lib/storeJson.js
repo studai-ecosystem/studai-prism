@@ -165,8 +165,10 @@ export async function getReportsByUser(userId) {
 
 export async function getAllOverallScores() {
   const db = await readDB()
+  // Composite pool for the internal percentile: legacy blobs carry
+  // scores.overall; profile-first reports carry composite.value (charter §6).
   return Object.values(db.reports)
-    .map((r) => r?.scores?.overall)
+    .map((r) => (typeof r?.composite?.value === 'number' ? r.composite.value : r?.scores?.overall))
     .filter((n) => typeof n === 'number')
 }
 
@@ -359,13 +361,12 @@ export async function listSessions({ q, userId, status, scenarioId, page, pageSi
   }
 }
 
-// Reports, newest first. Light projection — scores summary only.
-export async function listReports({ q, userId, minOverall, maxOverall, page, pageSize } = {}) {
+// Reports, newest first. Light projection — charter §6: the composite never
+// appears in this ordinary-operational projection and cannot be filtered on.
+export async function listReports({ q, userId, page, pageSize } = {}) {
   const db = await readDB()
   let rows = Object.values(db.reports).filter(Boolean)
   if (userId) rows = rows.filter((r) => r.userId === userId)
-  if (typeof minOverall === 'number') rows = rows.filter((r) => (r.scores?.overall ?? -1) >= minOverall)
-  if (typeof maxOverall === 'number') rows = rows.filter((r) => (r.scores?.overall ?? 101) <= maxOverall)
   if (q) {
     const needle = String(q).toLowerCase()
     rows = rows.filter((r) => String(r.sessionId).toLowerCase().includes(needle))
@@ -377,7 +378,6 @@ export async function listReports({ q, userId, minOverall, maxOverall, page, pag
     rows: pageRows.map((r) => ({
       sessionId: r.sessionId,
       userId: r.userId || null,
-      overall: r.scores?.overall ?? null,
       reliability: r.reliability?.level || r.reliability?.reliability || null,
       scenario: r.scenario?.title || r.scenario || null,
       language: r.scoring?.language || 'en',

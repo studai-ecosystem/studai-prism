@@ -18,16 +18,30 @@ function clampScore(n) {
 // Returns {scores} with every dimension clamped 0–100 and overall recomputed
 // server-side from the canonical weights. Rejects unknown score keys hard —
 // a correction cannot smuggle new fields into a report (mass-assignment guard).
-export function sanitizeCorrectionScores(input) {
+//
+// Charter §7.2/§8: `nullDimensions` lists dimensions the report issued as
+// `Insufficient evidence`. A correction can NEVER give them a number (that
+// would fabricate evidence) — they must stay null, and the recomputed overall
+// renormalizes the canonical weights over the scored dimensions (the same
+// arithmetic the issuance pipeline applies to its internal composite).
+export function sanitizeCorrectionScores(input, { nullDimensions = [] } = {}) {
   if (!input || typeof input !== 'object') throw new Error('scores object required')
   const unknown = Object.keys(input).filter((k) => !DIMENSION_KEYS.includes(k))
   if (unknown.length) throw new Error(`unknown score keys: ${unknown.join(', ')}`)
-  const missing = DIMENSION_KEYS.filter((k) => input[k] == null)
+  const fabricated = nullDimensions.filter((k) => input[k] != null)
+  if (fabricated.length) {
+    throw new Error(`cannot score dimensions reported as Insufficient evidence: ${fabricated.join(', ')}`)
+  }
+  const missing = DIMENSION_KEYS.filter((k) => input[k] == null && !nullDimensions.includes(k))
   if (missing.length) throw new Error(`missing score keys: ${missing.join(', ')}`)
   const clean = {}
-  for (const key of DIMENSION_KEYS) clean[key] = clampScore(input[key])
+  for (const key of DIMENSION_KEYS) {
+    clean[key] = nullDimensions.includes(key) ? null : clampScore(input[key])
+  }
+  const scored = DIMENSION_KEYS.filter((k) => typeof clean[k] === 'number')
+  const weightSum = scored.reduce((s, k) => s + DIMENSION_WEIGHTS[k], 0)
   clean.overall = clampScore(
-    DIMENSION_KEYS.reduce((sum, key) => sum + clean[key] * DIMENSION_WEIGHTS[key], 0),
+    scored.reduce((sum, key) => sum + clean[key] * DIMENSION_WEIGHTS[key], 0) / (weightSum || 1),
   )
   return clean
 }

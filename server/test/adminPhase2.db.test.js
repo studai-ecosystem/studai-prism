@@ -201,16 +201,21 @@ test('Phase 2 admin plane end-to-end', { skip }, async (t) => {
   })
   assert.equal(supersede.status, 200)
   assert.equal(supersede.json.version, 2)
-  // Server recomputed overall from canonical weights — not caller-supplied.
-  const expectedOverall = Math.round(70 * 0.25 + 60 * 0.25 + 75 * 0.2 + 60 * 0.2 + 55 * 0.1)
-  assert.equal(supersede.json.scores.overall, expectedOverall)
+  // Charter §6: the ops response carries the corrected DIMENSIONS only — the
+  // composite is recomputed internally and never returned to this surface.
+  assert.ok(!('overall' in supersede.json.scores), 'no composite in the supersession response')
+  assert.equal(supersede.json.scores.collaboration, 75, 'corrected dimension applied')
 
   const reportDetail = await call('GET', `/api/admin/reports/${sid}`, auditor)
   assert.equal(reportDetail.status, 200, 'auditor can read reports')
   assert.equal(reportDetail.json.versions.length, 2, 'initial + correction versions retained')
   assert.equal(reportDetail.json.versions[0].kind, 'initial')
   assert.equal(reportDetail.json.versions[1].kind, 'correction')
-  assert.equal(reportDetail.json.report.correction.previousOverall, 63)
+  // Charter §6: the composite (including the pre-correction one) is stripped
+  // from ordinary operational serving; the lineage stays in report_versions
+  // and the audit trail.
+  assert.ok(!('previousOverall' in (reportDetail.json.report.correction || {})), 'no composite lineage on the ops surface')
+  assert.ok(!('overall' in (reportDetail.json.report.scores || {})), 'ops detail carries no composite')
 
   const trailSup = await query(
     `SELECT COUNT(*) FROM audit_log WHERE event_type = 'report_superseded' AND session_id = $1::uuid`,

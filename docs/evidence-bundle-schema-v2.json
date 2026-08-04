@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://prism.studai.one/docs/evidence-bundle-schema-v2.json",
+  "title": "Prism Evidence Bundle v2 (profile-first)",
+  "description": "Canonical, pseudonymous evidence bundle signed into every glass-box credential from charter MASTER-2026-08-04 (§6) onward. PROFILE-FIRST: per-dimension scores only — the composite score and its derivation arithmetic never enter a v2 bundle. A dimension whose evidence floor was not met is null and listed in insufficientEvidence (charter §7.2/§8) — never a fabricated number. Already-issued v1 bundles are immutable and continue to verify against evidence-bundle-schema-v1.json. Serialization for hashing: recursively key-sorted JSON with no whitespace (see server/lib/credentials.js canonicalStringify). The signature is Ed25519 over the SHA-256 of that canonical form. Claim supported: the signature proves issuance and integrity of the Prism report at the stated identity-assurance level — it does not prove the candidate's underlying ability or identity beyond the recorded assurance level.",
+  "type": "object",
+  "required": ["schema", "sessionId", "issued", "scores", "consent", "provenance"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "evidence-bundle-v2" },
+    "sessionId": { "type": "string", "format": "uuid" },
+    "candidateId": { "type": ["string", "null"], "description": "Pseudonymous candidate id. The bundle NEVER carries name/email/identity fields (enforced at issuance)." },
+    "issued": {
+      "type": "object",
+      "required": ["scaleVersion", "validityMonths"],
+      "properties": {
+        "scaleVersion": { "type": "string" },
+        "calibrationRunId": { "type": ["string", "null"], "description": "Frozen calibration run applied; null until the first equating run exists." },
+        "validityMonths": { "type": "integer" },
+        "attemptNo": { "type": ["integer", "null"] },
+        "isSynthetic": { "type": ["boolean", "null"], "description": "true for dummy/dev/test sessions — such credentials are demos, never certificates." },
+        "language": { "type": "string", "description": "Assessment language code (en, hi-en, hi, ta)." },
+        "scoringStatus": { "enum": ["calibrated", "provisional_uncalibrated"], "description": "Non-English scoring stays provisional until the multilingual DIF study reports — rubric translation is not rubric equivalence." }
+      }
+    },
+    "scenario": { "type": ["object", "null"], "properties": { "title": { "type": "string" }, "domain": { "type": "string" } } },
+    "scores": {
+      "type": "object",
+      "required": ["dimensions", "insufficientEvidence"],
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "type": "object",
+          "description": "Per-dimension scores 0–100, or null where the evidence floor was not met (see insufficientEvidence). NO composite/overall value exists in a v2 bundle.",
+          "additionalProperties": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 }
+        },
+        "insufficientEvidence": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Dimension keys reported as 'Insufficient evidence' — a first-class result, never replaced by a fabricated score (charter §7.2/§8)."
+        }
+      }
+    },
+    "reliability": { "type": ["object", "null"], "description": "AI panel consistency record — judge-panel agreement (method, label, agreement, panel, positionSwapDelta, flaggedForReview). Presented externally as 'AI panel consistency', never as psychometric reliability." },
+    "confidenceInterval": { "type": ["object", "null"], "description": "AI panel variation interval when the dual scorer produced one; null otherwise. Never fabricated." },
+    "evidence": { "type": ["object", "null"], "description": "Per-dimension transcript quotes. Disclosure-gated at the API (candidate's share token); always inside the signed bundle." },
+    "judgeVotes": { "type": ["array", "null"], "description": "Per-vote judge records with model ids (dual scorer only)." },
+    "integrityEvents": { "type": "object", "description": "Counts per proctoring event type; never raw payloads." },
+    "review": {
+      "type": ["object", "null"],
+      "description": "Human-review state. Detection/integrity signals are ADVISORY ONLY: they may route a session to human review; they never auto-fail a candidate. There is no machine verdict vocabulary.",
+      "properties": {
+        "status": { "enum": ["none", "human_review_pending", "human_reviewed"] },
+        "outcome": { "enum": ["confirmed_valid", "annulled", null] }
+      },
+      "required": ["status", "outcome"],
+      "additionalProperties": false
+    },
+    "consent": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {
+        "version": { "type": ["string", "null"], "description": "Consent copy version the candidate accepted." },
+        "currentCopyVersion": { "type": "string" },
+        "scopes": { "type": ["array", "null"] }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["promptVersions", "flagsActive"],
+      "properties": {
+        "promptVersions": { "type": "array", "items": { "type": "string" }, "description": "Versioned prompt files governing scoring at issuance (includes anchor_probes.v1 when the standardized core is live)." },
+        "flagsActive": { "type": "object", "description": "PRISM_* feature flags at issuance (secret-named keys excluded)." },
+        "aiProvider": { "type": "string", "description": "Cloud AI gateway used for scoring." },
+        "judgeModel": { "type": "string", "description": "Pinned foundation-model or inference-profile ID used by the judge panel." },
+        "judgeDeployment": { "type": ["string", "null"], "description": "Backward-compatible alias carrying the pinned judge model ID." }
+      }
+    }
+  }
+}

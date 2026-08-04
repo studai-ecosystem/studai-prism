@@ -65,13 +65,12 @@ test('JSON store: list functions paginate, filter and project safely', async () 
   const clamped = await store.listSessions({ userId: uid, pageSize: 5000 })
   assert.ok(clamped.pageSize <= 100, 'pageSize hard-capped at 100')
 
-  // Reports.
+  // Reports. Charter §6: the ordinary operational projection carries no
+  // composite and cannot filter by one.
   const reports = await store.listReports({ userId: uid })
   assert.equal(reports.total, 1)
-  assert.equal(reports.rows[0].overall, 71)
+  assert.ok(!('overall' in reports.rows[0]), 'composite never in the ops projection')
   assert.equal(reports.rows[0].reliability, 'moderate')
-  const scoreBand = await store.listReports({ minOverall: 90 })
-  assert.ok(!scoreBand.rows.some((r) => r.sessionId === sids[0]))
 
   // Disputes + coarse status sync.
   const disputes = await store.listDisputes({ status: 'open' })

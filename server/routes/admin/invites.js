@@ -31,15 +31,16 @@ router.get('/:id', requirePermission('invites:read'), async (req, res) => {
   try {
     const invite = await getInvite(req.params.id)
     if (!invite) return res.status(404).json({ error: 'Invite not found.' })
-    // Roster rows carry the assessment outcome so an operator can see, per
-    // redeemer, whether the assessment was completed and jump to the report.
+    // Roster rows carry the assessment COMPLETION state so an operator can
+    // see, per redeemer, whether the assessment finished and jump to the
+    // report record. Charter §6: the composite score never appears in this
+    // ordinary operational view.
     const redemptions = await Promise.all(
       (await listRedemptions(invite.inviteId)).map(async (r) => {
         const report = await getReport(r.sessionId).catch(() => null)
         return {
           ...r,
           reportReady: Boolean(report),
-          overall: report?.scores?.overall ?? null,
         }
       }),
     )

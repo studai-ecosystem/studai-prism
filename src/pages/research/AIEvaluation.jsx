@@ -49,8 +49,8 @@ export default function AIEvaluation() {
             conversation is scored several times by independent judge passes
             with different judging personas and rubric orderings; your score on
             each dimension is the median of the panel, and the level of
-            agreement between judges is measured and shown on your report as a
-            reliability label. The model deployment used is configured per
+            agreement between judges is measured and shown on your report as an
+            AI panel consistency label. The model deployment used is configured per
             environment and recorded with your report — every result can be
             traced to the models that produced it.
           </p>

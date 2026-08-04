@@ -7,7 +7,10 @@ import {
   ShieldCheck, Briefcase, Share2, Scale, Trash2,
 } from 'lucide-react'
 import { getUser, getToken } from '../lib/session.js'
-import { DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, REASSESSMENT_DAYS } from '../../server/lib/sharedConstants.js'
+import {
+  DIMENSION_WEIGHTS, DIMENSION_LABELS, DIMENSION_PUBLIC_DEFINITIONS, SCORE_VALIDITY_MONTHS,
+  REASSESSMENT_DAYS, PILOT_NOTICE, NOT_SOLE_BASIS_POLICY, INSUFFICIENT_EVIDENCE_LABEL,
+} from '../../server/lib/sharedConstants.js'
 
 // ── Dimension config — single measurement accent (design-system LAW: the
 // accent belongs to measurement moments; concrete rgb() literals because the
@@ -49,9 +52,9 @@ const DIMENSIONS = [
   },
   {
     key: 'collaboration',
-    label: 'Collaboration',
+    label: DIMENSION_LABELS.collaboration,
     color: ACCENT,
-    sub: 'Perspective acknowledgment · Position updating · Conflict navigation',
+    sub: DIMENSION_PUBLIC_DEFINITIONS.collaboration,
     Icon: Users,
     ringBg: ACCENT_SOFT,
     iconBg: ACCENT_SOFTER,
@@ -196,8 +199,10 @@ export default function ScoreReport() {
   const [params] = useSearchParams()
   const sessionId = params.get('session')
 
+  // Profile-first demo (charter §6): the sample report shows the evidence
+  // profile — per-dimension scores only, no composite.
   const demoReport = params.get('demo') === '1' ? {
-    scores: { criticalThinking: 88, collaboration: 79, communication: 91, problemSolving: 85, aiDigitalFluency: 77, overall: 84 },
+    scores: { criticalThinking: 88, collaboration: 79, communication: 91, problemSolving: 85, aiDigitalFluency: 77 },
     feedback: { summary: 'Riya demonstrates the profile of a candidate ready for cross-functional roles that require both clear communication and structured decision-making under pressure. The standout characteristic was the consistent gap-identification behaviour before acting — asking for missing information rather than assuming.' },
     highlights: ['Framed the core trade-off early', 'Kept stakeholders aligned', 'Clear, structured communication'],
     growthAreas: ['Quantify risks more explicitly', 'Invite dissenting views sooner'],
@@ -269,16 +274,23 @@ export default function ScoreReport() {
   }
 
   const { scores, feedback, highlights, growthAreas } = report
-  const band = getBand(scores.overall)
+  // Charter §6 — profile-first: reports issued under the new policy carry NO
+  // composite; legacy reports (scores.overall present) render as issued.
+  const hasComposite = typeof scores.overall === 'number'
+  const band = hasComposite ? getBand(scores.overall) : null
+  // Charter §7.2/§8 — dimensions without their evidence floor are null and
+  // render as `Insufficient evidence`, never a number.
+  const insufficientDims = Array.isArray(report.insufficientEvidence) ? report.insufficientEvidence : []
 
-  // Honest reliability display (audit C4): the server measures judge-panel
-  // agreement and returns a reliability label — show THAT. Never render a
-  // numeric confidence interval until a calibrated one exists in the report.
+  // Honest panel-consistency display (audit C4, charter §7.4): the server
+  // measures judge-panel agreement and returns a label — show THAT as "AI
+  // panel consistency". Never render a numeric interval until a calibrated
+  // one exists in the report.
   const reliabilityText = {
-    high: 'High reliability',
-    moderate: 'Moderate reliability',
-    low: 'Low judge agreement — eligible for human review',
-  }[report.reliability?.label] || 'Provisional score'
+    high: 'High AI panel consistency',
+    moderate: 'Moderate AI panel consistency',
+    low: 'Low AI panel agreement — eligible for human review',
+  }[report.reliability?.label] || 'Provisional result'
 
   // Track 4.1: non-English sessions are provisional until the multilingual
   // DIF study calibrates them — the report must say so, always.
@@ -298,8 +310,14 @@ export default function ScoreReport() {
   const verifyId = sessionId || 'PSRM-DEMO'
   const displayName = userName || getUser()?.name || 'Prism Candidate'
 
-  const dims = DIMENSIONS.map((d) => ({ ...d, score: scores[d.key] ?? 0 }))
-  const radarDims = dims.map((d) => ({ label: d.label, score: d.score, color: d.color }))
+  const dims = DIMENSIONS.map((d) => ({
+    ...d,
+    score: typeof scores[d.key] === 'number' ? scores[d.key] : null,
+    insufficient: insufficientDims.includes(d.key) || typeof scores[d.key] !== 'number',
+  }))
+  // The radar plots only scored dimensions — an unscored dimension is absent,
+  // never drawn at zero (that would fabricate a value).
+  const radarDims = dims.filter((d) => !d.insufficient).map((d) => ({ label: d.label, score: d.score, color: d.color }))
 
   // Honest percentiles (audit C19): show ONLY server-computed values. Until a
   // real comparison pool exists the server returns null/0 — render an explicit
@@ -348,7 +366,8 @@ export default function ScoreReport() {
   ]
 
   const shareUrl = `${window.location.origin}/verify/${verifyId}`
-  const shareText = `I just got my Prism Score: ${scores.overall}/100 on the AI Skills Assessment by StudAI One.`
+  // Charter §6: the share line never carries the composite.
+  const shareText = 'I completed the Prism workplace-readiness assessment by StudAI One — my evidence profile is verifiable at the link.'
 
   const handleLinkedInShare = () => {
     const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}&summary=${encodeURIComponent(shareText)}`
@@ -767,31 +786,48 @@ export default function ScoreReport() {
               <div className="cert-meta-item"><Clock size={14} />30 min · Assessment Session</div>
             </div>
             <div className="cert-scores-row">
-              <div className="cert-score-hero">
-                <div className="cert-score-lbl">Overall Prism Score</div>
-                <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                  <div className="cert-score-num">{scores.overall}</div>
-                  <div className="cert-score-denom">%</div>
-                </div>
-                <div className="cert-score-tier"><Star size={14} fill="white" color="white" />{band.label} · {reliabilityText}</div>
-                {provisionalLanguage && (
-                  <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Provisional — {provisionalLanguage} scoring not yet calibrated
+              {hasComposite ? (
+                <div className="cert-score-hero">
+                  <div className="cert-score-lbl">Overall Prism Score</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                    <div className="cert-score-num">{scores.overall}</div>
+                    <div className="cert-score-denom">%</div>
                   </div>
-                )}
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '14px 20px', flexDirection: 'column' }}>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>National Percentile</div>
-                  {pctAll != null ? (
-                    <>
-                      <div className="cert-pct-num">{pctAll}<span style={{ fontSize: 18, opacity: 0.6 }}>{ordinalSuffix(pctAll)}</span></div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Top {Math.max(1, 100 - pctAll)}% nationally</div>
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', maxWidth: 140, lineHeight: 1.5 }}>Available once enough candidates have tested</div>
+                  <div className="cert-score-tier"><Star size={14} fill="white" color="white" />{band.label} · {reliabilityText}</div>
+                  {provisionalLanguage && (
+                    <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Provisional — {provisionalLanguage} scoring not yet calibrated
+                    </div>
                   )}
                 </div>
+              ) : (
+                <div className="cert-score-hero">
+                  <div className="cert-score-lbl">Evidence Profile</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.95)', maxWidth: 360, lineHeight: 1.5, marginTop: 6 }}>
+                    Five dimensions, each scored from observed behaviour in your session — no single composite number.
+                  </div>
+                  <div className="cert-score-tier"><Star size={14} fill="white" color="white" />{reliabilityText}</div>
+                  {provisionalLanguage && (
+                    <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.92)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Provisional — {provisionalLanguage} scoring not yet calibrated
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{ textAlign: 'right' }}>
+                {hasComposite && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '14px 20px', flexDirection: 'column' }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>National Percentile</div>
+                    {pctAll != null ? (
+                      <>
+                        <div className="cert-pct-num">{pctAll}<span style={{ fontSize: 18, opacity: 0.6 }}>{ordinalSuffix(pctAll)}</span></div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Top {Math.max(1, 100 - pctAll)}% nationally</div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', maxWidth: 140, lineHeight: 1.5 }}>Available once enough candidates have tested</div>
+                    )}
+                  </div>
+                )}
                 <div className="cert-validity" style={{ textAlign: 'right' }}>Valid until {validUntil} · {verifyId}</div>
               </div>
             </div>
@@ -824,12 +860,25 @@ export default function ScoreReport() {
           </div>
         </div>
 
+        {/* PILOT POSITIONING (charter §2) — rendered on every report and
+            captured into the PDF. */}
+        <div style={{ background: 'var(--s1)', border: '1px solid var(--bd)', borderRadius: 12, padding: '14px 18px', margin: '16px 0', fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
+          <span style={{ fontWeight: 700, color: 'var(--t2)' }}>Pilot notice.</span> {PILOT_NOTICE}{' '}
+          <span style={{ fontWeight: 600, color: 'var(--t2)' }}>{NOT_SOLE_BASIS_POLICY}</span>
+        </div>
+
         {/* RADAR + PERCENTILE */}
         <div className="two-col">
           <div className="radar-card">
             <div className="section-title">Skill Map</div>
             <div className="section-sub">Shape of ability across 5 dimensions</div>
-            <Radar dims={radarDims} />
+            {radarDims.length >= 3 ? (
+              <Radar dims={radarDims} />
+            ) : (
+              <div style={{ padding: '32px 16px', fontSize: 13, color: 'var(--t3)', textAlign: 'center', lineHeight: 1.6 }}>
+                Not enough scored dimensions to draw the skill map — see the dimension cards below.
+              </div>
+            )}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 12, justifyContent: 'center' }}>
               {dims.slice(0, 3).map((d) => (
                 <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--t3)' }}>
@@ -840,37 +889,49 @@ export default function ScoreReport() {
           </div>
 
           <div className="pct-card">
-            <div className="section-title">Percentile Ranking</div>
-            <div className="section-sub" style={{ marginBottom: 0 }}>Where you stand nationally</div>
+            <div className="section-title">{hasComposite ? 'Percentile Ranking' : 'How to read this profile'}</div>
+            <div className="section-sub" style={{ marginBottom: 0 }}>{hasComposite ? 'Where you stand nationally' : 'Evidence, not a ranking'}</div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 24, marginTop: 16 }}>
-              <PercentileRow label="All candidates tested" value={pctAll} />
-              <PercentileRow label="Same track" value={pctTrack} />
-              <PercentileRow label="Recent graduates" value={pctCohort} />
-              <div className="pct-bands">
-                {[
-                  { lbl: 'Developing', range: '0–49', active: scores.overall < 50 },
-                  { lbl: 'Growing', range: '50–69', active: scores.overall >= 50 && scores.overall < 70 },
-                  { lbl: 'Strong', range: '70–84', active: scores.overall >= 70 && scores.overall < 85 },
-                  { lbl: 'Exceptional', range: '85–100', active: scores.overall >= 85 },
-                ].map((b) => (
-                  <div key={b.lbl} className={`pct-band${b.active ? ' active' : ''}`}>
-                    <div className="pct-band-arrow" />
-                    <div className="pct-band-lbl">{b.lbl}</div>
-                    <div className="pct-band-range">{b.range}</div>
+              {hasComposite && (
+                <>
+                  <PercentileRow label="All candidates tested" value={pctAll} />
+                  <PercentileRow label="Same track" value={pctTrack} />
+                  <PercentileRow label="Recent graduates" value={pctCohort} />
+                  <div className="pct-bands">
+                    {[
+                      { lbl: 'Developing', range: '0–49', active: scores.overall < 50 },
+                      { lbl: 'Growing', range: '50–69', active: scores.overall >= 50 && scores.overall < 70 },
+                      { lbl: 'Strong', range: '70–84', active: scores.overall >= 70 && scores.overall < 85 },
+                      { lbl: 'Exceptional', range: '85–100', active: scores.overall >= 85 },
+                    ].map((b) => (
+                      <div key={b.lbl} className={`pct-band${b.active ? ' active' : ''}`}>
+                        <div className="pct-band-arrow" />
+                        <div className="pct-band-lbl">{b.lbl}</div>
+                        <div className="pct-band-range">{b.range}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              )}
+              {!hasComposite && (
+                <div style={{ fontSize: 13, color: 'var(--t3)', lineHeight: 1.7 }}>
+                  This report is profile-first: each dimension is scored separately from observed
+                  behaviour in your session, and no overall composite or ranking is issued.
+                  A dimension without enough evidence says “{INSUFFICIENT_EVIDENCE_LABEL}” —
+                  it is never guessed.
+                </div>
+              )}
               <div style={{ background: 'var(--s1)', border: '1px solid var(--bd)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
                 {ci ? (
                   <>
-                    <span style={{ fontWeight: 600, color: 'var(--t2)' }}>Score confidence interval:</span> {ci.low}–{ci.high} points (90% coverage target{ci.provisional ? ', provisional until first calibration study' : ''}).
+                    <span style={{ fontWeight: 600, color: 'var(--t2)' }}>AI panel variation interval:</span> {ci.low}–{ci.high} points (90% coverage target{ci.provisional ? ', provisional until first calibration study' : ''}).
                     {' '}Score is valid for {validityMonths} months from the date of assessment.
                   </>
                 ) : (
                   <>
-                    <span style={{ fontWeight: 600, color: 'var(--t2)' }}>Score reliability:</span> {reliabilityText}
+                    <span style={{ fontWeight: 600, color: 'var(--t2)' }}>AI panel consistency:</span> {reliabilityText}
                     {typeof report.reliability?.agreement === 'number' && <> · judge-panel agreement {Math.round(report.reliability.agreement * 100)}%</>}
-                    . Provisional — calibrated confidence intervals will be published after our first calibration study. Score is valid for {validityMonths} months from the date of assessment.
+                    . Provisional — calibrated variation intervals will be published after our first calibration study. Results are valid for {validityMonths} months from the date of assessment.
                   </>
                 )}
               </div>
@@ -878,7 +939,9 @@ export default function ScoreReport() {
           </div>
         </div>
 
-        {/* HOW THE OVERALL SCORE IS CALCULATED */}
+        {/* HOW THE OVERALL SCORE WAS CALCULATED — legacy reports only (charter
+            §6: new reports are profile-first and issue no composite). */}
+        {hasComposite && (
         <div className="dims-section" style={{ marginBottom: 20 }}>
           <div style={{ marginBottom: 12 }}>
             <div className="section-title" style={{ fontSize: 16 }}>How your overall score is calculated</div>
@@ -916,6 +979,7 @@ export default function ScoreReport() {
             </div>
           </div>
         </div>
+        )}
 
         {/* DIMENSION BREAKDOWN */}
         <div className="dims-section">
@@ -926,6 +990,33 @@ export default function ScoreReport() {
           <div className="dims-grid">
             {dims.map((d) => {
               const evidence = report.evidence?.[d.key] || feedback?.[d.key] || d.evidence
+              // Charter §7.2/§8: an unscored dimension is a first-class result
+              // — "Insufficient evidence", never a fabricated number or a zero.
+              if (d.insufficient) {
+                return (
+                  <div className="dim-card" key={d.key}>
+                    <div className="dim-ring" style={{ background: 'var(--s1)', borderColor: 'var(--bd)', color: 'var(--t3)' }}>
+                      <div className="dim-ring-num" style={{ fontSize: 18 }}>—</div>
+                    </div>
+                    <div className="dim-body">
+                      <div className="dim-header">
+                        <div>
+                          <div className="dim-name">{d.label}</div>
+                          <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{d.sub}</div>
+                        </div>
+                        <div className="dim-icon" style={{ background: d.iconBg }}><d.Icon size={14} color={d.color} /></div>
+                      </div>
+                      <div className="dim-evidence">
+                        <div className="dim-evidence-label">{INSUFFICIENT_EVIDENCE_LABEL}</div>
+                        <div className="dim-evidence-text">
+                          This session did not include enough standardized evidence opportunities to
+                          score this dimension, so no score is reported — a number is never guessed.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
               return (
                 <div className="dim-card" key={d.key}>
                   <div className="dim-ring" style={{ background: d.ringBg, borderColor: d.color, color: d.color }}>

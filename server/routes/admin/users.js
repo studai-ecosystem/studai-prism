@@ -71,14 +71,16 @@ router.get('/:id', requirePermission('users:read'), async (req, res) => {
 
     const sessionIds = await getSessionIdsByUser(user.id)
     const sessions = (await listSessions({ userId: user.id, page: 1, pageSize: 100 })).rows
+    // Charter §6: candidate 360° is an ordinary operational view — report rows
+    // carry completion state, never the composite.
     const reports = (await getReportsByUser(user.id)).map((r) => ({
       sessionId: r.sessionId,
-      overall: r.scores?.overall ?? null,
+      reportReady: true,
       scenario: r.scenario?.title || r.scenario || null,
       language: r.scoring?.language || 'en',
       flaggedForReview: Boolean(r.flaggedForReview),
       issuedAt: r.issuedAt || null,
-      correction: r.correction || null,
+      corrected: Boolean(r.correction),
     }))
 
     const perSession = {}
