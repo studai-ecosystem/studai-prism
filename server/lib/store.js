@@ -41,6 +41,7 @@ export const recordConsent = impl.recordConsent
 export const getConsent = impl.getConsent
 export const createDispute = impl.createDispute
 export const getDispute = impl.getDispute
+export const setDisputeResolution = impl.setDisputeResolution
 export const recordVerification = impl.recordVerification
 export const getVerification = impl.getVerification
 export const recordDeviceLink = impl.recordDeviceLink

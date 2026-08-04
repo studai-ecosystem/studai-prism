@@ -91,6 +91,26 @@ export function canTransitionDispute(from, to) {
   return Boolean(DISPUTE_TRANSITIONS[from]?.includes(to))
 }
 
+// Charter §11 — service-level MONITORING for the seven-business-day review
+// target (a target we track, never a guaranteed legal SLA). Business days =
+// Monday–Friday, no holiday calendar (a holiday-aware calendar would
+// overstate precision we don't have).
+export function businessDaysSince(fromIso, now = new Date()) {
+  const from = new Date(fromIso)
+  if (Number.isNaN(from.getTime())) return null
+  let days = 0
+  const cursor = new Date(from)
+  cursor.setHours(0, 0, 0, 0)
+  const end = new Date(now)
+  end.setHours(0, 0, 0, 0)
+  while (cursor < end) {
+    cursor.setDate(cursor.getDate() + 1)
+    const dow = cursor.getDay()
+    if (dow !== 0 && dow !== 6) days += 1
+  }
+  return days
+}
+
 // Coarse mapping to the candidate-store 3-state status (v1_disputes CHECK).
 export function coarseDisputeStatus(state) {
   if (state === 'resolved' || state === 'rejected') return 'resolved'

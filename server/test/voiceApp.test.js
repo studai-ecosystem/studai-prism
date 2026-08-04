@@ -112,7 +112,7 @@ test('APP: /api/payment/licence requires auth and reports honest store facts', a
   const reg = await fetch(`${base}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'Licence Test', email, college: 'QA', year: 'Graduated', password: 'licence-pass-1!' }),
+    body: JSON.stringify({ name: 'Licence Test', email, college: 'QA', year: 'Graduated', password: 'licence-pass-1!', ageConfirmed: true }),
   })
   assert.equal(reg.status, 201, 'registration works in the test store')
   const { token } = await reg.json()

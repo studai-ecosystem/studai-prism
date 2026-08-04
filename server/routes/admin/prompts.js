@@ -74,6 +74,13 @@ router.get('/versions/:versionId', requirePermission('prompts:read'), async (req
     )
     const version = r?.rows?.[0]
     if (!version) return res.status(404).json({ error: 'Version not found.' })
+    // Charter §18: rubric/prompt CONTENT access is role-restricted AND audited
+    // — anchor probes and scoring signals must never leak into training
+    // material through unlogged reads.
+    await adminAudit(req, {
+      action: 'prompt_content_accessed', entityType: 'prompt_version', entityId: req.params.versionId,
+      after: { name: version.name, version: version.version, language: version.language },
+    })
     res.json({ version })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_prompt_version_failed', requestId: req.requestId })

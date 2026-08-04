@@ -148,7 +148,7 @@ test('candidate auth: suspended accounts cannot sign in; token bump revokes live
   const password = 'candidate-pass-1'
 
   const reg = await request(app, 'POST', '/api/auth/register', {
-    body: { email, password, name: 'Auth Cand' },
+    body: { email, password, name: 'Auth Cand', ageConfirmed: true },
   })
   assert.equal(reg.status, 201)
   const token = reg.json.token

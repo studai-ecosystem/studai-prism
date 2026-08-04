@@ -329,6 +329,9 @@ export async function eraseTelemetry(sessionId) {
     // right-to-erasure removes it (the invite's used_count is NOT given back;
     // the seat was genuinely consumed).
     ['invite_redemptions', 'session_id'],
+    // Charter §9: the institution-verification event is governance evidence
+    // about this candidate's session — erased with it.
+    ['institution_verifications', 'session_id'],
     ['audit_log', 'session_id'],
   ]) {
     const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId]).catch(() => null)

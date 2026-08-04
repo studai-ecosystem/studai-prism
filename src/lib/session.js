@@ -64,9 +64,25 @@ async function postJSON(url, body) {
 }
 
 // Register a new account. Returns the stored profile on success.
-export async function register({ name, email, college, year, password }) {
-  const data = await postJSON('/api/auth/register', { name, email, college, year, password })
+// Charter §12: registration carries the explicit 18+ confirmation.
+export async function register({ name, email, college, year, password, ageConfirmed }) {
+  const data = await postJSON('/api/auth/register', { name, email, college, year, password, ageConfirmed })
   return persist(data.token, data.user)
+}
+
+// Charter §12: existing accounts confirm 18+ before an assessment can start.
+export async function confirmAge() {
+  const token = getToken()
+  if (!token) throw new Error('You are not signed in.')
+  const res = await fetch('/api/auth/confirm-age', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ ageConfirmed: true }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Could not record your confirmation.')
+  if (data.user) persist(token, data.user)
+  return data.user
 }
 
 // Sign in to an existing account. Returns the stored profile on success.

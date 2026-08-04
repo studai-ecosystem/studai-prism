@@ -253,7 +253,7 @@ export async function createDispute(sessionId, reason, contact) {
 }
 
 export async function getDispute(sessionId) {
-  const r = await query('SELECT session_id, reason, contact, status, at FROM v1_disputes WHERE session_id = $1', [sessionId])
+  const r = await query('SELECT session_id, reason, contact, status, at, resolution FROM v1_disputes WHERE session_id = $1', [sessionId])
   const row = r?.rows?.[0]
   if (!row) return null
   return {
@@ -262,7 +262,18 @@ export async function getDispute(sessionId) {
     contact: row.contact,
     status: row.status,
     at: row.at instanceof Date ? row.at.toISOString() : row.at,
+    ...(row.resolution ? { resolution: row.resolution } : {}),
   }
+}
+
+// Charter §11 — twin of storeJson.setDisputeResolution.
+export async function setDisputeResolution(sessionId, resolution) {
+  const r = await query(
+    'UPDATE v1_disputes SET resolution = $2 WHERE session_id = $1 RETURNING session_id',
+    [sessionId, JSON.stringify(resolution)],
+  )
+  if (!r?.rows?.length) return null
+  return getDispute(sessionId)
 }
 
 // ── Identity verification ─────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import { ShieldCheck, AlertTriangle, Loader2, BadgeCheck, ChevronDown } from 'lu
 import '../design/tokens.css'
 import { EvidenceThread, EvidenceTick, evidenceThreadStyles } from '../components/ui/EvidenceThread.jsx'
 import { ReliabilityLabel, ConfidenceBand, PendingStat } from '../components/ui/measurement.jsx'
-import { DIMENSION_LABELS, PILOT_NOTICE, NOT_SOLE_BASIS_POLICY, INSUFFICIENT_EVIDENCE_LABEL } from '../../server/lib/sharedConstants.js'
+import { DIMENSION_LABELS, PILOT_NOTICE, NOT_SOLE_BASIS_POLICY, INSUFFICIENT_EVIDENCE_LABEL, ASSURANCE_LEVELS, INTEGRITY_SCORING_NOTE } from '../../server/lib/sharedConstants.js'
 
 const DIMENSIONS = [
   { key: 'criticalThinking', label: DIMENSION_LABELS.criticalThinking },
@@ -137,6 +137,11 @@ export default function Verify() {
   const issuedStr = issued ? issued.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'
   const evidence = report.evidence || credential?.view?.evidence || {}
   const strongestDim = DIMENSIONS.reduce((a, b) => ((report.scores?.[b.key] ?? 0) > (report.scores?.[a.key] ?? 0) ? b : a), DIMENSIONS[0])
+  // Charter §9: the stated identity-assurance level, with its exact meaning.
+  const assurance = credential?.view?.identityAssurance || report.identityAssurance || null
+  const assuranceSpec = assurance ? ASSURANCE_LEVELS[assurance.level] : null
+  // Charter §10: integrity is ONLY the neutral tri-status.
+  const integrityStatus = credential?.view?.integrity?.status || null
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-paper)', color: 'var(--color-ink)', fontFamily: 'var(--font-body)', lineHeight: 'var(--leading-base)' }}>
@@ -190,6 +195,23 @@ export default function Verify() {
             <p style={{ marginTop: 'var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', lineHeight: 'var(--leading-base)' }}>
               {PILOT_NOTICE} {NOT_SOLE_BASIS_POLICY}
             </p>
+            {(assurance || integrityStatus) && (
+              <div style={{ marginTop: 'var(--space-4)', display: 'grid', gap: 'var(--space-2)' }}>
+                {assurance && (
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', lineHeight: 'var(--leading-base)' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--color-ink)' }}>Identity assurance · {assurance.label || assuranceSpec?.label}.</span>{' '}
+                    {assuranceSpec?.explanation} The signature proves issuance and integrity of this report at the stated
+                    identity-assurance level — it does not prove the candidate’s underlying ability or identity beyond that level.
+                  </p>
+                )}
+                {integrityStatus && (
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', lineHeight: 'var(--leading-base)' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--color-ink)' }}>Integrity · {integrityStatus}.</span>{' '}
+                    {INTEGRITY_SCORING_NOTE}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Dimensions */}

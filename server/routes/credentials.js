@@ -15,6 +15,7 @@ import logger from '../lib/logger.js'
 import { query, isDbConfigured } from '../db/pool.js'
 import { auditLog } from '../lib/telemetry.js'
 import { legacyAdminGuard } from '../lib/adminAuth.js'
+import { integrityStatusForSession } from '../lib/integrityStatus.js'
 import {
   isGlassBoxEnabled,
   getPublicKeyInfo,
@@ -45,6 +46,36 @@ router.get('/public-key', (_req, res) => {
   if (!info) return res.status(503).json({ error: 'credential signing not configured' })
   res.json(info)
 })
+
+// ── Charter §10: the buyer/institution-facing view of a signed bundle ────────
+// Exported for the buyer-access authorization suite. This is THE serving
+// boundary for every external verification (default AND share-token view):
+//   * integrity is limited to the three neutral statuses — raw integrity
+//     events, telemetry, gaze/typing/focus data never appear;
+//   * the identity-assurance level (§9) is stated;
+//   * transcripts are NOT here in any view — a full transcript would require
+//     separate explicit candidate authorization and no such surface exists;
+//   * full disclosure (candidate-held share token) adds ONLY the per-dimension
+//     evidence quotes and the AI judge vote records (model IDs — the glass-box
+//     policy explicitly publishes them; no human evaluator identity exists).
+// Legacy v1 bundles pass through the same boundary: their raw integrity
+// counts stay inside the signed artifact and off the wire.
+export function buildVerifyView(bundle, fullDisclosure, { integrityStatus, identityAssurance } = {}) {
+  return {
+    schema: bundle.schema,
+    sessionId: bundle.sessionId,
+    issued: bundle.issued,
+    scenario: bundle.scenario,
+    scores: bundle.scores,
+    reliability: bundle.reliability,
+    confidenceInterval: bundle.confidenceInterval,
+    identityAssurance: identityAssurance || bundle.identityAssurance || null,
+    integrity: { status: integrityStatus },
+    consent: { version: bundle.consent?.version || null },
+    provenance: bundle.provenance,
+    ...(fullDisclosure ? { evidence: bundle.evidence, judgeVotes: bundle.judgeVotes } : {}),
+  }
+}
 
 // Verification: recompute hash from the stored bundle, check the signature,
 // return the disclosure-appropriate view. Default view = scores + integrity +
@@ -77,19 +108,10 @@ router.get('/:sessionId/verify', async (req, res) => {
       credential.share_token_hash &&
       sha256(req.query.disclosure) === credential.share_token_hash
 
-    const view = {
-      schema: bundle.schema,
-      sessionId: bundle.sessionId,
-      issued: bundle.issued,
-      scenario: bundle.scenario,
-      scores: bundle.scores,
-      reliability: bundle.reliability,
-      confidenceInterval: bundle.confidenceInterval,
-      integrityEvents: bundle.integrityEvents,
-      consent: { version: bundle.consent?.version || null },
-      provenance: bundle.provenance,
-      ...(fullDisclosure ? { evidence: bundle.evidence, judgeVotes: bundle.judgeVotes } : {}),
-    }
+    // §10: integrity is the LIVE neutral tri-status (covers post-issuance
+    // invalidation and review routing) — never the raw event counts.
+    const integrityStatus = await integrityStatusForSession(req.params.sessionId, bundle)
+    const view = buildVerifyView(bundle, fullDisclosure, { integrityStatus })
 
     res.json({
       credentialId: credential.credential_id,

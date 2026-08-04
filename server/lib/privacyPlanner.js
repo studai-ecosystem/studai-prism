@@ -38,6 +38,7 @@ export const TELEMETRY_CASCADE = [
   ['teamfit_sessions', 'candidate_session_id'],
   ['team_members', 'member_session_id'],
   ['invite_redemptions', 'session_id'],
+  ['institution_verifications', 'session_id'],
   ['audit_log', 'session_id'],
 ]
 

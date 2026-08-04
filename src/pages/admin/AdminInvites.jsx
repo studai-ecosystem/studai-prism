@@ -79,7 +79,7 @@ export default function AdminInvites() {
     <div className="p-6 max-w-6xl">
       <PageHeader
         title="Group assessment invites"
-        subtitle="One link, a seat limit, a time window. Redeemed sessions are real candidates — they count for calibration.">
+        subtitle="One link, a seat limit, a time window. Redeemed sessions are real candidates — they count for calibration. Candidates must be 18+ (the platform enforces an explicit confirmation before commencement), and an invite alone is NOT institution-verified identity — Level 2 requires a recorded roster confirmation by the institution.">
         {canManage && (
           <button type="button" className={btn} onClick={() => { setCreating((v) => !v); setCreatedLink(null) }}>
             {creating ? 'Cancel' : 'Create invite link'}

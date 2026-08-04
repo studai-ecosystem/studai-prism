@@ -26,6 +26,12 @@ const isDummyPayments = () => process.env.PRISM_DUMMY_PAYMENTS === 'true'
 // only — never for certified assessments. Read lazily like the dummy flag.
 const isSkipVerification = () => process.env.PRISM_SKIP_VERIFICATION === 'true'
 
+// Charter §14 — proctoring minimization defaults: the phone second camera and
+// gaze interpretation are OFF unless their governance-gated flags are set
+// (documented buyer need + legal review; HA-005/HA-020). Read lazily.
+const isPhoneCamEnabled = () => process.env.PRISM_PROCTOR_PHONE_CAM === 'true'
+const isGazeEnabled = () => process.env.PRISM_PROCTOR_GAZE === 'true'
+
 // Validate env
 const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } = process.env
 if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
@@ -59,6 +65,10 @@ router.get('/config', (_req, res) => {
     devSessionAvailable: dummy || process.env.NODE_ENV !== 'production',
     dummyMode: dummy,
     skipVerification: isSkipVerification(),
+    // Charter §14: minimized proctoring defaults — the client reads these to
+    // decide whether the phone-camera step exists and whether gaze warnings
+    // are shown. Both default OFF.
+    proctoring: { phoneCam: isPhoneCamEnabled(), gaze: isGazeEnabled() },
   })
 })
 

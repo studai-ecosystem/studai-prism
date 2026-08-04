@@ -10,6 +10,7 @@ import { getUser, getToken } from '../lib/session.js'
 import {
   DIMENSION_WEIGHTS, DIMENSION_LABELS, DIMENSION_PUBLIC_DEFINITIONS, SCORE_VALIDITY_MONTHS,
   REASSESSMENT_DAYS, PILOT_NOTICE, NOT_SOLE_BASIS_POLICY, INSUFFICIENT_EVIDENCE_LABEL,
+  ASSURANCE_LEVELS, INTEGRITY_SCORING_NOTE,
 } from '../../server/lib/sharedConstants.js'
 
 // ── Dimension config — single measurement accent (design-system LAW: the
@@ -861,10 +862,18 @@ export default function ScoreReport() {
         </div>
 
         {/* PILOT POSITIONING (charter §2) — rendered on every report and
-            captured into the PDF. */}
+            captured into the PDF. Charter §9: new reports also state their
+            identity-assurance level; §14: integrity/scoring separation. */}
         <div style={{ background: 'var(--s1)', border: '1px solid var(--bd)', borderRadius: 12, padding: '14px 18px', margin: '16px 0', fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
           <span style={{ fontWeight: 700, color: 'var(--t2)' }}>Pilot notice.</span> {PILOT_NOTICE}{' '}
           <span style={{ fontWeight: 600, color: 'var(--t2)' }}>{NOT_SOLE_BASIS_POLICY}</span>
+          {report.identityAssurance && (
+            <>
+              {' '}<span style={{ fontWeight: 700, color: 'var(--t2)' }}>Identity assurance · {report.identityAssurance.label}.</span>{' '}
+              {ASSURANCE_LEVELS[report.identityAssurance.level]?.explanation}
+            </>
+          )}
+          {' '}{INTEGRITY_SCORING_NOTE}
         </div>
 
         {/* RADAR + PERCENTILE */}
@@ -1093,8 +1102,11 @@ export default function ScoreReport() {
         <div className="share-card no-print">
           <div className="share-hdr">
             <div>
-              <div className="share-title">Share your Prism Score</div>
-              <div className="share-sub">Your score is verified and shareable. Employers can check authenticity at the verification link.</div>
+              <div className="share-title">Share your Prism report</div>
+              <div className="share-sub">
+                Your report is verified and shareable. Employers can check authenticity at the verification link.
+                {' '}<a href={`/verify/${verifyId}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--pr)', fontWeight: 600 }}>Preview exactly what a recipient will see →</a>
+              </div>
             </div>
             <span className="verified-badge"><CheckCircle2 size={13} />Verified</span>
           </div>

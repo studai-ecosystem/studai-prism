@@ -18,10 +18,15 @@ import logger from '../../lib/logger.js'
 import { query } from '../../db/pool.js'
 import { requirePermission } from '../../lib/adminAuth.js'
 import { adminAudit } from '../../lib/adminAudit.js'
+import { auditLog } from '../../lib/telemetry.js'
 import {
-  DISPUTE_STATES, DISPUTE_TRANSITIONS, canTransitionDispute, coarseDisputeStatus,
+  DISPUTE_STATES, DISPUTE_TRANSITIONS, canTransitionDispute, coarseDisputeStatus, businessDaysSince,
 } from '../../lib/adminProduct.js'
-import { listDisputes, getDispute, setDisputeStatus, getReport, getEvents } from '../../lib/store.js'
+import { REVIEW_OUTCOMES, REVIEW_TARGET_BUSINESS_DAYS } from '../../lib/sharedConstants.js'
+import { toOperationalReport } from '../../lib/reportPolicy.js'
+import { loadPromptJson } from '../../engine/prompts.js'
+import { getLatestCredential, revokeCredential } from '../../lib/credentials.js'
+import { listDisputes, getDispute, setDisputeStatus, setDisputeResolution, getReport, getEvents, createEntitlement } from '../../lib/store.js'
 
 const router = Router()
 
@@ -56,9 +61,26 @@ router.get('/', requirePermission('disputes:read'), async (req, res) => {
     const { status, state, page, pageSize } = req.query
     const result = await listDisputes({ status: status ? String(status) : undefined, page, pageSize })
     const workflow = await workflowFor(result.rows.map((d) => d.sessionId))
-    let rows = result.rows.map((d) => ({ ...d, workflow: workflow[d.sessionId] || { state: 'open' } }))
+    // Charter §11: seven-business-day decision-target MONITORING (a target we
+    // track — not a guaranteed legal SLA).
+    let rows = result.rows.map((d) => {
+      const w = workflow[d.sessionId] || { state: 'open' }
+      const terminal = w.state === 'resolved' || w.state === 'rejected'
+      const ageBusinessDays = terminal ? null : businessDaysSince(d.at)
+      return {
+        ...d,
+        workflow: w,
+        ageBusinessDays,
+        overdue: typeof ageBusinessDays === 'number' && ageBusinessDays > REVIEW_TARGET_BUSINESS_DAYS,
+      }
+    })
     if (state) rows = rows.filter((d) => d.workflow.state === String(state))
-    res.json({ ...result, rows, states: DISPUTE_STATES })
+    res.json({
+      ...result,
+      rows,
+      states: DISPUTE_STATES,
+      reviewTarget: { businessDays: REVIEW_TARGET_BUSINESS_DAYS, note: 'decision target we monitor — not a guaranteed legal SLA' },
+    })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_disputes_list_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Internal server error' })
@@ -207,6 +229,151 @@ router.post('/:sessionId/notes', requirePermission('notes:write'), async (req, r
     res.status(201).json({ ok: true, noteId })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_dispute_note_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ── Blinded review packet (charter §11) ──────────────────────────────────────
+// Reviewers are blinded to unnecessary identity: the packet carries ONLY the
+// identity-scrubbed transcript (§5 blinded turns), the rubric, the evidence,
+// the administration context and the system output required for the review —
+// never the candidate's name, email or account details. Assembly is audited.
+router.get('/:sessionId/review-packet', requirePermission('disputes:manage'), async (req, res) => {
+  try {
+    const sid = req.params.sessionId
+    const dispute = await getDispute(sid)
+    if (!dispute) return res.status(404).json({ error: 'Dispute not found.' })
+    const report = await getReport(sid)
+    if (!report) return res.status(404).json({ error: 'No report for this session.' })
+
+    const transcript = await query(
+      'SELECT turns, scenario_key, is_synthetic FROM session_transcripts WHERE session_id = $1',
+      [sid],
+    ).then((r) => r?.rows?.[0] || null).catch(() => null)
+    const timeline = await query(
+      'SELECT scenario_key, scale_version, consent_version, flags_active, language FROM assessment_timeline WHERE session_id = $1',
+      [sid],
+    ).then((r) => r?.rows?.[0] || null).catch(() => null)
+
+    const ops = toOperationalReport(report)
+    await adminAudit(req, { action: 'review_packet_assembled', entityType: 'dispute', entityId: sid })
+    auditLog('review_packet_assembled', sid, { by: 'admin_console' })
+    res.json({
+      note: 'BLINDED review packet — no candidate identity. Integrity signals never change capability scores.',
+      candidateStatement: { reason: dispute.reason, at: dispute.at },
+      transcript: transcript?.turns || null,
+      rubric: loadPromptJson('dimension_rubric.v1'),
+      administration: timeline ? {
+        scenarioKey: timeline.scenario_key,
+        scaleVersion: timeline.scale_version,
+        consentVersion: timeline.consent_version,
+        flagsActive: timeline.flags_active,
+        language: timeline.language,
+      } : { scenario: report.scenario || null, language: report.scoring?.language || 'en' },
+      systemOutput: {
+        scores: ops.scores || null,
+        insufficientEvidence: ops.insufficientEvidence || [],
+        evidence: report.evidence || null,
+        feedback: report.feedback || null,
+        highlights: report.highlights || [],
+        growthAreas: report.growthAreas || [],
+        reliability: report.reliability || null,
+      },
+    })
+  } catch (err) {
+    logger.captureException(err, { msg: 'admin_dispute_packet_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ── Decide (charter §11) ─────────────────────────────────────────────────────
+// The four review outcomes. Every decision writes immutable audit rows and a
+// candidate-READABLE explanation (private reviewer reasoning stays in notes).
+//   upheld                    — report stands as issued.
+//   invalidated_reassessment  — session invalidated; a FREE reassessment
+//                               entitlement (mode 'review_grant') is minted and
+//                               any active credential is revoked so every
+//                               shared verification link shows the change.
+//   superseded                — decision recorded here; the corrected report
+//                               itself goes through the dual-approved
+//                               supersession workflow (reports plane), which
+//                               reissues the credential chain.
+//   second_review             — routed back for another blinded review cycle.
+router.post('/:sessionId/decide', requirePermission('disputes:manage'), async (req, res) => {
+  try {
+    const sid = req.params.sessionId
+    const { outcome, explanation, reason } = req.body || {}
+    if (!Object.hasOwn(REVIEW_OUTCOMES, String(outcome || ''))) {
+      return res.status(400).json({ error: `outcome must be one of: ${Object.keys(REVIEW_OUTCOMES).join(', ')}` })
+    }
+    if (!explanation || String(explanation).trim().length < 20) {
+      return res.status(400).json({ error: 'A candidate-readable explanation (>= 20 characters) is required.' })
+    }
+    const dispute = await getDispute(sid)
+    if (!dispute) return res.status(404).json({ error: 'Dispute not found.' })
+    if (dispute.resolution) {
+      return res.status(409).json({ error: 'This review has already been decided.', code: 'ALREADY_DECIDED' })
+    }
+
+    const secondReview = outcome === 'second_review'
+    const nextState = secondReview ? 'human_review' : 'resolved'
+    await query(
+      `INSERT INTO admin_dispute_workflow (session_id, state, decision, decided_by, decided_at, updated_at)
+       VALUES ($1,$2,$3,$4,CASE WHEN $5 THEN now() ELSE NULL END,now())
+       ON CONFLICT (session_id) DO UPDATE SET
+         state = $2,
+         decision = $3,
+         decided_by = CASE WHEN $5 THEN $4 ELSE admin_dispute_workflow.decided_by END,
+         decided_at = CASE WHEN $5 THEN now() ELSE admin_dispute_workflow.decided_at END,
+         updated_at = now()`,
+      [sid, nextState, `${outcome}: ${String(explanation).trim()}`, req.admin.id, !secondReview],
+    ).catch(() => null)
+
+    let reassessmentSessionId = null
+    let credentialRevoked = false
+    if (outcome === 'invalidated_reassessment') {
+      // Free reassessment — a REAL candidate mode (calibration-eligible).
+      reassessmentSessionId = randomUUID()
+      await createEntitlement({ sessionId: reassessmentSessionId, mode: 'review_grant', amount: 0 })
+      // §11: previously shared verification links must show the change —
+      // revoking the credential turns every share/verify surface into an
+      // explicit 'revoked' verdict (the notification mechanism link-holders see).
+      const credential = await getLatestCredential(sid).catch(() => null)
+      if (credential && credential.status === 'active') {
+        credentialRevoked = Boolean(await revokeCredential(credential.credential_id, 'assessment invalidated after human review'))
+      }
+    }
+
+    if (!secondReview) {
+      // Candidate-readable outcome (never private reviewer reasoning).
+      await setDisputeResolution(sid, {
+        outcome,
+        outcomeLabel: REVIEW_OUTCOMES[outcome],
+        explanation: String(explanation).trim().slice(0, 2000),
+        decidedAt: new Date().toISOString(),
+        ...(reassessmentSessionId ? { reassessmentSessionId } : {}),
+      })
+      await setDisputeStatus(sid, 'resolved').catch(() => null)
+    } else {
+      await setDisputeStatus(sid, 'in_review').catch(() => null)
+    }
+
+    // Immutable decision trail — assessment audit_log AND admin plane.
+    auditLog('review_decision', sid, {
+      outcome,
+      by: 'admin_console',
+      reassessmentSessionId,
+      credentialRevoked,
+    })
+    await adminAudit(req, {
+      action: 'review_decided', entityType: 'dispute', entityId: sid,
+      after: { outcome, reassessmentSessionId, credentialRevoked },
+      reason: reason || String(explanation).trim().slice(0, 200),
+    })
+
+    res.json({ ok: true, outcome, state: nextState, reassessmentSessionId, credentialRevoked })
+  } catch (err) {
+    logger.captureException(err, { msg: 'admin_dispute_decide_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Internal server error' })
   }
 })

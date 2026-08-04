@@ -209,7 +209,11 @@ export default function VerifyIdentity() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Could not record verification.')
       }
-      navigate(`/link-phone?session=${sessionId}`)
+      // Charter §14: the phone second camera is OFF by default — the link-phone
+      // step exists only when the governance-gated flag enables it.
+      const cfg = await fetch('/api/payment/config').then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      const nextStep = cfg?.proctoring?.phoneCam ? 'link-phone' : 'room-scan'
+      navigate(`/${nextStep}?session=${sessionId}`)
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.')
     } finally {
@@ -290,7 +294,7 @@ export default function VerifyIdentity() {
             {import.meta.env.DEV && (
               <button
                 type="button"
-                onClick={() => navigate(`/link-phone?session=${sessionId}`)}
+                onClick={() => navigate(`/room-scan?session=${sessionId}`)}
                 className="w-full text-center font-sans text-xs font-semibold text-[var(--color-accent)] hover:underline"
               >
                 Skip verification (dev only) →

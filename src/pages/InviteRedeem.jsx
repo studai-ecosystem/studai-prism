@@ -55,6 +55,9 @@ export default function InviteRedeem() {
           You have been invited to take a Prism assessment — a 30-minute working
           conversation, scored with evidence you can verify.
         </p>
+        <p className="mt-2 text-[12px] text-[var(--color-ink-muted)]">
+          Prism is currently available to candidates aged 18 or older.
+        </p>
 
         {error && (
           <p className="mt-4 text-[14px] text-[var(--color-danger)]">{error}</p>

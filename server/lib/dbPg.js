@@ -17,6 +17,7 @@ function rowToUser(row) {
     candidateId: row.candidate_id || null,
     accountState: row.account_state || 'active',
     tokenVersion: row.token_version != null ? Number(row.token_version) : 0,
+    ageDeclaration: row.age_declaration || null,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
   }
 }
@@ -43,14 +44,29 @@ export async function createUser(user) {
     college: user.college || '',
     year: user.year || '',
     passwordHash: user.passwordHash,
+    ageDeclaration: user.ageDeclaration || null,
     createdAt: new Date().toISOString(),
   }
   await query(
-    `INSERT INTO v1_users (id, email, name, college, year, password_hash, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [record.id, record.email, record.name, record.college, record.year, record.passwordHash, record.createdAt],
+    `INSERT INTO v1_users (id, email, name, college, year, password_hash, age_declaration, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [record.id, record.email, record.name, record.college, record.year, record.passwordHash, record.ageDeclaration ? JSON.stringify(record.ageDeclaration) : null, record.createdAt],
   )
   return record
+}
+
+// Charter §12 — twin of dbJson.recordAgeDeclaration (write-once).
+export async function recordAgeDeclaration(id, declaration) {
+  const user = await findUserById(id)
+  if (!user) throw new Error('USER_NOT_FOUND')
+  if (!user.ageDeclaration) {
+    await query(
+      'UPDATE v1_users SET age_declaration = $2 WHERE id = $1 AND age_declaration IS NULL',
+      [id, JSON.stringify(declaration)],
+    )
+    user.ageDeclaration = declaration
+  }
+  return user
 }
 
 export async function updateUser(id, fields) {
@@ -77,7 +93,11 @@ export async function updateUser(id, fields) {
 export function publicUser(user) {
   if (!user) return null
   const { id, email, name, college, year, createdAt } = user
-  return { id, email, name, college, year, createdAt }
+  return {
+    id, email, name, college, year, createdAt,
+    ageConfirmed: Boolean(user.ageDeclaration),
+    ageDeclarationVersion: user.ageDeclaration?.version || null,
+  }
 }
 
 // Admin Control Centre: aggregate counts only (no records leave the store).

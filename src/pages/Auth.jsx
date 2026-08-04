@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShieldCheck, Loader2 } from 'lucide-react'
 import { login, register, isAuthenticated } from '../lib/session.js'
+import { AGE_DECLARATION_TEXT } from '../../server/lib/sharedConstants.js'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional']
@@ -30,6 +31,7 @@ export default function Auth() {
   const isRegister = pathname !== '/login'
 
   const [form, setForm] = useState({ name: '', email: '', college: '', year: '', password: '' })
+  const [ageConfirmed, setAgeConfirmed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -61,6 +63,12 @@ export default function Auth() {
       setError('Please fill in all fields to register.')
       return
     }
+    // Charter §12: the pilot serves candidates aged 18+ — an explicit
+    // confirmation, not Terms fine print. No date of birth is collected.
+    if (isRegister && !ageConfirmed) {
+      setError('Please confirm that you are 18 or older — Prism is currently available to adult candidates only.')
+      return
+    }
 
     setSubmitting(true)
     const action = isRegister
@@ -70,6 +78,7 @@ export default function Auth() {
           college: form.college,
           year: form.year,
           password: form.password,
+          ageConfirmed,
         })
       : login({ email: form.email, password: form.password })
 
@@ -175,6 +184,20 @@ export default function Auth() {
             </AnimatePresence>
 
             <Field label="Password" type="password" value={form.password} onChange={update('password')} placeholder="••••••••" autoComplete={isRegister ? 'new-password' : 'current-password'} />
+
+            {isRegister && (
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={ageConfirmed}
+                  onChange={(e) => setAgeConfirmed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+                />
+                <span className="font-sans text-xs text-[var(--color-ink-muted)] leading-relaxed">
+                  {AGE_DECLARATION_TEXT} Prism is currently available to candidates aged 18 or older.
+                </span>
+              </label>
+            )}
 
             {error && (
               <p className="font-sans text-sm text-[var(--color-danger)] text-center">{error}</p>

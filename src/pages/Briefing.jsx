@@ -4,13 +4,17 @@ import { motion } from 'framer-motion'
 import { ShieldCheck, MonitorX, Clock, Copy, Eye, Camera, Check, MonitorDown } from 'lucide-react'
 import { CHARACTERS, CharacterAvatar } from '../lib/characters.jsx'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
-import { CONSENT_VERSION } from '../../server/lib/sharedConstants.js'
+import { getToken, confirmAge } from '../lib/session.js'
+import { CONSENT_VERSION, AGE_DECLARATION_TEXT } from '../../server/lib/sharedConstants.js'
 
+// Charter §14 — proctoring is DISCLOSED monitoring, not threatened enforcement.
+// Integrity signals never change capability scores; they can only route a
+// session to human review.
 const RULES = [
-  { icon: MonitorX, text: 'Do not switch tabs or close this window' },
+  { icon: MonitorX, text: 'Tab switches, window changes and fullscreen exits are recorded as integrity signals — they never change your scores' },
   { icon: Clock, text: 'You have 30 minutes — the timer cannot be paused' },
   { icon: Camera, text: 'Keep your camera on if prompted' },
-  { icon: Copy, text: 'No right-click, copy, or paste' },
+  { icon: Copy, text: 'Copy and paste attempts are recorded as integrity signals' },
   { icon: Eye, text: 'This is your performance — not a research exercise' },
 ]
 
@@ -46,6 +50,10 @@ export default function Briefing() {
   const [calibrationAnswer, setCalibrationAnswer] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  // Charter §12: accounts registered before the age gate confirm 18+ here —
+  // the server blocks /start without the declaration on file.
+  const [needsAgeConfirm, setNeedsAgeConfirm] = useState(false)
+  const [ageChecked, setAgeChecked] = useState(false)
   const [filter, setFilter] = useState('all') // 'all' | 'male' | 'female'
   const [shaking, setShaking] = useState(false)
   // Track 4.1 — assessment language (selector shows only when PRISM_LANG on).
@@ -81,6 +89,14 @@ export default function Briefing() {
       .then((r) => (r.ok ? r.json() : { enabled: false, languages: [] }))
       .then((d) => { if (!cancelled && d.enabled) setLanguages(d.languages) })
       .catch(() => {})
+    // §12: does the signed-in account already carry the 18+ declaration?
+    const token = getToken()
+    if (token) {
+      fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (!cancelled && d?.user && d.user.ageConfirmed === false) setNeedsAgeConfirm(true) })
+        .catch(() => {})
+    }
     return () => { cancelled = true }
   }, [])
 
@@ -144,11 +160,21 @@ export default function Briefing() {
       setSubmitError('Please accept all consent items to continue.')
       return
     }
+    if (needsAgeConfirm && !ageChecked) {
+      setSubmitError('Please confirm that you are 18 or older — Prism is currently available to adult candidates only.')
+      return
+    }
 
     localStorage.setItem('prismCharacter', JSON.stringify(selectedCharacter))
     setSubmitting(true)
     setSubmitError('')
     try {
+      // §12: record the explicit 18+ declaration before anything else — the
+      // server refuses assessment commencement without it.
+      if (needsAgeConfirm && ageChecked) {
+        await confirmAge()
+        setNeedsAgeConfirm(false)
+      }
       // Record affirmative consent (required) and run difficulty calibration
       // (best-effort) before entering the closed assessment surface.
       const consentRes = await fetch('/api/assessment/consent', {
@@ -520,6 +546,27 @@ export default function Briefing() {
                   </button>
                 ))}
               </div>
+              {needsAgeConfirm && (
+                <button
+                  type="button"
+                  onClick={() => setAgeChecked((v) => !v)}
+                  className="mt-3 flex gap-3 items-start text-left p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-line)] hover:border-[var(--color-accent)]/50 transition-colors w-full"
+                  aria-pressed={ageChecked}
+                >
+                  <span
+                    className="mt-0.5 shrink-0 flex items-center justify-center w-5 h-5 rounded-md transition-colors"
+                    style={{
+                      backgroundColor: ageChecked ? 'var(--color-accent)' : 'transparent',
+                      border: `1.5px solid ${ageChecked ? 'var(--color-accent)' : 'var(--color-line)'}`,
+                    }}
+                  >
+                    {ageChecked && <Check size={13} className="text-[var(--color-surface)]" strokeWidth={3} />}
+                  </span>
+                  <span className="font-sans text-[13px] text-[var(--color-ink)] leading-relaxed">
+                    {AGE_DECLARATION_TEXT} Prism is currently available to candidates aged 18 or older.
+                  </span>
+                </button>
+              )}
             </>
           )}
 
@@ -531,7 +578,7 @@ export default function Briefing() {
 
           <div className="relative group/btn">
             {(() => {
-              const canEnter = !!userName.trim() && !!selectedCharacter && (!sessionId || allConsented) && !submitting
+              const canEnter = !!userName.trim() && !!selectedCharacter && (!sessionId || allConsented) && (!needsAgeConfirm || ageChecked) && !submitting
               return (
                 <>
                   <motion.button

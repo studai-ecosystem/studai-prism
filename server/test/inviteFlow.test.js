@@ -31,7 +31,7 @@ async function registerUser() {
   const res = await fetch(`${base}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: 'invite-pass-1', name: 'Invitee' }),
+    body: JSON.stringify({ email, password: 'invite-pass-1', name: 'Invitee', ageConfirmed: true }),
   })
   assert.equal(res.status, 201)
   return (await res.json()).token

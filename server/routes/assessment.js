@@ -47,10 +47,12 @@ import { aggregateSamples } from '../lib/scoreAggregator.js'
 import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession, recordTimelineEntry, activeFlagSnapshot, eraseTelemetry, recordSessionTranscript, summarizeSessionBehavior, recordBehavioralFeatures, isDbConfigured as telemetryDbConfigured } from '../lib/telemetry.js'
 import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, SCALE_VERSION, REAL_ENTITLEMENT_MODES } from '../lib/sharedConstants.js'
 import { getJwtSecret } from '../lib/security.js'
+import { findUserById } from '../lib/db.js'
 import { ensureCandidateId } from '../lib/identity.js'
 import { configuredGapDays, reassessmentBlock } from '../lib/eligibility.js'
 import { assignSteeringArm } from '../lib/studies.js'
 import { isGlassBoxEnabled, issueCredential } from '../lib/credentials.js'
+import { assuranceForSession } from '../lib/identityAssurance.js'
 import { isExecutiveEnabled, isEarlyStopEnabled } from '../engine/executiveConfig.js'
 import { isStandardizedCoreEnabled, anchorDueForExchange, appendAnchorProbe, evaluateEvidenceSufficiency } from '../engine/anchorProbes.js'
 import { compositeOf, finalizeReportForIssuance, toExternalReport } from '../lib/reportPolicy.js'
@@ -578,6 +580,25 @@ router.post('/start', async (req, res) => {
   // Avoid serving a scenario this signed-in user has already seen, so repeat
   // attempts get a fresh problem statement.
   const authUser = getAuthUser(req)
+
+  // Charter §12: assessment commencement requires the explicit, version-
+  // stamped 18+ declaration on the account. This is the hard gate covering
+  // EVERY entitlement route (paid, invite, coupon, granted) — real candidates
+  // are always signed in. Anonymous sessions exist only on dev/trial paths
+  // (mode dummy/dev → synthetic) and are audited as such.
+  if (authUser) {
+    const account = await findUserById(authUser.id).catch(() => null)
+    if (!account?.ageDeclaration) {
+      auditLog('age_gate', sessionId, { declared: false, blocked: true })
+      return res.status(403).json({
+        error: 'Please confirm that you are 18 or older before starting your assessment.',
+        code: 'AGE_CONFIRMATION_REQUIRED',
+      })
+    }
+    auditLog('age_gate', sessionId, { declared: true, version: account.ageDeclaration.version })
+  } else {
+    auditLog('age_gate', sessionId, { declared: false, anonymous: true, note: 'no account — dev/trial session path' })
+  }
 
   // Track 0.1: durable pseudonymous candidate id (minted on first assessment).
   const candidateId = authUser ? await ensureCandidateId(authUser.id) : null
@@ -1391,6 +1412,15 @@ async function runEvaluation({ sessionId, session, requestId }) {
       weightsRenormalized: report.composite.weightsRenormalized,
     })
 
+    // Charter §9: every new report states its identity-assurance level.
+    // L3 stays feature-gated (PRISM_IDENTITY_L3, HA-007); an invite alone is
+    // never institution-verified — L2 needs the recorded verification event.
+    report.identityAssurance = await assuranceForSession(sessionId)
+    auditLog('identity_assurance_stamped', sessionId, {
+      level: report.identityAssurance.level,
+      basis: report.identityAssurance.basis,
+    })
+
     // Link the report to the signed-in user so it appears in their profile
     // history. Falls back to the durable session record (survives restarts).
     const persisted = await getSession(sessionId)
@@ -1665,6 +1695,12 @@ router.post('/event', async (req, res) => {
   if (!sessionId || !type) return res.status(400).json({ error: 'sessionId and type required' })
   const allowed = ['tab_switch', 'screenshot_attempt', 'fullscreen_exit', 'paste', 'room_scan_complete', 'face_absent', 'multiple_faces', 'looking_away', 'display_mode', 'app_blur']
   if (!allowed.includes(type)) return res.status(400).json({ error: 'Unknown event type' })
+  // Charter §14: gaze interpretation is OFF by default. When the governance
+  // flag is dark, looking_away events are accepted-and-dropped (the client
+  // stays happy, nothing is recorded — gaze telemetry does not exist).
+  if (type === 'looking_away' && process.env.PRISM_PROCTOR_GAZE !== 'true') {
+    return res.json({ ok: true, recorded: false })
+  }
   try {
     // Auth (audit C9): proctor integrity events are score-adjacent evidence —
     // they must not be injectable for arbitrary sessions. The session must
@@ -1990,6 +2026,8 @@ router.post('/consent', async (req, res) => {
 
 // ── POST /api/assessment/dispute ─────────────────────────────────────────────
 // Score dispute / human-review pathway. Requires a finalised report to exist.
+// Charter §11: ONE free human review per assessment — a second request after a
+// completed review is refused; re-posting while a review is open is idempotent.
 router.post('/dispute', async (req, res) => {
   const { sessionId, reason, contact } = req.body || {}
   if (!sessionId) return res.status(400).json({ error: 'sessionId required' })
@@ -2001,7 +2039,19 @@ router.post('/dispute', async (req, res) => {
     return res.status(404).json({ error: 'No completed assessment found for this session.' })
   }
   try {
+    const existing = await getDispute(sessionId)
+    if (existing) {
+      if (existing.resolution || existing.status === 'resolved') {
+        auditLog('review_request_refused', sessionId, { reason: 'free review already used' })
+        return res.status(409).json({
+          error: 'Your free human review for this assessment has already been completed.',
+          code: 'REVIEW_ALREADY_USED',
+        })
+      }
+      return res.json({ ok: true, status: existing.status, message: 'Your review request is already in progress.' })
+    }
     const dispute = await createDispute(sessionId, String(reason).slice(0, 2000), contact || null)
+    auditLog('review_requested', sessionId, { free: true })
     res.json({ ok: true, status: dispute.status, message: 'Your request has been submitted for human review.' })
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_dispute_failed', requestId: req.requestId })
@@ -2010,10 +2060,16 @@ router.post('/dispute', async (req, res) => {
 })
 
 // ── GET /api/assessment/dispute/:sessionId ───────────────────────────────────
+// Charter §11: the candidate receives a READABLE explanation of the outcome —
+// never the private reviewer reasoning.
 router.get('/dispute/:sessionId', async (req, res) => {
   const dispute = await getDispute(req.params.sessionId)
   if (!dispute) return res.status(404).json({ error: 'No dispute found' })
-  res.json({ status: dispute.status, at: dispute.at })
+  res.json({
+    status: dispute.status,
+    at: dispute.at,
+    ...(dispute.resolution ? { resolution: dispute.resolution } : {}),
+  })
 })
 
 // ── DELETE /api/assessment/data/:sessionId ───────────────────────────────────

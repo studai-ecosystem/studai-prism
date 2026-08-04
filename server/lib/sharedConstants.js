@@ -104,8 +104,61 @@ export const SCALE_VERSION = 'prism-scale-v1'
 
 // Entitlement modes whose sessions are REAL candidates (calibration-eligible).
 // 'paid' = direct purchase; 'invite' = admin-issued group assessment link
-// (college cohorts). Everything else (dummy/dev/admin_grant) stays synthetic.
-export const REAL_ENTITLEMENT_MODES = ['paid', 'invite']
+// (college cohorts); 'review_grant' = free reassessment granted after a human
+// review invalidated an assessment (charter §11 — still a real candidate).
+// Everything else (dummy/dev/admin_grant) stays synthetic.
+export const REAL_ENTITLEMENT_MODES = ['paid', 'invite', 'review_grant']
+
+// ── Charter §12: age gating ───────────────────────────────────────────────────
+// The pilot serves candidates aged 18+. The declaration is an explicit,
+// version-stamped confirmation (audited via the stored record + the /start
+// commencement audit row) — NOT a date of birth; none is collected for gating.
+export const AGE_DECLARATION_VERSION = 'age-18plus-v1'
+export const AGE_DECLARATION_TEXT =
+  'I confirm that I am 18 years of age or older.'
+
+// ── Charter §9: identity-assurance levels ────────────────────────────────────
+// Every NEW report and credential states its level; verification surfaces
+// explain exactly what the level means. Level 3 stays feature-gated
+// (PRISM_IDENTITY_L3, default off) pending legal/privacy approval (HA-007).
+export const ASSURANCE_LEVELS = {
+  L1: {
+    label: 'Level 1 — Self-declared',
+    explanation: 'Identity is based on the candidate account, a verified email where applicable, and candidate-entered details. It has not been independently confirmed.',
+  },
+  L2: {
+    label: 'Level 2 — Institution-verified',
+    explanation: 'The candidate\u2019s identity or enrolment was confirmed by an authorized institution through a recorded verification event (cohort roster or institutional workflow). Possessing an invite link alone does not meet this level.',
+  },
+  L3: {
+    label: 'Level 3 — Identity-verified',
+    explanation: 'Identity was verified through an approved identity-verification workflow. This level is issued only where that workflow has documented legal approval.',
+  },
+}
+
+// ── Charter §10: neutral integrity vocabulary ────────────────────────────────
+// The ONLY integrity statuses any buyer-facing surface may carry. Raw
+// integrity events and telemetry never leave the platform.
+export const INTEGRITY_STATUSES = {
+  met: 'Assessment conditions met',
+  review: 'Review recommended',
+  invalidated: 'Session invalidated',
+}
+// Rendered wherever an integrity status appears (§14: integrity and scoring
+// are separate concerns).
+export const INTEGRITY_SCORING_NOTE =
+  'Integrity signals do not affect capability scores; they can only route a session to human review.'
+
+// ── Charter §11: human-review outcomes ───────────────────────────────────────
+export const REVIEW_OUTCOMES = {
+  upheld: 'Report upheld',
+  invalidated_reassessment: 'Assessment invalidated — free reassessment granted',
+  superseded: 'Formally superseding report issued',
+  second_review: 'Referred for a second review',
+}
+// Monitoring target for review decisions — a target we track, NOT a
+// guaranteed legal SLA (§11).
+export const REVIEW_TARGET_BUSINESS_DAYS = 7
 
 // Consent copy version. Bump whenever the wording or scope set in
 // src/pages/Briefing.jsx CONSENT_ITEMS changes; recorded with every consent

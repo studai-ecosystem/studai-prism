@@ -21,6 +21,7 @@ import { createHash, createPrivateKey, createPublicKey, sign as edSign, verify a
 import { query, isDbConfigured } from '../db/pool.js'
 import { getReport, getEvents, getConsent, getSession } from './store.js'
 import { DIMENSION_KEYS, SCALE_VERSION, SCORE_VALIDITY_MONTHS, CONSENT_VERSION } from './sharedConstants.js'
+import { assuranceForSession } from './identityAssurance.js'
 import { activeFlagSnapshot } from './telemetry.js'
 import { assertJudgeAnchoredForIssuance } from './modelDrift.js'
 import logger from './logger.js'
@@ -142,6 +143,10 @@ export async function assembleEvidenceBundle(sessionId) {
     },
     scenario: report.scenario || null,
     scores: buildBundleScores(report),
+    // Charter §9: every new credential states its identity-assurance level.
+    // Reports stamped at issuance carry it; a legacy report credentialled
+    // today gets the level derived live from the same records.
+    identityAssurance: report.identityAssurance || await assuranceForSession(sessionId),
     reliability: report.reliability || null,
     confidenceInterval: report.confidenceInterval || null,
     evidence: report.evidence || null, // per-dimension transcript quotes (disclosure-gated at the API)

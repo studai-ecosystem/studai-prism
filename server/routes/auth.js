@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import logger from '../lib/logger.js'
 import { getJwtSecret } from '../lib/security.js'
-import { findUserByEmail, findUserById, createUser, updateUser, updateUserAccount, publicUser } from '../lib/db.js'
+import { findUserByEmail, findUserById, createUser, updateUser, updateUserAccount, publicUser, recordAgeDeclaration } from '../lib/db.js'
+import { AGE_DECLARATION_VERSION } from '../lib/sharedConstants.js'
 
 const router = Router()
 
@@ -33,7 +34,7 @@ function tokenVersionValid(payload, user) {
 // ── POST /api/auth/register ──────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, college, year, password } = req.body || {}
+    const { name, email, college, year, password, ageConfirmed } = req.body || {}
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' })
@@ -44,12 +45,29 @@ router.post('/register', async (req, res) => {
     if (String(password).length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters.' })
     }
+    // Charter §12: the pilot serves candidates aged 18+. Registration requires
+    // an explicit, version-stamped confirmation — not Terms fine print. The
+    // under-18 path stays feature-gated OFF (PRISM_UNDER18_PATH) pending the
+    // guardian-consent decision (HA-006). No date of birth is collected.
+    if (ageConfirmed !== true) {
+      return res.status(400).json({
+        error: 'Prism is currently available to candidates aged 18 or older. Please confirm your age to register.',
+        code: 'AGE_CONFIRMATION_REQUIRED',
+      })
+    }
 
     const passwordHash = await bcrypt.hash(String(password), 10)
 
     let user
     try {
-      user = await createUser({ name, email, college, year, passwordHash })
+      user = await createUser({
+        name, email, college, year, passwordHash,
+        ageDeclaration: {
+          version: AGE_DECLARATION_VERSION,
+          at: new Date().toISOString(),
+          meta: { ip: req.ip, userAgent: req.get('user-agent') || '' },
+        },
+      })
     } catch (err) {
       if (err.message === 'EMAIL_TAKEN') {
         return res.status(409).json({ error: 'An account with this email already exists.' })
@@ -62,6 +80,40 @@ router.post('/register', async (req, res) => {
   } catch (err) {
     logger.captureException(err, { msg: 'auth_register_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to create account.' })
+  }
+})
+
+// ── POST /api/auth/confirm-age ───────────────────────────────────────────────
+// Charter §12 — existing accounts (registered before the gate) confirm 18+
+// here before an assessment can commence. Write-once + idempotent: the first
+// declaration is the permanent record.
+router.post('/confirm-age', async (req, res) => {
+  try {
+    const header = req.headers.authorization || ''
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null
+    if (!token) return res.status(401).json({ error: 'Not authenticated.' })
+    let payload
+    try {
+      payload = jwt.verify(token, getJwtSecret())
+    } catch {
+      return res.status(401).json({ error: 'Invalid or expired token.' })
+    }
+    if (req.body?.ageConfirmed !== true) {
+      return res.status(400).json({
+        error: 'Prism is currently available to candidates aged 18 or older.',
+        code: 'AGE_CONFIRMATION_REQUIRED',
+      })
+    }
+    const user = await recordAgeDeclaration(payload.sub, {
+      version: AGE_DECLARATION_VERSION,
+      at: new Date().toISOString(),
+      meta: { ip: req.ip, userAgent: req.get('user-agent') || '' },
+    })
+    res.json({ ok: true, user: publicUser(user) })
+  } catch (err) {
+    if (err.message === 'USER_NOT_FOUND') return res.status(401).json({ error: 'Account not found.' })
+    logger.captureException(err, { msg: 'auth_confirm_age_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Could not record your confirmation.' })
   }
 })
 

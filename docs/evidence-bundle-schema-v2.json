@@ -24,6 +24,17 @@
       }
     },
     "scenario": { "type": ["object", "null"], "properties": { "title": { "type": "string" }, "domain": { "type": "string" } } },
+    "identityAssurance": {
+      "type": ["object", "null"],
+      "description": "Charter §9: the identity-assurance level at issuance. L1 self-declared; L2 institution-verified (requires a RECORDED institution-verification event — an invite alone never qualifies); L3 identity-verified (feature-gated pending legal approval). The signature proves issuance and integrity of the report AT THIS LEVEL — not identity beyond it.",
+      "properties": {
+        "level": { "enum": ["L1", "L2", "L3"] },
+        "label": { "type": "string" },
+        "basis": { "type": "string" },
+        "recordedAt": { "type": "string" }
+      },
+      "required": ["level", "label", "basis"]
+    },
     "scores": {
       "type": "object",
       "required": ["dimensions", "insufficientEvidence"],

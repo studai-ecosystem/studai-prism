@@ -251,6 +251,18 @@ export async function getDispute(sessionId) {
   return db.disputes[sessionId] || null
 }
 
+// Charter §11: the candidate-readable review outcome
+// ({ outcome, explanation, decidedAt }). Private reviewer reasoning stays in
+// admin notes — never here.
+export async function setDisputeResolution(sessionId, resolution) {
+  const db = await readDB()
+  const existing = db.disputes[sessionId]
+  if (!existing) return null
+  existing.resolution = resolution
+  await writeDB(db)
+  return existing
+}
+
 // ── Identity verification ─────────────────────────────────────────────────────
 export async function recordVerification(sessionId, data) {
   const db = await readDB()

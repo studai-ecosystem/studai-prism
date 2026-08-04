@@ -63,11 +63,27 @@ export async function createUser(user) {
     college: user.college || '',
     year: user.year || '',
     passwordHash: user.passwordHash,
+    // Charter §12: version-stamped 18+ declaration ({version, at, meta}).
+    ageDeclaration: user.ageDeclaration || null,
     createdAt: new Date().toISOString(),
   }
   db.users.push(record)
   await writeDB(db)
   return record
+}
+
+// Charter §12: record the explicit 18+ declaration on an EXISTING account
+// (accounts registered before the gate). Write-once semantics: an existing
+// declaration is never overwritten (the original acceptance is the record).
+export async function recordAgeDeclaration(id, declaration) {
+  const db = await readDB()
+  const user = db.users.find((u) => u.id === id)
+  if (!user) throw new Error('USER_NOT_FOUND')
+  if (!user.ageDeclaration) {
+    user.ageDeclaration = declaration
+    await writeDB(db)
+  }
+  return user
 }
 
 export async function updateUser(id, fields) {
@@ -86,7 +102,13 @@ export async function updateUser(id, fields) {
 export function publicUser(user) {
   if (!user) return null
   const { id, email, name, college, year, createdAt } = user
-  return { id, email, name, college, year, createdAt }
+  return {
+    id, email, name, college, year, createdAt,
+    // §12: the client needs to know whether the 18+ confirmation is on file
+    // (boolean + version only — never the meta).
+    ageConfirmed: Boolean(user.ageDeclaration),
+    ageDeclarationVersion: user.ageDeclaration?.version || null,
+  }
 }
 
 // Admin Control Centre: aggregate counts only (no records leave the store).

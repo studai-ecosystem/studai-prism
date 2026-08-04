@@ -10,9 +10,12 @@
 // candidate-side (routes/payment.js) and land in invite_redemptions.
 
 import { Router } from 'express'
+import { randomUUID } from 'crypto'
 import logger from '../../lib/logger.js'
+import { query, isDbConfigured } from '../../db/pool.js'
 import { requirePermission } from '../../lib/adminAuth.js'
 import { adminAudit } from '../../lib/adminAudit.js'
+import { auditLog } from '../../lib/telemetry.js'
 import { createInvite, listInvites, getInvite, listRedemptions, revokeInvite } from '../../lib/invites.js'
 import { getReport } from '../../lib/store.js'
 
@@ -105,6 +108,57 @@ router.post('/:id/revoke', requirePermission('invites:manage'), async (req, res)
     res.json({ ok: true })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_invite_revoke_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ── Institution verification (charter §9, Level 2) ─────────────────────────
+// An invite alone NEVER proves identity. Level 2 requires this RECORDED
+// verification event naming the responsible institutional authority — e.g.
+// the placement cell confirming the candidate against its roster. Write-once
+// per session; every recording is audited on both planes.
+router.post('/:id/institution-verification', requirePermission('invites:manage'), async (req, res) => {
+  try {
+    if (!isDbConfigured()) return res.status(503).json({ error: 'Requires the governance database.' })
+    const { sessionId, authority, method, note } = req.body || {}
+    if (!sessionId) return res.status(400).json({ error: 'sessionId is required.' })
+    if (!authority || String(authority).trim().length < 5) {
+      return res.status(400).json({ error: 'The responsible institutional authority is required (institution + person/role).' })
+    }
+    if (!method || !['roster_confirmation', 'placement_cell_attestation', 'institutional_workflow'].includes(method)) {
+      return res.status(400).json({ error: 'method must be one of: roster_confirmation, placement_cell_attestation, institutional_workflow' })
+    }
+    const invite = await getInvite(req.params.id)
+    if (!invite) return res.status(404).json({ error: 'Invite not found.' })
+    // The session must belong to this invite's redemptions — the cohort is
+    // the context the institution is attesting against.
+    const redemptions = await listRedemptions(invite.inviteId)
+    const redemption = redemptions.find((r) => r.sessionId === sessionId)
+    if (!redemption) return res.status(404).json({ error: 'That session was not started through this invite.' })
+
+    const verificationId = randomUUID()
+    const inserted = await query(
+      `INSERT INTO institution_verifications
+         (verification_id, session_id, invite_id, authority, method, note, recorded_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (session_id) DO NOTHING
+       RETURNING verification_id`,
+      [verificationId, sessionId, invite.inviteId,
+        String(authority).trim().slice(0, 200), method, String(note || '').slice(0, 1000), req.admin.id],
+    )
+    if (!inserted?.rows?.length) {
+      return res.status(409).json({ error: 'An institution-verification event is already recorded for this session.', code: 'ALREADY_RECORDED' })
+    }
+    auditLog('institution_verification_recorded', sessionId, {
+      verificationId, inviteId: invite.inviteId, method, by: 'admin_console',
+    })
+    await adminAudit(req, {
+      action: 'institution_verification_recorded', entityType: 'assessment_invite', entityId: invite.inviteId,
+      after: { sessionId, verificationId, method, authority: String(authority).trim().slice(0, 200) },
+    })
+    res.status(201).json({ ok: true, verificationId, assuranceLevel: 'L2' })
+  } catch (err) {
+    logger.captureException(err, { msg: 'admin_institution_verification_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Internal server error' })
   }
 })

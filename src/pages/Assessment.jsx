@@ -542,12 +542,26 @@ export default function Assessment() {
   }, [sessionId])
 
   // Surface a face-proctoring violation as a brief on-screen banner + log it.
+  // Charter §14: gaze interpretation is OFF by default — looking_away is
+  // neither warned about nor reported unless the governance flag enables it
+  // (the server accepts-and-drops it regardless when dark; this is the
+  // client-side half of the same default).
+  const gazeEnabledRef = useRef(false)
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/payment/config')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled) gazeEnabledRef.current = Boolean(d?.proctoring?.gaze) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
   const FACE_MESSAGES = {
     face_absent: 'Please stay in view of your camera.',
     multiple_faces: 'More than one person detected. You must take this test alone.',
     looking_away: 'Please keep your eyes on the screen.',
   }
   const handleFaceEvent = useCallback((type, meta) => {
+    if (type === 'looking_away' && !gazeEnabledRef.current) return
     reportProctorEvent(type, meta)
     const message = FACE_MESSAGES[type]
     if (!message) return

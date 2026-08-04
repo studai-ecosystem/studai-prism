@@ -80,6 +80,11 @@ router.get('/items', requirePermission('items:read'), async (req, res) => {
         ORDER BY i.scenario_key, i.kind, i.dimension LIMIT 500`,
       params,
     )
+    // Charter §18: item-bank access is role-restricted AND audited.
+    await adminAudit(req, {
+      action: 'item_bank_accessed', entityType: 'item_bank', entityId: String(scenarioKey || 'all'),
+      after: { rows: r?.rows?.length || 0 },
+    })
     res.json({ items: r?.rows || [] })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_items_failed', requestId: req.requestId })
