@@ -1,0 +1,33 @@
+# PRISM Human-Action Register
+
+**Charter §24.** Version-controlled register of every action requiring a human.
+The agent may prepare materials for these actions but must NEVER mark one complete
+without real evidence. Statuses: `OPEN` · `PREPARED (materials ready)` · `IN PROGRESS
+(human)` · `BLOCKED` · `CLOSED (evidence linked)`.
+
+Fields per entry: ID · Category · Priority · Exact action · Why human required ·
+Responsible role · Supporting artifact · Blocking dependency · Evidence required ·
+Status · Date added · Target date · Consequence of delay.
+
+| ID | Category | Pri | Exact action | Why human | Role | Artifact | Blocks | Evidence required | Status | Added | Target | Delay consequence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| HA-001 | Security | P0 | Rotate Razorpay live key pair in Razorpay dashboard; review activity since exposure | Provider console access + account authority | Founder/Ops | Rotation runbook (Phase 1 deliverable) | Real payments; incident closure | New keys live-verified, old keys 401, provider activity review notes | OPEN | 2026-08-04 | — | Live payment credentials remain compromised |
+| HA-002 | Security | P0 | Rotate SendPulse SMTP password in SendPulse dashboard; review auth/sending activity since exposure | Provider console access | Founder/Ops | Rotation runbook (Phase 1 deliverable) | Email trust; incident closure | New password verified in-pod, old dead, provider log review notes | OPEN | 2026-08-04 | — | Mail credentials remain compromised |
+| HA-003 | Legal | P1 | Counsel review of consent copy, terms, refund and retention periods (incl. provisional 8-year payment retention) | Legal judgement | Counsel | Retention policy draft (§16), legal pages (E4) | Retention defaults marked "pending counsel" | Signed/written counsel approval | OPEN | 2026-08-04 | — | Provisional legal copy stays draft-labelled |
+| HA-004 | Legal | P1 | Employment-law review of buyer-facing use policy ("not sole basis") and prohibited uses | Legal judgement | Counsel | Prohibited-uses policy draft (§2, §25) | Enterprise pack | Written approval | OPEN | 2026-08-04 | — | Pilot terms remain drafts |
+| HA-005 | Legal | P1 | Data-protection (DPDP) review: age gating, accommodations data, fairness-research consent, erasure interplay | Legal judgement | Counsel/DPO | §12/§13/§15 specs | Under-18 path; demographic flag | Written approval | OPEN | 2026-08-04 | — | Features stay feature-gated off |
+| HA-006 | Legal | P2 | Under-18 support decision memo (guardian consent or explicit exclusion) | Business + legal decision | Founder + counsel | Age-gating policy (§12) | Under-18 cohorts | Signed decision memo | OPEN | 2026-08-04 | — | 18+ gate remains the only path |
+| HA-007 | Legal | P2 | Identity-verification (Level 3 / Aadhaar-OCR) legal approval | Legal judgement | Counsel | Identity-assurance spec (§9) | Level 3 activation | Written approval | OPEN | 2026-08-04 | — | Level 3 stays feature-gated |
+| HA-008 | Science | P1 | Appoint external psychometrician / I-O psychologist | Hiring decision | Founder | Role brief (Phase 5 docs) | Science sign-offs, SME workshops | Signed engagement | OPEN | 2026-08-04 | — | All validity studies blocked |
+| HA-009 | Science | P1 | Recruit ≥4 human raters | Hiring decision | Founder/Science lead | Rater manual draft (§17) | S2 human–AI agreement study | Rater roster + engagement | OPEN | 2026-08-04 | — | 0/4 raters — critical path (named in weekly report) |
+| HA-010 | Science | P1 | Qualify raters (weighted-kappa gate ≥0.6, machinery exists) | Human performance | Science lead | Rater workbench (live) | Double-rating quota | Kappa records in rater workbench | OPEN | 2026-08-04 | — | No human-anchored evidence |
+| HA-011 | Science | P2 | SME content-validity workshops for construct definitions and anchors | External SMEs required | Science lead | Construct definition drafts (§17) | Content-validity claims | Workshop records + sign-off | OPEN | 2026-08-04 | — | Constructs remain provisional |
+| HA-012 | Science | P2 | Independent ethics review before publishing student research | External body | Science lead | Fairness-research spec (§15) | Research publication; demographic flag | Ethics approval letter | OPEN | 2026-08-04 | — | Research stays unpublished, flag off |
+| HA-013 | Science | P2 | Execute human studies (S2 agreement, S3 retest, DIF); approve conclusions | Real data + human judgement | Science lead | Preregistered protocols (live in docs/studies/) | Science-flag flips | study_results rows + external sign-off | OPEN | 2026-08-04 | — | All science flags NO-GO |
+| HA-014 | Governance | P2 | Science-flag activation decisions (flip-check GO required; humans flip) | ONE LAW: agent flips nothing | Founder + science lead | flip-check endpoint (live) | Public claims | Flag-change audit rows + GO verdicts | OPEN | 2026-08-04 | — | Claims stay at current ceiling |
+| HA-015 | Commercial | P1 | Approve and publish B2B pilot pricing (§22) | Pricing authority | Founder | Pricing package draft (Phase 5) | Design-partner contracts | Written approval | OPEN | 2026-08-04 | — | Pricing stays internal draft |
+| HA-016 | Commercial | P1 | Sign 3–5 paid design partners | Sales | Founder | Design-partner programme docs (Phase 5) | Fundability milestones | Signed agreements | OPEN | 2026-08-04 | — | No revenue evidence |
+| HA-017 | Commercial | P2 | Outcome-data agreements with partners (criterion studies) | Contract negotiation | Founder | External-criterion schema (§17) | Criterion validity | Signed agreements | OPEN | 2026-08-04 | — | Criterion studies blocked |
+| HA-018 | Security | P2 | Provider-side incident investigation conclusions (Razorpay/SendPulse) | Provider access + judgement | Founder/Ops | Incident record (Phase 1) | Incident closure | Provider logs reviewed + written conclusion | OPEN | 2026-08-04 | — | Incident cannot be closed |
+| HA-019 | Ops | P2 | First admin login + TOTP enrolment for seeded prod admins; retire legacy admin token | Credential holder action | Operator | Repo memory 2026-07-31 notes | PRISM_ADMIN_TOKEN_DISABLED | Login + admin_legacy_token_used adoption | OPEN | 2026-08-04 | — | Legacy token plane stays live |
+| HA-020 | Governance | P2 | Production feature-flag decisions requiring evidence (per flag workflow, dual approval) | Human governance | Founder + ops | Admin flags console (live) | Any gated feature | feature_flag_changes rows | OPEN | 2026-08-04 | — | Flags stay dark |

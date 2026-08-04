@@ -1,5 +1,20 @@
 # Prism v2 (MASA-2) build rules
 
+## Master remediation programme (2026-08-04) — governing charter
+
+- Operating charter: `docs/remediation/MASTER_PROMPT_2026-08-04.md` (frozen; takes
+  precedence over the historical phase rules below where they conflict).
+- Live programme state: `docs/remediation/PROGRAM_STATE.md` — read before any
+  remediation work; update before ending a session.
+- Human-gated work: `docs/remediation/HUMAN_ACTION_REGISTER.md` — never mark items
+  complete without linked evidence.
+- Standing laws: no fabrication of evidence/approvals/results; no secrets in
+  chat/git/logs; no candidate identity in any model payload; composite score hidden on
+  all new external surfaces; legacy artifacts immutable; the agent flips no feature
+  flags (humans decide); prompt files are never edited in place (new version files
+  only); the charter §19 freeze list gets no new work; one remediation phase per
+  branch/commit.
+
 - This is a psychometric assessment system. Server is the source of truth:
   every score is clamped 0–100 and recomputed server-side; the browser never
   calls AI; scoring is idempotent per session.
