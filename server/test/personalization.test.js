@@ -32,13 +32,18 @@ test('sanitizeCandidateName: keeps real names, strips everything else', () => {
 test('avatar prompt: personalization block appears only when provided', () => {
   const plain = buildAvatarSystemPrompt(scenario, 1, 'en')
   assert.ok(!plain.includes('THE CANDIDATE YOU ARE TALKING TO'), 'no block without personalization')
-  assert.ok(!plain.includes('{{'), 'no unfilled placeholders')
+  assert.ok(!/\{\{[A-Z0-9_]+\}\}/.test(plain), 'no unfilled placeholders')
 
-  const personal = buildAvatarSystemPrompt(scenario, 1, 'en', { candidateName: 'Sneha', characterId: 'priya' })
+  // Charter §5: the model is told a name exists but NEVER receives it — the
+  // prompt carries the neutral token {{candidate}} instead of the real name.
+  // ('Zubeida Farokhzad' is chosen to collide with no scenario cast name.)
+  const personal = buildAvatarSystemPrompt(scenario, 1, 'en', { candidateName: 'Zubeida Farokhzad', characterId: 'priya' })
   assert.ok(personal.includes('THE CANDIDATE YOU ARE TALKING TO'))
-  assert.ok(personal.includes('Their name is Sneha'))
+  assert.ok(!personal.includes('Zubeida'), 'real name must never enter the prompt')
+  assert.ok(!personal.includes('Farokhzad'), 'real name must never enter the prompt')
+  assert.ok(personal.includes('{{candidate}}'), 'neutral token instructs the model')
   assert.ok(personal.includes('The Creator'), 'server-side character trait is used')
-  assert.ok(!personal.includes('{{'), 'no unfilled placeholders')
+  assert.ok(!/\{\{[A-Z0-9_]+\}\}/.test(personal), 'no unfilled placeholders')
 })
 
 test('avatar prompt: unknown or hostile characterId is ignored', () => {
@@ -49,10 +54,11 @@ test('avatar prompt: unknown or hostile characterId is ignored', () => {
   }
 })
 
-test('avatar prompt: continuity rules present in v2', () => {
+test('avatar prompt: continuity rules present in v3', () => {
   const p = buildAvatarSystemPrompt(scenario, 1, 'en')
   assert.ok(p.includes('RE-READ the entire conversation'))
   assert.ok(p.includes('NEVER ask about anything the candidate has already answered'))
+  assert.ok(p.includes('PRIVACY — THE CANDIDATE NAME TOKEN'), 'v3 privacy rules present')
 })
 
 test('every active scenario carries a display-only yourRole line', () => {

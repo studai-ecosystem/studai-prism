@@ -58,6 +58,7 @@ import { selectProbe, stopDecision, isPressureEnabled } from '../engine/probeSel
 import { anchorsToTheta, heuristicTheta, thetaToTier } from '../engine/entryEstimator.js'
 import { loadPrompt, loadPromptJson, renderPrompt } from '../services/ai/promptManager.js'
 import { sanitizeCandidateText, INJECTION_GUARD } from '../lib/promptSecurity.js'
+import { CANDIDATE_TOKEN, renderCandidateText, renderParsedTurn, scrubCandidateIdentity, tokenizeForModel } from '../lib/identityIsolation.js'
 import { isDualScorerEnabled, runDualScorer } from '../scoring/dualScorer.js'
 import { equateScore, isEquatingEnabled } from '../scoring/equating.js'
 import { isLangEnabled, resolveLanguage, scoringStatusFor, asrHintFor, languageOptions } from '../lib/lang.js'
@@ -442,7 +443,10 @@ function buildCandidateLine({ candidateName = null, characterId = null } = {}) {
   if (!candidateName && !character) return ''
   const lines = ['THE CANDIDATE YOU ARE TALKING TO:']
   if (candidateName) {
-    lines.push(`- Their name is ${candidateName}. Greet them by name at the start and use their first name naturally now and then — not on every turn.`)
+    // Charter §5: the model NEVER receives the real name. It is told a name
+    // exists and to write the neutral token; the app substitutes the display
+    // name after generation (lib/identityIsolation.js).
+    lines.push(`- They have shared their name, but you are not shown it. Greet them warmly using the exact token ${CANDIDATE_TOKEN} where their name belongs, and use the token naturally now and then — not on every turn. Never invent a name.`)
   }
   if (character) {
     lines.push(`- They chose to be represented in this room as "${character.trait}" (${character.description}). If it fits naturally, you may nod to that style once or twice — never mock it or bring it up repeatedly.`)
@@ -455,12 +459,13 @@ function buildAvatarSystemPrompt(scenario, avatarStyle, language = 'en', persona
   const observerLine = p3
     ? `- MOSTLY LISTENS — ${p3.name} (${p3.role}): ${p3.personality}\n   ${p3.name} is an observer. They stay SILENT almost the whole time. They speak only very rarely — at most once or twice in the entire conversation — and only a single short line. On nearly every turn, ${p3.name} says NOTHING.`
     : ''
-  // Template lives in server/prompts/avatar_system.v2.md (audit C15) — includes
-  // the C14 rule that candidate messages are untrusted in-role answers, the
-  // strengthened continuity rules, and the candidate personalization block.
-  // Track 4.1: a language variant (avatar_system.{lang}.v2.md) prepends the
+  // Template lives in server/prompts/avatar_system.v3.md (audit C15) — v3 adds
+  // the charter-§5 candidate-name-token privacy rules on top of v2's C14 rule
+  // that candidate messages are untrusted, the continuity rules, and the
+  // candidate personalization block. The real name NEVER enters this prompt.
+  // Track 4.1: a language variant (avatar_system.{lang}.v3.md) prepends the
   // language-of-session directive; scenario content stays canonical English.
-  return renderPrompt('avatar_system.v2', {
+  return renderPrompt('avatar_system.v3', {
     SCENARIO_CONTEXT: scenario.context,
     CANDIDATE_LINE: buildCandidateLine(personalization),
     P1_NAME: p1.name,
@@ -678,9 +683,11 @@ router.post('/start', async (req, res) => {
     }
 
     // Expose non-sensitive scenario meta so the client can render the
-    // Scenario Card overlay during the staged flow.
+    // Scenario Card overlay during the staged flow. The stored history keeps
+    // the neutral token; only the candidate-facing copy carries the real name
+    // (charter §5 — substitution happens AFTER generation, app-side).
     res.json({
-      ...parsed,
+      ...renderParsedTurn(parsed, candidateName),
       language,
       scoringStatus: scoringStatusFor(language),
       scenario: {
@@ -788,8 +795,10 @@ router.post('/message', async (req, res) => {
 
   if (executive) {
     // Rehydrate the ledger, micro-rate this turn, fold it in, pick the probe.
+    // Charter §5: the micro-rater payload is scrubbed of the candidate's name
+    // (their own typed self-references included) before it leaves the app.
     ledger = EvidenceLedger.from(session._persisted?.ledger)
-    const rated = await microRateTurn(message, { createCompletion, model: fastModel(), language })
+    const rated = await microRateTurn(scrubCandidateIdentity(message, candidateName), { createCompletion, model: fastModel(), language })
     // Fallback when the rater is unavailable: derive coarse levels from the
     // interpretable signals so the ledger still advances (never blocks).
     microLevels = rated || levelsFromSignals(signals)
@@ -797,9 +806,10 @@ router.post('/message', async (req, res) => {
 
     // Track 3.2 (callback probe material): the candidate's own earlier
     // phrasing — first substantial SANITIZED user turn, quote-safe and short.
+    // §5: scrubbed of identity before it can enter a director directive.
     const earlierUserTexts = history
       .filter((m) => m.role === 'user')
-      .map((m) => sanitizeCandidateText(String(m.content).replace('[Candidate]: ', ''), 400))
+      .map((m) => scrubCandidateIdentity(sanitizeCandidateText(String(m.content).replace('[Candidate]: ', ''), 400), candidateName))
       .filter((t) => t.split(/\s+/).length >= 8)
     const candidateQuote = earlierUserTexts.length
       ? earlierUserTexts[0].replace(/["\n\r]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140)
@@ -843,10 +853,14 @@ router.post('/message', async (req, res) => {
   ]
 
   try {
+    // Charter §5: the conversation model never receives the candidate's name.
+    // New turns are token-native (v3 prompt); mapping the history through
+    // tokenizeForModel also covers legacy in-flight sessions whose earlier
+    // avatar lines carried the real name, and any name the candidate typed.
     const promptMessages = [
       { role: 'system', content: avatarSystem },
       ...(directive ? [{ role: 'system', content: directive }] : []),
-      ...updatedHistory,
+      ...updatedHistory.map((m) => ({ role: m.role, content: tokenizeForModel(m.content, candidateName) })),
     ]
     const response = await createCompletion({
       model: conversationModel(),
@@ -967,7 +981,7 @@ router.post('/message', async (req, res) => {
       })
     }
 
-    res.json(parsed)
+    res.json(renderParsedTurn(parsed, candidateName))
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_message_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to get AI response' })
@@ -1045,31 +1059,39 @@ router.get('/evaluate-status/:sessionId', async (req, res) => {
   return res.status(404).json({ error: 'Session not found' })
 })
 
+// Build the plain-text scoring transcript from session history (charter §5).
+// Candidate lines are sanitized (audit C14) and labelled CANDIDATE; avatar
+// lines are scrubbed of every candidate-identity reference — the neutral
+// token AND any literal name occurrence (legacy sessions) — so no judge,
+// micro-rater or calibration artifact ever sees who the candidate is.
+// Exported for the identity-isolation regression suite.
+export function buildJudgeTranscript(history, candidateName = null) {
+  return history
+    .map((m) => {
+      if (m.role === 'user') return `CANDIDATE: ${scrubCandidateIdentity(sanitizeCandidateText(String(m.content).replace('[Candidate]: ', '')), candidateName)}`
+      try {
+        const parsed = JSON.parse(m.content)
+        return parsed.messages
+          .map((msg) => `${msg.speaker.toUpperCase()} (${msg.role}): ${scrubCandidateIdentity(msg.content, candidateName)}`)
+          .join('\n')
+      } catch {
+        return scrubCandidateIdentity(m.content, candidateName)
+      }
+    })
+    .join('\n\n')
+}
+
 // Runs the full scoring pipeline for one session and returns the persisted
 // report. Body unchanged from the original inline handler — every audit row,
 // clamp, equating step and credential issuance is identical.
 async function runEvaluation({ sessionId, session, requestId }) {
   const { scenario, history } = session
+  const candidateName = session.candidateName || session._persisted?.candidateName || null
 
   // Phase 0 telemetry (no-op unless PRISM_V2_TELEMETRY + DB): mark submission.
   auditLog('submission', sessionId, { scenarioId: scenario?.id, turns: Array.isArray(history) ? history.length : null })
 
-  // Build plain-text transcript from history. Candidate lines are sanitized
-  // (audit C14) — the judge prompt wraps this whole block in
-  // <candidate_transcript> tags with a standing injection guard.
-  const transcript = history
-    .map((m) => {
-      if (m.role === 'user') return `CANDIDATE: ${sanitizeCandidateText(String(m.content).replace('[Candidate]: ', ''))}`
-      try {
-        const parsed = JSON.parse(m.content)
-        return parsed.messages
-          .map((msg) => `${msg.speaker.toUpperCase()} (${msg.role}): ${msg.content}`)
-          .join('\n')
-      } catch {
-        return m.content
-      }
-    })
-    .join('\n\n')
+  const transcript = buildJudgeTranscript(history, candidateName)
 
   try {
     // ── Panel of LLM Evaluators (PoLL) + position-swap + multi-sample vote ────    // Replaces the old single low-temperature scoring call. We draw N samples
@@ -1251,7 +1273,8 @@ async function runEvaluation({ sessionId, session, requestId }) {
         const candidateTurns = []
         history.forEach((m) => {
           if (m.role === 'user') {
-            candidateTurns.push({ text: String(m.content).replace('[Candidate]: ', '') })
+            // §5: dual-scorer judge payloads are identity-scrubbed like the panel's.
+            candidateTurns.push({ text: scrubCandidateIdentity(String(m.content).replace('[Candidate]: ', ''), candidateName) })
           }
         })
         // exchange_no is 1-based over candidate turns; link to persisted responses.
@@ -1326,18 +1349,19 @@ async function runEvaluation({ sessionId, session, requestId }) {
     })
 
     // Track 6.3: persist the blinded transcript (turns only, never scores) as
-    // double-rating material for the human-rating workbench.
+    // double-rating material for the human-rating workbench. §5: rater material
+    // is identity-scrubbed exactly like the judge transcript.
     recordSessionTranscript({
       sessionId,
       scenarioKey: scenario.id,
       isSynthetic: !isRealCandidate,
       turns: history.map((m) => {
         if (m.role === 'user') {
-          return { speaker: 'candidate', text: String(m.content).replace('[Candidate]: ', '') }
+          return { speaker: 'candidate', text: scrubCandidateIdentity(String(m.content).replace('[Candidate]: ', ''), candidateName) }
         }
         try {
           const parsed = JSON.parse(m.content)
-          return (parsed.messages || []).map((msg) => ({ speaker: 'avatar', name: msg.speaker, text: msg.content }))
+          return (parsed.messages || []).map((msg) => ({ speaker: 'avatar', name: msg.speaker, text: scrubCandidateIdentity(msg.content, candidateName) }))
         } catch {
           return null
         }
@@ -1484,12 +1508,19 @@ router.post('/speech', async (req, res) => {
     if (!session) return res.status(404).json({ error: 'Session not found' })
 
     // The requested line must be something the avatar actually said here.
+    // History stores the neutral token (charter §5) while the client displays
+    // the rendered name — accept BOTH forms. Polly receives only the already-
+    // rendered candidate-facing sentence (the charter's narrow TTS exception);
+    // audio is streamed and never persisted.
     const spoken = new Set()
     for (const m of session.history || []) {
       if (m.role !== 'assistant') continue
       try {
         for (const msg of JSON.parse(m.content)?.messages || []) {
-          if (msg?.content) spoken.add(`${msg.speaker}\u0000${msg.content}`)
+          if (!msg?.content) continue
+          spoken.add(`${msg.speaker}\u0000${msg.content}`)
+          const rendered = renderCandidateText(msg.content, session.candidateName)
+          if (rendered !== msg.content) spoken.add(`${msg.speaker}\u0000${rendered}`)
         }
       } catch {
         /* non-JSON assistant content — skip */

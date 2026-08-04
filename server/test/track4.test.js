@@ -23,7 +23,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const PROMPTS = join(__dirname, '..', 'prompts')
 
 const NON_ENGLISH = ['hi-en', 'hi', 'ta']
-const VARIANT_BASES = ['avatar_system.v2', 'opening_turn.v1', 'judge_full.v1', 'micro_rater.v1']
+const VARIANT_BASES = ['avatar_system.v3', 'opening_turn.v1', 'judge_full.v1', 'micro_rater.v1']
 
 // ── T4.1: flag-gated, untrusted-safe resolution ──────────────────────────────
 test('T4.1: language resolves to en unless PRISM_LANG is on and code is supported', () => {

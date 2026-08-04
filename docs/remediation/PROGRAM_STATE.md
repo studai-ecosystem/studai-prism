@@ -10,13 +10,13 @@ is frozen — record all interpretation and deviation here, never there.
 | Field | Value |
 | --- | --- |
 | Charter | MASTER-2026-08-04 (frozen) |
-| Programme status | PHASE 0 COMPLETE — ready for Phase 1 |
+| Programme status | PHASE 1 COMPLETE — ready for Phase 2 (P0 incident OPEN pending provider consoles: HA-001/HA-002) |
 | Starting commit | `ad4be54df1ad9d39e4c279834f21138b4c6c9d0c` (main = origin/main) |
 | Uncommitted at start | Foundation docs only: `.github/copilot-instructions.md` (M), `docs/PRISM_Product_Reference.md`, `docs/PRISM_Review_Response_Action_Plan.md`, `docs/remediation/` (untracked). No product code at risk. Worktrees wt-phase1/2/3 detached (historical). |
 | Baseline tests | Server: 286 tests / 275 pass / 0 fail / 11 skipped (DB-gated, no local DB). Python: 57 passed (`py -3.12 -m pytest`, 1.58s). 48 server test files; runner `node --test`. |
 | Production baseline | main @ ad4be54, image ad4be54df1ad, EKS StudAI-Prod-EKS-Cluster ns `prism`. Live-verified 2026-08-04: health `{status:ok}`; payments LIVE (₹499 INR, keyId rzp_live_TItHtKm7Qs0CPQ, dummyMode=false, skipVerification=false); TTS amazon-polly enabled; `/api/admin` 401 (console on); velocity 404 (dark) |
-| Current phase | Phase 0 done → next: Phase 1 (`/prism-phase1-p0-security`) |
-| Last session | 2026-08-04 — Phase 0 baseline executed (read-only; matrix populated below) |
+| Current phase | Phase 1 done → next: Phase 2 (`/prism-phase2-trust-reporting`) |
+| Last session | 2026-08-04 — Phase 1 executed: §5 identity isolation shipped + tested; §4.1 incident record/runbook prepared (rotation itself = HA-001/002); §4.2 split design frozen for Phase 4 |
 
 ## 1. Phase ledger
 
@@ -25,6 +25,7 @@ Rule: one phase per session/branch, commit per phase, update this table before e
 | Phase | Charter sections | Status | Branch/commit | Evidence |
 | --- | --- | --- | --- | --- |
 | 0 — Baseline | §1, §28.0 (+ record git state, traceability matrix) | **COMPLETE 2026-08-04** | main @ ad4be54 (read-only; no code changed) | §0 baseline row; §2 matrix; suites 286/0-fail + 57 py; prod endpoints verified |
+| 1 — P0 remediation | §4 (credentials, secret split), §5 (identity out of models) | **COMPLETE 2026-08-04** (code+docs; provider rotation = HA-001/002, incident stays OPEN) | main — baseline docs @ d2efbd9 + phase commit (see git log `feat(remediation-p1)`) | identityIsolation.js + avatar_system.v3 (+3 lang variants) + 9-test §5 suite; 295 tests/0 fail; incident record + rotation runbook + split design |
 | 1 — P0 remediation | §4 (credentials, secret split), §5 (identity out of models) | NOT STARTED | — | — |
 | 2 — Trust & reporting | §2, §3 (scope doc), §6, §7, §8, §17 (labels, "300 sessions" removal) | NOT STARTED | — | — |
 | 3 — Candidate & buyer governance | §9, §10, §11, §12, §13, §14, §15, §16, §18 (access controls) | NOT STARTED | — | — |
@@ -44,9 +45,9 @@ docs/ + live prod checks). Paths relative to repo root.
 | --- | --- | --- | --- | --- | --- | --- |
 | §2 | Pilot positioning, visible pilot notice, "not sole basis" policy | Nothing — no pilot/sole-basis copy anywhere in src/pages or content.json | Notice + policy on marketing/report/verify/institutional surfaces | 2 | Copy-presence test; claimsCeiling extension | TODO |
 | §3 | Job-family scope doc + scenario mapping | 8 active scenarios in routes/assessment.js (frozen bank; items=96 in prod incl. 48 retired) | Versioned scope doc; governed mapping; copy ceiling | 2 | Doc-exists + copy-scope test | TODO |
-| §4.1 | Credential rotation + incident record | Secrets in /studai/prism/aws-prod/runtime (35 keys); exposed Razorpay pair CONFIRMED live in prod config; SendPulse pw in secret | Rotation (provider consoles = HA-001/2), incident record, runbooks | 1 | Post-rotation live verification | TODO |
-| §4.2 | Split runtime secret by function, least-privilege IRSA | Single secret; IRSA role studai-prod-prism-runtime (secretsmanager+bedrock+kms+polly) | 7-way split, per-category rotation runbooks | 1 (design) / 4 (complete) | Secret-loading tests | TODO |
-| §5 | No candidate identity in model payloads | sanitizeCandidateName + buildCandidateLine → CANDIDATE_LINE in avatar_system.v2.md; judge transcript includes avatar lines VERBATIM (name reaches judge); micro-rater clean (candidateText only); credential bundle pseudonymous by construction | Neutral {{candidate}} token + post-generation substitution; transcript scrub incl. avatar lines; payload regression suite | 1 | Payload inspection across conversation/judge/micro-rater/director/estimator/calibration + lang variants; anchor-wording invariance | TODO |
+| §4.1 | Credential rotation + incident record | Secrets in /studai/prism/aws-prod/runtime (35 keys); exposed Razorpay pair CONFIRMED live in prod config; SendPulse pw in secret | DONE (agent side): incident record INC-2026-08-04-01 + rotation runbook. OPEN: provider-console rotation (HA-001/2) + provider log review (HA-018) | 1 | Post-rotation live verification | PREPARED — human-blocked |
+| §4.2 | Split runtime secret by function, least-privilege IRSA | Single secret; IRSA role studai-prod-prism-runtime (secretsmanager+bedrock+kms+polly) | Design frozen (SECRET-SPLIT-DESIGN.md, 8 secrets + loader contract + rotation SOPs); implementation in Phase 4 | 1 (design) / 4 (complete) | Secret-loading tests (Phase 4) | DESIGN DONE |
+| §5 | No candidate identity in model payloads | sanitizeCandidateName + buildCandidateLine → CANDIDATE_LINE in avatar_system.v2.md; judge transcript includes avatar lines VERBATIM (name reaches judge); micro-rater clean (candidateText only); credential bundle pseudonymous by construction | DONE: lib/identityIsolation.js ({{candidate}} token, post-generation substitution, scrub, legacy-history tokenization); avatar_system.v3 + 3 lang variants; buildJudgeTranscript scrubs judge/dual-scorer/rater/director payloads; /speech accepts rendered lines (Polly exception); activePromptVersions + VARIANT_BASES bumped. Residual: /calibrate entry-estimator sample is pre-name free-text (documented, tested handler references no identity) | 1 | server/test/identityIsolation.test.js (9 tests: payloads, substitution, scrubbing, source-scan wiring, anchor invariance) | **DONE** |
 | §6 | Composite hidden on new external surfaces | Exposed: /evaluate + /report/:sid responses, ScoreReport.jsx headline, mailer.js subject+body ("${overall}/100"), credential bundle scores.overall, Verify.jsx, admin invite roster (commit 1e81e8f "roster shows assessment outcome") | Profile-first rendering; API/PDF/email/verify/roster/admin scrub; research-role-only internal access; legacy immutable (report_versions blobs — safe) | 2 | Per-surface leak tests + legacy immutability | TODO |
 | §7.1 | `Collaboration` → `Collaborative Behaviour` | sharedConstants.js DIMENSION_LABELS (5 dims; weights 25/25/20/20/10) | Label change via sharedConstants + public definition | 2 | Label-consistency test | TODO |
 | §7.2 | AI & Digital Fluency requires direct probe | Scored today from ordinary conversation (judge+micro-rater, weight 0.1); no direct probe exists | Versioned direct probe; evidence threshold; `Insufficient evidence` rendering | 2 | Direct-probe requirement + insufficient-evidence tests | TODO |
@@ -86,6 +87,11 @@ Format: date · decision · reason · charter § affected · reversibility.
 | 2026-08-04 | Phase 0 baseline run with 11 DB-gated server tests skipped (no local PG) | Local environment has no DB; suites are green in CI and prod-verified; DB suites will run in Phase 4 rehearsal environment | §26 | Yes |
 | 2026-08-04 | Foundation docs (docs/remediation/, product reference, action plan, updated copilot-instructions) remain uncommitted during Phase 0 | Phase 0 is read-only for product code; these are the programme's own artifacts — commit them at Phase 1 start as the remediation baseline commit | §1 | Yes |
 | 2026-08-04 | Prod state verified from public edge only (health, payment config, TTS, dark sweeps) — no kubectl/SSM session opened | Sufficient for baseline; image tag corroborated by repo memory (ad4be54df1ad); full cluster verification deferred to Phase 4/6 | §28.0 | Yes |
+| 2026-08-04 | §5 neutral token chosen as literal `{{candidate}}` (lowercase) | renderPrompt only substitutes `{{UPPER_CASE}}` placeholders, so the token survives template rendering untouched; matches the charter's own example | §5 | Yes |
+| 2026-08-04 | Conversation-model context re-tokenized on every /message call (tokenizeForModel) | Covers legacy in-flight sessions whose pre-v3 avatar lines carry real names, and names candidates type about themselves | §5 | Yes |
+| 2026-08-04 | /calibrate entry-estimator input NOT name-scrubbed | The writing sample is collected before any name exists in the session; there is nothing to scrub against. Source-scan test pins that the handler references no identity fields | §5 | Yes |
+| 2026-08-04 | /speech accepts both tokenized (stored) and rendered (displayed) line forms | Client displays rendered text; history stores tokens; Polly receiving the rendered sentence is the charter's explicit narrow exception | §5 | Yes |
+| 2026-08-04 | Phase 1 split into two commits: baseline-docs commit (d2efbd9) + one phase implementation commit | Phase 0 decision — programme scaffolding is not phase code; phases themselves remain one-commit | §1, §28 | Yes |
 
 ## 4. Known conflicts with prior product laws (Phase 0 resolution status)
 
@@ -117,8 +123,8 @@ Format: date · decision · reason · charter § affected · reversibility.
 
 | Risk | Severity | Owner | Mitigation | Blocking |
 | --- | --- | --- | --- | --- |
-| Razorpay + SendPulse credentials still exposed/unrotated — exposed Razorpay keyId CONFIRMED serving live payments (prod /api/payment/config, 2026-08-04) | P0 | Operator + agent (Phase 1) | Charter §4.1 sequence; HA-001/HA-002 | Phase 6 sign-off |
-| Candidate first name reaches judge transcripts since avatar_system.v2 (CANDIDATE_LINE in avatar system prompt; avatar lines verbatim in judge transcript) | P0 | Agent (Phase 1) | Charter §5 | Phase 6 sign-off |
+| Razorpay + SendPulse credentials still exposed/unrotated — exposed Razorpay keyId CONFIRMED serving live payments (prod /api/payment/config, 2026-08-04). Runbook + incident record PREPARED; awaiting provider consoles | P0 | Operator (HA-001/HA-002) | INC-2026-08-04-01 + RUNBOOK-credential-rotation.md | Phase 6 sign-off |
+| Candidate identity in model payloads — RESOLVED IN CODE 2026-08-04 (identityIsolation.js, v3 prompts, scrubbed scoring payloads; 9-test regression suite). NOT YET DEPLOYED — prod still runs ad4be54 with the leak until Phase 6 release | P0 (deploy pending) | Agent (Phase 6 deploy) | Ship with next release; post-deploy Bedrock payload verification in §21 checklist | Phase 6 sign-off |
 | "certified report" wording + overall score in live report emails (server/lib/mailer.js — outside claims-ceiling scan) | P1 | Agent (Phase 2) | §7.4 sweep + ceiling extension to server copy | Phase 2 exit |
 | No standardized anchor probes — sessions not comparable in the charter's sense; v1 path is fully adaptive | P1 | Agent (Phase 2) | §8 standardized core | Phase 2 exit |
 | No age gate, no accommodations path (DPDP exposure for student cohorts) | P1 | Agent (Phase 3) + counsel (HA-005) | §12/§13 | Phase 3 exit |
