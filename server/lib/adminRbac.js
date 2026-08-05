@@ -114,6 +114,10 @@ export const PERMISSIONS = {
   'privacy:manage': 'Operate privacy request workflow (dry-runs, corrections)',
   'privacy:execute': 'Execute approved erasures (dual-approved)',
   'retention:manage': 'Set documented data-retention rules',
+  // Charter §13: accommodation requests may reference disability — the most
+  // sensitive candidate data in the system. Read is its own permission.
+  'accommodations:read': 'View accommodation requests (sensitive — may reference disability)',
+  'accommodations:manage': 'Decide accommodation requests (alternate administration modes)',
   'audit:read': 'Search and export the admin audit trail',
   'exports:create': 'Create data exports (every export is ledgered)',
   'notes:write': 'Add internal notes to operational entities',
@@ -155,6 +159,7 @@ export const ROLES = {
       'consents:read', 'verifications:read', 'integrity:read', 'integrity:review',
       'credentials:read', 'replays:read', 'replays:flag', 'teamfit:read', 'teamfit:manage',
       'invites:read', 'invites:manage',
+      'accommodations:read', 'accommodations:manage',
       'notes:write',
     ],
   },

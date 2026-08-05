@@ -39,13 +39,15 @@ import {
   recordItem,
   eraseSession,
   getSessionIdsByUser,
+  requestAccommodation,
+  getAccommodation,
 } from '../lib/store.js'
 import { extractTurnFeatures, sanitizeBehaviorTelemetry } from '../lib/behavioralFeatures.js'
 import { emptyEvidence, accumulateEvidence, decideDirector } from '../lib/director.js'
 import { buildPanelPlan } from '../lib/judgePanel.js'
 import { aggregateSamples } from '../lib/scoreAggregator.js'
 import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession, recordTimelineEntry, activeFlagSnapshot, eraseTelemetry, recordSessionTranscript, summarizeSessionBehavior, recordBehavioralFeatures, isDbConfigured as telemetryDbConfigured } from '../lib/telemetry.js'
-import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, SCALE_VERSION, REAL_ENTITLEMENT_MODES } from '../lib/sharedConstants.js'
+import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, SCALE_VERSION, REAL_ENTITLEMENT_MODES, ALTERNATE_ADMINISTRATION_DISCLOSURE } from '../lib/sharedConstants.js'
 import { getJwtSecret } from '../lib/security.js'
 import { findUserById } from '../lib/db.js'
 import { ensureCandidateId } from '../lib/identity.js'
@@ -634,6 +636,19 @@ router.post('/start', async (req, res) => {
   const seenScenarioIds = await getRecentScenarioIdsByUser(authUser?.id)
   const scenario = pickScenario(tier, seenScenarioIds)
 
+  // Charter §13: an APPROVED accommodation activates the alternate
+  // administration for this session (text-only / no-camera / reduced
+  // proctoring). Audited; the mode reaches the client so setup steps adapt.
+  const accommodation = await getAccommodation(sessionId).catch(() => null)
+  const administrationMode = accommodation?.status === 'approved'
+    ? { alternate: true, ...accommodation.modes, material: Boolean(accommodation.material) }
+    : null
+  if (administrationMode) {
+    auditLog('alternate_administration_applied', sessionId, {
+      modes: accommodation.modes, material: administrationMode.material,
+    })
+  }
+
   // Track 4.1 (PRISM_LANG, default OFF): assessment language. Untrusted —
   // resolves to 'en' unless the flag is on and the code is supported. Scoring
   // in any non-English language is PROVISIONAL/UNCALIBRATED (DIF study pending)
@@ -692,6 +707,7 @@ router.post('/start', async (req, res) => {
       characterId,
       studyArm: studyArm || null,
       language,
+      administrationMode,
       consentVersion: consentRecord?.meta?.consentVersion || null,
       consentScopes: consentRecord?.scopes || null,
     })
@@ -713,6 +729,7 @@ router.post('/start', async (req, res) => {
       ...renderParsedTurn(parsed, candidateName),
       language,
       scoringStatus: scoringStatusFor(language),
+      administrationMode,
       scenario: {
         title: scenario.title,
         domain: scenario.domain,
@@ -1421,6 +1438,18 @@ async function runEvaluation({ sessionId, session, requestId }) {
       basis: report.identityAssurance.basis,
     })
 
+    // Charter §13: disclosure ONLY when the reviewing administrator judged the
+    // alternate administration materially changes score interpretation — and
+    // then ONLY the charter sentence. The accommodation type, needs and any
+    // disability information NEVER reach the report or any buyer surface; a
+    // non-material alternate administration is externally indistinguishable
+    // (buyers cannot filter, rank or reject by it).
+    const administrationMode = session._persisted?.administrationMode || null
+    if (administrationMode?.material) {
+      report.administration = { mode: 'alternate', disclosure: ALTERNATE_ADMINISTRATION_DISCLOSURE }
+      auditLog('alternate_administration_disclosed', sessionId, { material: true })
+    }
+
     // Link the report to the signed-in user so it appears in their profile
     // history. Falls back to the durable session record (survives restarts).
     const persisted = await getSession(sessionId)
@@ -2022,6 +2051,51 @@ router.post('/consent', async (req, res) => {
     logger.captureException(err, { msg: 'assessment_consent_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to record consent' })
   }
+})
+
+// ── POST /api/assessment/accommodation ───────────────────────────────────
+// Charter §13 — candidate accommodation request (alternate administration:
+// text-only, no-camera, reduced proctoring). The needs text may reference
+// disability: it is visible ONLY to accommodations:read administrators,
+// never to buyers, and is erased with the session. Requires an entitled
+// session (request lands before the assessment starts).
+router.post('/accommodation', async (req, res) => {
+  const { sessionId, needs } = req.body || {}
+  if (!sessionId) return res.status(400).json({ error: 'sessionId required' })
+  if (!needs || String(needs).trim().length < 10) {
+    return res.status(400).json({ error: 'Please describe what you need (at least 10 characters).' })
+  }
+  const entitlement = await getEntitlement(sessionId)
+  if (!entitlement) return res.status(404).json({ error: 'No assessment session found for this id.' })
+  const session = await getSession(sessionId)
+  if (session?.completedAt) {
+    return res.status(409).json({ error: 'This assessment is already completed — accommodations apply to upcoming sessions. You can request a human review of your result instead.' })
+  }
+  try {
+    const record = await requestAccommodation(sessionId, String(needs))
+    auditLog('accommodation_requested', sessionId, { status: record.status })
+    res.json({
+      ok: true,
+      status: record.status,
+      message: 'Your request has been received. A person will review it before your assessment — you will see the outcome here.',
+    })
+  } catch (err) {
+    logger.captureException(err, { msg: 'accommodation_request_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Could not record your request.' })
+  }
+})
+
+// ── GET /api/assessment/accommodation/:sessionId ────────────────────────────
+// Candidate view: status + approved modes only (never the decision internals).
+router.get('/accommodation/:sessionId', async (req, res) => {
+  const record = await getAccommodation(req.params.sessionId)
+  if (!record) return res.status(404).json({ error: 'No accommodation request on file.' })
+  res.json({
+    status: record.status,
+    modes: record.status === 'approved' ? record.modes : null,
+    at: record.at,
+    decidedAt: record.decidedAt,
+  })
 })
 
 // ── POST /api/assessment/dispute ─────────────────────────────────────────────

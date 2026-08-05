@@ -46,6 +46,7 @@ import flagsRouter from './flags.js'
 import systemRouter from './system.js'
 import privacyRouter from './privacy.js'
 import auditRouter from './audit.js'
+import accommodationsRouter from './accommodations.js'
 
 const router = Router()
 
@@ -125,5 +126,7 @@ router.use('/system', systemRouter)
 // Phase 6 — privacy & enterprise governance.
 router.use('/privacy', privacyRouter)
 router.use('/audit', auditRouter)
+// Charter Phase 3 — candidate governance (§13 accommodations).
+router.use('/accommodations', accommodationsRouter)
 
 export default router

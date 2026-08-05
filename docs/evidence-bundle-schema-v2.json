@@ -35,6 +35,16 @@
       },
       "required": ["level", "label", "basis"]
     },
+    "administration": {
+      "type": ["object", "null"],
+      "description": "Charter §13: present ONLY when an approved alternate administration materially changes score interpretation — and then it carries the charter disclosure sentence alone. The accommodation type, the candidate's needs and any disability information NEVER enter a bundle; a non-material alternate administration is externally indistinguishable.",
+      "properties": {
+        "mode": { "const": "alternate" },
+        "disclosure": { "type": "string" }
+      },
+      "required": ["mode", "disclosure"],
+      "additionalProperties": false
+    },
     "scores": {
       "type": "object",
       "required": ["dimensions", "insufficientEvidence"],

@@ -117,6 +117,8 @@ export async function buildErasurePlan(request) {
     notes: [
       'Signed credentials are DESTROYED (deletion is the one mutation the immutability trigger permits, exactly for this right); public verification links die with them.',
       'The erasure uses the same cascade as the candidate self-service right (store eraseSession + telemetry eraseTelemetry).',
+      'Charter §16: an ACTIVE LEGAL HOLD on any in-scope session or the candidate blocks execution until released.',
+      'Charter §15: candidate_demographics rows for the candidate are deleted; anonymized aggregates survive by construction.',
     ],
   }
 }
@@ -148,6 +150,22 @@ export async function executeErasure(request) {
     candidateUserId: request.candidate_user_id, candidateEmail: request.candidate_email,
   })
   const sessionIds = await resolveSessionIds(request)
+
+  // Charter §16: candidate erasure supersedes normal retention EXCEPT a legal
+  // hold — an active hold on any in-scope session or the candidate refuses
+  // the execution until released (the request stays awaiting).
+  const { holdCovering } = await import('./retentionEnforcement.js')
+  const hold = await holdCovering({
+    sessionIds,
+    candidateRefs: [user?.id, user?.candidateId, user?.email].filter(Boolean),
+  })
+  if (hold) {
+    const err = new Error('LEGAL_HOLD_ACTIVE')
+    err.code = 'LEGAL_HOLD_ACTIVE'
+    err.holdId = hold.hold_id
+    throw err
+  }
+
   const receipt = {
     executedAt: new Date().toISOString(),
     scope: request.scope,
@@ -167,6 +185,17 @@ export async function executeErasure(request) {
     receipt.sessions.push({ sessionId: sid, storeRemoved, telemetry })
   }
   if (request.scope === 'candidate' && user) {
+    // Charter §15: re-identifiable demographic records go through the same
+    // candidate-erasure flow (keyed by the pseudonymous candidate_id).
+    // Properly anonymized aggregates — calibration parameters, approved
+    // aggregate statistics, published findings — survive by construction
+    // (they carry no per-candidate rows).
+    if (isDbConfigured() && user.candidateId) {
+      const demo = await query(
+        'DELETE FROM candidate_demographics WHERE candidate_id = $1', [user.candidateId],
+      ).catch(() => null)
+      receipt.demographicsDeleted = demo?.rowCount ?? 0
+    }
     await deleteUser(user.id)
     receipt.accountDeleted = true
   }

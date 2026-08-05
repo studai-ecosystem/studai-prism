@@ -26,6 +26,10 @@ import { adminAudit } from '../../lib/adminAudit.js'
 import {
   resolveCandidate, buildErasurePlan, executeErasure, buildAccessPackage,
 } from '../../lib/privacyPlanner.js'
+import {
+  seedRetentionDefaults, runRetention, ENFORCEABLE_ENTITIES, activeHolds,
+  isRetentionEnforcementEnabled,
+} from '../../lib/retentionEnforcement.js'
 
 const router = Router()
 
@@ -34,7 +38,8 @@ const RETENTION_ENTITIES = [
   'session_transcripts', 'verification_records', 'support_notes',
 ]
 
-// Seed retention rows once per boot (NULL days = "requires a decision").
+// Seed retention rows once per boot (NULL days = "requires a decision") plus
+// the charter §16 provisional defaults (labelled pending counsel, HA-003).
 let seeded = false
 router.use(async (req, res, next) => {
   if (!seeded) {
@@ -46,6 +51,7 @@ router.use(async (req, res, next) => {
           [randomUUID(), entity],
         )
       }
+      await seedRetentionDefaults()
       seeded = true
     } catch (err) {
       logger.captureException(err, { msg: 'retention_seed_failed', requestId: req.requestId })
@@ -67,9 +73,16 @@ router.get('/', requirePermission('privacy:read'), async (req, res) => {
       requests: requests?.rows || [],
       retention: (retention?.rows || []).map((r) => ({
         ...r,
-        state: r.retention_days == null ? 'NOT SET — requires an explicit operator decision' : `${r.retention_days} days`,
+        state: r.retention_days == null
+          ? 'NOT SET — requires an explicit operator decision'
+          : `${r.retention_days} days${r.provisional ? ' · PROVISIONAL, pending counsel' : ''}`,
       })),
-      note: 'Retention rules are documented policy. Nothing auto-deletes on a timer — enforcement is a deliberate, audited action.',
+      holds: await activeHolds(),
+      enforcement: {
+        scheduled: isRetentionEnforcementEnabled(),
+        enforceableEntities: ENFORCEABLE_ENTITIES,
+        note: 'Provisional defaults are labelled pending counsel (HA-003); the payment period is NOT legally approved. Scheduled enforcement stays off until humans enable PRISM_RETENTION_ENFORCEMENT — dry-runs and deliberate audited runs are available anytime.',
+      },
     })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_privacy_list_failed', requestId: req.requestId })
@@ -216,7 +229,27 @@ router.post('/:id/execute', requirePermission('privacy:execute'), async (req, re
     }
     await query(`UPDATE privacy_requests SET status = 'executing', updated_at = now() WHERE request_id = $1`, [req.params.id])
 
-    const receipt = await executeErasure(request)
+    let receipt
+    try {
+      receipt = await executeErasure(request)
+    } catch (err) {
+      if (err.code === 'LEGAL_HOLD_ACTIVE') {
+        // Charter §16: a legal hold blocks erasure until released — the
+        // request returns to awaiting_approval (the approval was consumed;
+        // a fresh one is required after the hold is lifted, deliberately).
+        await query(`UPDATE privacy_requests SET status = 'awaiting_approval', updated_at = now() WHERE request_id = $1`, [req.params.id])
+        await adminAudit(req, {
+          action: 'privacy_erasure_blocked_by_hold', entityType: 'privacy_request', entityId: req.params.id,
+          after: { holdId: err.holdId },
+        })
+        return res.status(409).json({
+          error: 'An active legal hold covers this candidate or a session in scope. Release the hold first — erasure supersedes retention, but never a legal hold.',
+          code: 'LEGAL_HOLD_ACTIVE',
+          holdId: err.holdId,
+        })
+      }
+      throw err
+    }
     await query(
       `UPDATE privacy_requests SET status = 'completed', receipt = $2, approval_id = $3,
               completed_at = now(), updated_at = now() WHERE request_id = $1`,
@@ -325,8 +358,9 @@ router.put('/retention/:entity', requirePermission('retention:manage'), async (r
     if (!basis || String(basis).trim().length < 10) {
       return res.status(400).json({ error: 'A written legal/operational basis (>= 10 characters) is required.' })
     }
+    // An explicit operator decision replaces the provisional charter default.
     const r = await query(
-      `UPDATE data_retention_rules SET retention_days = $2, basis = $3, updated_by = $4, updated_at = now()
+      `UPDATE data_retention_rules SET retention_days = $2, basis = $3, provisional = FALSE, updated_by = $4, updated_at = now()
         WHERE entity = $1 RETURNING entity`,
       [req.params.entity, retentionDays ?? null, String(basis).trim(), req.admin.id],
     )
@@ -338,6 +372,131 @@ router.put('/retention/:entity', requirePermission('retention:manage'), async (r
     res.json({ ok: true })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_retention_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ── Retention enforcement runs (charter §16) ─────────────────────────────────
+// Dry-run is available to privacy:manage; a REAL enforcement pass requires
+// retention:manage (wildcard-only), a dry-run receipt for the same entity
+// within the last 24h, and leaves a receipt + audit rows either way.
+router.post('/retention/:entity/run', requirePermission('privacy:manage'), async (req, res) => {
+  try {
+    const entity = req.params.entity
+    const dryRun = req.body?.dryRun !== false
+    if (!dryRun) {
+      const { hasPermission } = await import('../../lib/adminAuth.js')
+      if (!hasPermission(req.admin, 'retention:manage')) {
+        return res.status(403).json({ error: 'Enforcement requires retention:manage (dry-run needs only privacy:manage).' })
+      }
+      const recent = await query(
+        `SELECT run_id FROM retention_runs
+          WHERE entity = $1 AND mode = 'dry_run' AND created_at > now() - interval '24 hours'
+          ORDER BY created_at DESC LIMIT 1`,
+        [entity],
+      )
+      if (!recent?.rows?.length) {
+        return res.status(409).json({ error: 'Run a dry-run for this entity first (within 24 hours) — enforcement never runs blind.', code: 'DRY_RUN_REQUIRED' })
+      }
+    }
+    const result = await runRetention(entity, { dryRun, ranBy: req.admin.id })
+    if (!result.ok) return res.status(409).json(result)
+    await adminAudit(req, {
+      action: dryRun ? 'retention_dry_run' : 'retention_enforced',
+      entityType: 'retention_rule', entityId: entity,
+      after: { matched: result.receipt.matched, deleted: result.receipt.deleted, cutoff: result.receipt.cutoff },
+    })
+    res.json(result)
+  } catch (err) {
+    logger.captureException(err, { msg: 'admin_retention_run_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ── Legal holds (charter §16) ────────────────────────────────────────────────
+// A hold suspends BOTH retention enforcement AND candidate erasure for the
+// referenced session/candidate/entity until released. Placement and release
+// are audited governance actions.
+router.post('/holds', requirePermission('privacy:manage'), async (req, res) => {
+  try {
+    const { scope, reference, reason } = req.body || {}
+    if (!['session', 'candidate', 'entity'].includes(scope)) {
+      return res.status(400).json({ error: "scope must be 'session', 'candidate' or 'entity'." })
+    }
+    if (!reference || !String(reference).trim()) return res.status(400).json({ error: 'reference is required.' })
+    if (!reason || String(reason).trim().length < 10) {
+      return res.status(400).json({ error: 'A written reason (>= 10 characters) is required.' })
+    }
+    const holdId = randomUUID()
+    await query(
+      `INSERT INTO legal_holds (hold_id, scope, reference, reason, placed_by) VALUES ($1,$2,$3,$4,$5)`,
+      [holdId, scope, String(reference).trim(), String(reason).trim(), req.admin.id],
+    )
+    await adminAudit(req, {
+      action: 'legal_hold_placed', entityType: 'legal_hold', entityId: holdId,
+      after: { scope, reference: String(reference).trim() }, reason: String(reason).trim(),
+    })
+    res.status(201).json({ ok: true, holdId })
+  } catch (err) {
+    logger.captureException(err, { msg: 'admin_hold_place_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.post('/holds/:id/release', requirePermission('privacy:manage'), async (req, res) => {
+  try {
+    const { reason } = req.body || {}
+    if (!reason || String(reason).trim().length < 10) {
+      return res.status(400).json({ error: 'A written release reason (>= 10 characters) is required.' })
+    }
+    const r = await query(
+      `UPDATE legal_holds SET released_at = now(), release_reason = $2
+        WHERE hold_id = $1 AND released_at IS NULL RETURNING hold_id`,
+      [req.params.id, String(reason).trim()],
+    )
+    if (!r?.rows?.length) return res.status(404).json({ error: 'Hold not found or already released.' })
+    await adminAudit(req, {
+      action: 'legal_hold_released', entityType: 'legal_hold', entityId: req.params.id,
+      reason: String(reason).trim(),
+    })
+    res.json({ ok: true })
+  } catch (err) {
+    logger.captureException(err, { msg: 'admin_hold_release_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ── Contract retention overrides (charter §16) ───────────────────────────────
+// Validated: known entity + contract reference + positive days + written
+// basis. The enforcement engine uses the LONGEST applicable period — an
+// override can extend, never silently shorten, what the timer keeps.
+router.post('/retention/:entity/overrides', requirePermission('retention:manage'), async (req, res) => {
+  try {
+    const { contractRef, retentionDays, basis } = req.body || {}
+    if (!contractRef || String(contractRef).trim().length < 3) {
+      return res.status(400).json({ error: 'A contract reference is required.' })
+    }
+    if (!Number.isInteger(retentionDays) || retentionDays < 1) {
+      return res.status(400).json({ error: 'retentionDays must be a positive integer.' })
+    }
+    if (!basis || String(basis).trim().length < 10) {
+      return res.status(400).json({ error: 'A written basis (>= 10 characters) is required.' })
+    }
+    const known = await query('SELECT entity FROM data_retention_rules WHERE entity = $1', [req.params.entity])
+    if (!known?.rows?.length) return res.status(404).json({ error: 'Unknown retention entity.' })
+    const overrideId = randomUUID()
+    await query(
+      `INSERT INTO retention_overrides (override_id, entity, contract_ref, retention_days, basis, recorded_by)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [overrideId, req.params.entity, String(contractRef).trim(), retentionDays, String(basis).trim(), req.admin.id],
+    )
+    await adminAudit(req, {
+      action: 'retention_override_recorded', entityType: 'retention_rule', entityId: req.params.entity,
+      after: { overrideId, contractRef: String(contractRef).trim(), retentionDays }, reason: String(basis).trim(),
+    })
+    res.status(201).json({ ok: true, overrideId })
+  } catch (err) {
+    logger.captureException(err, { msg: 'admin_retention_override_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Internal server error' })
   }
 })

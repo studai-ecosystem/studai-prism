@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.DATA_DIR || join(__dirname, '..', 'data')
 const DB_FILE = join(DATA_DIR, 'assessments.json')
 
-const EMPTY = { sessions: {}, payments: {}, reports: {}, events: [], calibrations: {}, consents: {}, disputes: {}, verifications: {}, deviceLinks: {}, items: [] }
+const EMPTY = { sessions: {}, payments: {}, reports: {}, events: [], calibrations: {}, consents: {}, disputes: {}, verifications: {}, deviceLinks: {}, items: [], accommodations: {} }
 
 // Serialize writes so concurrent calls don't clobber each other.
 let writeChain = Promise.resolve()
@@ -57,6 +57,7 @@ async function readDB() {
       verifications: parsed.verifications || {},
       deviceLinks: parsed.deviceLinks || {},
       items: Array.isArray(parsed.items) ? parsed.items : [],
+      accommodations: parsed.accommodations || {},
     }
   } catch {
     return { ...EMPTY }
@@ -251,6 +252,80 @@ export async function getDispute(sessionId) {
   return db.disputes[sessionId] || null
 }
 
+// ── Accommodations (charter §13) ───────────────────────────────────────
+// The needs text may reference disability — it is visible ONLY to admins
+// holding accommodations:read, NEVER on any buyer-facing surface, and is
+// erased with the session.
+export async function requestAccommodation(sessionId, needs) {
+  const db = await readDB()
+  const existing = db.accommodations?.[sessionId]
+  if (existing && existing.status !== 'requested') return existing // decided — immutable
+  if (!db.accommodations) db.accommodations = {}
+  db.accommodations[sessionId] = {
+    sessionId,
+    needs: String(needs).slice(0, 2000),
+    modes: existing?.modes || null,
+    status: 'requested',
+    material: false,
+    decisionNote: '',
+    decidedBy: null,
+    at: existing?.at || new Date().toISOString(),
+    decidedAt: null,
+  }
+  await writeDB(db)
+  return db.accommodations[sessionId]
+}
+
+export async function getAccommodation(sessionId) {
+  const db = await readDB()
+  return db.accommodations?.[sessionId] || null
+}
+
+export async function decideAccommodation(sessionId, { approved, modes, material, note, decidedBy }) {
+  const db = await readDB()
+  const existing = db.accommodations?.[sessionId]
+  if (!existing) return null
+  existing.status = approved ? 'approved' : 'denied'
+  existing.modes = approved ? {
+    textOnly: Boolean(modes?.textOnly),
+    noCamera: Boolean(modes?.noCamera),
+    reducedProctoring: Boolean(modes?.reducedProctoring),
+  } : null
+  existing.material = approved ? Boolean(material) : false
+  existing.decisionNote = String(note || '').slice(0, 1000)
+  existing.decidedBy = decidedBy || null
+  existing.decidedAt = new Date().toISOString()
+  await writeDB(db)
+  return existing
+}
+
+export async function listAccommodations({ status, page, pageSize } = {}) {
+  const db = await readDB()
+  let rows = Object.values(db.accommodations || {})
+  if (status) rows = rows.filter((a) => a.status === status)
+  rows.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
+  return paginate(rows, page, pageSize)
+}
+
+// ── Retention enforcement (charter §16): integrity-event pruning ────────────
+// Deletes proctoring/integrity events older than the cutoff, EXCEPT events
+// belonging to excluded sessions (legal hold / active dispute). Dry-run
+// counts without mutating.
+export async function pruneEventsBefore(cutoffIso, { excludeSessionIds = [], dryRun = true } = {}) {
+  const db = await readDB()
+  const cutoff = new Date(cutoffIso).getTime()
+  const excluded = new Set(excludeSessionIds)
+  const matches = db.events.filter((e) => {
+    const t = new Date(e.at || 0).getTime()
+    return Number.isFinite(t) && t < cutoff && !excluded.has(e.sessionId)
+  })
+  if (dryRun) return { matched: matches.length, deleted: 0 }
+  const keep = new Set(matches)
+  db.events = db.events.filter((e) => !keep.has(e))
+  await writeDB(db)
+  return { matched: matches.length, deleted: matches.length }
+}
+
 // Charter §11: the candidate-readable review outcome
 // ({ outcome, explanation, decidedAt }). Private reviewer reasoning stays in
 // admin notes — never here.
@@ -314,8 +389,8 @@ export async function getDeviceLink(pairCode) {
 export async function eraseSession(sessionId) {
   const db = await readDB()
   let removed = false
-  for (const bucket of ['sessions', 'payments', 'reports', 'calibrations', 'consents', 'disputes', 'verifications', 'deviceLinks']) {
-    if (db[bucket][sessionId]) {
+  for (const bucket of ['sessions', 'payments', 'reports', 'calibrations', 'consents', 'disputes', 'verifications', 'deviceLinks', 'accommodations']) {
+    if (db[bucket]?.[sessionId]) {
       delete db[bucket][sessionId]
       removed = true
     }

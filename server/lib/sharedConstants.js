@@ -160,6 +160,15 @@ export const REVIEW_OUTCOMES = {
 // guaranteed legal SLA (§11).
 export const REVIEW_TARGET_BUSINESS_DAYS = 7
 
+// ── Charter §13: alternate administration ────────────────────────────────────
+// The ONLY disclosure any external surface may carry about an accommodated
+// session — and ONLY when the reviewing administrator judged that the
+// alternate administration materially changes score interpretation. The
+// accommodation type, the candidate's needs and any disability information
+// are NEVER disclosed. Wording is charter-verbatim.
+export const ALTERNATE_ADMINISTRATION_DISCLOSURE =
+  'This assessment was completed using an approved alternate administration mode. Results should be interpreted according to the accompanying administration notes.'
+
 // Consent copy version. Bump whenever the wording or scope set in
 // src/pages/Briefing.jsx CONSENT_ITEMS changes; recorded with every consent
 // and stamped onto the session record (audit finding C5).

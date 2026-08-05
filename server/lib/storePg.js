@@ -276,6 +276,91 @@ export async function setDisputeResolution(sessionId, resolution) {
   return getDispute(sessionId)
 }
 
+// ── Accommodations (charter §13) — twins of storeJson ────────────────────────
+function rowToAccommodation(row) {
+  if (!row) return null
+  return {
+    sessionId: row.session_id,
+    needs: row.needs,
+    modes: row.modes || null,
+    status: row.status,
+    material: Boolean(row.material),
+    decisionNote: row.decision_note || '',
+    decidedBy: row.decided_by || null,
+    at: row.at instanceof Date ? row.at.toISOString() : row.at,
+    decidedAt: row.decided_at instanceof Date ? row.decided_at.toISOString() : row.decided_at,
+  }
+}
+
+export async function requestAccommodation(sessionId, needs) {
+  const existing = await getAccommodation(sessionId)
+  if (existing && existing.status !== 'requested') return existing
+  await query(
+    `INSERT INTO v1_accommodations (session_id, needs, status) VALUES ($1,$2,'requested')
+     ON CONFLICT (session_id) DO UPDATE SET needs = EXCLUDED.needs
+       WHERE v1_accommodations.status = 'requested'`,
+    [sessionId, String(needs).slice(0, 2000)],
+  )
+  return getAccommodation(sessionId)
+}
+
+export async function getAccommodation(sessionId) {
+  const r = await query('SELECT * FROM v1_accommodations WHERE session_id = $1', [sessionId])
+  return rowToAccommodation(r?.rows?.[0])
+}
+
+export async function decideAccommodation(sessionId, { approved, modes, material, note, decidedBy }) {
+  const existing = await getAccommodation(sessionId)
+  if (!existing) return null
+  const cleanModes = approved ? {
+    textOnly: Boolean(modes?.textOnly),
+    noCamera: Boolean(modes?.noCamera),
+    reducedProctoring: Boolean(modes?.reducedProctoring),
+  } : null
+  await query(
+    `UPDATE v1_accommodations SET status = $2, modes = $3, material = $4,
+       decision_note = $5, decided_by = $6, decided_at = now() WHERE session_id = $1`,
+    [sessionId, approved ? 'approved' : 'denied', cleanModes ? JSON.stringify(cleanModes) : null,
+      approved ? Boolean(material) : false, String(note || '').slice(0, 1000), decidedBy || null],
+  )
+  return getAccommodation(sessionId)
+}
+
+export async function listAccommodations({ status, page, pageSize } = {}) {
+  const { p, size, offset } = pageArgs(page, pageSize)
+  const params = []
+  let clause = ''
+  if (status) { params.push(String(status)); clause = 'WHERE status = $1' }
+  const total = await query(`SELECT COUNT(*) FROM v1_accommodations ${clause}`, params)
+  const r = await query(
+    `SELECT * FROM v1_accommodations ${clause} ORDER BY at DESC LIMIT ${size} OFFSET ${offset}`,
+    params,
+  )
+  return {
+    rows: (r?.rows || []).map(rowToAccommodation),
+    total: Number(total?.rows?.[0]?.count || 0),
+    page: p,
+    pageSize: size,
+  }
+}
+
+// ── Retention enforcement (charter §16) — twin of storeJson.pruneEventsBefore ─
+export async function pruneEventsBefore(cutoffIso, { excludeSessionIds = [], dryRun = true } = {}) {
+  const params = [cutoffIso]
+  let exclusion = ''
+  if (excludeSessionIds.length) {
+    params.push(excludeSessionIds)
+    exclusion = 'AND (session_id IS NULL OR NOT (session_id = ANY($2::text[])))'
+  }
+  const matched = await query(
+    `SELECT COUNT(*) FROM v1_events WHERE at < $1 ${exclusion}`, params,
+  )
+  const count = Number(matched?.rows?.[0]?.count || 0)
+  if (dryRun) return { matched: count, deleted: 0 }
+  const del = await query(`DELETE FROM v1_events WHERE at < $1 ${exclusion}`, params)
+  return { matched: count, deleted: del?.rowCount ?? 0 }
+}
+
 // ── Identity verification ─────────────────────────────────────────────────────
 export async function recordVerification(sessionId, data) {
   const rec = {
@@ -348,7 +433,7 @@ export async function eraseSession(sessionId) {
   let removed = false
   const tables = [
     'v1_sessions', 'v1_payments', 'v1_reports', 'v1_calibrations',
-    'v1_consents', 'v1_disputes', 'v1_verifications',
+    'v1_consents', 'v1_disputes', 'v1_verifications', 'v1_accommodations',
   ]
   for (const t of tables) {
     const r = await query(`DELETE FROM ${t} WHERE session_id = $1`, [sessionId])

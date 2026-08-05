@@ -54,6 +54,10 @@ export default function Briefing() {
   // the server blocks /start without the declaration on file.
   const [needsAgeConfirm, setNeedsAgeConfirm] = useState(false)
   const [ageChecked, setAgeChecked] = useState(false)
+  // Charter §13: candidate accommodation request (reviewed by a person).
+  const [accomOpen, setAccomOpen] = useState(false)
+  const [accomNeeds, setAccomNeeds] = useState('')
+  const [accomState, setAccomState] = useState('idle') // idle | sending | sent | error
   const [filter, setFilter] = useState('all') // 'all' | 'male' | 'female'
   const [shaking, setShaking] = useState(false)
   // Track 4.1 — assessment language (selector shows only when PRISM_LANG on).
@@ -567,6 +571,60 @@ export default function Briefing() {
                   </span>
                 </button>
               )}
+              {/* Charter §13: accessible accommodation request path. */}
+              <div className="mt-4 p-3 rounded-xl bg-[var(--color-paper)] border border-[var(--color-line)]">
+                {!accomOpen ? (
+                  <p className="font-sans text-[12px] text-[var(--color-ink-muted)]">
+                    Need an adjustment — text-only, no camera, or reduced monitoring?{' '}
+                    <button type="button" onClick={() => setAccomOpen(true)} className="text-[var(--color-accent)] font-semibold underline cursor-pointer bg-transparent border-0 p-0">
+                      Request an accommodation
+                    </button>{' '}
+                    — a person reviews every request, and it is never shared with employers.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <label className="font-sans text-[12px] font-semibold text-[var(--color-ink)]" htmlFor="accom-needs">
+                      What do you need? (reviewed by a person; never shared with employers)
+                    </label>
+                    <textarea
+                      id="accom-needs"
+                      value={accomNeeds}
+                      onChange={(e) => setAccomNeeds(e.target.value)}
+                      rows={3}
+                      className="w-full rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] p-2 font-sans text-[13px]"
+                      placeholder="e.g. I need a text-only assessment without a camera because…"
+                    />
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        disabled={accomNeeds.trim().length < 10 || accomState === 'sending'}
+                        onClick={async () => {
+                          setAccomState('sending')
+                          try {
+                            const r = await fetch('/api/assessment/accommodation', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ sessionId, needs: accomNeeds.trim() }),
+                            })
+                            const d = await r.json().catch(() => ({}))
+                            if (!r.ok) throw new Error(d.error || 'Could not send your request.')
+                            setAccomState('sent')
+                          } catch (err) {
+                            setAccomState('error')
+                            setSubmitError(err.message)
+                          }
+                        }}
+                        className="px-4 py-2 rounded-lg bg-[var(--color-ink)] text-[var(--color-paper)] font-sans text-[12px] font-semibold disabled:opacity-50"
+                      >
+                        {accomState === 'sending' ? 'Sending…' : 'Send request'}
+                      </button>
+                      {accomState === 'sent' && (
+                        <span className="font-sans text-[12px] text-[var(--color-ink-muted)]">Received — a person will review it before your assessment.</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
 

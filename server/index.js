@@ -95,6 +95,15 @@ async function start() {
     })
     .catch((err) => logger.captureException(err, { msg: 'v2_seed_items_failed' }))
 
+  // Charter §16 (PRISM_RETENTION_ENFORCEMENT, default OFF): the scheduled
+  // retention-enforcement job. Dark = nothing auto-deletes; dry-runs and
+  // deliberate audited runs remain available through the privacy plane.
+  import('./lib/retentionEnforcement.js')
+    .then(({ startRetentionScheduler }) => {
+      if (startRetentionScheduler()) logger.info('retention_scheduler_active')
+    })
+    .catch((err) => logger.captureException(err, { msg: 'retention_scheduler_failed' }))
+
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       logger.error('port_in_use', {

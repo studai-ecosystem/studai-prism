@@ -873,6 +873,12 @@ export default function ScoreReport() {
               {ASSURANCE_LEVELS[report.identityAssurance.level]?.explanation}
             </>
           )}
+          {report.administration?.disclosure && (
+            <>
+              {' '}<span style={{ fontWeight: 700, color: 'var(--t2)' }}>Administration.</span>{' '}
+              {report.administration.disclosure}
+            </>
+          )}
           {' '}{INTEGRITY_SCORING_NOTE}
         </div>
 

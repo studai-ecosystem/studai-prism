@@ -147,6 +147,9 @@ export async function assembleEvidenceBundle(sessionId) {
     // Reports stamped at issuance carry it; a legacy report credentialled
     // today gets the level derived live from the same records.
     identityAssurance: report.identityAssurance || await assuranceForSession(sessionId),
+    // Charter §13: the alternate-administration disclosure (charter sentence
+    // only, when material) — never the accommodation type or needs.
+    administration: report.administration || null,
     reliability: report.reliability || null,
     confidenceInterval: report.confidenceInterval || null,
     evidence: report.evidence || null, // per-dimension transcript quotes (disclosure-gated at the API)

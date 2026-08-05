@@ -142,6 +142,9 @@ export default function Verify() {
   const assuranceSpec = assurance ? ASSURANCE_LEVELS[assurance.level] : null
   // Charter §10: integrity is ONLY the neutral tri-status.
   const integrityStatus = credential?.view?.integrity?.status || null
+  // Charter §13: the alternate-administration disclosure (charter sentence
+  // only, present only when material) — never the type or needs.
+  const administration = credential?.view?.administration || report.administration || null
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-paper)', color: 'var(--color-ink)', fontFamily: 'var(--font-body)', lineHeight: 'var(--leading-base)' }}>
@@ -208,6 +211,12 @@ export default function Verify() {
                   <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', lineHeight: 'var(--leading-base)' }}>
                     <span style={{ fontWeight: 700, color: 'var(--color-ink)' }}>Integrity · {integrityStatus}.</span>{' '}
                     {INTEGRITY_SCORING_NOTE}
+                  </p>
+                )}
+                {administration?.disclosure && (
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', lineHeight: 'var(--leading-base)' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--color-ink)' }}>Administration.</span>{' '}
+                    {administration.disclosure}
                   </p>
                 )}
               </div>

@@ -210,9 +210,13 @@ export default function VerifyIdentity() {
         throw new Error(data.error || 'Could not record verification.')
       }
       // Charter §14: the phone second camera is OFF by default — the link-phone
-      // step exists only when the governance-gated flag enables it.
+      // step exists only when the governance-gated flag enables it. Charter
+      // §13: an approved no-camera accommodation also skips the room scan.
       const cfg = await fetch('/api/payment/config').then((r) => (r.ok ? r.json() : null)).catch(() => null)
-      const nextStep = cfg?.proctoring?.phoneCam ? 'link-phone' : 'room-scan'
+      const accommodation = await fetch(`/api/assessment/accommodation/${sessionId}`)
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      const noCamera = accommodation?.status === 'approved' && accommodation?.modes?.noCamera
+      const nextStep = noCamera ? 'briefing' : cfg?.proctoring?.phoneCam ? 'link-phone' : 'room-scan'
       navigate(`/${nextStep}?session=${sessionId}`)
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.')

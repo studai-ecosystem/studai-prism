@@ -70,6 +70,9 @@ export function buildVerifyView(bundle, fullDisclosure, { integrityStatus, ident
     reliability: bundle.reliability,
     confidenceInterval: bundle.confidenceInterval,
     identityAssurance: identityAssurance || bundle.identityAssurance || null,
+    // §13: the charter disclosure sentence only (when material) — never the
+    // accommodation type, needs or any disability information.
+    administration: bundle.administration || null,
     integrity: { status: integrityStatus },
     consent: { version: bundle.consent?.version || null },
     provenance: bundle.provenance,
