@@ -6,6 +6,7 @@
     "start": "node index.js",
     "dev": "node --watch index.js",
     "migrate": "node config/runWithRuntimeSecrets.js db/migrate.js",
+    "migrate:store": "node config/runWithRuntimeSecrets.js db/migrateStore.js",
     "seed:items": "node config/runWithRuntimeSecrets.js db/seedItems.js",
     "seed:admin": "node config/runWithRuntimeSecrets.js db/seedAdmin.js",
     "test": "node --test"

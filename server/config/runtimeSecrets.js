@@ -20,6 +20,7 @@ const BOOTSTRAP_KEYS = new Set([
   'AWS_SECRETS_MANAGER_REGION',
   'AWS_SECRETS_MANAGER_REQUIRED',
   'AWS_SECRETS_MANAGER_SECRET_ID',
+  'AWS_SECRETS_MANAGER_SECRET_IDS',
   'AWS_SESSION_TOKEN',
   'AWS_WEB_IDENTITY_TOKEN_FILE',
   'IDENTITY_ENDPOINT',
@@ -41,6 +42,33 @@ export class RuntimeSecretsError extends Error {
 
 function requiredFor(env) {
   return env.NODE_ENV === 'production' || env.AWS_SECRETS_MANAGER_REQUIRED === 'true'
+}
+
+// Charter §4.2 (SECRET-SPLIT-DESIGN.md loader contract): the runtime can load
+// EITHER the legacy monolithic secret (AWS_SECRETS_MANAGER_SECRET_ID) OR an
+// ordered comma-separated list of category secrets
+// (AWS_SECRETS_MANAGER_SECRET_IDS). The list wins when both are set so the
+// cutover is a single env change and instantly reversible.
+function secretIdsFor(env) {
+  const list = String(env.AWS_SECRETS_MANAGER_SECRET_IDS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (list.length > 0) {
+    const seen = new Set()
+    for (const id of list) {
+      if (seen.has(id)) {
+        throw new RuntimeSecretsError(
+          'SECRETS_MANAGER_DUPLICATE_SECRET_ID',
+          `AWS_SECRETS_MANAGER_SECRET_IDS lists secret ${id} more than once.`,
+        )
+      }
+      seen.add(id)
+    }
+    return list
+  }
+  const single = String(env.AWS_SECRETS_MANAGER_SECRET_ID || '').trim()
+  return single ? [single] : []
 }
 
 function parseSecretString(secretString) {
@@ -71,7 +99,7 @@ function parseSecretString(secretString) {
   return payload
 }
 
-function applyPayload(payload, env) {
+function validatePayload(payload) {
   const keys = Object.keys(payload)
   for (const key of keys) {
     if (!ENV_KEY_PATTERN.test(key)) {
@@ -94,14 +122,12 @@ function applyPayload(payload, env) {
       )
     }
   }
-
-  for (const key of keys) env[key] = String(payload[key])
-  return keys.length
+  return keys
 }
 
 export async function loadRuntimeSecrets({ env = process.env, client = null } = {}) {
-  const secretId = String(env.AWS_SECRETS_MANAGER_SECRET_ID || '').trim()
-  if (!secretId) {
+  const secretIds = secretIdsFor(env)
+  if (secretIds.length === 0) {
     if (requiredFor(env)) {
       throw new RuntimeSecretsError(
         'SECRETS_MANAGER_SECRET_ID_MISSING',
@@ -122,25 +148,54 @@ export async function loadRuntimeSecrets({ env = process.env, client = null } = 
   }
 
   const secretsClient = client || new SecretsManagerClient(awsClientConfig({ env, region }))
-  let response
-  try {
-    response = await secretsClient.send(new GetSecretValueCommand({
-      SecretId: secretId,
-      VersionStage: 'AWSCURRENT',
-    }))
-  } catch (error) {
-    throw new RuntimeSecretsError(
-      'SECRETS_MANAGER_FETCH_FAILED',
-      `AWS Secrets Manager request failed (${error?.name || 'unknown'}).`,
-      error,
-    )
+
+  // Fetch and validate EVERY secret before applying ANY key: a bad payload in
+  // one category must not leave the environment partially hydrated.
+  const merged = {}
+  const ownerOf = new Map() // key → secretId that first defined it
+  const perSecret = []
+  for (const secretId of secretIds) {
+    let response
+    try {
+      response = await secretsClient.send(new GetSecretValueCommand({
+        SecretId: secretId,
+        VersionStage: 'AWSCURRENT',
+      }))
+    } catch (error) {
+      throw new RuntimeSecretsError(
+        'SECRETS_MANAGER_FETCH_FAILED',
+        `AWS Secrets Manager request failed (${error?.name || 'unknown'}).`,
+        error,
+      )
+    }
+    const payload = parseSecretString(response.SecretString)
+    const keys = validatePayload(payload)
+    for (const key of keys) {
+      // §4.2 loader contract: a key defined by more than one secret is a
+      // configuration ERROR — refuse to boot rather than silently override.
+      if (ownerOf.has(key)) {
+        throw new RuntimeSecretsError(
+          'SECRETS_MANAGER_DUPLICATE_KEY',
+          `Runtime secret key ${key} is defined by both ${ownerOf.get(key)} and ${secretId}.`,
+        )
+      }
+      ownerOf.set(key, secretId)
+      merged[key] = payload[key]
+    }
+    perSecret.push({ secretId, keyCount: keys.length, versionId: response.VersionId || null })
   }
 
-  const keyCount = applyPayload(parseSecretString(response.SecretString), env)
+  for (const key of Object.keys(merged)) env[key] = String(merged[key])
+
+  if (perSecret.length === 1) {
+    // Legacy single-secret status shape, unchanged for existing callers/logs.
+    return { enabled: true, keyCount: perSecret[0].keyCount, versionId: perSecret[0].versionId }
+  }
   return {
     enabled: true,
-    keyCount,
-    versionId: response.VersionId || null,
+    keyCount: ownerOf.size,
+    versionId: null,
+    secrets: perSecret,
   }
 }
 

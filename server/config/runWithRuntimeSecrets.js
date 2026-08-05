@@ -6,6 +6,7 @@ import { loadRuntimeSecrets } from './runtimeSecrets.js'
 const SERVER_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ALLOWED_TARGETS = new Set([
   'db/migrate.js',
+  'db/migrateStore.js',
   'db/seedAdmin.js',
   'db/seedItems.js',
 ])

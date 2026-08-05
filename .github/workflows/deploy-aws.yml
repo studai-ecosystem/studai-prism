@@ -1,8 +1,20 @@
-name: Deploy AWS
+# ⛔ PROHIBITED LEGACY PATH (remediation charter §21 / Phase 4).
+# This workflow deploys the OLD ECS service. Production runs on EKS
+# (namespace prism) with a single-writer JSON store on EFS: starting the ECS
+# service creates a SECOND WRITER against the same EFS store and corrupts it.
+# The supported release path is build-image.yml + `kubectl set image`
+# (see studai-prism/docs/DEPLOYMENT_RUNBOOK_v1.md). This file is retained,
+# guarded, for audit history only — do not run it.
+name: Deploy AWS (ECS — PROHIBITED legacy path)
 
 on:
   workflow_dispatch:
     inputs:
+      confirm_prohibited_ecs_deploy:
+        description: 'PROHIBITED (double-writer risk). To override you must type exactly: I-UNDERSTAND-THIS-STARTS-A-SECOND-WRITER'
+        required: true
+        default: 'DO-NOT-RUN'
+        type: string
       hostname:
         description: Comma-separated public hostnames routed by the shared production ALB (first is canonical)
         required: true
@@ -33,6 +45,18 @@ jobs:
     timeout-minutes: 40
 
     steps:
+      - name: Refuse prohibited ECS deploy (charter §21 guard)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.confirm_prohibited_ecs_deploy }}" != 'I-UNDERSTAND-THIS-STARTS-A-SECOND-WRITER' ]]; then
+            echo '::error::This ECS pipeline is PROHIBITED: production runs on EKS with a single-writer'
+            echo '::error::JSON store on EFS. Running ECS in parallel creates a second writer and corrupts'
+            echo '::error::the store. Use build-image.yml + kubectl set image (docs/DEPLOYMENT_RUNBOOK_v1.md).'
+            exit 1
+          fi
+          echo '::warning::Prohibited-path override confirmed by operator input. Proceeding.'
+
       - name: Check out committed source
         uses: actions/checkout@v4
 

@@ -56,6 +56,119 @@ test('runtime secrets are optional for local development', async () => {
   )
 })
 
+// ── Charter §4.2: split-secret loader (SECRET-SPLIT-DESIGN.md contract) ──────
+
+function fakeMultiClient(payloadsById) {
+  return {
+    async send(command) {
+      assert.equal(command.input.VersionStage, 'AWSCURRENT')
+      const entry = payloadsById[command.input.SecretId]
+      assert.ok(entry, `unexpected SecretId ${command.input.SecretId}`)
+      return { SecretString: JSON.stringify(entry.payload), VersionId: entry.versionId }
+    },
+  }
+}
+
+test('split secrets merge across an ordered id list', async () => {
+  const env = {
+    NODE_ENV: 'production',
+    AWS_SECRETS_MANAGER_SECRET_IDS: ' /studai/prism/aws-prod/database, /studai/prism/aws-prod/ai ',
+    AWS_SECRETS_MANAGER_REGION: 'ap-south-1',
+  }
+  const status = await loadRuntimeSecrets({
+    env,
+    client: fakeMultiClient({
+      '/studai/prism/aws-prod/database': { payload: { DATABASE_URL: 'postgres://x' }, versionId: 'db-1' },
+      '/studai/prism/aws-prod/ai': { payload: { BEDROCK_TIMEOUT_MS: 25000, AI_REGION: 'ap-south-1' }, versionId: 'ai-1' },
+    }),
+  })
+  assert.equal(env.DATABASE_URL, 'postgres://x')
+  assert.equal(env.BEDROCK_TIMEOUT_MS, '25000')
+  assert.deepEqual(status, {
+    enabled: true,
+    keyCount: 3,
+    versionId: null,
+    secrets: [
+      { secretId: '/studai/prism/aws-prod/database', keyCount: 1, versionId: 'db-1' },
+      { secretId: '/studai/prism/aws-prod/ai', keyCount: 2, versionId: 'ai-1' },
+    ],
+  })
+})
+
+test('split secrets refuse to boot when a key is defined by two secrets', async () => {
+  const env = {
+    NODE_ENV: 'production',
+    AWS_SECRETS_MANAGER_SECRET_IDS: '/studai/prism/aws-prod/database,/studai/prism/aws-prod/ai',
+    AWS_SECRETS_MANAGER_REGION: 'ap-south-1',
+  }
+  await assert.rejects(
+    loadRuntimeSecrets({
+      env,
+      client: fakeMultiClient({
+        '/studai/prism/aws-prod/database': { payload: { DATABASE_URL: 'postgres://x' }, versionId: 'db-1' },
+        '/studai/prism/aws-prod/ai': { payload: { DATABASE_URL: 'postgres://evil' }, versionId: 'ai-1' },
+      }),
+    }),
+    (error) => error instanceof RuntimeSecretsError &&
+      error.code === 'SECRETS_MANAGER_DUPLICATE_KEY' &&
+      !error.message.includes('postgres://'),
+  )
+  // Fail closed: nothing was applied to the environment.
+  assert.equal(env.DATABASE_URL, undefined)
+})
+
+test('split secrets refuse a repeated secret id in the list', async () => {
+  await assert.rejects(
+    loadRuntimeSecrets({
+      env: {
+        NODE_ENV: 'production',
+        AWS_SECRETS_MANAGER_SECRET_IDS: '/a,/b,/a',
+        AWS_SECRETS_MANAGER_REGION: 'ap-south-1',
+      },
+      client: fakeMultiClient({}),
+    }),
+    (error) => error instanceof RuntimeSecretsError &&
+      error.code === 'SECRETS_MANAGER_DUPLICATE_SECRET_ID',
+  )
+})
+
+test('split secrets validate every payload before applying any key', async () => {
+  const env = {
+    NODE_ENV: 'production',
+    AWS_SECRETS_MANAGER_SECRET_IDS: '/ok,/bad',
+    AWS_SECRETS_MANAGER_REGION: 'ap-south-1',
+  }
+  await assert.rejects(
+    loadRuntimeSecrets({
+      env,
+      client: fakeMultiClient({
+        '/ok': { payload: { JWT_SECRET: 'fine' }, versionId: 'v1' },
+        '/bad': { payload: { AWS_ACCESS_KEY_ID: 'bootstrap' }, versionId: 'v2' },
+      }),
+    }),
+    (error) => error instanceof RuntimeSecretsError &&
+      error.code === 'SECRETS_MANAGER_BOOTSTRAP_KEY',
+  )
+  assert.equal(env.JWT_SECRET, undefined, 'atomic apply: valid secret must not leak through')
+})
+
+test('split-secret id list satisfies the production requirement and cannot itself be injected', async () => {
+  // AWS_SECRETS_MANAGER_SECRET_IDS is a bootstrap key: a payload must not set it.
+  const env = {
+    NODE_ENV: 'production',
+    AWS_SECRETS_MANAGER_SECRET_ID: '/studai/prism/prod/runtime',
+    AWS_SECRETS_MANAGER_REGION: 'ap-south-1',
+  }
+  await assert.rejects(
+    loadRuntimeSecrets({
+      env,
+      client: fakeClient({ SecretString: JSON.stringify({ AWS_SECRETS_MANAGER_SECRET_IDS: '/evil' }) }),
+    }),
+    (error) => error instanceof RuntimeSecretsError &&
+      error.code === 'SECRETS_MANAGER_BOOTSTRAP_KEY',
+  )
+})
+
 test('runtime secrets reject AWS bootstrap credentials in the payload', async () => {
   const env = {
     NODE_ENV: 'production',
