@@ -17,7 +17,7 @@ import { requirePermission } from '../../lib/adminAuth.js'
 import { adminAudit } from '../../lib/adminAudit.js'
 import { auditLog } from '../../lib/telemetry.js'
 import { createInvite, listInvites, getInvite, listRedemptions, revokeInvite } from '../../lib/invites.js'
-import { getReport } from '../../lib/store.js'
+import { getReport, getDispute } from '../../lib/store.js'
 
 const router = Router()
 
@@ -41,13 +41,29 @@ router.get('/:id', requirePermission('invites:read'), async (req, res) => {
     const redemptions = await Promise.all(
       (await listRedemptions(invite.inviteId)).map(async (r) => {
         const report = await getReport(r.sessionId).catch(() => null)
+        const dispute = await getDispute(r.sessionId).catch(() => null)
         return {
           ...r,
           reportReady: Boolean(report),
+          reviewRequested: Boolean(dispute),
         }
       }),
     )
-    res.json({ invite, redemptions })
+    // Charter §22 cohort accounting: contracted seats, used seats, completions
+    // and human-review usage against the plan's allowance. All computed from
+    // operational facts — no prices anywhere near this view (HA-015).
+    const completions = redemptions.filter((r) => r.reportReady).length
+    const reviewsUsed = redemptions.filter((r) => r.reviewRequested).length
+    const allowancePct = Number(invite.plan?.reviewAllowancePct)
+    const accounting = {
+      contractedSeats: invite.maxUses,
+      usedSeats: invite.usedCount,
+      completions,
+      completionRate: invite.usedCount > 0 ? +(completions / invite.usedCount).toFixed(3) : null,
+      reviewsUsed,
+      reviewAllowance: Number.isFinite(allowancePct) ? Math.ceil((invite.maxUses * allowancePct) / 100) : null,
+    }
+    res.json({ invite, redemptions, accounting })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_invite_detail_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Internal server error' })
@@ -56,7 +72,7 @@ router.get('/:id', requirePermission('invites:read'), async (req, res) => {
 
 router.post('/', requirePermission('invites:manage'), async (req, res) => {
   try {
-    const { label, maxUses, startsAt, expiresAt, code } = req.body || {}
+    const { label, maxUses, startsAt, expiresAt, code, institution, plan, renewalOf } = req.body || {}
     if (!label || !String(label).trim()) {
       return res.status(400).json({ error: 'A label is required (e.g. the college and batch).' })
     }
@@ -72,9 +88,12 @@ router.post('/', requirePermission('invites:manage'), async (req, res) => {
         expiresAt,
         createdBy: req.admin.id,
         code: code ? String(code) : null,
+        institution: institution ? String(institution) : '',
+        plan: plan ?? null,
+        renewalOf: renewalOf || null,
       })
     } catch (err) {
-      if (['INVALID_MAX_USES', 'INVALID_EXPIRY', 'INVALID_WINDOW', 'INVALID_CODE'].includes(err.code)) {
+      if (['INVALID_MAX_USES', 'INVALID_EXPIRY', 'INVALID_WINDOW', 'INVALID_CODE', 'INVALID_PLAN', 'INVALID_RENEWAL'].includes(err.code)) {
         return res.status(400).json({ error: err.message })
       }
       if (err.code === 'CODE_TAKEN') {
@@ -86,7 +105,10 @@ router.post('/', requirePermission('invites:manage'), async (req, res) => {
       action: 'invite_created',
       entityType: 'assessment_invite',
       entityId: created.invite.inviteId,
-      after: { label: created.invite.label, maxUses: created.invite.maxUses, expiresAt: created.invite.expiresAt },
+      after: {
+        label: created.invite.label, maxUses: created.invite.maxUses, expiresAt: created.invite.expiresAt,
+        institution: created.invite.institution, plan: created.invite.plan, renewalOf: created.invite.renewalOf,
+      },
     })
     // The raw token appears in this response ONLY — never stored, never listed.
     res.status(201).json({ invite: created.invite, token: created.token, path: `/invite/${created.token}` })

@@ -1,4 +1,5 @@
 import logger from '../../lib/logger.js'
+import { query, isDbConfigured } from '../../db/pool.js'
 
 const DEFAULT_RATES = Object.freeze({
   // Promotional price through 2026-08-31; the standard rate is applied after.
@@ -56,10 +57,10 @@ export function estimateCost(modelId, usage, now = new Date()) {
   return +cost.toFixed(8)
 }
 
-export function recordUsage({ task, modelId, response, fallback = false }) {
+export function recordUsage({ task, modelId, response, fallback = false, sessionId = null }) {
   const usage = response?.usage || {}
   const costUsd = estimateCost(modelId, usage)
-  logger.info('ai_usage', {
+  const record = {
     provider: 'aws-bedrock',
     task,
     modelId,
@@ -71,7 +72,25 @@ export function recordUsage({ task, modelId, response, fallback = false }) {
     cacheWriteInputTokens: Number(usage.cacheWriteInputTokens) || 0,
     latencyMs: Number(response?.metrics?.latencyMs) || null,
     estimatedCostUsd: costUsd,
-  })
+  }
+  logger.info('ai_usage', record)
+  // Charter §23: persist per-call usage into the queryable margin plane.
+  // Fire-and-forget and failure-tolerant — cost accounting must never break
+  // or slow the assessment path. estimatedCostUsd stays NULL when the rate
+  // is unknown (UNKNOWN is never rendered as zero).
+  if (isDbConfigured()) {
+    query(
+      `INSERT INTO ai_usage_events
+         (session_id, task, provider, model_id, fallback, input_tokens, output_tokens,
+          cache_read_tokens, cache_write_tokens, latency_ms, estimated_cost_usd)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [sessionId || null, task, record.provider, modelId, Boolean(fallback),
+        record.inputTokens, record.outputTokens, record.cacheReadInputTokens,
+        record.cacheWriteInputTokens, record.latencyMs, costUsd],
+    ).catch((err) => {
+      logger.warn('ai_usage_persist_failed', { task, detail: err?.code || err?.message || 'unknown' })
+    })
+  }
   return costUsd
 }
 

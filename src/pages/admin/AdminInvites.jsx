@@ -21,8 +21,8 @@ export default function AdminInvites() {
   const [notice, setNotice] = useState('')
   const [creating, setCreating] = useState(false)
   const [createdLink, setCreatedLink] = useState(null) // { url, invite }
-  const [form, setForm] = useState({ label: '', maxUses: 10, expiresAt: '', code: '' })
-  const [detail, setDetail] = useState(null) // { invite, redemptions }
+  const [form, setForm] = useState({ label: '', maxUses: 10, expiresAt: '', code: '', institution: '', cohortPlanned: '', reviewAllowancePct: 5, term: '' })
+  const [detail, setDetail] = useState(null) // { invite, redemptions, accounting }
   const canManage = adminHasPermission('invites:manage')
 
   const reload = useCallback(async () => {
@@ -45,11 +45,18 @@ export default function AdminInvites() {
           maxUses: Number(form.maxUses),
           expiresAt: new Date(form.expiresAt).toISOString(),
           code: form.code.trim() || undefined,
+          institution: form.institution.trim() || undefined,
+          // §22 cohort plan metadata — never prices (pricing provisional, HA-015).
+          plan: {
+            ...(form.cohortPlanned !== '' ? { cohortPlanned: Number(form.cohortPlanned) } : {}),
+            reviewAllowancePct: Number(form.reviewAllowancePct),
+            ...(form.term.trim() ? { term: form.term.trim() } : {}),
+          },
         }),
       })
       setCreatedLink({ url: `${window.location.origin}${r.path}`, invite: r.invite, code: form.code.trim() || null })
       setCreating(false)
-      setForm({ label: '', maxUses: 10, expiresAt: '', code: '' })
+      setForm({ label: '', maxUses: 10, expiresAt: '', code: '', institution: '', cohortPlanned: '', reviewAllowancePct: 5, term: '' })
       reload()
     } catch (err) { setError(err.message) }
   }
@@ -135,6 +142,33 @@ export default function AdminInvites() {
               onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
               placeholder="leave empty for a random link" />
           </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Sponsoring institution (optional)</span>
+            <input className={field} value={form.institution} maxLength={200}
+              onChange={(e) => setForm((f) => ({ ...f, institution: e.target.value }))}
+              placeholder="e.g. IIT Madras placement cell" />
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Planned cohort</span>
+              <input className={field} type="number" min={1} max={10000} value={form.cohortPlanned}
+                onChange={(e) => setForm((f) => ({ ...f, cohortPlanned: e.target.value }))} placeholder="e.g. 100" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Review allowance %</span>
+              <input className={field} type="number" min={0} max={100} value={form.reviewAllowancePct}
+                onChange={(e) => setForm((f) => ({ ...f, reviewAllowancePct: e.target.value }))} />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Term</span>
+              <input className={field} value={form.term} maxLength={100}
+                onChange={(e) => setForm((f) => ({ ...f, term: e.target.value }))} placeholder="e.g. 2026-27 odd" />
+            </label>
+          </div>
+          <p className="text-[11px] text-[var(--color-ink-muted)]">
+            Plans carry no prices — pricing is provisional and lives in the internal pricing package until approved (HA-015).
+            Institution-required candidates never pay.
+          </p>
           <div>
             <button type="submit" className={btn}>Create link</button>
           </div>
@@ -179,6 +213,22 @@ export default function AdminInvites() {
             <p className="font-semibold text-[var(--color-ink)]">Roster — {detail.invite.label}</p>
             <button type="button" className="underline text-[13px]" onClick={() => setDetail(null)}>Close</button>
           </div>
+          {detail.accounting && (
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
+              {[
+                ['Contracted seats', detail.accounting.contractedSeats],
+                ['Used', detail.accounting.usedSeats],
+                ['Completions', detail.accounting.completions],
+                ['Reviews used', `${detail.accounting.reviewsUsed}${detail.accounting.reviewAllowance != null ? ` / ${detail.accounting.reviewAllowance} allowed` : ''}`],
+                ['Institution', detail.invite.institution || '—'],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-[8px] border border-[var(--color-line)] p-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{label}</p>
+                  <p className={`${mono} tabular-nums text-[var(--color-ink)]`}>{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
           {detail.redemptions.length === 0 ? (
             <p className="mt-3 text-sm text-[var(--color-ink-muted)]">No redemptions yet.</p>
           ) : (

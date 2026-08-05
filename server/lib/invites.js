@@ -27,7 +27,42 @@ export function isInvitesAvailable() {
 // type them in any case; random link tokens stay case-sensitive.
 const CODE_RE = /^[a-z0-9][a-z0-9-]{2,31}$/
 
-export async function createInvite({ label = '', maxUses = 10, startsAt = null, expiresAt, createdBy, code = null }) {
+// Charter §22: cohort plan metadata — validated, price-free (pricing is
+// provisional/unpublished, HA-015; quotes live in documents, never the DB).
+export function sanitizePlan(plan) {
+  if (plan === null || plan === undefined) return null
+  if (typeof plan !== 'object' || Array.isArray(plan)) {
+    throw Object.assign(new Error('plan must be an object'), { code: 'INVALID_PLAN' })
+  }
+  const out = {}
+  if (plan.cohortPlanned !== undefined && plan.cohortPlanned !== null && plan.cohortPlanned !== '') {
+    const n = Number(plan.cohortPlanned)
+    if (!Number.isInteger(n) || n < 1 || n > 10000) {
+      throw Object.assign(new Error('plan.cohortPlanned must be an integer between 1 and 10000'), { code: 'INVALID_PLAN' })
+    }
+    out.cohortPlanned = n
+  }
+  // Human-review allowance — charter indicative default: up to 5% of cohort.
+  const pct = plan.reviewAllowancePct === undefined || plan.reviewAllowancePct === null || plan.reviewAllowancePct === ''
+    ? 5
+    : Number(plan.reviewAllowancePct)
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+    throw Object.assign(new Error('plan.reviewAllowancePct must be between 0 and 100'), { code: 'INVALID_PLAN' })
+  }
+  out.reviewAllowancePct = pct
+  if (plan.term !== undefined && plan.term !== null) out.term = String(plan.term).slice(0, 100)
+  if (plan.notes !== undefined && plan.notes !== null) out.notes = String(plan.notes).slice(0, 1000)
+  const allowed = new Set(['cohortPlanned', 'reviewAllowancePct', 'term', 'notes'])
+  for (const key of Object.keys(plan)) {
+    if (!allowed.has(key)) {
+      // Refuse unknown keys so prices can never sneak into the database plan.
+      throw Object.assign(new Error(`plan.${key} is not a recognised plan field`), { code: 'INVALID_PLAN' })
+    }
+  }
+  return out
+}
+
+export async function createInvite({ label = '', maxUses = 10, startsAt = null, expiresAt, createdBy, code = null, institution = '', plan = null, renewalOf = null }) {
   const uses = Number(maxUses)
   if (!Number.isInteger(uses) || uses < 1 || uses > 100) {
     throw Object.assign(new Error('maxUses must be an integer between 1 and 100'), { code: 'INVALID_MAX_USES' })
@@ -54,11 +89,17 @@ export async function createInvite({ label = '', maxUses = 10, startsAt = null, 
   }
 
   const inviteId = randomUUID()
+  const cleanPlan = sanitizePlan(plan)
+  if (renewalOf) {
+    const prior = await getInvite(renewalOf)
+    if (!prior) throw Object.assign(new Error('renewalOf must reference an existing invite'), { code: 'INVALID_RENEWAL' })
+  }
   try {
     await query(
-      `INSERT INTO assessment_invites (invite_id, token_hash, label, max_uses, starts_at, expires_at, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [inviteId, hashToken(token), String(label).slice(0, 200), uses, start.toISOString(), expiry.toISOString(), createdBy],
+      `INSERT INTO assessment_invites (invite_id, token_hash, label, max_uses, starts_at, expires_at, created_by, institution, plan, renewal_of)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [inviteId, hashToken(token), String(label).slice(0, 200), uses, start.toISOString(), expiry.toISOString(), createdBy,
+        String(institution || '').slice(0, 200), cleanPlan ? JSON.stringify(cleanPlan) : null, renewalOf || null],
     )
   } catch (err) {
     if (err?.code === '23505') {
@@ -82,6 +123,9 @@ function rowToInvite(row) {
     createdAt: row.created_at,
     revokedAt: row.revoked_at,
     revokeReason: row.revoke_reason,
+    institution: row.institution || '',
+    plan: row.plan || null,
+    renewalOf: row.renewal_of || null,
     status: row.revoked_at
       ? 'revoked'
       : new Date(row.expires_at) < new Date()

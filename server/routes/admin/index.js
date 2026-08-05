@@ -47,6 +47,7 @@ import systemRouter from './system.js'
 import privacyRouter from './privacy.js'
 import auditRouter from './audit.js'
 import accommodationsRouter from './accommodations.js'
+import marginRouter from './margin.js'
 
 const router = Router()
 
@@ -128,5 +129,7 @@ router.use('/privacy', privacyRouter)
 router.use('/audit', auditRouter)
 // Charter Phase 3 — candidate governance (§13 accommodations).
 router.use('/accommodations', accommodationsRouter)
+// Charter Phase 5 — commercial readiness (§23 contribution margin).
+router.use('/margin', marginRouter)
 
 export default router

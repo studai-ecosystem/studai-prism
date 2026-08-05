@@ -41,6 +41,7 @@ const NAV = [
     items: [
       { to: '/admin/payments', label: 'Payments', icon: ClipboardList, permission: 'payments:read' },
       { to: '/admin/invites', label: 'Group invites', icon: ClipboardList, permission: 'invites:read' },
+      { to: '/admin/margin', label: 'Contribution margin', icon: ClipboardList, permission: 'margin:read' },
     ],
   },
   {

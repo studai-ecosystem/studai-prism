@@ -125,7 +125,7 @@ export function createCompletionService({ converseFn = converse } = {}) {
         retries,
         task,
       })
-      recordUsage({ task, modelId, response, fallback })
+      recordUsage({ task, modelId, response, fallback, sessionId: options.sessionId ?? null })
       return toCompletionEnvelope(response, { modelId, expectJson, fallback })
     }
 

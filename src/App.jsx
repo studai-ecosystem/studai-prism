@@ -44,6 +44,7 @@ import AdminAudit from './pages/admin/AdminAudit.jsx'
 import ShellHome from './pages/ShellHome.jsx'
 import InviteRedeem from './pages/InviteRedeem.jsx'
 import AdminInvites from './pages/admin/AdminInvites.jsx'
+import AdminMargin from './pages/admin/AdminMargin.jsx'
 import ScienceBehindPrism from './pages/research/ScienceBehindPrism.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
 import AIEvaluation from './pages/research/AIEvaluation.jsx'
@@ -108,6 +109,7 @@ export default function App() {
         <Route path="disputes/:sessionId" element={<AdminDisputeDetail />} />
         <Route path="payments" element={<AdminPayments />} />
         <Route path="invites" element={<AdminInvites />} />
+        <Route path="margin" element={<AdminMargin />} />
         <Route path="consents" element={<AdminRecords mode="consents" />} />
         <Route path="verifications" element={<AdminRecords mode="verifications" />} />
         <Route path="integrity" element={<AdminRecords mode="integrity" />} />

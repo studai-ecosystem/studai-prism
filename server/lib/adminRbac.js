@@ -119,6 +119,7 @@ export const PERMISSIONS = {
   'accommodations:read': 'View accommodation requests (sensitive — may reference disability)',
   'accommodations:manage': 'Decide accommodation requests (alternate administration modes)',
   'audit:read': 'Search and export the admin audit trail',
+  'margin:read': 'View contribution-margin dashboards and finance exports (unknown costs shown as UNKNOWN, never zero)',
   'exports:create': 'Create data exports (every export is ledgered)',
   'notes:write': 'Add internal notes to operational entities',
   'dashboard:read': 'View the command centre',
@@ -199,7 +200,7 @@ export const ROLES = {
     description: 'Payments, entitlements, refunds, reconciliation, revenue reports.',
     permissions: [
       'dashboard:read', 'payments:read', 'payments:grant', 'payments:revoke', 'payments:refund',
-      'users:read', 'invites:read', 'exports:create', 'notes:write',
+      'users:read', 'invites:read', 'margin:read', 'exports:create', 'notes:write',
     ],
   },
   content_admin: {

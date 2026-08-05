@@ -38,7 +38,7 @@ export function buildTranscriptionRequest(buffer, filename, language, modelId) {
   }
 }
 
-export async function transcribeAudio(buffer, filename = 'answer.webm', language = 'en') {
+export async function transcribeAudio(buffer, filename = 'answer.webm', language = 'en', { sessionId = null } = {}) {
   const policy = policyFor('speech_to_text')
   const response = await converse(buildTranscriptionRequest(buffer, filename, language, policy.modelId), {
     region: policy.region,
@@ -46,6 +46,6 @@ export async function transcribeAudio(buffer, filename = 'answer.webm', language
     retries: 2,
     task: 'speech_to_text',
   })
-  recordUsage({ task: 'speech_to_text', modelId: policy.modelId, response })
+  recordUsage({ task: 'speech_to_text', modelId: policy.modelId, response, sessionId })
   return textFromConverse(response).replace(/^['"]|['"]$/g, '').trim()
 }

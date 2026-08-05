@@ -332,6 +332,10 @@ export async function eraseTelemetry(sessionId) {
     // Charter §9: the institution-verification event is governance evidence
     // about this candidate's session — erased with it.
     ['institution_verifications', 'session_id'],
+    // Charter §23: per-call AI cost telemetry is session-keyed — erased with
+    // the session (aggregate finance reporting loses erased rows; recorded in
+    // the contribution-margin methodology).
+    ['ai_usage_events', 'session_id'],
     ['audit_log', 'session_id'],
   ]) {
     const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId]).catch(() => null)

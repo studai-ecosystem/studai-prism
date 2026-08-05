@@ -674,7 +674,7 @@ router.post('/start', async (req, res) => {
         { role: 'system', content: avatarSystem },
         { role: 'user', content: openingPrompt },
       ],
-    }, { task: 'opening' })
+    }, { task: 'opening', sessionId })
 
     const raw = response.choices[0].message.content
     const parsed = JSON.parse(raw)
@@ -926,7 +926,7 @@ router.post('/message', async (req, res) => {
       temperature: 0.85,
       response_format: { type: 'json_object' },
       messages: promptMessages,
-    }, { task: 'conversation' })
+    }, { task: 'conversation', sessionId })
 
     const raw = response.choices[0].message.content
     const parsed = JSON.parse(raw)
@@ -1207,7 +1207,7 @@ async function runEvaluation({ sessionId, session, requestId }) {
             },
             { role: 'user', content: 'Evaluate the candidate now. Return only valid JSON.' },
           ],
-        }, { task: 'judge_full' }).then((r) => ({ spec, raw: r.choices[0].message.content })),
+        }, { task: 'judge_full', sessionId }).then((r) => ({ spec, raw: r.choices[0].message.content })),
       ),
     )
 
@@ -1706,7 +1706,7 @@ router.post('/transcribe', audioUpload.single('audio'), async (req, res) => {
     const asrSession = req.body?.sessionId ? await getSession(req.body.sessionId) : null
     const langCode = resolveLanguage(asrSession?.language)
     const hint = asrHintFor(langCode)
-    const transcript = await transcribeAudio(req.file.buffer, filename, hint)
+    const transcript = await transcribeAudio(req.file.buffer, filename, hint, { sessionId: req.body?.sessionId || null })
     if (!transcript) {
       return res.status(422).json({ error: 'Could not understand the audio. Please try again.' })
     }
@@ -1955,7 +1955,7 @@ router.post('/calibrate', async (req, res) => {
             max_completion_tokens: 60,
             response_format: { type: 'json_object' },
           },
-          { retries: 1, task: 'entry_estimator' },
+          { retries: 1, task: 'entry_estimator', sessionId },
         )
         const parsed = JSON.parse(completion?.choices?.[0]?.message?.content || '{}')
         const est = anchorsToTheta(parsed)
@@ -1978,7 +1978,7 @@ router.post('/calibrate', async (req, res) => {
             temperature: 0.2,
             max_completion_tokens: 8,
           },
-          { retries: 1, task: 'calibration' },
+          { retries: 1, task: 'calibration', sessionId },
         )
         const raw = (completion?.choices?.[0]?.message?.content || '').toLowerCase()
         const match = DIFFICULTY_TIERS.find((t) => raw.includes(t))
