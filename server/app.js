@@ -23,6 +23,9 @@ import teamfitRouter from './routes/teamfit.js'
 import pilotRouter from './routes/pilot.js'
 import evidenceRouter from './routes/evidence.js'
 import adminRouter from './routes/admin/index.js'
+import ecosystemRouter from './routes/ecosystem.js'
+import catalogRouter from './routes/catalog.js'
+import wellKnownRouter from './routes/wellKnown.js'
 import { checkModelDriftAtBoot } from './lib/modelDrift.js'
 import {
   isProduction,
@@ -140,6 +143,11 @@ export function buildApp() {
   // Super Admin & Product Control Centre (dark: 404 unless PRISM_ADMIN_CONSOLE=true).
   // Database-backed admin identities + MFA + RBAC; audited mutations only.
   app.use('/api/admin', adminRouter)
+  // StudAI Talent Ecosystem: aligned jobs, dynamic assessment catalog & JWKS
+  app.use('/api/ecosystem', ecosystemRouter)
+  app.use('/api/assessments/catalog', catalogRouter)
+  app.use('/api/catalog', catalogRouter)
+  app.use('/.well-known', wellKnownRouter)
   // Phase 3 Stage 6.1: surface judge-model drift loudly at boot.
   checkModelDriftAtBoot()
 

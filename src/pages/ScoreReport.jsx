@@ -251,6 +251,46 @@ export default function ScoreReport() {
     setEmailInput(getUser()?.email || '')
   }, [])
 
+  // ── StudAI One Talent Ecosystem (Journey A: Put Strengths to Work) ─────────
+  const [ecosystemJobs, setEcosystemJobs] = useState([])
+  const [handoverLoading, setHandoverLoading] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/ecosystem/aligned-jobs')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.jobs && Array.isArray(data.jobs)) {
+          setEcosystemJobs(data.jobs)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleEcosystemHandover = async (destination, targetJobRef = null) => {
+    setHandoverLoading(true)
+    try {
+      const res = await fetch('/api/ecosystem/handover-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          destination,
+          targetJobRef,
+          sessionId: sessionId || report?.sessionId,
+          credentialId: verifyId || report?.credentialId,
+        }),
+      })
+      const data = await res.json()
+      if (data?.redirect_url) {
+        window.location.href = data.redirect_url
+        return
+      }
+    } catch {
+      window.location.href = destination === 'career' ? 'https://career.studai.one' : 'https://hire.studai.one'
+    } finally {
+      setHandoverLoading(false)
+    }
+  }
+
   if (!report) {
     if (loadingReport) {
       return (
@@ -1205,6 +1245,164 @@ export default function ScoreReport() {
               <CheckCircle2 size={16} />{disputeMsg}
             </div>
           )}
+        </div>
+
+        {/* ── STUDAI TALENT ECOSYSTEM: PUT YOUR VERIFIED STRENGTHS TO WORK ── */}
+        <div
+          className="rpt-section no-print"
+          style={{
+            marginTop: 28,
+            padding: '28px 24px',
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, rgba(14,124,123,0.06) 0%, rgba(255,255,255,1) 100%)',
+            border: '2px solid rgba(14,124,123,0.22)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span
+                style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: 'rgb(14,124,123)', color: 'white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, fontSize: 16,
+                }}
+              >
+                ◆
+              </span>
+              <div>
+                <span
+                  style={{
+                    fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+                    letterSpacing: '0.06em', color: 'rgb(14,124,123)',
+                  }}
+                >
+                  StudAI One Talent Ecosystem
+                </span>
+                <h3 style={{ fontFamily: 'Georgia, serif', fontSize: 22, color: 'var(--color-ink)', margin: 0 }}>
+                  Put your verified strengths to work
+                </h3>
+              </div>
+            </div>
+            <span
+              style={{
+                fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999,
+                background: 'rgba(14,124,123,0.12)', color: 'rgb(14,124,123)',
+              }}
+            >
+              Verified Proof Active
+            </span>
+          </div>
+
+          <p style={{ fontSize: 14, color: 'var(--color-ink-muted)', margin: '0 0 20px', lineHeight: 1.6 }}>
+            Your assessment is complete. Your verified behavioral profile has unlocked matching opportunities in
+            <strong> StudAI Hire</strong> and portable credential verification.
+          </p>
+
+          {/* Aligned Opportunities Feed */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14, marginBottom: 24 }}>
+            {ecosystemJobs.map((job) => (
+              <div
+                key={job.job_ref}
+                style={{
+                  background: 'white',
+                  borderRadius: 12,
+                  padding: 16,
+                  border: '1px solid var(--color-line)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'rgb(14,124,123)' }}>
+                      {job.company?.name || 'Enterprise Partner'}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>
+                      {job.work_mode === 'remote' ? 'Remote' : 'Hybrid'}
+                    </span>
+                  </div>
+                  <h4 style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-ink)', margin: '0 0 6px' }}>
+                    {job.title}
+                  </h4>
+                  <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', margin: '0 0 10px', lineHeight: 1.4 }}>
+                    {job.alignment_reason || 'Values your demonstrated Critical Thinking & Problem Solving proof.'}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid var(--color-line)' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-ink)' }}>
+                    ₹{(job.salary_range?.min / 100000).toFixed(1)}L - {(job.salary_range?.max / 100000).toFixed(1)}L
+                  </span>
+                  <button
+                    onClick={() => handleEcosystemHandover('hire', job.job_ref)}
+                    disabled={handoverLoading}
+                    style={{
+                      border: 'none', background: 'transparent',
+                      color: 'rgb(14,124,123)', fontWeight: 600, fontSize: 12,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                      padding: 0,
+                    }}
+                  >
+                    Apply with PRISM <ArrowRight size={13} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Dual Primary Ecosystem CTAs */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, paddingTop: 16, borderTop: '1px solid rgba(14,124,123,0.15)' }}>
+            <button
+              onClick={() => handleEcosystemHandover('hire')}
+              disabled={handoverLoading}
+              style={{
+                flex: '1 1 240px',
+                padding: '12px 20px',
+                borderRadius: 10,
+                background: 'rgb(14,124,123)',
+                color: 'white',
+                border: 'none',
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                boxShadow: '0 2px 6px rgba(14,124,123,0.25)',
+              }}
+            >
+              <Briefcase size={16} />
+              {handoverLoading ? 'Connecting to Hire…' : 'View Jobs in StudAI Hire'}
+              <ArrowRight size={15} />
+            </button>
+            <button
+              onClick={() => handleEcosystemHandover('career')}
+              disabled={handoverLoading}
+              style={{
+                flex: '1 1 240px',
+                padding: '12px 20px',
+                borderRadius: 10,
+                background: 'white',
+                color: 'rgb(14,124,123)',
+                border: '1.5px solid rgb(14,124,123)',
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <Sparkles size={16} />
+              {handoverLoading ? 'Connecting to Career…' : 'See what these results mean for your career'}
+              <ArrowRight size={15} />
+            </button>
+          </div>
         </div>
 
         {/* EMAIL REPORT MODAL */}
