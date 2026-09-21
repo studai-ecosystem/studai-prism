@@ -75,14 +75,23 @@ export function sampleCount() {
 // executes one LLM completion per spec, then the aggregator votes across them.
 //
 //   defaultModel — the pinned primary Bedrock model ID.
-export function buildPanelPlan(defaultModel) {
+//   customDimensions — optional array of dimension keys (defaults to DIMENSION_KEYS)
+export function buildPanelPlan(defaultModel, customDimensions = null) {
   const models = [defaultModel, ...extraModels()]
   const total = sampleCount()
+  const dims = Array.isArray(customDimensions) && customDimensions.length > 0 ? customDimensions : DIMENSION_KEYS
+  
+  // Generate rotated permutations of dimensions
+  const orderings = [dims]
+  for (let s = 1; s < Math.min(4, dims.length); s++) {
+    orderings.push([...dims.slice(s), ...dims.slice(0, s)])
+  }
+
   const plan = []
   for (let i = 0; i < total; i++) {
     const persona = PERSONAS[PERSONA_ORDER[i % PERSONA_ORDER.length]]
     const model = models[i % models.length]
-    const dimensionOrder = DIMENSION_ORDERS[i % DIMENSION_ORDERS.length]
+    const dimensionOrder = orderings[i % orderings.length]
     plan.push({
       id: `${persona.id}#${i + 1}`,
       model,

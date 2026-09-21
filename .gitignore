@@ -20,6 +20,11 @@ server/data/assessments.json
 *.log
 npm-debug.log*
 
+# Browser audit artifacts (generated evidence; CI uploads these separately)
+test-results/
+playwright-report/
+audit-results/
+
 # OS
 .DS_Store
 Thumbs.db

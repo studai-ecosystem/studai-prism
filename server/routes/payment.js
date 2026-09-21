@@ -74,6 +74,8 @@ router.get('/config', (_req, res) => {
 
 // ── POST /api/payment/create-order ───────────────────────────────────────────
 router.post('/create-order', async (req, res) => {
+  const authUser = getAuthUser(req)
+  if (!authUser) return res.status(401).json({ error: 'Sign in before starting checkout.' })
   try {
     const order = await getRazorpay().orders.create({
       amount: PRICE_PAISE, // always use server-side amount
@@ -103,6 +105,8 @@ router.post('/create-order', async (req, res) => {
 
 // ── POST /api/payment/verify ─────────────────────────────────────────────────
 router.post('/verify', async (req, res) => {
+  const authUser = getAuthUser(req)
+  if (!authUser) return res.status(401).json({ error: 'Sign in before verifying payment.' })
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -137,6 +141,8 @@ router.post('/verify', async (req, res) => {
       orderId: razorpay_order_id,
       amount: PRICE_PAISE,
       mode: 'paid',
+      userId: authUser.id,
+      userEmail: authUser.email,
     })
   } catch (err) {
     logger.captureException(err, { msg: 'payment_verify_entitlement_failed', requestId: req.requestId })
@@ -151,13 +157,15 @@ router.post('/verify', async (req, res) => {
 // production when PRISM_DUMMY_PAYMENTS=true (checkout bypass while the
 // payment gateway is not live). Dummy sessions are marked mode='dummy'.
 router.post('/dev-session', async (req, res) => {
+  const authUser = getAuthUser(req)
+  if (!authUser) return res.status(401).json({ error: 'Sign in before creating an assessment session.' })
   const dummy = isDummyPayments()
   if (process.env.NODE_ENV === 'production' && !dummy) {
     return res.status(403).json({ error: 'Not available in production' })
   }
   const sessionId = uuidv4()
   const mode = dummy && process.env.NODE_ENV === 'production' ? 'dummy' : 'dev'
-  await createEntitlement({ sessionId, mode, amount: 0 })
+  await createEntitlement({ sessionId, mode, amount: 0, userId: authUser.id, userEmail: authUser.email })
   logger.info('payment_session_minted', { sessionId, mode, requestId: req.requestId })
   res.json({ sessionId })
 })

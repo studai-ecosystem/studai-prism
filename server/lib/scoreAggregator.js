@@ -53,14 +53,18 @@ function reliabilityLabel(agreement, maxBand) {
 
 // samples: array of { scores:{dim:0-100,...}, feedback, evidence, highlights,
 //                     growthAreas, _meta:{id,persona,model,swapped,dimensionOrder} }
-export function aggregateSamples(samples) {
+export function aggregateSamples(samples, customDimensionKeys = null) {
   const valid = (samples || []).filter((s) => s && s.scores)
   if (!valid.length) return null
+
+  const dims = Array.isArray(customDimensionKeys) && customDimensionKeys.length > 0
+    ? customDimensionKeys
+    : (valid[0]?.scores ? Object.keys(valid[0].scores) : DIMENSION_KEYS)
 
   const scores = {}
   const perDimensionBand = {}
   const bands = []
-  for (const dim of DIMENSION_KEYS) {
+  for (const dim of dims) {
     const vals = valid.map((s) => Number(s.scores[dim])).filter((n) => Number.isFinite(n))
     scores[dim] = Math.round(median(vals))
     const band = Math.round(spread(vals))
@@ -80,12 +84,12 @@ export function aggregateSamples(samples) {
   let positionSwapDelta = null
   if (swapped.length && unswapped.length) {
     let sum = 0
-    for (const dim of DIMENSION_KEYS) {
+    for (const dim of dims) {
       const a = median(swapped.map((s) => Number(s.scores[dim])))
       const b = median(unswapped.map((s) => Number(s.scores[dim])))
       sum += Math.abs(a - b)
     }
-    positionSwapDelta = +(sum / DIMENSION_KEYS.length).toFixed(1)
+    positionSwapDelta = +(sum / (dims.length || 1)).toFixed(1)
   }
 
   // Pick the representative sample (closest to the medians) for the prose.
@@ -93,7 +97,7 @@ export function aggregateSamples(samples) {
   let bestDist = Infinity
   for (const s of valid) {
     let dist = 0
-    for (const dim of DIMENSION_KEYS) dist += Math.abs(Number(s.scores[dim]) - scores[dim])
+    for (const dim of dims) dist += Math.abs(Number(s.scores[dim]) - (scores[dim] || 0))
     if (dist < bestDist) {
       bestDist = dist
       rep = s

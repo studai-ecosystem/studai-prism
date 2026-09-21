@@ -218,7 +218,9 @@ export default function ScoreReport() {
     if (report || !sessionId) return
     let cancelled = false
     setLoadingReport(true)
-    fetch(`/api/assessment/report/${sessionId}`)
+    fetch(`/api/assessment/report/${sessionId}`, {
+      headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+    })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (!cancelled && d) setReport(d) })
       .catch(() => {})
@@ -271,7 +273,7 @@ export default function ScoreReport() {
     try {
       const res = await fetch('/api/ecosystem/handover-token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
         body: JSON.stringify({
           destination,
           targetJobRef,

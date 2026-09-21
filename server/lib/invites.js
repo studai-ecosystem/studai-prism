@@ -201,7 +201,7 @@ export async function redeemInvite(token, { userId, userEmail }) {
 
   // Mint the entitlement first; if the seat claim below loses, revoke it.
   const sessionId = randomUUID()
-  await createEntitlement({ sessionId, mode: 'invite', amount: 0 })
+  await createEntitlement({ sessionId, mode: 'invite', amount: 0, userId, userEmail })
 
   const client = await pool.connect()
   try {

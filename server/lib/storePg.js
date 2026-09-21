@@ -9,23 +9,26 @@
 import { query } from '../db/pool.js'
 
 // ── Payments ────────────────────────────────────────────────────────────────
-export async function createEntitlement({ sessionId, paymentId, orderId, amount, mode }) {
+export async function createEntitlement({ sessionId, paymentId, orderId, amount, mode, userId, userEmail }) {
   const rec = {
     sessionId,
     paymentId: paymentId || null,
     orderId: orderId || null,
     amount: amount ?? null,
     mode: mode || 'paid',
+    userId: userId || null,
+    userEmail: userEmail || null,
     consumed: false,
     createdAt: new Date().toISOString(),
   }
   await query(
-    `INSERT INTO v1_payments (session_id, payment_id, order_id, amount, mode, consumed, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
+    `INSERT INTO v1_payments (session_id, payment_id, order_id, amount, mode, consumed, created_at, user_id, user_email)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      ON CONFLICT (session_id) DO UPDATE SET
        payment_id = EXCLUDED.payment_id, order_id = EXCLUDED.order_id,
-       amount = EXCLUDED.amount, mode = EXCLUDED.mode, consumed = EXCLUDED.consumed`,
-    [sessionId, rec.paymentId, rec.orderId, rec.amount, rec.mode, rec.consumed, rec.createdAt],
+       amount = EXCLUDED.amount, mode = EXCLUDED.mode, consumed = EXCLUDED.consumed,
+       user_id = EXCLUDED.user_id, user_email = EXCLUDED.user_email`,
+    [sessionId, rec.paymentId, rec.orderId, rec.amount, rec.mode, rec.consumed, rec.createdAt, rec.userId, rec.userEmail],
   )
   return rec
 }
@@ -40,6 +43,8 @@ export async function getEntitlement(sessionId) {
     orderId: row.order_id,
     amount: row.amount,
     mode: row.mode,
+    userId: row.user_id || null,
+    userEmail: row.user_email || null,
     consumed: row.consumed,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
   }

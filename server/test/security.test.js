@@ -49,6 +49,8 @@ const BEDROCK_PRODUCTION_ENV = {
   BEDROCK_MULTIMODAL_MODEL: 'mistral.mistral-large-3-675b-instruct',
   BEDROCK_STT_MODEL: 'mistral.voxtral-mini-3b-2507',
   BEDROCK_ALLOW_GLOBAL_INFERENCE: 'true',
+  PRISM_PG_STORE: 'true',
+  DATABASE_URL: 'postgres://studai:prism@127.0.0.1:5432/prism',
 }
 
 // ── C8: JWT hard-fail in production ──────────────────────────────────────────
@@ -231,5 +233,38 @@ test('C21: production app does not reflect arbitrary Origins (no CORS wildcard)'
     }
   } finally {
     process.env.NODE_ENV = oldEnv
+  }
+})
+
+test('DEF-07 & DEF-02: production requires PRISM_PG_STORE=true and blocks PRISM_DUMMY_PAYMENTS', () => {
+  const saved = new Map()
+  for (const key of ['NODE_ENV', 'JWT_SECRET', 'PRISM_DUMMY_PAYMENTS', ...Object.keys(BEDROCK_PRODUCTION_ENV)]) {
+    saved.set(key, process.env[key])
+  }
+  try {
+    process.env.NODE_ENV = 'production'
+    process.env.JWT_SECRET = 'a-real-secret'
+    Object.assign(process.env, BEDROCK_PRODUCTION_ENV)
+
+    // DEF-07: PRISM_PG_STORE must be true
+    process.env.PRISM_PG_STORE = 'false'
+    assert.throws(() => assertProductionSecrets(), /PRISM_PG_STORE/)
+    process.env.PRISM_PG_STORE = 'true'
+
+    // DEF-07: DATABASE_URL must be present
+    delete process.env.DATABASE_URL
+    assert.throws(() => assertProductionSecrets(), /DATABASE_URL/)
+    process.env.DATABASE_URL = BEDROCK_PRODUCTION_ENV.DATABASE_URL
+
+    // DEF-02: PRISM_DUMMY_PAYMENTS must NOT be true in production
+    process.env.PRISM_DUMMY_PAYMENTS = 'true'
+    assert.throws(() => assertProductionSecrets(), /PRISM_DUMMY_PAYMENTS/)
+    delete process.env.PRISM_DUMMY_PAYMENTS
+    assert.doesNotThrow(() => assertProductionSecrets())
+  } finally {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
   }
 })

@@ -251,7 +251,9 @@ router.post('/:id/entitlement', requirePermission('payments:grant'), async (req,
     // mode 'admin_grant' ≠ 'paid' → the session is synthetic-flagged by the
     // existing timeline rule and stays OUT of calibration data (conservative).
     const sessionId = randomUUID()
-    const entitlement = await createEntitlement({ sessionId, mode: 'admin_grant', amount: 0 })
+    const entitlement = await createEntitlement({
+      sessionId, mode: 'admin_grant', amount: 0, userId: user.id, userEmail: user.email,
+    })
     await adminAudit(req, {
       action: 'entitlement_granted', entityType: 'user', entityId: user.id,
       after: { sessionId, mode: 'admin_grant' }, reason,

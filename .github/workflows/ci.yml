@@ -51,6 +51,20 @@ jobs:
         run: |
           npm ci
           npm run build
+      - name: Install critical-path browser
+        run: npx playwright install --with-deps chromium
+      - name: Critical browser and accessibility gates
+        run: npm run test:e2e:critical -- --project=chromium
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prism-browser-audit-evidence
+          path: |
+            audit-results/
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
       - name: Judge fingerprint consistency (Stage 6.1)
         # The pinned judge deployment file must parse and carry the escalation
         # rule; config changes touching the deployment must update it in the

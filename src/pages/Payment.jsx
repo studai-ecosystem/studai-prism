@@ -33,7 +33,7 @@ function loadRazorpayScript() {
 
 // Open the Razorpay modal and, on success, verify server-side. Resolves with the
 // minted sessionId. The amount is always enforced server-side.
-function openRazorpayCheckout({ cfg, order, user }) {
+function openRazorpayCheckout({ cfg, order, user, token }) {
   return new Promise((resolve, reject) => {
     const rzp = new window.Razorpay({
       key: cfg.keyId,
@@ -48,7 +48,7 @@ function openRazorpayCheckout({ cfg, order, user }) {
         try {
           const verifyRes = await fetch('/api/payment/verify', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify(response),
           })
           if (!verifyRes.ok) throw new Error('Payment could not be verified. If you were charged, contact support.')
@@ -112,6 +112,8 @@ export default function Payment() {
     setLoading(true)
     setError(null)
     try {
+      const token = getToken()
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {}
       // Ask the server which checkout flow is available (publishable key only).
       const cfgRes = await fetch('/api/payment/config')
       const cfg = cfgRes.ok ? await cfgRes.json() : {}
@@ -123,13 +125,13 @@ export default function Payment() {
       if (cfg.enabled && cfg.keyId) {
         // ── Live Razorpay checkout ──────────────────────────────────────────
         await loadRazorpayScript()
-        const orderRes = await fetch('/api/payment/create-order', { method: 'POST' })
+        const orderRes = await fetch('/api/payment/create-order', { method: 'POST', headers: authHeaders })
         if (!orderRes.ok) {
           const data = await orderRes.json().catch(() => ({}))
           throw new Error(data.error || 'Could not start checkout. Please try again.')
         }
         const order = await orderRes.json()
-        const sessionId = await openRazorpayCheckout({ cfg, order, user })
+        const sessionId = await openRazorpayCheckout({ cfg, order, user, token })
         navigate(nextStep(sessionId))
         return
       }
@@ -138,7 +140,7 @@ export default function Payment() {
       if (!cfg.devSessionAvailable) {
         throw new Error('Payments are not configured yet. Please contact support.')
       }
-      const res = await fetch('/api/payment/dev-session', { method: 'POST' })
+      const res = await fetch('/api/payment/dev-session', { method: 'POST', headers: authHeaders })
       if (!res.ok) throw new Error('Could not start your session. Please try again.')
       const { sessionId } = await res.json()
       // Continue into the next step (which carries the sessionId through to

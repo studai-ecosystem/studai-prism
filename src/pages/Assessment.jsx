@@ -886,7 +886,9 @@ export default function Assessment() {
         await new Promise((r) => setTimeout(r, 3000))
         let data
         try {
-          const res = await fetch(`/api/assessment/evaluate-status/${sessionId}`)
+          const res = await fetch(`/api/assessment/evaluate-status/${sessionId}`, {
+            headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+          })
           if (!res.ok) continue
           data = await res.json()
         } catch {
@@ -897,7 +899,7 @@ export default function Assessment() {
         if (data.status === 'idle') {
           const retry = await fetch('/api/assessment/evaluate', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
             body: JSON.stringify({ sessionId }),
           })
           if (retry.ok && retry.status !== 202) return await retry.json()
@@ -910,7 +912,7 @@ export default function Assessment() {
     try {
       const res = await fetch('/api/assessment/evaluate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
         body: JSON.stringify({ sessionId }),
       })
       let data
@@ -977,7 +979,7 @@ export default function Assessment() {
       try {
         res = await fetch('/api/assessment/message', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
           body: JSON.stringify({ sessionId, message: text, telemetry }),
         })
       } finally {
@@ -1041,7 +1043,11 @@ export default function Assessment() {
       const ext = blob.type.includes('ogg') ? 'ogg' : 'webm'
       form.append('audio', blob, `answer.${ext}`)
       form.append('sessionId', sessionId) // Track 4.1: server applies the session's ASR language hint
-      const res = await fetch('/api/assessment/transcribe', { method: 'POST', body: form })
+      const res = await fetch('/api/assessment/transcribe', {
+        method: 'POST',
+        headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+        body: form,
+      })
       if (res.status === 503) {
         // Server-side transcription not configured — fall back to dictation.
         setNotice('Voice transcription is unavailable right now. Type your answer or use the dictation mic.')

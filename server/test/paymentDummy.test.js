@@ -39,6 +39,18 @@ function withEnv(vars, fn) {
     })
 }
 
+async function candidateHeaders(label) {
+  const email = `payment-${label}-${Date.now()}-${Math.random().toString(16).slice(2)}@test.local`
+  const res = await fetch(`${base}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Payment Test', email, password: 'candidate-pass-1!', ageConfirmed: true }),
+  })
+  assert.equal(res.status, 201)
+  const { token } = await res.json()
+  return { Authorization: `Bearer ${token}` }
+}
+
 test('dummy mode ON in production: config reports dummyMode and dev-session mints a dummy entitlement', () =>
   withEnv({ NODE_ENV: 'production', PRISM_DUMMY_PAYMENTS: 'true' }, async () => {
     const cfg = await (await fetch(`${base}/api/payment/config`)).json()
@@ -47,7 +59,7 @@ test('dummy mode ON in production: config reports dummyMode and dev-session mint
     assert.equal(cfg.keyId, null, 'publishable key must not be exposed in dummy mode')
     assert.equal(cfg.devSessionAvailable, true)
 
-    const res = await fetch(`${base}/api/payment/dev-session`, { method: 'POST' })
+    const res = await fetch(`${base}/api/payment/dev-session`, { method: 'POST', headers: await candidateHeaders('dummy') })
     assert.equal(res.status, 200)
     const { sessionId } = await res.json()
     assert.ok(sessionId, 'dummy session must return a sessionId')
@@ -55,7 +67,7 @@ test('dummy mode ON in production: config reports dummyMode and dev-session mint
 
 test('dummy mode OFF in production: dev-session stays forbidden (403)', () =>
   withEnv({ NODE_ENV: 'production', PRISM_DUMMY_PAYMENTS: undefined }, async () => {
-    const res = await fetch(`${base}/api/payment/dev-session`, { method: 'POST' })
+    const res = await fetch(`${base}/api/payment/dev-session`, { method: 'POST', headers: await candidateHeaders('prod-off') })
     assert.equal(res.status, 403)
     const cfg = await (await fetch(`${base}/api/payment/config`)).json()
     assert.equal(cfg.dummyMode, false)
@@ -64,7 +76,7 @@ test('dummy mode OFF in production: dev-session stays forbidden (403)', () =>
 
 test('non-production keeps the classic dev-session flow with the flag unset', () =>
   withEnv({ NODE_ENV: 'test', PRISM_DUMMY_PAYMENTS: undefined }, async () => {
-    const res = await fetch(`${base}/api/payment/dev-session`, { method: 'POST' })
+    const res = await fetch(`${base}/api/payment/dev-session`, { method: 'POST', headers: await candidateHeaders('dev') })
     assert.equal(res.status, 200)
     const { sessionId } = await res.json()
     assert.ok(sessionId)

@@ -13,6 +13,11 @@ import ScoreReport from './pages/ScoreReport.jsx'
 import Verify from './pages/Verify.jsx'
 import Profile from './pages/Profile.jsx'
 import RaterWorkbench from './pages/RaterWorkbench.jsx'
+import AssessmentWorkspace from './pages/AssessmentWorkspace.jsx'
+import ExploreMode from './pages/ExploreMode.jsx'
+import StudentReportV2 from './pages/StudentReportV2.jsx'
+import EmployeeReportV2 from './pages/EmployeeReportV2.jsx'
+import DevelopmentMission from './pages/DevelopmentMission.jsx'
 import Admin from './pages/Admin.jsx'
 import AdminLogin from './pages/admin/AdminLogin.jsx'
 import AdminShell from './pages/admin/AdminShell.jsx'
@@ -148,6 +153,13 @@ export default function App() {
       <Route path="/verify/:id" element={<Verify />} />
       <Route path="/rater" element={<RaterWorkbench />} />
       <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+      {/* PRISM Next Phase 0-10 Reference Implementation */}
+      <Route path="/explore" element={<ExploreMode />} />
+      <Route path="/workspace/:sessionId" element={<AssessmentWorkspace />} />
+      <Route path="/report/:sessionId/v2" element={<StudentReportV2 />} />
+      <Route path="/report/:sessionId/employee" element={<EmployeeReportV2 />} />
+      <Route path="/missions" element={<DevelopmentMission />} />
+      <Route path="/missions/:missionId" element={<DevelopmentMission />} />
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

@@ -107,13 +107,9 @@ test('§6: ordinary operational-admin serving strips the composite from EVERY re
 
 test('§6: every candidate/buyer report route serves through the external boundary', async () => {
   const source = await read('server/routes/assessment.js')
-  for (const marker of [
-    'if (existing) return res.json(toExternalReport(existing))',
-    'if (outcome.saved) return res.json(toExternalReport(outcome.saved))',
-    "if (report) return res.json({ status: 'complete', report: toExternalReport(report) })",
-  ]) {
-    assert.ok(source.includes(marker), `serving boundary present: ${marker.slice(0, 50)}…`)
-  }
+  assert.match(source, /if\s*\(existing\)[\s\S]{0,120}?res\.json\(toExternalReport\(existing\)\)/, 'serving boundary present: existing')
+  assert.ok(source.includes('if (outcome.saved) return res.json(toExternalReport(outcome.saved))'), 'serving boundary present: outcome.saved')
+  assert.match(source, /if\s*\(report\)[\s\S]{0,120}?res\.json\(\{\s*status:\s*['"]complete['"],\s*report:\s*toExternalReport\(report\)\s*\}\)/, 'serving boundary present: report')
   // GET /report/:sessionId
   assert.match(source, /report\/:sessionId'[\s\S]{0,400}?res\.json\(toExternalReport\(report\)\)/, '/report/:sessionId serves the external shape')
 })

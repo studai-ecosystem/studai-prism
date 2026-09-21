@@ -28,6 +28,21 @@ async function ensureFile() {
   }
 }
 
+async function atomicRename(src, dest, retries = 5) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await fs.rename(src, dest)
+      return
+    } catch (err) {
+      if ((err.code === 'EPERM' || err.code === 'EBUSY') && i < retries - 1) {
+        await new Promise(r => setTimeout(r, 50 * (i + 1)))
+      } else {
+        throw err
+      }
+    }
+  }
+}
+
 // Atomic write (audit C13): write to a temp file then rename over the target,
 // so a crash mid-write can never leave a torn/corrupted assessments.json.
 // NOTE: this protects single-instance durability only — it does NOT make the
@@ -35,9 +50,9 @@ async function ensureFile() {
 // Multi-instance deployments must run PRISM_PG_STORE=true.
 function writeDB(db) {
   writeChain = writeChain.then(async () => {
-    const tmp = `${DB_FILE}.${process.pid}.tmp`
+    const tmp = `${DB_FILE}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`
     await fs.writeFile(tmp, JSON.stringify(db, null, 2))
-    await fs.rename(tmp, DB_FILE)
+    await atomicRename(tmp, DB_FILE)
   })
   return writeChain
 }
@@ -65,7 +80,7 @@ async function readDB() {
 }
 
 // ── Payments ────────────────────────────────────────────────────────────────
-export async function createEntitlement({ sessionId, paymentId, orderId, amount, mode }) {
+export async function createEntitlement({ sessionId, paymentId, orderId, amount, mode, userId, userEmail }) {
   const db = await readDB()
   db.payments[sessionId] = {
     sessionId,
@@ -73,6 +88,8 @@ export async function createEntitlement({ sessionId, paymentId, orderId, amount,
     orderId: orderId || null,
     amount: amount ?? null,
     mode: mode || 'paid', // 'paid' | 'dev'
+    userId: userId || null,
+    userEmail: userEmail || null,
     consumed: false,
     createdAt: new Date().toISOString(),
   }

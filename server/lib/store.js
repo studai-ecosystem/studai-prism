@@ -14,7 +14,16 @@ import { isDbConfigured } from '../db/pool.js'
 import * as jsonStore from './storeJson.js'
 import * as pgStore from './storePg.js'
 
+const isProd = process.env.NODE_ENV === 'production'
 const usePg = process.env.PRISM_PG_STORE === 'true' && isDbConfigured()
+
+if (isProd && !usePg) {
+  logger.error('v1_store_production_error', {
+    detail: 'Silent fallback to JSON storage is prohibited in production (DEF-07).',
+  })
+  throw new Error('Production persistence invariant failed: storePg is the authoritative backend. JSON fallback is prohibited when NODE_ENV=production.')
+}
+
 const impl = usePg ? pgStore : jsonStore
 
 logger.info('v1_store_backend', { backend: usePg ? 'postgres' : 'json' })

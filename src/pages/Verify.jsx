@@ -87,14 +87,15 @@ export default function Verify() {
   useEffect(() => {
     let cancelled = false
     document.title = 'Prism — Credential verification'
-    fetch(`/api/assessment/report/${id}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('not found'))))
-      .then((report) => { if (!cancelled) setState({ status: 'ok', report }) })
-      .catch(() => { if (!cancelled) setState({ status: 'error', report: null }) })
     fetch(`/api/credentials/${id}/verify`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((c) => { if (!cancelled) setCredential(c) })
-      .catch(() => {})
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('not found'))))
+      .then((c) => {
+        if (!cancelled) {
+          setCredential(c)
+          setState({ status: 'ok', report: c.view })
+        }
+      })
+      .catch(() => { if (!cancelled) setState({ status: 'error', report: null }) })
     return () => { cancelled = true }
   }, [id])
 

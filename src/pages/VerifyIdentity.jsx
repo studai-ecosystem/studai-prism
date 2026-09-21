@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ShieldCheck, Loader2, Upload, Check, X, Lock } from 'lucide-react'
 import Tesseract from 'tesseract.js'
-import { getUser } from '../lib/session.js'
+import { getUser, getToken } from '../lib/session.js'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
 
 // Pre-test identity verification (Phase 2).
@@ -192,7 +192,7 @@ export default function VerifyIdentity() {
     try {
       const res = await fetch('/api/assessment/verify-identity', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({
           sessionId,
           fullName: form.fullName.trim(),
@@ -213,7 +213,9 @@ export default function VerifyIdentity() {
       // step exists only when the governance-gated flag enables it. Charter
       // §13: an approved no-camera accommodation also skips the room scan.
       const cfg = await fetch('/api/payment/config').then((r) => (r.ok ? r.json() : null)).catch(() => null)
-      const accommodation = await fetch(`/api/assessment/accommodation/${sessionId}`)
+      const accommodation = await fetch(`/api/assessment/accommodation/${sessionId}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      })
         .then((r) => (r.ok ? r.json() : null)).catch(() => null)
       const noCamera = accommodation?.status === 'approved' && accommodation?.modes?.noCamera
       const nextStep = noCamera ? 'briefing' : cfg?.proctoring?.phoneCam ? 'link-phone' : 'room-scan'

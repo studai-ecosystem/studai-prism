@@ -3,6 +3,7 @@ import { converse } from './bedrockClient.js'
 import { policyFor } from './modelRouter.js'
 import { recordUsage } from './costTracker.js'
 import { toCompletionEnvelope } from './responseParser.js'
+import { auditConverse } from './auditConverse.js'
 
 const MAX_MESSAGES = 200
 const MAX_TEXT_CHARS = 1_000_000
@@ -145,4 +146,5 @@ export function createCompletionService({ converseFn = converse } = {}) {
   }
 }
 
-export const createCompletion = createCompletionService()
+const isolatedAuditProvider = process.env.NODE_ENV === 'test' && process.env.PRISM_AUDIT_AI === 'true'
+export const createCompletion = createCompletionService({ converseFn: isolatedAuditProvider ? auditConverse : converse })

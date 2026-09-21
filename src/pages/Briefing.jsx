@@ -214,7 +214,13 @@ export default function Briefing() {
     setSubmitting(false)
     // Trigger fullscreen lock before entering the closed assessment surface.
     document.documentElement.requestFullscreen?.().catch(() => {})
-    navigate(`/assessment?session=${sessionId}`)
+    const mode = params.get('mode')
+    const type = params.get('type')
+    if (mode === 'legacy' || type === 'v1') {
+      navigate(`/assessment?session=${sessionId}`)
+    } else {
+      navigate(`/workspace/${sessionId}`)
+    }
   }
 
   return (

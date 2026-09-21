@@ -27,8 +27,10 @@ import { assertJudgeAnchoredForIssuance } from './modelDrift.js'
 import logger from './logger.js'
 import { aiProvider, judgeModel } from '../services/ai/modelRouter.js'
 
+const testCredentials = new Map()
+
 export function isGlassBoxEnabled() {
-  return process.env.PRISM_GLASS_BOX === 'true' && Boolean(process.env.PRISM_CREDENTIAL_SIGNING_KEY) && isDbConfigured()
+  return process.env.PRISM_GLASS_BOX === 'true' && Boolean(process.env.PRISM_CREDENTIAL_SIGNING_KEY) && (isDbConfigured() || process.env.NODE_ENV === 'test')
 }
 
 // ── canonical JSON ───────────────────────────────────────────────────────────
@@ -203,18 +205,44 @@ export async function issueCredential(sessionId, { supersedes = null } = {}) {
   const credentialId = randomUUID()
   const shareToken = randomUUID().replaceAll('-', '')
 
-  await query(
-    `INSERT INTO credentials
-       (credential_id, session_id, candidate_id, bundle, bundle_hash, signature, key_id, supersedes, share_token_hash)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [credentialId, sessionId, bundle.candidateId, canonical, bundleHash, signature, k.keyId, supersedes, sha256hex(shareToken)],
-  )
-  if (supersedes) {
-    await query(
-      `UPDATE credentials SET status = 'superseded', superseded_by = $2 WHERE credential_id = $1`,
-      [supersedes, credentialId],
-    )
+  const record = {
+    credential_id: credentialId,
+    session_id: sessionId,
+    candidate_id: bundle.candidateId,
+    bundle: canonical,
+    bundle_hash: bundleHash,
+    signature,
+    key_id: k.keyId,
+    supersedes,
+    share_token_hash: sha256hex(shareToken),
+    status: 'active',
+    issued_at: new Date().toISOString(),
   }
+
+  if (isDbConfigured()) {
+    await query(
+      `INSERT INTO credentials
+         (credential_id, session_id, candidate_id, bundle, bundle_hash, signature, key_id, supersedes, share_token_hash)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [credentialId, sessionId, bundle.candidateId, canonical, bundleHash, signature, k.keyId, supersedes, sha256hex(shareToken)],
+    )
+    if (supersedes) {
+      await query(
+        `UPDATE credentials SET status = 'superseded', superseded_by = $2 WHERE credential_id = $1`,
+        [supersedes, credentialId],
+      )
+    }
+  } else if (process.env.NODE_ENV === 'test') {
+    testCredentials.set(credentialId, record)
+    if (supersedes) {
+      const old = testCredentials.get(supersedes)
+      if (old) {
+        old.status = 'superseded'
+        old.superseded_by = credentialId
+      }
+    }
+  }
+
   logger.info('credential_issued', { credentialId, sessionId, keyId: k.keyId })
   // shareToken is returned ONCE (candidate-held; only its hash is stored).
   return { credentialId, bundleHash, keyId: k.keyId, shareToken }
@@ -242,30 +270,71 @@ export async function verifyCredential(credential) {
 }
 
 export async function getLatestCredential(sessionId) {
-  if (!isDbConfigured()) return null
-  const r = await query(
-    'SELECT * FROM credentials WHERE session_id = $1 ORDER BY issued_at DESC LIMIT 1',
-    [sessionId],
-  )
-  return r?.rows?.[0] || null
+  if (isDbConfigured()) {
+    const r = await query(
+      'SELECT * FROM credentials WHERE session_id = $1 ORDER BY issued_at DESC LIMIT 1',
+      [sessionId],
+    )
+    return r?.rows?.[0] || null
+  }
+  if (process.env.NODE_ENV === 'test') {
+    const matching = [...testCredentials.values()]
+      .filter((c) => c.session_id === sessionId)
+      .sort((a, b) => new Date(b.issued_at) - new Date(a.issued_at))
+    return matching[0] || null
+  }
+  return null
+}
+
+export async function getCredentialById(credentialId) {
+  if (isDbConfigured()) {
+    const r = await query(
+      'SELECT * FROM credentials WHERE credential_id = $1',
+      [credentialId],
+    )
+    return r?.rows?.[0] || null
+  }
+  if (process.env.NODE_ENV === 'test') {
+    return testCredentials.get(credentialId) || null
+  }
+  return null
 }
 
 export async function getCredentialChain(sessionId) {
-  if (!isDbConfigured()) return []
-  const r = await query(
-    'SELECT credential_id, status, bundle_hash, key_id, supersedes, superseded_by, revoked_reason, issued_at FROM credentials WHERE session_id = $1 ORDER BY issued_at',
-    [sessionId],
-  )
-  return r?.rows || []
+  if (isDbConfigured()) {
+    const r = await query(
+      'SELECT credential_id, status, bundle_hash, key_id, supersedes, superseded_by, revoked_reason, issued_at FROM credentials WHERE session_id = $1 ORDER BY issued_at',
+      [sessionId],
+    )
+    return r?.rows || []
+  }
+  if (process.env.NODE_ENV === 'test') {
+    return [...testCredentials.values()]
+      .filter((c) => c.session_id === sessionId)
+      .sort((a, b) => new Date(a.issued_at) - new Date(b.issued_at))
+  }
+  return []
 }
 
 // ── T2.3 revocation & correction ─────────────────────────────────────────────
 export async function revokeCredential(credentialId, reason) {
-  const r = await query(
-    `UPDATE credentials SET status = 'revoked', revoked_reason = $2 WHERE credential_id = $1 AND status = 'active' RETURNING credential_id`,
-    [credentialId, String(reason || 'revoked').slice(0, 500)],
-  )
-  return Boolean(r?.rows?.length)
+  if (isDbConfigured()) {
+    const r = await query(
+      `UPDATE credentials SET status = 'revoked', revoked_reason = $2 WHERE credential_id = $1 AND status = 'active' RETURNING credential_id`,
+      [credentialId, String(reason || 'revoked').slice(0, 500)],
+    )
+    return Boolean(r?.rows?.length)
+  }
+  if (process.env.NODE_ENV === 'test') {
+    const cred = testCredentials.get(credentialId)
+    if (cred && cred.status === 'active') {
+      cred.status = 'revoked'
+      cred.revoked_reason = String(reason || 'revoked').slice(0, 500)
+      return true
+    }
+    return false
+  }
+  return false
 }
 
 // Correction = revoke nothing silently: issue a NEW credential superseding the

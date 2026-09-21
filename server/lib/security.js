@@ -31,10 +31,11 @@ export function getJwtSecret() {
   return DEV_ONLY_FALLBACK
 }
 
-// ── Startup checks (C8) ──────────────────────────────────────────────────────
+// ── Startup checks (C8 / DEF-02 / DEF-07) ───────────────────────────────────
 // Called from index.js before the server starts listening. Throws (→ exit 1)
 // instead of warning: a mis-provisioned production instance must not serve
-// traffic with a well-known signing secret.
+// traffic with a well-known signing secret, insecure dummy payments, or missing
+// PostgreSQL backend.
 export function assertProductionSecrets() {
   if (!isProduction()) return
   const missing = []
@@ -49,6 +50,7 @@ export function assertProductionSecrets() {
     'BEDROCK_EMBEDDING_MODEL',
     'BEDROCK_MULTIMODAL_MODEL',
     'BEDROCK_STT_MODEL',
+    'DATABASE_URL',
   ]) {
     if (!process.env[key]) missing.push(key)
   }
@@ -57,6 +59,12 @@ export function assertProductionSecrets() {
     throw new Error(
       `Refusing to start in production: missing required secret(s): ${missing.join(', ')} (audit C8).`,
     )
+  }
+  if (process.env.PRISM_PG_STORE !== 'true') {
+    throw new Error('Refusing to start in production: PRISM_PG_STORE must be "true". storePg is the only production source of truth (DEF-07).')
+  }
+  if (process.env.PRISM_DUMMY_PAYMENTS === 'true') {
+    throw new Error('Refusing to start in production: PRISM_DUMMY_PAYMENTS cannot be enabled in production (DEF-02).')
   }
   if (aiProvider() !== 'aws-bedrock') {
     throw new Error('Refusing to start in production: AI_PROVIDER must be aws-bedrock.')
@@ -112,6 +120,9 @@ const baseOptions = {
   // keyGenerator handles it, so silence that specific validation.
   validate: { ip: false, keyGeneratorIpFallback: false },
   message: { error: 'Too many requests. Please slow down and try again shortly.' },
+  // The isolated Playwright harness creates many unique candidates from one
+  // loopback address. Bypass buckets only under its double test-only guard.
+  skip: () => process.env.NODE_ENV === 'test' && process.env.PRISM_AUDIT_E2E === 'true',
 }
 
 // Brute-force guard for credential endpoints: 5 attempts/min/IP.

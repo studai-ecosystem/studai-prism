@@ -26,6 +26,8 @@ import adminRouter from './routes/admin/index.js'
 import ecosystemRouter from './routes/ecosystem.js'
 import catalogRouter from './routes/catalog.js'
 import wellKnownRouter from './routes/wellKnown.js'
+import jobFamiliesRouter from './routes/jobFamilies.js'
+import missionsRouter from './routes/missions.js'
 import { checkModelDriftAtBoot } from './lib/modelDrift.js'
 import {
   isProduction,
@@ -147,6 +149,8 @@ export function buildApp() {
   app.use('/api/ecosystem', ecosystemRouter)
   app.use('/api/assessments/catalog', catalogRouter)
   app.use('/api/catalog', catalogRouter)
+  app.use('/api/job-families', jobFamiliesRouter)
+  app.use('/api/missions', missionsRouter)
   app.use('/.well-known', wellKnownRouter)
   // Phase 3 Stage 6.1: surface judge-model drift loudly at boot.
   checkModelDriftAtBoot()
