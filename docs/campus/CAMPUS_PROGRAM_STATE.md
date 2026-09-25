@@ -16,9 +16,9 @@ Machine-read by `.github/hooks/scripts/*.cjs` (workspace root `PRISM/`). Keep th
 
 <!-- CAMPUS-STATE:BEGIN
 run_mode: autopilot
-active_phase: 0
+active_phase: 1
 target_phase: 12
-branch: campus/p00-baseline
+branch: campus/p01-foundation
 last_updated: 2026-09-25
 CAMPUS-STATE:END -->
 
@@ -39,7 +39,7 @@ CAMPUS-STATE:END -->
 
 Status: COMPLETE
 Gates: PASS 2026-09-25T17:03:55.732Z @ 63d320d (skipped: server-db-tests, frontend-unit)
-Commit: —
+Commit: 388d459
 
 - [x] C0.01 Record git state (branch, HEAD, dirty files) in Baseline table; create branch `campus/p00-baseline` — evidence: Baseline table; `git switch -c campus/p00-baseline` from `63d320d`
 - [x] C0.02 Run baseline gates and record counts in Baseline table — evidence: Baseline table; `audit-results/campus-gates/phase-00.json`
@@ -55,28 +55,28 @@ Commit: —
 
 ## Phase 1 — Frontend foundation, design system, central API/auth/workspace layer
 
-Status: NOT_STARTED
-Gates: NOT_RUN
+Status: COMPLETE
+Gates: PASS 2026-09-25T18:26:43.833Z @ 388d459 (skipped: server-db-tests)
 Commit: —
 
-- [ ] C1.01 Dependencies: @tanstack/react-query, zod, react-hook-form, recharts, date-fns; dev: vitest, @testing-library/react, @testing-library/jest-dom, @testing-library/user-event, jsdom; `test:unit` script + vitest config
-- [ ] C1.02 Folder structure per spec §5.4 (`src/app`, `layouts`, `components/*`, `features/*`, `api`, `hooks`, `lib`, `styles`)
-- [ ] C1.03 Backend `/api/v1` router skeleton: request-id middleware, standard error envelope, `GET /api/v1/health`, `GET /api/v1/me` (user + client-visible flags + permissions stub) + tests
-- [ ] C1.04 `src/api/client.js` per §32.1 (base URL, auth, workspace header, request id, error normalisation, 401/403, safe-only retry, idempotency keys) + unit tests
-- [ ] C1.05 Providers: QueryProvider, AuthProvider (single token accessor wrapping `lib/session.js`), FeatureFlagProvider, WorkspaceProvider (personal-only until Phase 3)
-- [ ] C1.06 Guards: AuthGuard, WorkspaceGuard, RoleGuard, EntitlementGuard (UX only; server enforces)
-- [ ] C1.07 `src/app/AppRouter.jsx` with route-level lazy loading; `App.jsx` becomes thin wrapper; every existing route preserved
-- [ ] C1.08 Design tokens: light neutral app theme + semantic colours + scoped dark assessment theme, without regressing legacy pages
-- [ ] C1.09 UI primitives §8.1 (all 33) accessible, keyboard-operable, reduced-motion aware
-- [ ] C1.10 State components: Skeleton/Loading, EmptyState, ErrorState, PartialDataNotice, UnauthorizedState, ExpiredEntitlementState, OfflineReconnectBanner
-- [ ] C1.11 Layouts: PublicLayout, AppShell (§7.1 nav, top bar, skip link), StudentShell, CampusShell (§19.1 nav, role-aware), AssessmentShell (dark)
-- [ ] C1.12 Responsive navigation incl. student mobile bottom nav (§7.3)
-- [ ] C1.13 `/app/*` routes (§6.2) behind `PRISM_APP_SHELL_V3` rendering honest empty states (no fake data); flag off → legacy `/app` unchanged
-- [ ] C1.14 Legacy redirects §6.5 (targets resolve to legacy pages until replaced)
-- [ ] C1.15 Migrate ShellHome/Profile raw token + fetch boilerplate to the API client (no behaviour change)
-- [ ] C1.16 DesignSystem page showcases new primitives
-- [ ] C1.17 Tests: unit (client, providers, guards, primitives), Playwright shell at 360/768/1024/1440, keyboard nav, axe on shell; legacy direct assessment flow still green
-- [ ] C1.18 Gates PASS, reviewer + UX auditor PASS, commit `feat(campus-p01): ...`
+- [x] C1.01 Dependencies: @tanstack/react-query, zod, react-hook-form, recharts, date-fns; dev: vitest, @testing-library/react, @testing-library/jest-dom, @testing-library/user-event, jsdom; `test:unit` script + vitest config — evidence: `package.json` (+ `@testing-library/dom`), `server/package.json` (zod), `vitest.config.js`, `src/test/setup.js`, `.github/workflows/ci.yml` vitest step; `npm audit --omit=dev` 0 vulnerabilities
+- [x] C1.02 Folder structure per spec §5.4 (`src/app`, `layouts`, `components/*`, `features/*`, `api`, `hooks`, `lib`, `styles`) — evidence: `src/app/{providers,guards}`, `src/layouts`, `src/components/{ui,navigation,states}`, `src/features/{home,assessments,capabilities,evidence,development,growth,sharing,settings,campus,workspaces,shared,designSystem}`, `src/api`, `src/hooks`, `src/lib/copy`, `src/styles`; remaining component folders arrive with their phase (no empty placeholders)
+- [x] C1.03 Backend `/api/v1` router skeleton: request-id middleware, standard error envelope, `GET /api/v1/health`, `GET /api/v1/me` (user + client-visible flags + permissions stub) + tests — evidence: `server/domain/http/{errors,asyncHandler,requestId,pagination,idempotency}.js`, `server/domain/auth/requireUser.js`, `server/domain/flags/index.js`, `server/domain/workspaces/personal.js`, `server/routes/v1/{index,me}.js`, `server/app.js` mount + v1 error envelope + CORS headers; tests: `server/test/v1Foundation.test.js` (11), `server/test/v1Http.test.js` (4)
+- [x] C1.04 `src/api/client.js` per §32.1 (base URL, auth, workspace header, request id, error normalisation, 401/403, safe-only retry, idempotency keys) + unit tests — evidence: `src/api/client.js`; tests: `src/api/client.test.js` (13)
+- [x] C1.05 Providers: QueryProvider, AuthProvider (single token accessor wrapping `lib/session.js`), FeatureFlagProvider, WorkspaceProvider (personal-only until Phase 3) — evidence: `src/app/providers/{QueryProvider,AuthProvider,FeatureFlagProvider,WorkspaceProvider,index}.jsx`, `src/api/{me,auth}.js`, `src/lib/session.js` session-change event; tests: `src/app/providers/providers.test.jsx` (11 — incl. cross-account cache isolation, direct A→B switch, signIn)
+- [x] C1.06 Guards: AuthGuard, WorkspaceGuard, RoleGuard, EntitlementGuard (UX only; server enforces) — evidence: `src/app/guards/*.jsx`; tests: `src/app/guards/guards.test.jsx` (8 — EntitlementGuard renders children only for ACTIVE)
+- [x] C1.07 `src/app/AppRouter.jsx` with route-level lazy loading; `App.jsx` becomes thin wrapper; every existing route preserved — evidence: `src/app/AppRouter.jsx` (all BASELINE_INVENTORY §1 routes, `React.lazy` + Suspense), `src/App.jsx`; `src/main.jsx` imports `design/tokens.css` globally (was only reached through eager imports); `src/app/RouteErrorBoundary.jsx` (`lazyWithRetry` + boundary); tests: `src/app/AppRouter.test.jsx` (15 — incl. focus + title on V3 shell routes, retryable /me error), `src/app/RouteErrorBoundary.test.jsx` (4), e2e baseline + legacy suites green
+- [x] C1.08 Design tokens: light neutral app theme + semantic colours + scoped dark assessment theme, without regressing legacy pages — evidence: `src/design/tokens.css` (`--prism-*` palette + `.theme-assessment`, the only hex-allowed source), `src/styles/tokens.css` (app frame/focus/reduced motion), `tailwind.config.js` `prism.*` colours; legacy tokens untouched; `designSystem.test.js` green
+- [x] C1.09 UI primitives §8.1 (all 33) accessible, keyboard-operable, reduced-motion aware — evidence: `src/components/ui/{Button(Button,IconButton,LinkButton),Badge(Badge,StatusChip),Card(Card,Panel,StatCard),ProgressBar,Tabs,SegmentedControl,Tooltip,Popover,Modal,Drawer,DropdownMenu,Avatar,FormControls(Input,Select,Textarea,Checkbox,RadioGroup,Switch),DataTable(DataTable,Pagination),Breadcrumbs,PageHeader,EmptyState,ErrorState,Skeleton,Notice(InlineNotice,Callout),Toast,index}.jsx`, `src/hooks/useFocusTrap.js`; tests: `src/components/ui/primitives.test.jsx` (27)
+- [x] C1.10 State components: Skeleton/Loading, EmptyState, ErrorState, PartialDataNotice, UnauthorizedState, ExpiredEntitlementState, OfflineReconnectBanner — evidence: `src/components/states/*.jsx`; tests: `src/components/states/states.test.jsx` (7)
+- [x] C1.11 Layouts: PublicLayout, AppShell (§7.1 nav, top bar, skip link), StudentShell, CampusShell (§19.1 nav, role-aware), AssessmentShell (dark) — evidence: `src/layouts/*.jsx`, `src/components/navigation/{navConfig,SideNav,BottomNav,TopBar,SkipLink}.jsx`, `src/features/workspaces/components/WorkspaceSwitcher.jsx`; tests: `src/layouts/layouts.test.jsx` (9 — campus nav filtering none/some/all, CampusShell + mobile drawer, StudentShell campus scoping + PERSONAL reset, WorkspaceSwitcher keyboard/switch/toast, AssessmentShell dark + no nav, page title + h1 focus)
+- [x] C1.12 Responsive navigation incl. student mobile bottom nav (§7.3) — evidence: `BottomNav.jsx` (Home, Assess, Develop, Growth, More → drawer), campus drawer nav; tests: e2e CAMPUS-SHELL-01 at 360/768/1024/1440
+- [x] C1.13 `/app/*` routes (§6.2) behind `PRISM_APP_SHELL_V3` rendering honest empty states (no fake data); flag off → legacy `/app` unchanged — evidence: `src/features/*/pages/*.jsx`, `src/lib/copy/emptyStates.js` (spec §40 copy); tests: AppRouter.test.jsx, CAMPUS-SHELL-04
+- [x] C1.14 Legacy redirects §6.5 (targets resolve to legacy pages until replaced) — evidence: `src/app/routing.jsx` (`LegacyAlias`, `V3Route`, `ParamRedirect`), AppRouter aliases for `/workspace/:sessionId`, `/report/:sessionId/v2`, `/missions/:missionId`, `/explore`; tests: AppRouter.test.jsx (V3 URL → legacy with params; legacy stays legacy while flag off; report-on/shell-off no loop; all-on placeholders link to legacy `?legacy=1`), e2e CAMPUS-SHELL-05
+- [x] C1.15 Migrate ShellHome/Profile raw token + fetch boilerplate to the API client (no behaviour change) — evidence: `src/api/account.js`, `src/pages/ShellHome.jsx`, `src/pages/Profile.jsx`, `src/api/evidence.js` (now on the client); e2e CAMPUS-BASELINE-01 + CAMPUS-SHELL-04 green
+- [x] C1.16 DesignSystem page showcases new primitives — evidence: `src/features/designSystem/CampusShowcase.jsx` in `src/pages/DesignSystem.jsx` (existing admin gating kept)
+- [x] C1.17 Tests: unit (client, providers, guards, primitives), Playwright shell at 360/768/1024/1440, keyboard nav, axe on shell; legacy direct assessment flow still green — evidence: vitest 94 tests (8 files); `tests/e2e/campus-shell.spec.js` (21 @critical: 4 widths, keyboard, axe on all 14 new routes, flags-off legacy, legacy escape hatch) against the campus harness server (`playwright.config.js` second webServer :4174, `scripts/start-audit-server.mjs` `PRISM_AUDIT_CAMPUS`), `tests/e2e/campusHelpers.js`; e2e critical 33/33 (chromium) and campus-shell 42/42 on chromium + mobile-chromium
+- [x] C1.18 Gates PASS, reviewer + UX auditor PASS, commit `feat(campus-p01): ...` — evidence: gates `audit-results/campus-gates/phase-01.json` PASS (server 428/405 pass/0 fail/12 skipped/11 todo; vitest 94; e2e critical 33); Prism Campus Reviewer: all code findings fixed over 3 passes, final FAIL was evidence counts only (corrected); Prism Campus UX Auditor PASS on 3rd pass; commit on `campus/p01-foundation`
 
 ## Phase 2 — Measurement integrity (fail closed)
 
@@ -309,6 +309,14 @@ Format: date · id · decision · reason · spec/charter § · reversible.
 | 2026-09-25 | K15 | `PRISM/.github/**` (skill, gate runner, hooks) is not inside the `studai-prism` git repo and the workspace root is not a repository; those files are versioned by the workspace owner, not by campus phase commits | Scope rule: commits only in `studai-prism/` | Spec §50 | Yes |
 | 2026-09-25 | K16 | Pre-existing swallowed errors in legacy UI (e.g. `ClaimsProvider` `.catch(() => {})`) are left unchanged in Phase 0 (zero behaviour change) and replaced by explicit error states when the component moves onto the Phase 1 API client | Phase 0 forbids behaviour change | Spec §53 | Yes |
 | 2026-09-25 | K17 | `audit-results/` is git-ignored: gate JSON/logs and baseline screenshots are local evidence regenerated by the gate runner / `@campus-screens` spec, not committed | Existing `.gitignore` convention | Quality gates | Yes |
+| 2026-09-25 | K18 | The PERSONAL workspace is derived per authenticated user with the stable id `personal` (no DB row); `workspaces` rows hold CAMPUS_* contexts only. Direct customers therefore work with or without the campus store | Contract §4 "lazily created" would make B2C depend on PG | Spec §4.2, contract §4 | Yes |
+| 2026-09-25 | K19 | App shells own `<main id="main">` (skip-link target always exists); pages render sections inside it. `claimsCeiling` route-identifier exemption extended from `App.jsx` to `src/app/AppRouter.jsx` because the identical route table moved there | Structural move, no copy change | Spec §8.3, charter claims ceiling | Yes |
+| 2026-09-25 | K20 | Campus e2e runs against a SECOND isolated audit server (:4174, `PRISM_AUDIT_CAMPUS=true` sets the 9 flags in that throwaway process only); legacy specs keep the flags-off server (:4173) so the direct flow is always re-proven | K2: flags on only inside test processes | Spec §48.4 | Yes |
+| 2026-09-25 | K21 | Campus navigation permission keys (`org.overview.read`, `students.read`, `cohorts.read`, `programs.read`, `assignments.read`, `interventions.read`, `reassessments.read`, `analytics.read`, `reports.read`, `team.read`, `integrations.read`, `billing.read`, `org.settings.read`) are the UI visibility contract; the Phase 3 permission matrix must define them | Role-aware nav §19.1 before RBAC lands | Spec §19.1, §29 | Yes |
+| 2026-09-25 | K22 | V3 routes enabled before their phase's page exists render an honest "not available yet" page linking to the working legacy page (never a mock); unreachable in real environments while flags are OFF | No fake content; legacy stays reachable | Spec §6.5, §53 | Yes |
+| 2026-09-25 | K23 | Phase 1 empty-state copy ("No assessments yet" etc.) is unconditional only while `PRISM_APP_SHELL_V3` is dark; Phase 4 replaces every Phase 1 section page with data-backed read models before the shell can be proposed for a flip | Copy must not assert facts the page did not check | Spec §40, §52 | Yes |
+| 2026-09-25 | K24 | A 401 from `GET /api/v1/me` signs the browser out on any page (the token is invalid/revoked server-side, so every later call would fail too); other `/me` failures leave flags OFF on legacy pages and show a retryable ErrorState on shell/campus routes | Fail closed without breaking legacy B2C when v1 has an outage | Spec §32.1, §40 | Yes |
+| 2026-09-25 | K25 | Dark `/app/*` (shell off) and `/campus/*` (campus off) URLs redirect to `/` exactly like unknown legacy URLs, so a dark route is indistinguishable from a missing one; V3 placeholders link to legacy with `?legacy=1`, which `LegacyAlias` always honours. Flip precondition (Phase 3/4): shell/campus gating must become anonymous-safe so signed-out deep links reach `/login?next=` instead of `/` | Dark-route parity + no redirect loops | Spec §6.5 | Yes |
 
 ## Risks
 
@@ -316,6 +324,7 @@ Format: date · id · decision · reason · spec/charter § · reversible.
 | --- | --- | --- | --- | --- |
 | Local Postgres unavailable → DB-gated suites SKIPPED locally | P2 | Operator | CI Postgres service runs them; gates record SKIPPED honestly | No |
 | Capability level labels not yet finalised by measurement governance | P1 | Psychometrics (HA-C002) | Labels live in one governed constant marked PROVISIONAL | Campus rollout |
+| Legacy `/explore` (reachable from the V3 placeholder via `?legacy=1`) has 21 serious axe issues and "Prism Next" copy | P2 | Engineering | C2.12/C2.13 remove the copy + defaults; Explore V2 (C4.10) replaces the page | Explore V2 flip |
 
 ## Session handoff
 

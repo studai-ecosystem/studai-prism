@@ -112,9 +112,10 @@ test('CLAIMS CEILING: dark features have zero public marketing copy', async () =
     if (f.includes('Briefing.jsx')) continue
     // Operator surfaces (see above): the admin console administers dark
     // features and so must name them; App.jsx carries its route IDENTIFIERS
-    // (e.g. AdminTeamfit) — code, not marketing copy. Public pages stay fully
-    // scanned.
-    if (/[\\/]pages[\\/]admin[\\/]/.test(f) || f.endsWith('App.jsx')) continue
+    // (e.g. AdminTeamfit) — code, not marketing copy. Campus Phase 1 moved
+    // those route identifiers verbatim into src/app/AppRouter.jsx. Public
+    // pages stay fully scanned.
+    if (/[\\/]pages[\\/]admin[\\/]/.test(f) || f.endsWith('App.jsx') || f.endsWith('AppRouter.jsx')) continue
     const text = visibleText(await readFile(f, 'utf-8'), f)
     for (const rx of darkFeatures) {
       assert.ok(!rx.test(text), `dark-feature marketing in ${f}: ${rx}`)

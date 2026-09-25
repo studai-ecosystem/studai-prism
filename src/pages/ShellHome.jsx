@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShieldCheck, Play, LogOut, Loader2, RotateCcw, BadgeCheck, CreditCard } from 'lucide-react'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
-import { isAuthenticated, getUser, getToken, clearUser } from '../lib/session.js'
+import { isAuthenticated, getUser, clearUser } from '../lib/session.js'
+import { fetchLicence } from '../api/account.js'
 
 // ── The app launcher ─────────────────────────────────────────────────────────
 // What the desktop shell (and installed PWA) opens into: not the marketing
@@ -22,8 +23,7 @@ export default function ShellHome() {
   const loadLicence = useCallback(() => {
     if (!isAuthenticated()) return
     setLicence(null)
-    fetch('/api/payment/licence', { headers: { Authorization: `Bearer ${getToken()}` } })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    fetchLicence()
       .then(setLicence)
       .catch(() => setLicence('error'))
   }, [])

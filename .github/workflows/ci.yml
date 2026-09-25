@@ -51,6 +51,8 @@ jobs:
         run: |
           npm ci
           npm run build
+      - name: Frontend unit + component tests (vitest)
+        run: npm run test:unit
       - name: Install critical-path browser
         run: npx playwright install --with-deps chromium
       - name: Critical browser and accessibility gates

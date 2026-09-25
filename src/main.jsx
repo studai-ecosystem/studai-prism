@@ -2,7 +2,9 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
+import './design/tokens.css'
 import './index.css'
+import './styles/tokens.css'
 
 // Installable app plumbing. The install prompt fires EARLY — capture it here
 // so the Briefing page can offer "Install the app" (a standalone window has

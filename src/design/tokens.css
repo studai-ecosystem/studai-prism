@@ -90,6 +90,64 @@
   color-scheme: dark;
 }
 
+/* Prism Campus palette (spec §5.2) — light neutral application theme.
+   Semantic only: positive = emerald, partial = amber, blocked = red,
+   insufficient = neutral gray (never failure-red). Consumed via the
+   Tailwind `prism-*` colours and src/styles/tokens.css. */
+:root {
+  --prism-canvas: #F6F7F9;
+  --prism-surface: #FFFFFF;
+  --prism-subtle: #F0F2F5;
+  --prism-border: #DFE3E8;
+  --prism-border-strong: #7B8494;
+  --prism-ink: #111827;
+  --prism-ink-muted: #475467;
+  --prism-ink-subtle: #5F6B7A;
+  --prism-accent: #4F46E5;
+  --prism-accent-strong: #3F37C9;
+  --prism-accent-soft: #EEF0FF;
+  --prism-accent-ink: #FFFFFF;
+  --prism-positive: #047857;
+  --prism-positive-soft: #ECFDF5;
+  --prism-partial: #92400E;
+  --prism-partial-soft: #FFFBEB;
+  --prism-blocked: #B42318;
+  --prism-blocked-soft: #FEF3F2;
+  --prism-insufficient: #475467;
+  --prism-insufficient-soft: #F2F4F7;
+  --prism-focus: #4F46E5;
+  --prism-overlay: rgba(17, 24, 39, 0.45);
+  --prism-radius-sm: 6px;
+  --prism-radius-md: 10px;
+  --prism-radius-lg: 14px;
+}
+
+/* Scoped dark theme for the assessment workspace (spec §5.2 "Assessment workspace"). */
+.theme-assessment {
+  --prism-canvas: #0B0F19;
+  --prism-surface: #111827;
+  --prism-subtle: #1A2233;
+  --prism-border: #273244;
+  --prism-border-strong: #6B7A90;
+  --prism-ink: #F3F4F6;
+  --prism-ink-muted: #C3CAD5;
+  --prism-ink-subtle: #A3ADBB;
+  --prism-accent: #8B93FF;
+  --prism-accent-strong: #A5ABFF;
+  --prism-accent-soft: #1E2350;
+  --prism-accent-ink: #0B0F19;
+  --prism-positive: #6EE7B7;
+  --prism-positive-soft: #0D2A22;
+  --prism-partial: #FCD34D;
+  --prism-partial-soft: #2D2410;
+  --prism-blocked: #FCA5A5;
+  --prism-blocked-soft: #331616;
+  --prism-insufficient: #C3CAD5;
+  --prism-insufficient-soft: #1F2735;
+  --prism-focus: #A5ABFF;
+  color-scheme: dark;
+}
+
 /* Global reduced-motion strategy (LAW 4): every duration collapses; nothing
    may convey meaning by motion alone — states always pair with text/icon. */
 @media (prefers-reduced-motion: reduce) {

@@ -10,6 +10,7 @@
     "dev:frontend": "vite",
     "dev:backend": "node server/index.js",
     "build": "vite build",
+    "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:critical": "playwright test --grep @critical",
     "audit:static": "node scripts/prism-audit.mjs",
@@ -20,7 +21,9 @@
     "setup": "npm install && cd server && npm install"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.103.2",
     "concurrently": "^8.2.2",
+    "date-fns": "^4.4.0",
     "face-api.js": "^0.22.2",
     "framer-motion": "^11.3.0",
     "html2canvas": "^1.4.1",
@@ -29,20 +32,29 @@
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-hook-form": "^7.88.0",
     "react-router-dom": "^7.18.3",
+    "recharts": "^2.15.4",
     "socket.io-client": "^4.8.3",
-    "tesseract.js": "^5.1.0"
+    "tesseract.js": "^5.1.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.62.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
     "cross-env": "^7.0.3",
+    "jsdom": "^25.0.1",
     "postcss": "^8.4.44",
     "tailwindcss": "^3.4.10",
     "vite": "^5.4.2",
-    "@axe-core/playwright": "^4.13.0",
-    "@playwright/test": "^1.62.1"
+    "vitest": "^2.1.9"
   },
   "overrides": {
     "dompurify": "3.4.14",

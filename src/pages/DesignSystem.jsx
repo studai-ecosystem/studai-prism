@@ -12,6 +12,7 @@ import tokens, { color, font, typeScale, space, radius, elevation, motion } from
 import '../design/tokens.css'
 import { EvidenceThread, EvidenceTick, evidenceThreadStyles } from '../components/ui/EvidenceThread.jsx'
 import { ReliabilityLabel, ConfidenceBand, PendingStat } from '../components/ui/measurement.jsx'
+import CampusShowcase from '../features/designSystem/CampusShowcase.jsx'
 
 const TYPE_TESTS = [
   { lang: 'Latin', text: 'Measurement you can see inside — every score carries its evidence.' },
@@ -236,6 +237,10 @@ export default function DesignSystem() {
               reports stay paper. The thread brightens to stay legible: <EvidenceTick>evidence · turn 2</EvidenceTick>
             </p>
           </div>
+        </Section>
+
+        <Section title="Prism Campus primitives (spec §8.1) and page states (§40)">
+          <CampusShowcase />
         </Section>
 
         <footer style={{ borderTop: '1px solid var(--color-line)', paddingTop: 'var(--space-6)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)' }}>

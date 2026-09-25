@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Award, Calendar, FileText, ChevronRight, ClipboardList, Pencil, Loader2, KeyRound, ShieldAlert, PlayCircle } from 'lucide-react'
 import PageLayout from '../components/PageLayout.jsx'
 import { getUser, getToken, updateProfile, clearUser, setToken } from '../lib/session.js'
+import { fetchLicence, fetchAssessmentHistory, changePassword, deleteCandidateData } from '../api/account.js'
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional']
 
@@ -85,14 +86,8 @@ export default function Profile() {
     setPwBusy(true)
     setPwMsg(null)
     try {
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Failed to change password.')
-      if (data.token) setToken(data.token) // other sessions are revoked; this one continues
+      const data = await changePassword({ currentPassword: pwForm.current, newPassword: pwForm.next })
+      if (data?.token) setToken(data.token) // other sessions are revoked; this one continues
       setPwForm({ current: '', next: '', confirm: '' })
       setPwMsg({ ok: true, text: 'Password changed. Other signed-in devices were signed out.' })
     } catch (err) {
@@ -107,12 +102,7 @@ export default function Profile() {
     setDangerBusy(true)
     setDangerError(null)
     try {
-      const res = await fetch('/api/assessment/candidate-data', {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${getToken()}` },
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Deletion failed. Contact support@studaione.com.')
+      await deleteCandidateData()
       clearUser()
       navigate('/', { replace: true })
     } catch (err) {
@@ -161,17 +151,10 @@ export default function Profile() {
       return
     }
     let active = true
-    fetch('/api/assessment/history', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(data.error || 'Failed to load your test history.')
-        return data
-      })
+    fetchAssessmentHistory()
       .then((data) => {
         if (!active) return
-        setHistory(Array.isArray(data.history) ? data.history : [])
+        setHistory(Array.isArray(data?.history) ? data.history : [])
         setLoading(false)
       })
       .catch((e) => {
@@ -179,11 +162,10 @@ export default function Profile() {
         setError(e.message)
         setLoading(false)
       })
-    // Non-blocking: pending-assessment banner data.
-    fetch('/api/payment/licence', { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => (res.ok ? res.json() : null))
+    // Non-blocking: pending-assessment banner data (absent on failure).
+    fetchLicence()
       .then((data) => { if (active && data) setLicence(data) })
-      .catch(() => {})
+      .catch(() => { if (active) setLicence(null) })
     return () => {
       active = false
     }

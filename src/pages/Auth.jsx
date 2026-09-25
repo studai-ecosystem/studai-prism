@@ -25,10 +25,18 @@ function Field({ label, type = 'text', value, onChange, placeholder, required = 
   )
 }
 
+// Only same-origin in-app paths are honoured (no open redirect).
+function safeNext(search) {
+  const raw = new URLSearchParams(search).get('next')
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return null
+  return raw
+}
+
 export default function Auth() {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const navigate = useNavigate()
   const isRegister = pathname !== '/login'
+  const next = safeNext(search)
 
   const [form, setForm] = useState({ name: '', email: '', college: '', year: '', password: '' })
   const [ageConfirmed, setAgeConfirmed] = useState(false)
@@ -45,9 +53,9 @@ export default function Auth() {
   useEffect(() => {
     if (isAuthenticated()) {
       const invite = sessionStorage.getItem('prismInviteToken')
-      navigate(invite ? `/invite/${invite}` : '/payment', { replace: true })
+      navigate(invite ? `/invite/${invite}` : next || '/payment', { replace: true })
     }
-  }, [navigate])
+  }, [navigate, next])
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -88,7 +96,7 @@ export default function Auth() {
         // otherwise the paid flow continues into checkout, which mints the
         // sessionId and then identity verification + proctoring.
         const invite = sessionStorage.getItem('prismInviteToken')
-        navigate(invite ? `/invite/${invite}` : '/payment')
+        navigate(invite ? `/invite/${invite}` : next || '/payment')
       })
       .catch((err) => setError(err.message || 'Something went wrong. Please try again.'))
       .finally(() => setSubmitting(false))

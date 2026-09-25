@@ -28,6 +28,7 @@ import catalogRouter from './routes/catalog.js'
 import wellKnownRouter from './routes/wellKnown.js'
 import jobFamiliesRouter from './routes/jobFamilies.js'
 import missionsRouter from './routes/missions.js'
+import { createV1Router, v1ErrorHandler } from './routes/v1/index.js'
 import { checkModelDriftAtBoot } from './lib/modelDrift.js'
 import {
   isProduction,
@@ -40,7 +41,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-export function buildApp() {
+export function buildApp(v1Deps = {}) {
   const app = express()
 
   // Azure App Service fronts the container with a single proxy hop — required
@@ -97,8 +98,9 @@ export function buildApp() {
   app.use(
     cors({
       origin: allowlist.length ? allowlist : isProduction() ? false : true,
-      methods: ['GET', 'POST', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Prism-Workspace', 'X-Request-Id', 'Idempotency-Key', 'If-Match'],
+      exposedHeaders: ['X-Request-Id', 'ETag'],
     }),
   )
 
@@ -152,6 +154,9 @@ export function buildApp() {
   app.use('/api/job-families', jobFamiliesRouter)
   app.use('/api/missions', missionsRouter)
   app.use('/.well-known', wellKnownRouter)
+  // Prism Campus V1: versioned API with the standard envelope. Every campus
+  // surface under it is dark behind its PRISM_* flag (default OFF).
+  app.use('/api/v1', createV1Router(v1Deps))
   // Phase 3 Stage 6.1: surface judge-model drift loudly at boot.
   checkModelDriftAtBoot()
 
@@ -186,6 +191,8 @@ export function buildApp() {
   app.use((_req, res) => res.status(404).json({ error: 'Not found' }))
 
   // ── Global error handler ─────────────────────────────────────────────────
+  // Errors raised before the v1 router (e.g. malformed JSON) keep the v1 envelope.
+  app.use('/api/v1', v1ErrorHandler)
   app.use((err, _req, res, _next) => {
     logger.captureException(err, { msg: 'unhandled_error' })
     res.status(500).json({ error: 'Internal server error' })

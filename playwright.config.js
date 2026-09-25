@@ -17,12 +17,23 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  webServer: process.env.PRISM_AUDIT_BASE_URL ? undefined : {
-    command: 'node scripts/start-audit-server.mjs',
-    url: 'http://127.0.0.1:4173/api/health',
-    reuseExistingServer: false,
-    timeout: 120_000,
-  },
+  webServer: process.env.PRISM_AUDIT_BASE_URL ? undefined : [
+    {
+      command: 'node scripts/start-audit-server.mjs',
+      url: 'http://127.0.0.1:4173/api/health',
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      // Campus harness: same isolated audit server with the campus flags on
+      // (test process only, K2). Campus specs target it via CAMPUS_BASE_URL.
+      command: 'node scripts/start-audit-server.mjs',
+      url: 'http://127.0.0.1:4174/api/health',
+      env: { PORT: '4174', PRISM_AUDIT_CAMPUS: 'true' },
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+  ],
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
