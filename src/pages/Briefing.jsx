@@ -219,7 +219,10 @@ export default function Briefing() {
     if (mode === 'legacy' || type === 'v1') {
       navigate(`/assessment?session=${sessionId}`)
     } else {
-      navigate(`/workspace/${sessionId}`)
+      // The assessment is chosen server-side; an explicit id (e.g. from an
+      // assignment link) is forwarded untouched and validated by the server.
+      const assessment = params.get('assessment')
+      navigate(`/workspace/${sessionId}${assessment ? `?assessment=${encodeURIComponent(assessment)}` : ''}`)
     }
   }
 
@@ -241,7 +244,7 @@ export default function Briefing() {
               <ShieldCheck size={22} className="text-[var(--color-accent)]" />
             </div>
             <h1 className="font-serif text-4xl text-[var(--color-ink)] mb-2">Your assessment is about to begin</h1>
-            <p className="font-sans text-sm text-[var(--color-ink-muted)]">30-minute assessment · 5 skill dimensions · Verified result</p>
+            <p className="font-sans text-sm text-[var(--color-ink-muted)]">30-minute assessment · 5 skill dimensions · Verifiable result</p>
           </div>
 
           {/* Rules */}

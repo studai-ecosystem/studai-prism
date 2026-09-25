@@ -16,9 +16,9 @@ Machine-read by `.github/hooks/scripts/*.cjs` (workspace root `PRISM/`). Keep th
 
 <!-- CAMPUS-STATE:BEGIN
 run_mode: autopilot
-active_phase: 1
+active_phase: 2
 target_phase: 12
-branch: campus/p01-foundation
+branch: campus/p02-measurement
 last_updated: 2026-09-25
 CAMPUS-STATE:END -->
 
@@ -57,7 +57,7 @@ Commit: 388d459
 
 Status: COMPLETE
 Gates: PASS 2026-09-25T18:26:43.833Z @ 388d459 (skipped: server-db-tests)
-Commit: —
+Commit: 24c0b75
 
 - [x] C1.01 Dependencies: @tanstack/react-query, zod, react-hook-form, recharts, date-fns; dev: vitest, @testing-library/react, @testing-library/jest-dom, @testing-library/user-event, jsdom; `test:unit` script + vitest config — evidence: `package.json` (+ `@testing-library/dom`), `server/package.json` (zod), `vitest.config.js`, `src/test/setup.js`, `.github/workflows/ci.yml` vitest step; `npm audit --omit=dev` 0 vulnerabilities
 - [x] C1.02 Folder structure per spec §5.4 (`src/app`, `layouts`, `components/*`, `features/*`, `api`, `hooks`, `lib`, `styles`) — evidence: `src/app/{providers,guards}`, `src/layouts`, `src/components/{ui,navigation,states}`, `src/features/{home,assessments,capabilities,evidence,development,growth,sharing,settings,campus,workspaces,shared,designSystem}`, `src/api`, `src/hooks`, `src/lib/copy`, `src/styles`; remaining component folders arrive with their phase (no empty placeholders)
@@ -80,27 +80,27 @@ Commit: —
 
 ## Phase 2 — Measurement integrity (fail closed)
 
-Status: NOT_STARTED
-Gates: NOT_RUN
-Commit: —
+Status: COMPLETE
+Gates: PASS 2026-09-25T20:00:40.150Z @ 24c0b75 (server 468/454 pass/0 fail/14 skipped/0 todo; DB 12/12 on PGlite; python 57; vitest 122; build; static audit; campus-scan clean; e2e critical 37 — 74/74 on --repeat-each=2; legacy prism-next specs 35/35)
+Commit: see C2.17
 
-- [ ] C2.01 Migration: evidence ledger strict/nullable semantics + §30.8 columns + `evidence_status`; legacy rows untouched; down file
-- [ ] C2.02 Evidence write path strict: no defaults; missing provenance → `INSUFFICIENT_EVIDENCE`, `rubric_level NULL`
-- [ ] C2.03 Capability sufficiency engine (`server/domain/evidence/sufficiency.js`) with §33.2 rule config + exhaustive tests
-- [ ] C2.04 Remove `VERIFIED` wording from capability claims (SUFFICIENT/PROVISIONAL/INSUFFICIENT_EVIDENCE/HUMAN_REVIEW_REQUIRED)
-- [ ] C2.05 Scenario registry fails explicitly for unknown ids (`SCENARIO_NOT_FOUND`); remove every marketing fallback (reportV2, assessment routes, missions)
-- [ ] C2.06 reportV2 fallback scores/quotes/archetypes/strengths/precision removed → fail closed; issued legacy blobs untouched
-- [ ] C2.07 Role recommendations: no percentages, no default interest vectors
-- [ ] C2.08 Report claim registry (`server/domain/reports/claims.js`) with provenance schema; renderer rejects unsupported claims
-- [ ] C2.09 Mission evaluator interim fail-closed (no Level 4 on length; no unverified behaviours) until Phase 8
-- [ ] C2.10 Convert Phase 0 `todo` regression tests into passing real assertions
-- [ ] C2.11 Frontend: EvidenceSufficiencyBadge, CapabilityLevelBadge, insufficient-evidence state
-- [ ] C2.12 Remove fake precision/percentages in StudentReportV2, ExploreMode (blank defaults, no auto-evaluate), DevelopmentMission (no Level-4 claim)
-- [ ] C2.13 Remove customer-visible "PRISM NEXT", "12-section", emoji headers; extend claims ceiling test to ban them
-- [ ] C2.14 AssessmentWorkspace minimal fix: no fallback dialogue, no hard-coded scenario (session metadata or explicit error state)
-- [ ] C2.15 Audit events for evidence-status decisions
-- [ ] C2.16 Tests incl. Journey D (insufficient evidence → no fabricated score) at API + UI level
-- [ ] C2.17 Gates PASS, reviewer PASS, commit `feat(campus-p02): ...`
+- [x] C2.01 Migration: evidence ledger strict/nullable semantics + §30.8 columns + `evidence_status`; legacy rows untouched; down file — evidence: `server/db/migrations/0025_evidence_fail_closed.sql` + `.down.sql` (defaults/NOT NULL dropped, new columns, `legacy_row` flag-only UPDATE, 5 CHECK constraints, index); `server/test/campusMigrations.db.test.js` up→down→up on PGlite (K26): legacy row values unchanged + `legacy_row=true`, CHECKs reject INSUFFICIENT-with-level / status-less / unprovenanced / `VERIFIED` rows, rollback refuses to invent values; all 11 DB suites pass; added to CI DB step
+- [x] C2.02 Evidence write path strict: no defaults; missing provenance → `INSUFFICIENT_EVIDENCE`, `rubric_level NULL` — evidence: `server/domain/evidence/evidenceUnit.js` (zod, `normalizeEvidenceUnit`, legacy `readEvidenceRow` adapter), `server/lib/evidenceGraph.js` (only writer; PG path fixed K32), artifact writer in `routes/assessment.js` records action+provenance only; `server/test/evidenceSufficiency.test.js` (7 unit tests)
+- [x] C2.03 Capability sufficiency engine (`server/domain/evidence/sufficiency.js`) with §33.2 rule config + exhaustive tests — evidence: `sufficiencyRules.js` (`sufficiency-rules.v1-provisional`, HA-C002), `sufficiency.js` pure `evaluateCapability`/`evaluateProfile`; tests: empty, inadmissible, two rows never SUFFICIENT, each threshold named, review → HUMAN_REVIEW_REQUIRED, legacy → ≤ PROVISIONAL, uncalibrated/unapproved → PROVISIONAL, SUFFICIENT only when all rules met, deterministic/order-independent (K35)
+- [x] C2.04 Remove `VERIFIED` wording from capability claims (SUFFICIENT/PROVISIONAL/INSUFFICIENT_EVIDENCE/HUMAN_REVIEW_REQUIRED) — evidence: evidence ledger writes `evidence_status` (never `VERIFIED_CONSENSUS`); single legacy mapping constant in `evidenceUnit.js` (`campus-allow VERIFIED_CLAIM`); report V2 has no verification status; ecosystem example roles and ScoreReport copy no longer claim "verified strengths"/matching (K30); credential-integrity "verified" (signature/hash) is a different, true claim and stays
+- [x] C2.05 Scenario registry fails explicitly for unknown ids (`SCENARIO_NOT_FOUND`); remove every marketing fallback (reportV2, assessment routes, missions) — evidence: `scenarioBank.getScenarioOrThrow`/unknown→null; `/start` unknown id → 422 + audit; `test-mkt-session-` revive removed; artifacts unknown session → 404; reportV2 no fallback; workspace sends no scenario (K31); known-unsafe tests 8–10 pass
+- [x] C2.06 reportV2 fallback scores/quotes/archetypes/strengths/precision removed → fail closed; issued legacy blobs untouched — evidence: `server/lib/reportV2.js` `2.1.0-fail-closed` (status + reasons per capability, verbatim-only quotes, claim ids, no SEM/CI/readiness/percent/weights); `/report/:id/v2` + `/employee` 404 when neither report nor session; issued reports untouched (`toExternalReport` path unchanged)
+- [x] C2.07 Role recommendations: no percentages, no default interest vectors — evidence: `server/lib/roleAffinityEngine.js` (`sanitizeInterests`, reasons typed DEMONSTRATED_CAPABILITY / SELF_REPORTED_INTEREST, unknowns, nextStep; no score); `/api/job-families/explore` 422 on invalid interests, ignores client capability profile; `failClosed.test.js` Journey D explore cases
+- [x] C2.08 Report claim registry (`server/domain/reports/claims.js`) with provenance schema; renderer rejects unsupported claims — evidence: `buildClaim` (deterministic id), `validateClaims` rejecting NO_EVIDENCE_IDS / UNKNOWN_EVIDENCE_ID / EVIDENCE_CAPABILITY_MISMATCH / QUOTE_NOT_VERBATIM / QUOTE_ON_INSUFFICIENT_CLAIM / MALFORMED; used by reportV2; `server/test/reportClaims.test.js` (6 tests incl. invented-quote rejection and a quote copied from the opening prompt — only `[Candidate]:` turns count)
+- [x] C2.09 Mission evaluator interim fail-closed (no Level 4 on length; no unverified behaviours) until Phase 8 — evidence: `routes/missions.js` submit → 404 unknown mission, deterministic HYPOTHESIS_FRAME check only, `status` PRACTICE_FEEDBACK_UNAVAILABLE / INSUFFICIENT_EVIDENCE, `evidenceType: PRACTICE`, no `levelAchieved`/`observableBehaviors`
+- [x] C2.10 Convert Phase 0 `todo` regression tests into passing real assertions — evidence: `server/test/campusKnownUnsafe.test.js` 11/11 pass, `todo 0`
+- [x] C2.11 Frontend: EvidenceSufficiencyBadge, CapabilityLevelBadge, insufficient-evidence state — evidence: `src/components/evidence/EvidenceSufficiencyBadge.jsx`, `src/components/capability/CapabilityLevelBadge.jsx`, `src/components/states/InsufficientEvidenceState.jsx`, `src/components/reports/CapabilityCard.jsx`, governed copy `src/lib/copy/evidence.js`; `src/components/evidence.test.jsx` (12 tests: gray never red, unknown → insufficient, no numbers, reasons in plain language)
+- [x] C2.12 Remove fake precision/percentages in StudentReportV2, ExploreMode (blank defaults, no auto-evaluate), DevelopmentMission (no Level-4 claim) — evidence: all three pages + `EmployeeReportV2.jsx` rebuilt on the design system and `src/api/{assessment,development}.js`; `src/pages/failClosedPages.test.jsx` (13 tests) + `campusCopyCeiling.test.js` bans SEM/CI/percent/rubric numbers/readiness/levelAchieved (K33)
+- [x] C2.13 Remove customer-visible "PRISM NEXT", "12-section", emoji headers; extend claims ceiling test to ban them — evidence: `server/test/campusCopyCeiling.test.js` (5 tests: no programme name/section-count anywhere in `src`, no emoji in fail-closed pages + campus strict zones, no precision/percent, API client only, no scripted dialogue)
+- [x] C2.14 AssessmentWorkspace minimal fix: no fallback dialogue, no hard-coded scenario (session metadata or explicit error state) — evidence: `src/pages/AssessmentWorkspace.jsx` (scenario only from `/start` payload, ErrorState + retry when absent, consent/age/409 states, "Not sent — retry" keeps draft, empty reply adds no participant line, finish navigates only on server ack incl. 202 polling; fixed render/fetch loop from unstable store actions); Briefing forwards explicit `?assessment=` only (K31); work materials render only server data (`ArtifactRenderer` + data-driven dashboard/tickets/budget; nine unreachable fixture components removed, K37), saves go through `src/api/assessment.js` `saveArtifact` and show "Saved" only on server ack, else "Not saved — retry" with input kept; `src/components/artifacts/artifacts.test.jsx` (3) + copy-ceiling scan of `src/components/artifacts/**` and `artifactStore.js`
+- [x] C2.15 Audit events for evidence-status decisions — evidence: `auditLog('evidence.status.decided', …)` on every artifact evidence write (capabilityId, status, reasons, source) and on every report V2 and workplace-view build (`auditSufficiencyDecisions`: surface, ruleVersion, per-capability status/reasons); `server/test/evidenceAudit.db.test.js` proves both surfaces land in `audit_log` (PGlite; in CI DB step)
+- [x] C2.16 Tests incl. Journey D (insufficient evidence → no fabricated score) at API + UI level — evidence: `server/test/failClosed.test.js` (5 API tests: deep scan for score/percent/precision keys, statuses, no strengths/roles/missions, unknown ids fail, explore, missions); `tests/e2e/campus-insufficient.spec.js` (4 @critical incl. axe + 360px); legacy `prism-next-marketing.spec.js` / `prism-next-reality.spec.js` rewritten to fail-closed truth (35/35, K29)
+- [x] C2.17 Gates PASS, reviewer PASS, commit `feat(campus-p02): ...` — evidence: gates `audit-results/campus-gates/phase-02.json` PASS; Prism Campus Reviewer FAIL (3 blocking) → all fixed → PASS (non-blocking notes fixed: K41, K42, key on ArtifactRenderer; pre-existing issues logged as Risks); e2e helper `api()` moved to Playwright request context (flake root cause: page.evaluate raced a client redirect); commit on `campus/p02-measurement`
 
 ## Phase 3 — Organization, workspace, membership, entitlement foundation
 
@@ -317,14 +317,36 @@ Format: date · id · decision · reason · spec/charter § · reversible.
 | 2026-09-25 | K23 | Phase 1 empty-state copy ("No assessments yet" etc.) is unconditional only while `PRISM_APP_SHELL_V3` is dark; Phase 4 replaces every Phase 1 section page with data-backed read models before the shell can be proposed for a flip | Copy must not assert facts the page did not check | Spec §40, §52 | Yes |
 | 2026-09-25 | K24 | A 401 from `GET /api/v1/me` signs the browser out on any page (the token is invalid/revoked server-side, so every later call would fail too); other `/me` failures leave flags OFF on legacy pages and show a retryable ErrorState on shell/campus routes | Fail closed without breaking legacy B2C when v1 has an outage | Spec §32.1, §40 | Yes |
 | 2026-09-25 | K25 | Dark `/app/*` (shell off) and `/campus/*` (campus off) URLs redirect to `/` exactly like unknown legacy URLs, so a dark route is indistinguishable from a missing one; V3 placeholders link to legacy with `?legacy=1`, which `LegacyAlias` always honours. Flip precondition (Phase 3/4): shell/campus gating must become anonymous-safe so signed-out deep links reach `/login?next=` instead of `/` | Dark-route parity + no redirect loops | Spec §6.5 | Yes |
+| 2026-09-25 | K26 | DB-gated suites run locally against PGlite (`PRISM/.tools/pglite/serve.mjs`, in-memory, `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55432/postgres`) — a throwaway test database only, outside the repo; CI keeps real Postgres | No local Postgres/Docker; DB suites must not be SKIPPED | Spec §48, campus-testing rules | Yes |
+| 2026-09-25 | K27 | `adminPhase2.db.test.js` asserted the internal composite (`overall === 63`) on the external admin report; updated to `undefined` (charter §6 composite hidden) — the test was stale since the remediation programme, not weakened | Charter §6 outranks a stale assertion | Charter §6 | Yes |
+| 2026-09-25 | K28 | `0025_evidence_fail_closed.down.sql` restores the 0024 `VERIFIED_CONSENSUS` default with an inline `campus-allow SQL_DEFAULT_VERIFIED` (exact reversal, rollback only); rollback deliberately fails while strict rows with NULL judgement fields exist | Down must reverse exactly and never invent values | Campus DB rules | Yes |
+| 2026-09-25 | K29 | Legacy e2e specs `prism-next-marketing.spec.js` / `prism-next-reality.spec.js` asserted fabricated content (scripted Lumina dialogue, "±3.1 pts", "82%", "Rubric Level 4 Achieved!") and seeded sessions into the Playwright process's own store; rewritten to assert the fail-closed truth through the real API (35 tests) | K6 fabrication removal; tests must test reality | Spec §33, §53 | Yes |
+| 2026-09-25 | K30 | Ecosystem example roles (`routes/ecosystem.js`) and the ScoreReport opportunities block no longer claim "verified strengths" or matching; they are labelled as example roles not matched to the result | No capability-level verification/match claims (C2.04) | Spec §18, §33 | Yes |
+| 2026-09-25 | K31 | The legacy workspace sends only `sessionId` to `/start` (server chooses the scenario); an explicit `?assessment=<id>` is forwarded untouched from Briefing and validated server-side (422 `SCENARIO_NOT_FOUND`). The marketing simulation is reachable only by explicit id until Phase 4 assignments supply it | Scenario identity from server session metadata, never client constants | Spec §12.2, §34.3 | Yes |
+| 2026-09-25 | K32 | `evidenceGraph`, `occupationalGraph` and `routes/missions` imported `getPool` from `lib/dbPg.js`, which does not export it — every PG path threw and silently fell back to memory. Fixed to `db/pool.js`; with `DATABASE_URL` set, evidence units persist and blueprints/missions read from their tables | Latent defect surfaced by the 0025 DB test | Spec §30.8 | Yes |
+| 2026-09-25 | K33 | Legacy practice-mission page keeps one response box (the only input the interim evaluator checks); the marketing-specific sliders that were never evaluated and the 20-minute countdown were removed | Inputs that are never checked imply feedback that does not exist | Spec §16, §33 | Yes |
+| 2026-09-25 | K34 | Report V2 on legacy routes is on-demand and fail closed; it renders the new server shape (status + reasons, verbatim quotes, claim-backed strengths) and Phase 6 Report V3 supersedes it | K6/K7 | Spec §14, §33 | Yes |
+| 2026-09-25 | K35 | Default sufficiency rules ship `UNCALIBRATED` + approval `PROVISIONAL`, so no capability can reach SUFFICIENT until HA-C002 approves thresholds; PROVISIONAL is the ceiling and is labelled as such | Fail closed until measurement governance decides | Spec §33.2, HA-C002 | Yes |
+| 2026-09-25 | K36 | The gate runner's concurrent server suite runs with `TEST_DATABASE_URL` blanked (as CI does); DB suites share one database and run only in the serial DB step — running them concurrently races (migration walk-down vs store tests) | Mirror CI; no test weakened | Quality gates | Yes |
+| 2026-09-25 | K37 | Legacy work-material components: only types present in governed content (analytics dashboard, ticket log, budget modeler) are kept, rebuilt to render only artifact data (no sample figures, hints, keyword tags, client-side CAC/ROAS projections or emoji). The nine unreachable fixture-filled primitives (email, chat, memo, brief, calendar, board, spreadsheet, transcript, policy) were removed (git history keeps them); unknown types render "cannot be displayed". Data-driven primitives for every type arrive with Workspace V3 (C5.09) | Reviewer finding: fixtures shipped as fallbacks and false "recorded/deployed" confirmations | Spec §12.2, §33, §53 | Yes |
+| 2026-09-25 | K38 | With a database configured, a failed evidence-unit insert now throws (logged) instead of silently falling back to memory — the artifact save returns 500 and the UI shows "Not saved — retry" | A memory fallback bypassed the 0025 CHECKs and lost evidence on restart | Spec §33.1 | Yes |
+| 2026-09-25 | K39 | Sufficiency thresholds have non-overridable floors (`RULE_FLOORS`: ≥ 3 units, ≥ 2 independent opportunities) applied in `rulesFor` and inside `evaluateCapability` | "Two rows alone never produce SUFFICIENT" must hold for any configuration | Spec §33.2 | Yes |
+| 2026-09-25 | K40 | Legacy marketing copy "Verified result" / "Verified Prism Score" reworded to "verifiable" (credential integrity is the true claim; measurement verification is not claimed) | Reviewer note; claim-reducing | Spec §33, charter claims ceiling | Yes |
+| 2026-09-25 | K41 | The ScoreReport `?demo=1` sample (named person, invented dimension scores) was removed; the page shows only issued reports | K6 unconditional fabrication removal | Spec §33, §53 | Yes |
+| 2026-09-25 | K42 | Artifact saves: unknown `artifactId` → 404 `ARTIFACT_NOT_FOUND` (never `ok:true`); the evidence write happens before the session state changes; an evidence-ledger PG read failure now throws (outage ≠ insufficient evidence) | Reviewer notes; fail closed on errors | Spec §33.1, §53 | Yes |
 
 ## Risks
 
 | Risk | Severity | Owner | Mitigation | Blocking |
 | --- | --- | --- | --- | --- |
-| Local Postgres unavailable → DB-gated suites SKIPPED locally | P2 | Operator | CI Postgres service runs them; gates record SKIPPED honestly | No |
+| Local Postgres unavailable → DB-gated suites SKIPPED locally | P2 | Operator | PGlite throwaway DB runs them locally (K26); CI Postgres service runs them in CI | No |
 | Capability level labels not yet finalised by measurement governance | P1 | Psychometrics (HA-C002) | Labels live in one governed constant marked PROVISIONAL | Campus rollout |
-| Legacy `/explore` (reachable from the V3 placeholder via `?legacy=1`) has 21 serious axe issues and "Prism Next" copy | P2 | Engineering | C2.12/C2.13 remove the copy + defaults; Explore V2 (C4.10) replaces the page | Explore V2 flip |
+| Legacy `/explore` had 21 serious axe issues and "Prism Next" copy | P3 | Engineering | Resolved in Phase 2: page rebuilt on the design system; axe-clean in `campus-insufficient.spec.js`; Explore V2 (C4.10) replaces it | No |
+| No capability can be SUFFICIENT until sufficiency thresholds are approved | P1 | Psychometrics (HA-C002) | Reports show PROVISIONAL / INSUFFICIENT honestly (K35) | Campus rollout |
+| With `DATABASE_URL` set, PG reads for blueprints/missions/evidence now actually execute (K32) — behaviour depends on seeded tables | P2 | Engineering | Memory fallback kept when a table is empty; DB suites cover the evidence table | No |
+| Legacy `/api/assessment/report/:id/v2` and `/employee` have no authentication/ownership check (pre-existing): anyone with a session id sees the candidate name and, once judged evidence exists, verbatim quotes | P1 | Engineering | Phase 3 scope/permission middleware + Phase 6 owner/sponsor-only report API (C6.02) replace these routes | Campus rollout |
+| Legacy workspace calls `/start` on every load, so a refresh restarts the conversation (pre-existing) | P2 | Engineering | Phase 5 resume/idempotent session contract (C5.02, C5.06, C5.10) | Workspace V3 flip |
+| `ScoreReport` `?demo=1` sample hard-codes a name and invented scores; server maps `jobFamilyId` STUDAI-JF-MKT-L1 → marketing scenario at `/start` (pre-existing) | P2 | Engineering | Phase 4 assignment catalogue supplies assessment ids; Phase 6 report rebuild removes the demo sample | Campus rollout |
 
 ## Session handoff
 

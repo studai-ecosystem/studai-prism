@@ -1,337 +1,121 @@
-// src/pages/ExploreMode.jsx — Mode A: Career Discovery & Role Affinity Engine
-import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import PrismLogo from '../components/ui/PrismLogo.jsx'
+// src/pages/ExploreMode.jsx — role exploration from SELF-REPORTED interests
+// (legacy /explore route). Fail closed (spec §18, §33): nothing is
+// pre-filled, nothing runs until the candidate answers, and every reason is
+// labelled by its source. No percentages, scores or "match" language.
+import { useState } from 'react'
+import { exploreRoles } from '../api/development.js'
+import { PageHeader, Card, Button, Select, Callout, LinkButton, Badge } from '../components/ui/index.js'
+import { ErrorState } from '../components/states/index.js'
 
-const RIASEC_DIMENSIONS = [
-  {
-    key: 'E',
-    name: 'Enterprising',
-    icon: '🚀',
-    color: 'emerald',
-    description: 'Leading, persuading, commercial decision-making, and taking calculated risks.'
-  },
-  {
-    key: 'I',
-    name: 'Investigative',
-    icon: '🔬',
-    color: 'indigo',
-    description: 'Analyzing data, discovering root causes, and testing empirical hypotheses.'
-  },
-  {
-    key: 'A',
-    name: 'Artistic',
-    icon: '🎨',
-    color: 'purple',
-    description: 'Positioning, creative storytelling, design, and non-conventional ideation.'
-  },
-  {
-    key: 'S',
-    name: 'Social',
-    icon: '🤝',
-    color: 'blue',
-    description: 'Mentoring, collaborating, customer advocacy, and stakeholder de-escalation.'
-  },
-  {
-    key: 'C',
-    name: 'Conventional',
-    icon: '📋',
-    color: 'cyan',
-    description: 'Systematic workflows, budget reconciliation, precision metrics, and compliance.'
-  },
-  {
-    key: 'R',
-    name: 'Realistic',
-    icon: '⚙️',
-    color: 'amber',
-    description: 'Hands-on execution, practical tooling, infrastructure, and technical implementation.'
-  }
+const DIMENSIONS = [
+  { key: 'E', name: 'Enterprising', description: 'Leading, persuading and making commercial decisions.' },
+  { key: 'I', name: 'Investigative', description: 'Analysing information and testing ideas.' },
+  { key: 'A', name: 'Artistic', description: 'Creating, designing and communicating ideas.' },
+  { key: 'S', name: 'Social', description: 'Helping, teaching and working with people.' },
+  { key: 'C', name: 'Conventional', description: 'Organising information, processes and detail.' },
+  { key: 'R', name: 'Realistic', description: 'Hands-on, practical and technical work.' },
 ]
 
-const WORK_PREFERENCES = [
-  { id: 'pref_analytics', label: 'Auditing CAC, ROAS & Performance Dashboards' },
-  { id: 'pref_customer', label: 'Synthesizing Qualitative Churn & Customer Feedback' },
-  { id: 'pref_budget', label: 'Reallocating Budgets Under Financial Constraints' },
-  { id: 'pref_experiments', label: 'Designing A/B Split Tests & Scientific Hypotheses' },
-  { id: 'pref_stakeholders', label: 'Aligning Conflicting Stakeholder Opinions' },
-  { id: 'pref_workflows', label: 'Standardizing Operations & Cross-Team SLAs' }
+const ANSWERS = [
+  { value: '0', label: 'Not for me' },
+  { value: '0.5', label: 'Somewhat' },
+  { value: '1', label: 'Very much' },
 ]
+
+const REASON_SOURCE = {
+  SELF_REPORTED_INTEREST: 'Self-reported',
+  DEMONSTRATED_CAPABILITY: 'From assessment evidence',
+}
 
 export default function ExploreMode() {
-  const navigate = useNavigate()
-  const [riasecScores, setRiasecScores] = useState({
-    E: 0.6,
-    I: 0.5,
-    A: 0.4,
-    S: 0.3,
-    C: 0.3,
-    R: 0.2
-  })
-  const [selectedPrefs, setSelectedPrefs] = useState(['pref_analytics', 'pref_budget', 'pref_customer'])
-  const [recommendations, setRecommendations] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [evaluated, setEvaluated] = useState(false)
+  const [answers, setAnswers] = useState({})
+  const [state, setState] = useState({ loading: false, roles: null, error: null })
 
-  const handleSliderChange = (key, val) => {
-    setRiasecScores(prev => ({
-      ...prev,
-      [key]: parseFloat(val)
-    }))
-  }
+  const interests = Object.fromEntries(
+    Object.entries(answers).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v)]),
+  )
+  const canExplore = Object.values(interests).some((v) => v > 0)
 
-  const togglePref = (id) => {
-    setSelectedPrefs(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    )
-  }
-
-  const runAffinityEvaluation = async () => {
-    setLoading(true)
+  const run = async () => {
+    if (!canExplore) return
+    setState({ loading: true, roles: null, error: null })
     try {
-      // Normalize vector
-      const total = Object.values(riasecScores).reduce((a, b) => a + b, 0) || 1
-      const normalized = {}
-      for (const [k, v] of Object.entries(riasecScores)) {
-        normalized[k] = +(v / total).toFixed(3)
-      }
-
-      const res = await fetch('/api/job-families/explore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          candidateInterests: normalized
-        })
-      })
-      const data = await res.json()
-      if (data.recommendations) {
-        setRecommendations(data.recommendations)
-      }
-    } catch (err) {
-      console.error('Affinity evaluation failed', err)
-    } finally {
-      setLoading(false)
-      setEvaluated(true)
+      const data = await exploreRoles({ candidateInterests: interests })
+      setState({ loading: false, roles: data?.recommendations || [], error: null })
+    } catch (error) {
+      setState({ loading: false, roles: null, error })
     }
   }
 
-  useEffect(() => {
-    runAffinityEvaluation()
-  }, [])
+  const shown = (state.roles || []).filter((r) => (r.whyShown || []).length > 0)
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* Navigation Header */}
-      <header className="h-16 px-6 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="flex items-center gap-2">
-            <PrismLogo size={28} />
-          </Link>
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
-            Mode A · Explore Mode
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/register"
-            className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md"
-          >
-            Start Assessment →
-          </Link>
-        </div>
-      </header>
-
-      {/* Hero Explainer */}
-      <section className="px-6 pt-10 pb-8 max-w-5xl mx-auto text-center space-y-4">
-        <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-          Discover Your Occupational Affinity
-        </h1>
-        <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          Prism Next replaces deceptive percentages with deterministic interest vector matching and authentic simulation evidence. Calibrate your interests below to discover role families and where your capabilities match.
-        </p>
-      </section>
-
-      {/* Main Interactive Grid */}
-      <main className="max-w-6xl mx-auto px-6 pb-20 w-full grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1">
-        {/* Left Column: RIASEC & Preferences Intake (5 Cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-6">
-            <div className="border-b border-slate-800 pb-3">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Holland RIASEC Profile</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Adjust your natural affinities across the 6 core vocational dimensions:
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {RIASEC_DIMENSIONS.map(d => (
-                <div key={d.key} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                      <span>{d.icon}</span>
-                      <span>{d.name}</span>
-                    </span>
-                    <span className="font-mono text-indigo-400 font-bold">
-                      {Math.round(riasecScores[d.key] * 100)}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={riasecScores[d.key]}
-                    onChange={(e) => handleSliderChange(d.key, e.target.value)}
-                    className="w-full accent-indigo-500 bg-slate-800 rounded-lg cursor-pointer h-1.5"
-                  />
-                  <p className="text-[11px] text-slate-500">{d.description}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Work Preferences Checklist */}
-            <div className="pt-4 border-t border-slate-800 space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Work Activity Preferences
-              </h3>
-              <div className="space-y-2">
-                {WORK_PREFERENCES.map(pref => (
-                  <button
-                    key={pref.id}
-                    type="button"
-                    onClick={() => togglePref(pref.id)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-all border flex items-center justify-between ${
-                      selectedPrefs.includes(pref.id)
-                        ? 'bg-indigo-950/50 border-indigo-500/50 text-indigo-200 font-semibold'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
-                  >
-                    <span>{pref.label}</span>
-                    <span className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] ${
-                      selectedPrefs.includes(pref.id) ? 'bg-indigo-600 text-white' : 'border border-slate-700'
-                    }`}>
-                      {selectedPrefs.includes(pref.id) ? '✓' : ''}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={runAffinityEvaluation}
-              disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2"
-            >
-              {loading ? 'Evaluating Vectors...' : 'Recalibrate Role Recommendations ⚡'}
-            </button>
-          </div>
-        </div>
-
-        {/* Right Column: Recommended Role Families & Explainability (7 Cols) */}
-        <div className="lg:col-span-7 space-y-6">
-          <div className="flex items-center justify-between">
+    <div className="prism-app min-h-screen">
+      <main id="main" className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+        <PageHeader
+          title="Explore roles"
+          description="Tell us what kind of work you enjoy. We show roles linked to your answers and say clearly what is not yet known. This is not an assessment."
+          actions={<LinkButton to="/register" size="sm">Start an assessment</LinkButton>}
+        />
+        <div className="grid gap-8 lg:grid-cols-12">
+          <Card as="section" aria-labelledby="interests-heading" className="space-y-4 p-5 lg:col-span-5">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                Deterministic Guidance
-              </span>
-              <h2 className="text-xl font-black text-white mt-0.5">
-                Recommended Role Families
-              </h2>
+              <h2 id="interests-heading" className="text-lg font-semibold text-prism-ink">Self-reported interests</h2>
+              <p className="text-sm text-prism-ink-muted">Answer any that apply. Unanswered items are left out.</p>
             </div>
-            <span className="text-xs text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-800">
-              {recommendations.length} Families Evaluated
-            </span>
-          </div>
+            {DIMENSIONS.map((d) => (
+              <Select
+                key={d.key}
+                id={`interest-${d.key}`}
+                label={d.name}
+                hint={d.description}
+                placeholder="Not answered"
+                options={ANSWERS}
+                value={answers[d.key] ?? ''}
+                onChange={(e) => setAnswers((prev) => ({ ...prev, [d.key]: e.target.value }))}
+              />
+            ))}
+            <Button block onClick={run} disabled={!canExplore} loading={state.loading} loadingLabel="Finding roles…">
+              Show roles
+            </Button>
+            {!canExplore && <p className="text-xs text-prism-ink-muted">Choose &ldquo;Somewhat&rdquo; or &ldquo;Very much&rdquo; for at least one kind of work.</p>}
+          </Card>
 
-          <div className="space-y-4">
-            {recommendations.map((rec, index) => {
-              const isHigh = rec.exploration_tier === 'HIGH_EXPLORATION_RELEVANCE'
-              const isMod = rec.exploration_tier === 'MODERATE_EXPLORATION_RELEVANCE'
-              const tierBadge = isHigh ? (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  🟢 Tier 1: Strong Affinity
-                </span>
-              ) : isMod ? (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                  🔵 Tier 2: High Growth Potential
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  🟡 Tier 3: Adjacent Pathway
-                </span>
-              )
-
-              return (
-                <div
-                  key={rec.job_family_id || index}
-                  className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md space-y-4 hover:border-slate-700 transition-all"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-                    <div>
-                      <span className="text-[11px] font-mono text-slate-500 uppercase">
-                        {rec.job_family_id} · {rec.track}
-                      </span>
-                      <h3 className="text-lg font-bold text-white mt-0.5">{rec.title}</h3>
-                    </div>
-                    {tierBadge}
-                  </div>
-
-                  {/* Why this role appeared */}
-                  <div className="space-y-1.5">
-                    <span className="text-xs font-bold text-slate-300 block">
-                      💡 Why this role appeared:
-                    </span>
-                    <div className="space-y-1">
-                      {rec.why_this_role_appeared && rec.why_this_role_appeared.length > 0 ? (
-                        rec.why_this_role_appeared.map((why, i) => (
-                          <div key={i} className="text-xs text-slate-400 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
-                            {why.statement}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-xs text-slate-400 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
-                          Strong alignment between your stated enterprising/analytical preferences and the primary tasks of this role.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* What remains unknown */}
-                  <div className="space-y-1.5">
-                    <span className="text-xs font-bold text-amber-400/90 block">
-                      ❓ Key unknowns (requires simulation evidence):
-                    </span>
-                    <div className="text-xs text-slate-400 bg-amber-950/20 border border-amber-900/30 p-2.5 rounded-lg">
-                      {rec.what_remains_unknown && rec.what_remains_unknown.length > 0 ? (
-                        <span>Needs verification of practical performance on {rec.what_remains_unknown.map(u => u.name || u.capability_id).join(', ')}.</span>
-                      ) : (
-                        <span>Requires direct simulation telemetry to calibrate real-time judgment under pressure.</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Next Step Action CTAs */}
-                  <div className="pt-2 flex flex-wrap items-center gap-3">
-                    {rec.suggested_next_step && (
-                      <Link
-                        to={`/missions/${rec.suggested_next_step.mission_id}`}
-                        className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow"
-                      >
-                        ⚡ Practice 20-Min Mission ({rec.suggested_next_step.title})
-                      </Link>
-                    )}
-                    <button
-                      onClick={() => navigate('/briefing')}
-                      className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all border border-slate-700"
-                    >
-                      Enter Full Simulation Workspace →
-                    </button>
-                  </div>
+          <section aria-labelledby="roles-heading" aria-live="polite" className="space-y-4 lg:col-span-7">
+            <h2 id="roles-heading" className="text-lg font-semibold text-prism-ink">Roles to explore</h2>
+            {state.error && <ErrorState title="Roles could not be loaded" description={state.error.message} requestId={state.error.requestId} onRetry={run} />}
+            {!state.error && state.roles === null && (
+              <p className="text-sm text-prism-ink-muted">Roles appear here after you answer and choose &ldquo;Show roles&rdquo;.</p>
+            )}
+            {state.roles !== null && shown.length === 0 && (
+              <Callout tone="insufficient" title="No roles linked to your answers yet">
+                None of the roles we currently cover are linked to the interests you chose.
+              </Callout>
+            )}
+            {shown.map((r) => (
+              <Card key={r.roleId} className="space-y-3 p-5" data-testid="role-card">
+                <h3 className="text-base font-semibold text-prism-ink">{r.title}</h3>
+                <div>
+                  <p className="text-sm font-medium text-prism-ink">Why this role is shown</p>
+                  <ul className="mt-1 space-y-1 text-sm text-prism-ink">
+                    {r.whyShown.map((w) => (
+                      <li key={w.statement} className="flex flex-wrap items-center gap-2">
+                        <Badge tone="neutral">{REASON_SOURCE[w.type] || 'Other'}</Badge>
+                        <span>{w.statement}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              )
-            })}
-          </div>
+                {(r.unknowns || []).length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-prism-ink">Not yet known</p>
+                    <p className="text-sm text-prism-ink-muted">We have no assessment evidence yet for {r.unknowns.map((u) => u.name).join(', ')}.</p>
+                  </div>
+                )}
+                {r.nextStep?.label && <p className="text-sm text-prism-ink-muted">Next step: {r.nextStep.label}</p>}
+              </Card>
+            ))}
+          </section>
         </div>
       </main>
     </div>

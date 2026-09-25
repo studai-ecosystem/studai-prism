@@ -1,4 +1,4 @@
-import { isDbConfigured, query } from '../db/pool.js'
+import { isDbConfigured, query, getPool } from '../db/pool.js'
 import { LAYER_1_TRANSFERABLE_CAPABILITIES, LAYER_2_MARKETING_CAPABILITIES, CONTEXTUAL_DIGITAL_CAPABILITIES } from './competencyModelV2.js'
 
 // In-memory fallback dataset for deterministic standalone testing
@@ -212,7 +212,6 @@ export class OccupationalCapabilityGraph {
   async getJobFamilyBlueprint(jobFamilyId, version = 'latest') {
     if (isDbConfigured()) {
       try {
-        const { getPool } = await import('./dbPg.js')
         const pool = getPool()
         const query = version === 'latest'
           ? `SELECT * FROM job_family_blueprints WHERE job_family_id = $1 ORDER BY version DESC LIMIT 1`
@@ -229,7 +228,6 @@ export class OccupationalCapabilityGraph {
   async getAllJobFamilies() {
     if (isDbConfigured()) {
       try {
-        const { getPool } = await import('./dbPg.js')
         const pool = getPool()
         const { rows } = await pool.query(`SELECT job_family_id, name, version, track, level, decision_use, validation_status, adjacent_families FROM job_family_blueprints ORDER BY name ASC`)
         if (rows.length > 0) return rows

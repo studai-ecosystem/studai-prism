@@ -46,7 +46,9 @@ jobs:
           node --test --test-concurrency=1 \
             test/migration.db.test.js \
             test/storePg.db.test.js \
-            test/storeMigration.db.test.js
+            test/storeMigration.db.test.js \
+            test/campusMigrations.db.test.js \
+            test/evidenceAudit.db.test.js
       - name: Client build
         run: |
           npm ci

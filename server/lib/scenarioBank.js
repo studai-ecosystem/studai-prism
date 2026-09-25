@@ -106,6 +106,24 @@ export const PRE_APPROVED_SCENARIOS = {
   }
 }
 
+// Unknown ids return null — there is no fallback scenario (spec §34.3).
 export function getScenarioByAssessmentId(assessmentDefinitionId) {
-  return PRE_APPROVED_SCENARIOS[assessmentDefinitionId] || PRE_APPROVED_SCENARIOS['prism-sim-mkt-l1']
+  return Object.prototype.hasOwnProperty.call(PRE_APPROVED_SCENARIOS, assessmentDefinitionId)
+    ? PRE_APPROVED_SCENARIOS[assessmentDefinitionId]
+    : null
+}
+
+export class ScenarioNotFoundError extends Error {
+  constructor(id) {
+    super(`Scenario not found: ${id}`)
+    this.name = 'ScenarioNotFoundError'
+    this.code = 'SCENARIO_NOT_FOUND'
+    this.scenarioId = id
+  }
+}
+
+export function getScenarioOrThrow(assessmentDefinitionId) {
+  const scenario = getScenarioByAssessmentId(assessmentDefinitionId)
+  if (!scenario) throw new ScenarioNotFoundError(assessmentDefinitionId)
+  return scenario
 }

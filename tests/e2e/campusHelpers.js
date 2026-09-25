@@ -13,19 +13,21 @@ export function syntheticEmail(label) {
   return `${label}-${Date.now()}-${seq}@test.local`
 }
 
+// API calls go through Playwright's request context against the page's
+// origin, so they never race a client-side navigation (a page.evaluate fetch
+// dies with "Execution context was destroyed" if the app redirects meanwhile).
 export async function api(page, path, { method = 'GET', token, body, headers = {} } = {}) {
-  return page.evaluate(async ({ path, method, token, body, headers }) => {
-    const r = await fetch(path, {
-      method,
-      headers: {
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...headers,
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    })
-    return { status: r.status, body: await r.json().catch(() => null) }
-  }, { path, method, token, body, headers })
+  const origin = new URL(page.url()).origin
+  const r = await page.request.fetch(`${origin}${path}`, {
+    method,
+    headers: {
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    ...(body === undefined ? {} : { data: JSON.stringify(body) }),
+  })
+  return { status: r.status(), body: await r.json().catch(() => null) }
 }
 
 // Registers a synthetic user through the real API and stores the session the

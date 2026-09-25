@@ -127,7 +127,8 @@ test('Phase 2 admin plane end-to-end', { skip }, async (t) => {
   const detail = await call('GET', `/api/admin/users/${cand.id}`, superAdmin)
   assert.equal(detail.status, 200)
   assert.equal(detail.json.sessions.length, 1)
-  assert.equal(detail.json.reports[0].overall, 63)
+  assert.equal(detail.json.reports[0].overall, undefined, 'charter §6: operational report rows never carry the composite')
+  assert.equal(detail.json.reports[0].reportReady, true)
   assert.ok(detail.json.perSession[sid].consent)
 
   const badPatch = await call('PATCH', `/api/admin/users/${cand.id}`, superAdmin, { email: 'evil@x.com' })
@@ -150,7 +151,8 @@ test('Phase 2 admin plane end-to-end', { skip }, async (t) => {
   // ── Sessions: list overlay + review hold + invalidate ─────────────────────
   const sessList = await call('GET', `/api/admin/sessions?userId=${cand.id}`, opsAdmin)
   assert.equal(sessList.status, 200)
-  assert.equal(sessList.json.rows[0].overall, 63)
+  assert.equal(sessList.json.rows[0].overall, undefined, 'charter §6: session list never carries the composite')
+  assert.equal(sessList.json.rows[0].reportReady, true)
 
   const hold = await call('POST', `/api/admin/sessions/${sid}/review`, opsAdmin, { action: 'hold', reason: 'needs a second look' })
   assert.equal(hold.status, 200)

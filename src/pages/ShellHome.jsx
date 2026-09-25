@@ -57,7 +57,7 @@ export default function ShellHome() {
             </div>
             <h1 className="font-serif text-3xl mb-2">Prism Assessment</h1>
             <p className="font-sans text-sm text-[var(--color-ink-muted)]">
-              One 30-minute conversation · five dimensions · a verified result
+              One 30-minute conversation · five dimensions · a verifiable result
             </p>
           </div>
 

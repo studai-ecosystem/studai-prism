@@ -200,16 +200,9 @@ export default function ScoreReport() {
   const [params] = useSearchParams()
   const sessionId = params.get('session')
 
-  // Profile-first demo (charter §6): the sample report shows the evidence
-  // profile — per-dimension scores only, no composite.
-  const demoReport = params.get('demo') === '1' ? {
-    scores: { criticalThinking: 88, collaboration: 79, communication: 91, problemSolving: 85, aiDigitalFluency: 77 },
-    feedback: { summary: 'Riya demonstrates the profile of a candidate ready for cross-functional roles that require both clear communication and structured decision-making under pressure. The standout characteristic was the consistent gap-identification behaviour before acting — asking for missing information rather than assuming.' },
-    highlights: ['Framed the core trade-off early', 'Kept stakeholders aligned', 'Clear, structured communication'],
-    growthAreas: ['Quantify risks more explicitly', 'Invite dissenting views sooner'],
-  } : null
-
-  const [report, setReport] = useState(location.state?.report || demoReport)
+  // No sample/demo report: every score shown here comes from an issued report
+  // (Prism Campus K6/K41 — no invented scores or named sample candidates).
+  const [report, setReport] = useState(location.state?.report || null)
   const [loadingReport, setLoadingReport] = useState(false)
 
   // Refresh-safe: if the page is reloaded or opened directly with a session id,
@@ -1249,7 +1242,7 @@ export default function ScoreReport() {
           )}
         </div>
 
-        {/* ── STUDAI TALENT ECOSYSTEM: PUT YOUR VERIFIED STRENGTHS TO WORK ── */}
+        {/* ── STUDAI TALENT ECOSYSTEM: EXAMPLE OPPORTUNITIES (not matched to the candidate) ── */}
         <div
           className="rpt-section no-print"
           style={{
@@ -1283,23 +1276,15 @@ export default function ScoreReport() {
                   StudAI One Talent Ecosystem
                 </span>
                 <h3 style={{ fontFamily: 'Georgia, serif', fontSize: 22, color: 'var(--color-ink)', margin: 0 }}>
-                  Put your verified strengths to work
+                  Explore opportunities in StudAI Hire
                 </h3>
               </div>
             </div>
-            <span
-              style={{
-                fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999,
-                background: 'rgba(14,124,123,0.12)', color: 'rgb(14,124,123)',
-              }}
-            >
-              Verified Proof Active
-            </span>
           </div>
 
           <p style={{ fontSize: 14, color: 'var(--color-ink-muted)', margin: '0 0 20px', lineHeight: 1.6 }}>
-            Your assessment is complete. Your verified behavioral profile has unlocked matching opportunities in
-            <strong> StudAI Hire</strong> and portable credential verification.
+            Example roles from <strong>StudAI Hire</strong>. These are not matched to your result — review each
+            role&apos;s requirements yourself. Your credential can be checked at its verification link.
           </p>
 
           {/* Aligned Opportunities Feed */}
@@ -1331,7 +1316,7 @@ export default function ScoreReport() {
                     {job.title}
                   </h4>
                   <p style={{ fontSize: 12, color: 'var(--color-ink-muted)', margin: '0 0 10px', lineHeight: 1.4 }}>
-                    {job.alignment_reason || 'Values your demonstrated Critical Thinking & Problem Solving proof.'}
+                    {job.alignment_reason || null}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: '1px solid var(--color-line)' }}>

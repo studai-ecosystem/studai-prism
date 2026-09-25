@@ -1,5 +1,6 @@
 import { Router } from 'express'
-import { isDbConfigured, query } from '../db/pool.js'
+import { randomUUID } from 'node:crypto'
+import { isDbConfigured, query, getPool } from '../db/pool.js'
 
 const router = Router()
 
@@ -87,7 +88,6 @@ const SEEDED_MISSIONS = {
 router.get('/', async (_req, res) => {
   if (isDbConfigured()) {
     try {
-      const { getPool } = await import('../lib/dbPg.js')
       const pool = getPool()
       const { rows } = await pool.query(
         `SELECT mission_id, title, job_family_id, target_capability_id, target_rubric_level, estimated_duration_minutes, scaffolding_tier, status FROM development_missions ORDER BY created_at ASC`
@@ -105,7 +105,6 @@ router.get('/:id', async (req, res) => {
   const { id } = req.params
   if (isDbConfigured()) {
     try {
-      const { getPool } = await import('../lib/dbPg.js')
       const pool = getPool()
       const { rows } = await pool.query(`SELECT * FROM development_missions WHERE mission_id = $1`, [id])
       if (rows[0]) return res.json({ mission: rows[0] })
@@ -118,32 +117,46 @@ router.get('/:id', async (req, res) => {
   res.json({ mission })
 })
 
-// POST /api/missions/:id/submit — Submit candidate deliberate practice output
+// POST /api/missions/:id/submit — Submit candidate deliberate practice output.
+// Interim fail-closed evaluator (C2.09, until Development Engine V2): only
+// deterministic checks that actually ran are reported. Text length never
+// produces a rubric level, and no observable behaviour is emitted without a
+// matching check. Practice output never becomes formal evidence.
 router.post('/:id/submit', async (req, res) => {
   const { id } = req.params
-  const { candidateInputs, artifactDeltas } = req.body || {}
-  const attemptId = `att-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+  let mission = SEEDED_MISSIONS[id] || null
+  if (!mission && isDbConfigured()) {
+    const r = await query('SELECT mission_id FROM development_missions WHERE mission_id = $1', [id]).catch(() => null)
+    mission = r?.rows?.[0] || null
+  }
+  if (!mission) return res.status(404).json({ error: 'Development mission not found' })
+  const { candidateInputs } = req.body || {}
+  const attemptId = `att-${randomUUID()}`
+  const hypothesis = typeof candidateInputs?.hypothesis === 'string' ? candidateInputs.hypothesis.trim() : ''
 
-  // Evaluate candidate actions against criteria
-  const isHypothesisFormulated = Boolean(candidateInputs?.hypothesis?.length > 15)
-  const isBudgetValid = Boolean(artifactDeltas?.length > 0 || candidateInputs?.budgetAllocated)
-  const levelAchieved = isHypothesisFormulated && isBudgetValid ? 4 : 3
-
-  const result = {
-    attemptId,
-    missionId: id,
-    status: 'COMPLETED',
-    levelAchieved,
-    feedback: isHypothesisFormulated
-      ? 'Excellent deliberate practice. You cleanly isolated the test variable and allocated budget with clear conversion stop-losses.'
-      : 'Good attempt. To reach Level 4, ensure your hypothesis explicitly states the psychological reason for expected lift.',
-    observableBehaviors: [
-      'Candidate isolated single variable in A/B test parameter designer.',
-      'Candidate verified sample size prior to test deployment.'
-    ]
+  const criteria = []
+  if (hypothesis) {
+    // Structural check only: an "If … then … because …" hypothesis frame.
+    const framed = /\bif\b[\s\S]+\bthen\b[\s\S]+\bbecause\b/i.test(hypothesis)
+    criteria.push({
+      criterionId: 'HYPOTHESIS_FRAME',
+      description: 'Hypothesis is written as "If … then … because …".',
+      check: 'DETERMINISTIC',
+      observed: framed,
+    })
   }
 
-  res.json(result)
+  const observed = criteria.filter((c) => c.observed)
+  res.json({
+    attemptId,
+    missionId: id,
+    status: criteria.length === 0 ? 'INSUFFICIENT_EVIDENCE' : 'PRACTICE_FEEDBACK_UNAVAILABLE',
+    evidenceType: 'PRACTICE',
+    criteria,
+    summary: criteria.length === 0
+      ? 'Nothing was submitted that can be checked yet.'
+      : `${observed.length} of ${criteria.length} structural checks passed. Full practice feedback is not available yet.`,
+  })
 })
 
 export default router

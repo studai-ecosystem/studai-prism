@@ -1,137 +1,111 @@
-import { isDbConfigured, query } from '../db/pool.js'
+// Behavioural evidence ledger (spec §30.8, §33). Every write goes through the
+// strict contract in domain/evidence/evidenceUnit.js — nothing is defaulted —
+// and every capability status comes from the sufficiency engine.
+import { isDbConfigured, getPool } from '../db/pool.js'
+import logger from './logger.js'
+import { normalizeEvidenceUnit, readEvidenceRow } from '../domain/evidence/evidenceUnit.js'
+import { evaluateProfile } from '../domain/evidence/sufficiency.js'
 
-// In-memory fallback map for session evidence units
+// In-memory ledger used when no database is configured (and in unit tests).
 const memoryEvidenceStore = new Map()
 
+const json = (v) => (v == null ? null : JSON.stringify(v))
+
 export class EvidenceGraph {
-  /**
-   * Persists an atomic EvidenceUnit
-   */
-  async recordEvidenceUnit(unit) {
-    const evidenceUnit = {
-      evidence_id: unit.evidence_id || unit.evidenceId || `evid-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      session_id: unit.session_id || unit.sessionId,
-      attempt_id: unit.attempt_id || unit.attemptId || null,
-      blueprint_id: unit.blueprint_id || unit.blueprintId || 'STUDAI-JF-MKT-L1',
-      capability_id: unit.capability_id || unit.capabilityId,
-      capability_layer: unit.capability_layer || unit.capabilityLayer || 'LAYER_2_ROLE_SPECIFIC',
-      source_turn: unit.source_turn || unit.sourceTurn || 1,
-      source_artifact_id: unit.source_artifact_id || unit.sourceArtifactId || unit.sourceId || null,
-      candidate_action: unit.candidate_action || unit.candidateAction || {},
-      observable_behavior: unit.observable_behavior || unit.observedBehavior || 'Demonstrated domain judgment in simulation turn.',
-      rubric_level: unit.rubric_level || unit.rubricLevel || 3,
-      rubric_label: unit.rubric_label || unit.rubricLabel || 'Competent',
-      confidence_status: unit.confidence_status || unit.confidenceStatus || 'VERIFIED_CONSENSUS',
-      judge_agreement: unit.judge_agreement || unit.judgeAgreement || { unanimous: true, score: unit.rubric_level || unit.rubricLevel || 3 },
-      provenance: unit.provenance || { timestamp: new Date().toISOString() },
-      created_at: new Date()
-    }
+  /** Persist one evidence unit. Returns the stored (normalised) unit. */
+  async recordEvidenceUnit(input) {
+    const { unit } = normalizeEvidenceUnit(input)
 
     if (isDbConfigured()) {
       try {
-        const { getPool } = await import('./dbPg.js')
-        const pool = getPool()
-        await pool.query(
+        await getPool().query(
           `INSERT INTO behavioral_evidence_units (
-            evidence_id, session_id, attempt_id, blueprint_id, capability_id,
-            capability_layer, source_turn, source_artifact_id, candidate_action,
-            observable_behavior, rubric_level, rubric_label, confidence_status,
-            judge_agreement, provenance, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+            evidence_id, session_id, attempt_id, blueprint_id, capability_id, capability_layer,
+            source_type, source_turn, source_artifact_id, behavior_anchor_id,
+            candidate_action, candidate_action_json, observable_behavior, rubric_level, rubric_label,
+            confidence_status, judge_agreement, judge_agreement_json, human_review_status,
+            provenance, provenance_json, assessment_form_id, evidence_status, legacy_row, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$12,$13,$14,$15,$16,$16,$17,$18,$18,$19,$20,false,$21)`,
           [
-            evidenceUnit.evidence_id,
-            evidenceUnit.session_id,
-            evidenceUnit.attempt_id,
-            evidenceUnit.blueprint_id,
-            evidenceUnit.capability_id,
-            evidenceUnit.capability_layer,
-            evidenceUnit.source_turn,
-            evidenceUnit.source_artifact_id,
-            JSON.stringify(evidenceUnit.candidate_action),
-            evidenceUnit.observable_behavior,
-            evidenceUnit.rubric_level,
-            evidenceUnit.rubric_label,
-            evidenceUnit.confidence_status,
-            JSON.stringify(evidenceUnit.judge_agreement),
-            JSON.stringify(evidenceUnit.provenance),
-            evidenceUnit.created_at
-          ]
+            unit.evidence_id, unit.session_id, unit.attempt_id, unit.blueprint_id, unit.capability_id, unit.capability_layer,
+            unit.source_type, unit.source_turn, unit.source_artifact_id, unit.behavior_anchor_id,
+            json(unit.candidate_action_json), unit.observable_behavior, unit.rubric_level, unit.rubric_label,
+            unit.evidence_status, json(unit.judge_agreement_json), unit.human_review_status,
+            json(unit.provenance_json), unit.assessment_form_id, unit.evidence_status, unit.created_at,
+          ],
         )
-      } catch {
-        // Continue to memory
+        return unit
+      } catch (err) {
+        // With a database configured, a rejected write is an error, never a
+        // silent memory fallback that bypasses the schema checks (fail closed).
+        logger.captureException(err, { msg: 'evidence_unit_pg_write_failed', sessionId: unit.session_id })
+        throw err
       }
     }
 
-    const sessionList = memoryEvidenceStore.get(evidenceUnit.session_id) || []
-    sessionList.push(evidenceUnit)
-    memoryEvidenceStore.set(evidenceUnit.session_id, sessionList)
-
-    return evidenceUnit
+    const list = memoryEvidenceStore.get(unit.session_id) || []
+    list.push(unit)
+    memoryEvidenceStore.set(unit.session_id, list)
+    return unit
   }
 
-  /**
-   * Retrieves all verified EvidenceUnits for a session
-   */
+  /** All evidence units for a session, legacy rows read through the adapter. */
   async getEvidenceUnitsBySession(sessionId) {
     if (isDbConfigured()) {
       try {
-        const { getPool } = await import('./dbPg.js')
-        const pool = getPool()
-        const { rows } = await pool.query(
-          `SELECT * FROM behavioral_evidence_units WHERE session_id = $1 ORDER BY source_turn ASC, created_at ASC`,
-          [sessionId]
+        const { rows } = await getPool().query(
+          'SELECT * FROM behavioral_evidence_units WHERE session_id = $1 ORDER BY source_turn ASC NULLS LAST, created_at ASC',
+          [sessionId],
         )
-        if (rows.length > 0) return rows
-      } catch {
-        // Fall back to memory
+        if (rows.length > 0) return rows.map(readEvidenceRow)
+      } catch (err) {
+        // A read failure is an outage, not missing evidence: never let it
+        // surface as INSUFFICIENT_EVIDENCE on a report or in the audit trail.
+        logger.captureException(err, { msg: 'evidence_unit_pg_read_failed', sessionId })
+        throw err
       }
     }
-    return memoryEvidenceStore.get(sessionId) || []
+    return (memoryEvidenceStore.get(sessionId) || []).map(readEvidenceRow)
   }
 
-  /**
-   * Retrieves all verified EvidenceUnits for a session (alias)
-   */
   async getEvidenceUnits(sessionId) {
     return this.getEvidenceUnitsBySession(sessionId)
   }
 
   /**
-   * Aggregates verified EvidenceUnits into a Candidate Capability Profile
+   * Capability profile for a session: one sufficiency decision per capability.
+   * A level (band + label) exists only for PROVISIONAL / SUFFICIENT
+   * capabilities; everything else carries `level: null` and its reasons.
    */
-  async aggregateCapabilityProfile(sessionId, blueprintId) {
+  async aggregateCapabilityProfile(sessionId, { capabilityIds = [] } = {}) {
     const units = await this.getEvidenceUnitsBySession(sessionId)
-    const grouped = {}
-
-    for (const unit of units) {
-      if (!grouped[unit.capability_id]) {
-        grouped[unit.capability_id] = []
-      }
-      grouped[unit.capability_id].push(unit)
-    }
-
+    const decisions = evaluateProfile(units, { capabilityIds })
     const profile = {}
-    for (const [capId, observations] of Object.entries(grouped)) {
-      const levels = observations.map(o => o.rubric_level)
-      const avgLevel = +(levels.reduce((sum, val) => sum + val, 0) / levels.length).toFixed(2)
-      const roundedLevel = Math.round(avgLevel)
-
+    for (const [capId, d] of Object.entries(decisions)) {
+      const eligible = new Set(d.unitIds)
       profile[capId] = {
         capability_id: capId,
-        score_level: roundedLevel,
-        continuous_theta: avgLevel,
-        evidence_count: observations.length,
-        status: observations.length >= 2 ? 'VERIFIED' : 'PROVISIONAL',
-        observations: observations.map(o => ({
-          turn: o.source_turn,
-          behavior: o.observable_behavior,
-          rubric_level: o.rubric_level,
-          rubric_label: o.rubric_label,
-          citation: o.candidate_action?.dialogue_excerpt || null
-        }))
+        status: d.status,
+        reasons: d.reasons,
+        level: d.level ? { band: d.level.band, label: d.level.label } : null,
+        score_level: d.level ? Math.round(d.level.rubricMedian) : null,
+        evidence_count: d.unitIds.length,
+        opportunities: d.opportunities,
+        unit_ids: d.unitIds,
+        rules_version: d.rulesVersion,
+        observations: units
+          .filter((u) => eligible.has(u.evidence_id))
+          .map((u) => ({
+            evidence_id: u.evidence_id,
+            turn: u.source_turn,
+            artifact: u.source_artifact_id,
+            behavior: u.observable_behavior,
+            rubric_level: u.rubric_level,
+            rubric_label: u.rubric_label,
+            citation: u.candidate_action_json?.dialogue_excerpt || null,
+          })),
       }
     }
-
     return profile
   }
 }
