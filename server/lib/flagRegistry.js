@@ -49,6 +49,16 @@ export const FLAG_CATALOGUE = [
   { key: 'PRISM_SKIP_VERIFICATION', risk: 'medium', owner: 'business', description: 'Trial mode: bypass identity verification steps (consent never skipped).', dataGate: 'business decision only' },
   { key: 'PRISM_DRIFT_HARD', risk: 'high', owner: 'psychometrics', description: 'Judge-drift hard gate: block credential issuance on drifted judge.', dataGate: 'calibration-v1 frozen' },
   { key: 'PRISM_STUDY_STEERING_AB', risk: 'high', owner: 'research', description: 'Study 1 A/B arm assignment at session start.', dataGate: 'pilot start (human checklist)' },
+  // Prism Campus + Personal V1 (spec §49). ALL default OFF; humans flip (HA-C001).
+  { key: 'PRISM_APP_SHELL_V3', risk: 'medium', owner: 'product', description: 'Campus V1: new /app/* application shell and student pages.', dataGate: 'internal QA of the shell at 4 widths + axe clean (HA-C001)' },
+  { key: 'PRISM_EVIDENCE_FAIL_CLOSED', risk: 'high', owner: 'psychometrics', description: 'Campus V1: V3 evidence-status vocabulary (SUFFICIENT / PROVISIONAL / INSUFFICIENT_EVIDENCE / HUMAN_REVIEW_REQUIRED) on surfaces. Fabrication removal itself is unconditional.', dataGate: 'provisional sufficiency thresholds approved (HA-C002) + operator flip (HA-C001)' },
+  { key: 'PRISM_STUDENT_REPORT_V3', risk: 'high', owner: 'psychometrics', description: 'Campus V1: Student Report V3 route and /api/v1 report endpoint.', dataGate: 'evidence fail-closed live + claim registry review (HA-C002) + operator flip (HA-C001)' },
+  { key: 'PRISM_ASSESSMENT_WORKSPACE_V3', risk: 'medium', owner: 'engineering', description: 'Campus V1: Assessment Workspace V3 player and /api/v1 session endpoints.', dataGate: 'Journey E (network interruption) green + operator flip (HA-C001)' },
+  { key: 'PRISM_CAMPUS_ENABLED', risk: 'high', owner: 'product', description: 'Campus V1: every organization/campus route and campus UI.', dataGate: 'DATABASE_URL + campus migrations + legal review of disclosure copy (HA-C005) + operator flip (HA-C001)' },
+  { key: 'PRISM_CAMPUS_ANALYTICS', risk: 'high', owner: 'psychometrics', description: 'Campus V1: aggregate campus analytics with small-group suppression.', dataGate: 'PRISM_CAMPUS_ENABLED live + suppression review (HA-C002) + operator flip (HA-C001)' },
+  { key: 'PRISM_DEVELOPMENT_V2', risk: 'high', owner: 'psychometrics', description: 'Campus V1: Development Engine V2 missions, plans and interventions (practice evidence only).', dataGate: 'mission evaluator prompt review + operator flip (HA-C001)' },
+  { key: 'PRISM_GROWTH_ENABLED', risk: 'high', owner: 'psychometrics', description: 'Campus V1: reassessment cycles and growth comparison (approved-equivalent forms only).', dataGate: 'form equivalence approved (HA-C004) + operator flip (HA-C001)' },
+  { key: 'PRISM_ROLE_EXPLORATION_V2', risk: 'medium', owner: 'product', description: 'Campus V1: Explore Roles V2 (self-reported vs demonstrated, no percentages).', dataGate: 'copy review + operator flip (HA-C001)' },
 ]
 
 export async function seedFlagRegistry() {

@@ -15,6 +15,7 @@
 import { useEffect, useState, createContext, useContext } from 'react'
 import { ShieldCheck, AlertTriangle, HelpCircle, Hourglass } from 'lucide-react'
 import { EvidenceThread } from './EvidenceThread.jsx'
+import { fetchEvidenceClaims } from '../../api/evidence.js'
 
 // ── LAW 1: useClaims ─────────────────────────────────────────────────────────
 const ClaimsContext = createContext(null)
@@ -23,8 +24,7 @@ export function ClaimsProvider({ children }) {
   const [claims, setClaims] = useState(null)
   useEffect(() => {
     let cancelled = false
-    fetch('/api/evidence/claims')
-      .then((r) => (r.ok ? r.json() : null))
+    fetchEvidenceClaims()
       .then((c) => { if (!cancelled) setClaims(c) })
       .catch(() => {})
     return () => { cancelled = true }
