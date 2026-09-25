@@ -3,13 +3,12 @@ import { Router } from 'express'
 import { asyncHandler } from '../../domain/http/asyncHandler.js'
 import { ok } from '../../domain/http/errors.js'
 import { clientFlags } from '../../domain/flags/index.js'
-import { personalWorkspaceFor } from '../../domain/workspaces/personal.js'
 
-export function createMeRouter({ requireUser, listWorkspaces }) {
+export function createMeRouter({ requireUser, campus }) {
   const router = Router()
 
   router.get('/me', requireUser, asyncHandler(async (req, res) => {
-    const workspaces = listWorkspaces ? await listWorkspaces(req.user) : [personalWorkspaceFor(req.user)]
+    const workspaces = await campus.workspaceService.listWorkspaces(req.user)
     return ok(res, {
       user: req.user,
       flags: clientFlags(),

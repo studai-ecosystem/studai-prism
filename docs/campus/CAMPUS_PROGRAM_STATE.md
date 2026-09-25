@@ -16,9 +16,9 @@ Machine-read by `.github/hooks/scripts/*.cjs` (workspace root `PRISM/`). Keep th
 
 <!-- CAMPUS-STATE:BEGIN
 run_mode: autopilot
-active_phase: 2
+active_phase: 3
 target_phase: 12
-branch: campus/p02-measurement
+branch: campus/p03-org-foundation
 last_updated: 2026-09-25
 CAMPUS-STATE:END -->
 
@@ -82,7 +82,7 @@ Commit: 24c0b75
 
 Status: COMPLETE
 Gates: PASS 2026-09-25T20:00:40.150Z @ 24c0b75 (server 468/454 pass/0 fail/14 skipped/0 todo; DB 12/12 on PGlite; python 57; vitest 122; build; static audit; campus-scan clean; e2e critical 37 — 74/74 on --repeat-each=2; legacy prism-next specs 35/35)
-Commit: see C2.17
+Commit: ce17ce7 (`campus/p02-measurement`)
 
 - [x] C2.01 Migration: evidence ledger strict/nullable semantics + §30.8 columns + `evidence_status`; legacy rows untouched; down file — evidence: `server/db/migrations/0025_evidence_fail_closed.sql` + `.down.sql` (defaults/NOT NULL dropped, new columns, `legacy_row` flag-only UPDATE, 5 CHECK constraints, index); `server/test/campusMigrations.db.test.js` up→down→up on PGlite (K26): legacy row values unchanged + `legacy_row=true`, CHECKs reject INSUFFICIENT-with-level / status-less / unprovenanced / `VERIFIED` rows, rollback refuses to invent values; all 11 DB suites pass; added to CI DB step
 - [x] C2.02 Evidence write path strict: no defaults; missing provenance → `INSUFFICIENT_EVIDENCE`, `rubric_level NULL` — evidence: `server/domain/evidence/evidenceUnit.js` (zod, `normalizeEvidenceUnit`, legacy `readEvidenceRow` adapter), `server/lib/evidenceGraph.js` (only writer; PG path fixed K32), artifact writer in `routes/assessment.js` records action+provenance only; `server/test/evidenceSufficiency.test.js` (7 unit tests)
@@ -104,27 +104,27 @@ Commit: see C2.17
 
 ## Phase 3 — Organization, workspace, membership, entitlement foundation
 
-Status: NOT_STARTED
-Gates: NOT_RUN
-Commit: —
+Status: COMPLETE
+Gates: PASS 2026-09-25T20:55:19.462Z @ ce17ce7 (server 501/485 pass/0 fail/16 skipped/0 todo; DB 18/18 on PGlite; python 57; vitest 130; build; static audit; campus-scan clean; e2e critical 38 incl. Journey B)
+Commit: see C3.17
 
-- [ ] C3.01 Migration: organizations, campuses, academic_departments, academic_programs, academic_batches, cohorts, cohort_members
-- [ ] C3.02 Migration: organization_memberships, workspaces
-- [ ] C3.03 Migration: entitlements + immutable entitlement_consumptions (trigger-enforced append-only)
-- [ ] C3.04 Migration: consent_records, share_grants, share_grant_resources, data_access_audit_events, assessment_session_scopes
-- [ ] C3.05 Repository layer (PG + in-memory adapter) for all Phase 3 tables
-- [ ] C3.06 Permission service (§29 roles/matrix, deny-by-default, scope resolution) + exhaustive matrix tests
-- [ ] C3.07 Entitlement resolver (§31.1) + ledger + read-only adapter mapping legacy paid/invite/coupon to PERSONAL_PURCHASE / PROMO / ADMIN_GRANT
-- [ ] C3.08 Middleware: `requireAuth`, `resolveWorkspace` (X-Prism-Workspace), `requireOrgPermission`, data-access audit
-- [ ] C3.09 APIs: `GET /api/v1/workspaces`, `POST /api/v1/workspaces/:id/activate`
-- [ ] C3.10 Campus invite + membership acceptance with existing-account linking (no duplicate identity)
-- [ ] C3.11 Session scope attachment on sponsored start; legacy sessions resolve as PERSONAL
-- [ ] C3.12 `PRISM_CAMPUS_ENABLED` gate: all org routes 404 when off; require DATABASE_URL
-- [ ] C3.13 Frontend: WorkspaceSwitcher (query invalidation, context confirmation), workspace-namespaced query keys
-- [ ] C3.14 Frontend: campus invite acceptance page, SponsoredByCard, PrivacyScopeBadge, ConsentScopePanel
-- [ ] C3.15 Isolation integration tests: campus admin denied personal report; other org denied; expired sponsor entitlement; personal credits never consumed by campus
-- [ ] C3.16 E2E Journey B (partial): existing user → invite → accept → switch workspace → privacy disclosure
-- [ ] C3.17 Gates PASS, reviewer PASS, commit `feat(campus-p03): ...`
+- [x] C3.01 Migration: organizations, campuses, academic_departments, academic_programs, academic_batches, cohorts, cohort_members — evidence: `server/db/migrations/0026_campus_organizations.sql` + `.down.sql` (CHECK enums, org FKs + indexes, TEXT user ids); `server/test/campusFoundation.db.test.js` up→down→up on PGlite
+- [x] C3.02 Migration: organization_memberships, workspaces — evidence: `0027_campus_memberships_workspaces.sql` + `.down.sql` (§29 role CHECK, status CHECK, unique(org,user,role), workspace unique(type,owner,org) + org-required CHECK, `organization_invites` storing token hash only)
+- [x] C3.03 Migration: entitlements + immutable entitlement_consumptions (trigger-enforced append-only) — evidence: `0028_entitlements_v2.sql` + `.down.sql` (source CHECKs: sponsorship org-scoped, personal user-scoped, consumed ≤ quantity; `campus_reject_mutation()` trigger; unique idempotency key); DB test proves UPDATE/DELETE raise and over-consumption fails
+- [x] C3.04 Migration: consent_records, share_grants, share_grant_resources, data_access_audit_events, assessment_session_scopes — evidence: `0029_consent_sharing_scope.sql` + `.down.sql` (append-only audit trigger; personal scope must be OWNER_ONLY without sponsor; institution scope needs sponsor; grant recipient/expiry CHECKs); DB test covers each constraint
+- [x] C3.05 Repository layer (PG + in-memory adapter) for all Phase 3 tables — evidence: `server/domain/{organizations,memberships,workspaces,entitlements,sharing,audit,scopes}/repository.{pg,memory}.js`, `server/domain/campusStore/{memoryDb,pgUtil,index}.js`; shared contract `server/test-support/campusRepoContract.js` run by `campusRepositories.test.js` (memory, 5/5) and `campusRepositories.db.test.js` (PGlite, 5/5)
+- [x] C3.06 Permission service (§29 roles/matrix, deny-by-default, scope resolution) + exhaustive matrix tests — evidence: `server/domain/permissions/{roles,matrix,can}.js`; `server/test/campusPermissions.test.js` (7: spec §29.1 table verbatim, full role × permission table, `personal_result.read` false for all 8 roles, unknown role/permission/inactive/other-org deny, ASSIGNED/DEPARTMENT/PERMISSION/OWN scopes, widest-scope wins, K21 nav keys defined)
+- [x] C3.07 Entitlement resolver (§31.1) + ledger + read-only adapter mapping legacy paid/invite/coupon to PERSONAL_PURCHASE / PROMO / ADMIN_GRANT — evidence: `server/domain/entitlements/{resolver,ledger,legacyAdapter}.js` (+ read-only `listEntitlementsByUser` on both v1 store twins); `server/test/campusEntitlements.test.js` (8: adapter mapping, personal path V2 then legacy, sponsorship path members-only, no cross-pool fallback, expired/exhausted named, idempotent reserve + single consume audit + release frees seat, forged cross-scope resolutions rejected, memory ledger frozen)
+- [x] C3.08 Middleware: `requireAuth`, `resolveWorkspace` (X-Prism-Workspace), `requireOrgPermission`, data-access audit — evidence: `domain/auth/requireUser.js` (Phase 1), `domain/workspaces/resolveWorkspace.js` (unknown header 422, foreign workspace 403), `domain/permissions/middleware.js` (`requireCampus` 404/503, `requireOrgPermission` → 404 on deny), `domain/audit/dataAccess.js` (row written before data returns)
+- [x] C3.09 APIs: `GET /api/v1/workspaces`, `POST /api/v1/workspaces/:id/activate` — evidence: `server/routes/v1/workspaces.js`, `/api/v1/me` now returns real workspaces from `domain/workspaces/service.js` (PERSONAL virtual K18 + CAMPUS_* from ACTIVE memberships with server-computed permissions); `POST /api/v1/entitlements/check` (`routes/v1/entitlements.js`); covered in `campusIsolation.test.js`
+- [x] C3.10 Campus invite + membership acceptance with existing-account linking (no duplicate identity) — evidence: `domain/memberships/inviteService.js`, `routes/v1/organizations.js` (POST invites; token never returned; role rules), `routes/v1/orgInvites.js` (public preview with masked email; accept needs sign-in + matching email + explicit acknowledgement; decline; rate-limited), `lib/mailer.js` `sendOrgInviteEmail` (escaped org name); consent recorded with `campus-disclosure.v1-draft` (HA-C005) (K45)
+- [x] C3.11 Session scope attachment on sponsored start; legacy sessions resolve as PERSONAL — evidence: `domain/scopes/sessionScope.js` (`resolveSessionScope` → implicit PERSONAL/OWNER_ONLY, `recordSponsoredStart` writes INSTITUTION scope for CAMPUS_STUDENT workspaces, `authorizeSponsorRead`); legacy `/start` never runs in a campus workspace so it writes no row (K46); `campusIsolation.test.js` (4)
+- [x] C3.12 `PRISM_CAMPUS_ENABLED` gate: all org routes 404 when off; require DATABASE_URL — evidence: `requireCampus` on `/organizations` and `/org-invites`; campus workspaces vanish from `/me`/`/workspaces` when off or store absent; `campusIsolation.test.js` C3.12 case (404 × 5 routes, 503 `CAMPUS_STORE_UNAVAILABLE`, personal still works)
+- [x] C3.13 Frontend: WorkspaceSwitcher (query invalidation, context confirmation), workspace-namespaced query keys — evidence: Phase 1 `WorkspaceSwitcher` (listbox, keyboard, current check, `removeQueries(['ws', prev])`, navigate home, toast) + new `src/api/workspaces.js` (zod); invite acceptance invalidates `['me']` then switches; `PrivacyScopeBadge` in the top bar
+- [x] C3.14 Frontend: campus invite acceptance page, SponsoredByCard, PrivacyScopeBadge, ConsentScopePanel — evidence: `src/features/workspaces/pages/CampusInvitePage.jsx` (route `/app/campus-invite/:token`, AuthGuard first so signed-out invitees reach `/login?next=`), `src/components/campus/{SponsoredByCard,PrivacyScopeBadge,ConsentScopePanel}.jsx`, governed copy `src/lib/copy/privacy.js`, `src/api/campus.js`; SponsoredByCard on every campus student page (StudentShell); `src/features/workspaces/campusInvite.test.jsx` (8); Toast live regions fixed (K47)
+- [x] C3.15 Isolation integration tests: campus admin denied personal report; other org denied; expired sponsor entitlement; personal credits never consumed by campus — evidence: `server/test/campusIsolation.test.js` (7, real `/api/v1` handlers + memory repos): (1) personal session 404 to campus admin, (2) other org / non-member / out-of-scope readers 404, (3) `ENTITLEMENT_EXPIRED`, (4) campus reserve leaves personal entitlement untouched, (5) data-access row per allowed read with request id; share grant opens and revoke closes access; invite flow guards
+- [x] C3.16 E2E Journey B (partial): existing user → invite → accept → switch workspace → privacy disclosure — evidence: `tests/e2e/campus-join.spec.js` (@critical: fixture `tests/fixtures/campusSeed.mjs` on the throwaway campus store, acceptance with disclosure + acknowledgement, campus home with SponsoredByCard, campus nav lacks personal sections, one identity/two workspaces, switch back to personal, owner gets 404 on the student's personal session, axe clean) — passes on PGlite (K43)
+- [x] C3.17 Gates PASS, reviewer PASS, commit `feat(campus-p03): ...` — evidence: gates `audit-results/campus-gates/phase-03.json` PASS; Prism Campus Reviewer FAIL (2 blocking: mentor-invite scope delegation, share-grant scope) → fixed (K50) → PASS; non-blocking follow-ups fixed (cohort scope merge, consent once per version, case-insensitive token redaction, reserving user closes seat) or logged as Risks; commit on `campus/p03-org-foundation`
 
 ## Phase 4 — Student application V3
 
@@ -333,6 +333,14 @@ Format: date · id · decision · reason · spec/charter § · reversible.
 | 2026-09-25 | K39 | Sufficiency thresholds have non-overridable floors (`RULE_FLOORS`: ≥ 3 units, ≥ 2 independent opportunities) applied in `rulesFor` and inside `evaluateCapability` | "Two rows alone never produce SUFFICIENT" must hold for any configuration | Spec §33.2 | Yes |
 | 2026-09-25 | K40 | Legacy marketing copy "Verified result" / "Verified Prism Score" reworded to "verifiable" (credential integrity is the true claim; measurement verification is not claimed) | Reviewer note; claim-reducing | Spec §33, charter claims ceiling | Yes |
 | 2026-09-25 | K41 | The ScoreReport `?demo=1` sample (named person, invented dimension scores) was removed; the page shows only issued reports | K6 unconditional fabrication removal | Spec §33, §53 | Yes |
+| 2026-09-25 | K43 | Journey B e2e needs a campus store: the campus harness server (:4174) runs `migrateUp` against `PRISM_E2E_DATABASE_URL` (throwaway DB only — PGlite locally, the CI service container in CI); the gate runner passes `TEST_DATABASE_URL` through. Without it the spec is skipped with an explicit reason, like the DB suites | Org routes are 503 without a store; no real database is ever used | Spec §48.4, K2 | Yes |
+| 2026-09-25 | K44 | The Track 0 PII schema gate exempts the campus identity/authorization plane by explicit table name (`cohort_members`, `organization_memberships`, `organization_invites`, `entitlements`, `entitlement_consumptions`, `consent_records`), the same way v1_/admin_/invite_redemptions are exempt; research tables remain guarded | These tables exist to decide who may see what; they never join research data | Charter §5, spec §30 | Yes |
+| 2026-09-25 | K45 | Accounts carry no email-verified flag, so an invitation can be accepted only by the signed-in account whose email equals the invited address (`INVITE_EMAIL_MISMATCH` otherwise); the preview shows only a masked address; tokens are 256-bit, stored as SHA-256, never returned by the API, expire after 14 days | One identity without trusting unverified emails | Spec §37.2 | Yes |
+| 2026-09-25 | K46 | The legacy `/api/assessment/start` path is personal-only (no campus assignment can reach it), so it writes no scope row and resolves as PERSONAL/OWNER_ONLY; `recordSponsoredStart` + ledger reserve are called by the sponsored start endpoint in Phase 5 (C5.03) | No sponsored start exists before assignments | Spec §4.3, §31.2 | Yes |
+| 2026-09-25 | K47 | Toast live regions were `<ul role=status>` with `<li>` children (role strips list semantics → axe `listitem` serious); now `<div role=status>` containers | Surfaced by Journey B axe run | WCAG 1.3.1 | Yes |
+| 2026-09-25 | K48 | Every org-route denial (not a member, role or scope not permitted, other org, personal session) is 404, never 403, so organization and session existence never leak; invite role rules: STUDENT via `students.manage` in scope, staff via `team.manage`, `LIMITED` managers may invite faculty mentors only, only owners invite owners, platform roles are never invitable | Contract §4, §5 | Spec §29 | Yes |
+| 2026-09-25 | K49 | A personal session (no scope row) is readable by an organization only through the owner's explicit, unexpired, unrevoked share grant naming that session; the owner is looked up from the session store. The share-grant create/revoke API arrives with Phase 6 (C6.03) | Spec §36.3 | Spec §36 | Yes |
+| 2026-09-25 | K50 | Phase 3 review hardening: (a) staff invites carrying a cohort/department require the inviter's own `cohorts.read` reach (no delegating access you do not hold) and departments must belong to the org; (b) share-grant reads need `students.read` over the owner's cohort/department — a grant to an org is not a grant to every staff member; (c) memberships of non-ACTIVE organizations authorize nothing; (d) org-invite tokens are redacted from request logs; (e) acceptance writes consent first and refuses SUSPENDED/REMOVED members; (f) ledger closing events check the open reservation inside the locked write and concurrent same-key inserts replay; reserve keys are namespaced per user; (g) partial unique index for PERSONAL workspace rows; (h) invite email is not sent without `PUBLIC_APP_URL` | Reviewer findings (2 blocking, 10 warnings) | Contract §4–§6, spec §53 | Yes |
 | 2026-09-25 | K42 | Artifact saves: unknown `artifactId` → 404 `ARTIFACT_NOT_FOUND` (never `ok:true`); the evidence write happens before the session state changes; an evidence-ledger PG read failure now throws (outage ≠ insufficient evidence) | Reviewer notes; fail closed on errors | Spec §33.1, §53 | Yes |
 
 ## Risks
@@ -347,6 +355,9 @@ Format: date · id · decision · reason · spec/charter § · reversible.
 | Legacy `/api/assessment/report/:id/v2` and `/employee` have no authentication/ownership check (pre-existing): anyone with a session id sees the candidate name and, once judged evidence exists, verbatim quotes | P1 | Engineering | Phase 3 scope/permission middleware + Phase 6 owner/sponsor-only report API (C6.02) replace these routes | Campus rollout |
 | Legacy workspace calls `/start` on every load, so a refresh restarts the conversation (pre-existing) | P2 | Engineering | Phase 5 resume/idempotent session contract (C5.02, C5.06, C5.10) | Workspace V3 flip |
 | `ScoreReport` `?demo=1` sample hard-codes a name and invented scores; server maps `jobFamilyId` STUDAI-JF-MKT-L1 → marketing scenario at `/start` (pre-existing) | P2 | Engineering | Phase 4 assignment catalogue supplies assessment ids; Phase 6 report rebuild removes the demo sample | Campus rollout |
+| Candidate erasure (`DELETE /api/assessment/candidate-data`) does not yet cascade to campus identity-plane rows (memberships, invites, consents, entitlements, share grants) | P1 | Engineering | Add campus rows to the erasure cascade with retention rules (Phase 12 C12.04/retention policy); append-only ledgers keep pseudonymised history per RETENTION_POLICY_v1 | Campus rollout |
+| Invite acceptance performs several writes without one transaction (consent, membership, workspace, cohort, invite status); a mid-way failure leaves a retryable partial state | P3 | Engineering | Consent is written first (once per copy version), membership/workspace/cohort writes are upserts and the invite is marked ACCEPTED last, so re-accepting completes it | No |
+| Share grants are not revoked when a student leaves an organization; ALL-scope staff could still read a shared session until the grant expires | P2 | Engineering | Phase 6 share-grant API (C6.03): revoke org grants on membership removal and require an ACTIVE student membership | Campus rollout |
 
 ## Session handoff
 

@@ -85,6 +85,9 @@ function safeStringify(obj) {
 // ── Express request-logging middleware ────────────────────────────────────────
 // Adds a request id, then logs method/url/status/duration once the response
 // finishes. Mounted before the routers in index.js.
+// One-time tokens in URLs (campus org invites) never reach the logs.
+export const redactUrl = (url) => String(url || '').replace(/(\/org-invites\/)[^/?#]+/gi, '$1[redacted]')
+
 export function requestLogger(req, res, next) {
   const requestId = req.headers['x-request-id'] || randomUUID()
   req.requestId = requestId
@@ -97,7 +100,7 @@ export function requestLogger(req, res, next) {
     emit(level, 'http_request', {
       requestId,
       method: req.method,
-      url: req.originalUrl,
+      url: redactUrl(req.originalUrl),
       status: res.statusCode,
       durationMs: Math.round(durationMs * 10) / 10,
     })

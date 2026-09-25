@@ -10,6 +10,7 @@ import { useWorkspace } from '../../app/providers/WorkspaceProvider.jsx'
 import { useFlag } from '../../app/providers/FeatureFlagProvider.jsx'
 import { WorkspaceSwitcher } from '../../features/workspaces/components/WorkspaceSwitcher.jsx'
 import { workspaceLabel } from '../../features/workspaces/workspacePaths.js'
+import { PrivacyScopeBadge } from '../campus/PrivacyScopeBadge.jsx'
 
 // Top bar (spec §7.1): workspace selector, context badge, profile menu.
 // Notifications arrive with Phase 7 (no placeholder control until then).
@@ -35,6 +36,7 @@ export function TopBar({ onOpenNav, navLabel = 'Open navigation' }) {
         <Badge tone={personal ? 'neutral' : 'accent'} className="hidden sm:inline-flex" aria-label={`Current context: ${workspaceLabel(active)}`}>
           {workspaceLabel(active)}
         </Badge>
+        <span className="hidden lg:inline-flex"><PrivacyScopeBadge workspace={active} /></span>
       </div>
       <div className="ml-auto">
         <DropdownMenu

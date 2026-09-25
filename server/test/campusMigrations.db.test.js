@@ -96,6 +96,7 @@ test('0025: up → down → up, legacy rows flagged not rewritten, CHECKs fail c
   )
 
   // Rollback refuses to invent values for strict rows; once they are removed it reverses cleanly.
+  while ((await latestMigration()) >= '0026') await migrateDown()
   await assert.rejects(migrateDown())
   await query('DELETE FROM behavioral_evidence_units WHERE session_id = $1', [session])
   await migrateDown()

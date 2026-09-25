@@ -116,3 +116,36 @@ export async function sendReportLinkEmail({ to, name, reportUrl }) {
   })
   return true
 }
+
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+// Prism Campus (C3.10): an institution invites someone to join its
+// organization. The link carries a one-time token (only its hash is stored).
+// The organization name is institution-entered text, so it is escaped.
+export async function sendOrgInviteEmail({ to, organizationName, inviteUrl }) {
+  const transport = await getTransport()
+  if (!transport) throw new Error('mail_not_configured')
+  const fromAddress = process.env.MAIL_FROM || process.env.SMTP_USER
+  const fromName = process.env.MAIL_FROM_NAME || 'StudAI Prism'
+  const org = String(organizationName || 'An institution').replace(/[\r\n]+/g, ' ').slice(0, 120)
+
+  await transport.sendMail({
+    from: `"${fromName}" <${fromAddress}>`,
+    to,
+    subject: `${org} invited you to Prism`,
+    text:
+      `${org} has invited you to join its Prism workspace.\n\n` +
+      `Open this link to see exactly what ${org} will and will not be able to see before you accept:\n\n` +
+      `${inviteUrl}\n\n` +
+      `Your personal Prism results stay private unless you choose to share them.\n\n— StudAI Prism`,
+    html:
+      `<div style="font-family:Arial,Helvetica,sans-serif;color:#1A1A2E;line-height:1.6">` +
+      `<p><strong>${escapeHtml(org)}</strong> has invited you to join its Prism workspace.</p>` +
+      `<p>Open the link to see exactly what they will and will not be able to see before you accept:</p>` +
+      `<p><a href="${escapeHtml(inviteUrl)}">${escapeHtml(inviteUrl)}</a></p>` +
+      `<p>Your personal Prism results stay private unless you choose to share them.</p>` +
+      `<p style="color:#7A7F8C;font-size:13px;margin-top:16px">— StudAI Prism</p>` +
+      `</div>`,
+  })
+  return true
+}

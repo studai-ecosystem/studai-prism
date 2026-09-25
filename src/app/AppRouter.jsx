@@ -95,6 +95,7 @@ const GrowthPage = lazy(() => import('../features/growth/pages/GrowthPage.jsx'))
 const SharingPage = lazy(() => import('../features/sharing/pages/SharingPage.jsx'))
 const SettingsPage = lazy(() => import('../features/settings/pages/SettingsPage.jsx'))
 const CampusOverviewPage = lazy(() => import('../features/campus/pages/CampusOverviewPage.jsx'))
+const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusInvitePage.jsx'))
 const NotYetAvailablePage = lazy(() => import('../features/shared/NotYetAvailablePage.jsx'))
 
 // Legacy guard — behaviour preserved exactly (redirects to /register).
@@ -214,6 +215,13 @@ export default function AppRouter() {
           <Route path="/app/development/missions/:missionId" element={<V3Route flag="PRISM_DEVELOPMENT_V2" requiresShell legacyPath="/missions/:missionId" page={inShell(<NotYetAvailablePage title="Mission" legacyPattern="/missions/:missionId" />)} />} />
           <Route path="/app/explore" element={<V3Route flag="PRISM_ROLE_EXPLORATION_V2" requiresShell legacyPath="/explore" page={inShell(<NotYetAvailablePage title="Explore Roles" legacyPattern="/explore" />)} />} />
           <Route path="/app/*" element={<ShellGate><Navigate to="/app/home" replace /></ShellGate>} />
+
+          {/* Campus invitation (spec §37.2): sign-in first, so a signed-out
+              invitee reaches /login?next= (K25 flip precondition). */}
+          <Route
+            path="/app/campus-invite/:token"
+            element={<AuthGuard><ShellGate><CampusGate><CampusInvitePage /></CampusGate></ShellGate></AuthGuard>}
+          />
 
           {/* Campus student workspace (spec §6.3). */}
           <Route

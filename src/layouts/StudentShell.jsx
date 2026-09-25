@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { Outlet, useParams } from 'react-router-dom'
 import { AppShell } from './AppShell.jsx'
+import { SponsoredByCard } from '../components/campus/SponsoredByCard.jsx'
 import { STUDENT_NAV, STUDENT_NAV_FOOTER, STUDENT_BOTTOM_NAV } from '../components/navigation/navConfig.js'
 import { useWorkspace, PERSONAL_FALLBACK } from '../app/providers/WorkspaceProvider.jsx'
 
@@ -28,7 +29,8 @@ export function StudentShell({ children }) {
 
   return (
     <AppShell navLabel="Primary" items={items} footerItems={footer} bottomItems={bottom}>
-      {children}
+      {organizationId && active.type === 'CAMPUS_STUDENT' && <SponsoredByCard organizationName={active.organizationName || active.name} />}
+      {children || <Outlet />}
     </AppShell>
   )
 }

@@ -48,7 +48,9 @@ jobs:
             test/storePg.db.test.js \
             test/storeMigration.db.test.js \
             test/campusMigrations.db.test.js \
-            test/evidenceAudit.db.test.js
+            test/evidenceAudit.db.test.js \
+            test/campusFoundation.db.test.js \
+            test/campusRepositories.db.test.js
       - name: Client build
         run: |
           npm ci
@@ -58,6 +60,9 @@ jobs:
       - name: Install critical-path browser
         run: npx playwright install --with-deps chromium
       - name: Critical browser and accessibility gates
+        env:
+          # Campus harness server (Journey B) uses the same throwaway CI database.
+          PRISM_E2E_DATABASE_URL: postgres://prism:prism-ci-only@localhost:5432/prism_test
         run: npm run test:e2e:critical -- --project=chromium
       - name: Upload browser evidence
         if: always()

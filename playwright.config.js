@@ -29,7 +29,12 @@ export default defineConfig({
       // (test process only, K2). Campus specs target it via CAMPUS_BASE_URL.
       command: 'node scripts/start-audit-server.mjs',
       url: 'http://127.0.0.1:4174/api/health',
-      env: { PORT: '4174', PRISM_AUDIT_CAMPUS: 'true' },
+      env: {
+        PORT: '4174',
+        PRISM_AUDIT_CAMPUS: 'true',
+        // Throwaway campus store (Journey B) when the runner provides one.
+        ...(process.env.PRISM_E2E_DATABASE_URL ? { PRISM_AUDIT_CAMPUS_DATABASE_URL: process.env.PRISM_E2E_DATABASE_URL } : {}),
+      },
       reuseExistingServer: false,
       timeout: 120_000,
     },

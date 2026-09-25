@@ -29,7 +29,7 @@ export function ToastProvider({ children, durationMs = 5000 }) {
   const assertive = toasts.filter((t) => t.tone === 'blocked')
 
   const render = (t) => (
-    <li key={t.id} className={cx('pointer-events-auto flex items-start gap-3 rounded-[var(--prism-radius-md)] border-l-4 bg-prism-surface px-4 py-3 text-sm text-prism-ink shadow-lg', TONE[t.tone] || TONE.info)}>
+    <div key={t.id} className={cx('pointer-events-auto flex items-start gap-3 rounded-[var(--prism-radius-md)] border-l-4 bg-prism-surface px-4 py-3 text-sm text-prism-ink shadow-lg', TONE[t.tone] || TONE.info)}>
       <div className="min-w-0 flex-1">
         {t.title && <p className="font-semibold">{t.title}</p>}
         <p>{t.message}</p>
@@ -37,15 +37,15 @@ export function ToastProvider({ children, durationMs = 5000 }) {
       <button type="button" onClick={() => dismiss(t.id)} aria-label="Dismiss notification" className="rounded p-0.5 text-prism-ink-muted hover:bg-prism-subtle">
         <X size={14} aria-hidden="true" />
       </button>
-    </li>
+    </div>
   )
 
   return (
     <ToastContext.Provider value={value}>
       {children}
       <div className="pointer-events-none fixed bottom-20 right-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2 md:bottom-4">
-        <ul role="status" aria-live="polite" className="flex flex-col gap-2">{polite.map(render)}</ul>
-        <ul role="alert" aria-live="assertive" className="flex flex-col gap-2">{assertive.map(render)}</ul>
+        <div role="status" aria-live="polite" className="flex flex-col gap-2">{polite.map(render)}</div>
+        <div role="alert" aria-live="assertive" className="flex flex-col gap-2">{assertive.map(render)}</div>
       </div>
     </ToastContext.Provider>
   )
