@@ -32,6 +32,24 @@ export function createSharingRepoPg({ query, getPool }) {
         return { ...grant(rows[0]), resources }
       })
     },
+    async listShareGrantsForOwner(ownerUserId) {
+      const { rows } = await query(
+        `SELECT g.*, o.name AS recipient_organization_name FROM share_grants g
+         LEFT JOIN organizations o ON o.id = g.recipient_organization_id
+         WHERE g.owner_user_id = $1 ORDER BY g.created_at DESC, g.id`,
+        [ownerUserId],
+      )
+      if (!rows.length) return []
+      const { rows: res } = await query(
+        'SELECT * FROM share_grant_resources WHERE share_grant_id = ANY($1::uuid[]) ORDER BY resource_type, resource_id',
+        [rows.map((r) => r.id)],
+      )
+      return rows.map((r) => ({
+        ...grant(r),
+        recipientOrganizationName: r.recipient_organization_name || null,
+        resources: res.filter((x) => x.share_grant_id === r.id).map((x) => ({ resourceType: x.resource_type, resourceId: x.resource_id, disclosureLevel: x.disclosure_level })),
+      }))
+    },
     async revokeShareGrant(id, ownerUserId, revokedAt) {
       const { rows } = await query(
         'UPDATE share_grants SET revoked_at = COALESCE(revoked_at, $3) WHERE id = $1 AND owner_user_id = $2 RETURNING *',

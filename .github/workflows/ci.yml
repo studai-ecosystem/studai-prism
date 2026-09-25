@@ -50,7 +50,8 @@ jobs:
             test/campusMigrations.db.test.js \
             test/evidenceAudit.db.test.js \
             test/campusFoundation.db.test.js \
-            test/campusRepositories.db.test.js
+            test/campusRepositories.db.test.js \
+            test/campusStudent.db.test.js
       - name: Client build
         run: |
           npm ci

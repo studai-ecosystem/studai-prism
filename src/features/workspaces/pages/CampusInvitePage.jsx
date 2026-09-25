@@ -14,6 +14,7 @@ import { ErrorState } from '../../../components/states/index.js'
 import { ConsentScopePanel } from '../../../components/campus/ConsentScopePanel.jsx'
 import { ROLE_LABELS } from '../../../lib/copy/privacy.js'
 import { homePathFor, workspaceLabel } from '../workspacePaths.js'
+import { track } from '../../../lib/telemetry.js'
 
 export default function CampusInvitePage() {
   const { token } = useParams()
@@ -29,11 +30,18 @@ export default function CampusInvitePage() {
   const accept = useMutation({
     mutationFn: () => acceptOrgInvite(token),
     onSuccess: async (result) => {
+      track('membership_accepted', { surface: 'CAMPUS_INVITE' })
       await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY })
       setTarget(result.workspaceId)
     },
   })
   const decline = useMutation({ mutationFn: () => declineOrgInvite(token) })
+  const inviteLoaded = Boolean(invite.data)
+
+  // The token is never sent with the event.
+  useEffect(() => {
+    if (inviteLoaded) track('invite_received', { surface: 'CAMPUS_INVITE' })
+  }, [inviteLoaded])
 
   // Once /me includes the new workspace, switch to it and land on its home.
   useEffect(() => {

@@ -17,6 +17,17 @@ export function createSharingRepoMemory(db) {
       for (const r of resources) db.shareGrantResources.push({ shareGrantId: row.id, resourceType: r.resourceType, resourceId: String(r.resourceId), disclosureLevel: r.disclosureLevel })
       return { ...clone(row), resources: clone(resources) }
     },
+    // Every grant the owner created (newest first), with its resources and recipient org name.
+    async listShareGrantsForOwner(ownerUserId) {
+      return [...db.shareGrants.values()]
+        .filter((g) => g.ownerUserId === ownerUserId)
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .map((g) => ({
+          ...clone(g),
+          recipientOrganizationName: g.recipientOrganizationId ? db.organizations.get(g.recipientOrganizationId)?.name || null : null,
+          resources: db.shareGrantResources.filter((r) => r.shareGrantId === g.id).map(({ shareGrantId: _s, ...r }) => clone(r)),
+        }))
+    },
     async revokeShareGrant(id, ownerUserId, revokedAt) {
       const row = db.shareGrants.get(id)
       if (!row || row.ownerUserId !== ownerUserId) return null

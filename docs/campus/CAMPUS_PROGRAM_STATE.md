@@ -16,9 +16,9 @@ Machine-read by `.github/hooks/scripts/*.cjs` (workspace root `PRISM/`). Keep th
 
 <!-- CAMPUS-STATE:BEGIN
 run_mode: autopilot
-active_phase: 3
+active_phase: 4
 target_phase: 12
-branch: campus/p03-org-foundation
+branch: campus/p04-student-app
 last_updated: 2026-09-25
 CAMPUS-STATE:END -->
 
@@ -106,7 +106,7 @@ Commit: ce17ce7 (`campus/p02-measurement`)
 
 Status: COMPLETE
 Gates: PASS 2026-09-25T20:55:19.462Z @ ce17ce7 (server 501/485 pass/0 fail/16 skipped/0 todo; DB 18/18 on PGlite; python 57; vitest 130; build; static audit; campus-scan clean; e2e critical 38 incl. Journey B)
-Commit: see C3.17
+Commit: 6ccb0fe (`campus/p03-org-foundation`)
 
 - [x] C3.01 Migration: organizations, campuses, academic_departments, academic_programs, academic_batches, cohorts, cohort_members — evidence: `server/db/migrations/0026_campus_organizations.sql` + `.down.sql` (CHECK enums, org FKs + indexes, TEXT user ids); `server/test/campusFoundation.db.test.js` up→down→up on PGlite
 - [x] C3.02 Migration: organization_memberships, workspaces — evidence: `0027_campus_memberships_workspaces.sql` + `.down.sql` (§29 role CHECK, status CHECK, unique(org,user,role), workspace unique(type,owner,org) + org-required CHECK, `organization_invites` storing token hash only)
@@ -128,25 +128,25 @@ Commit: see C3.17
 
 ## Phase 4 — Student application V3
 
-Status: NOT_STARTED
-Gates: NOT_RUN
-Commit: —
+Status: COMPLETE
+Gates: PASS 2026-09-25T22:44:25.960Z @ 6ccb0fe (working tree)
+Commit: see C4.15
 
-- [ ] C4.01 Migration: assessment_definitions, assessment_forms, assessment_assignments, assessment_assignment_targets, assessment_assignment_students (map the frozen scenario bank; no new scenarios)
-- [ ] C4.02 Personal assignments derived from personal entitlements (idempotent, no data mutation of legacy)
-- [ ] C4.03 Read APIs: `/api/v1/me/home`, `/me/capabilities`, `/me/evidence`, `/me/assessments`, `/me/development-plan`, `/me/growth` (workspace-scoped, fail closed)
-- [ ] C4.04 Student Home §9 (primary action priority, capability snapshot, development focus, sponsor card)
-- [ ] C4.05 Assessments list §10 (Active/Completed/Upcoming, scope labels)
-- [ ] C4.06 Assessment Briefing §11 + system check route (reuse existing device checks); sponsored disclosure acknowledgement persisted in consent_records
-- [ ] C4.07 Capabilities page §13
-- [ ] C4.08 Evidence explorer §15 (formal vs practice visually distinct, filters)
-- [ ] C4.09 Development overview (plan read; missions arrive Phase 8) and Growth page honest states
-- [ ] C4.10 Explore Roles V2 §18 (self-reported vs demonstrated, no %, no auto-evaluate)
-- [ ] C4.11 Sharing (list/revoke grants) + Settings (profile, privacy, accessibility preferences)
-- [ ] C4.12 Campus student routes `/app/campus/:organizationId/*` with scoped data only
-- [ ] C4.13 Product telemetry events §46 (no PII/transcripts)
-- [ ] C4.14 Tests: API read models, component tests, Playwright student journeys, axe, mobile widths
-- [ ] C4.15 Gates PASS, reviewer + UX auditor PASS, commit `feat(campus-p04): ...`
+- [x] C4.01 Migration: assessment_definitions, assessment_forms, assessment_assignments, assessment_assignment_targets, assessment_assignment_students (map the frozen scenario bank; no new scenarios) — evidence: `server/db/migrations/0030_assessment_assignments.sql` (+ down; extends the 0022 table, K51; no status defaults; sponsor/roster CHECKs) and `0031_student_preferences_product_events.sql` (+ down); catalog derived from the injected frozen bank only (`server/domain/assessments/catalog.js`, `catalogService.js` idempotent seed); repos `assessments/repository.{memory,pg}.js`; `test-support/campusRepoContract.js` on memory + real Postgres; up/down walk in `campusMigrations.db.test.js`
+- [x] C4.02 Personal assignments derived from personal entitlements (idempotent, no data mutation of legacy) — evidence: `server/domain/assessments/assignmentService.js` (deterministic `pa_` ids, insert-if-absent, forward-only mirror, K57); `campusStudent.test.js` "C4.02" (two reads identical, 3 rows, legacy snapshot byte-identical, other students never visible)
+- [x] C4.03 Read APIs: `/api/v1/me/home`, `/me/capabilities`, `/me/evidence`, `/me/assessments`, `/me/development-plan`, `/me/growth` (workspace-scoped, fail closed) — evidence: `server/routes/v1/student.js`, `server/domain/student/{sessionDirectory,readModels}.js` (sufficiency engine over COMPLETED formal sessions only; validated claims; verbatim quotes only; change null; growth `comparable:false`); `campusStudent.test.js` (capabilities, evidence filters + 422, home priority, growth/plan, shell flag off 404, admin workspace 403, anonymous 401, store down → personal reads still 200)
+- [x] C4.04 Student Home §9 (primary action priority, capability snapshot, development focus, sponsor card) — evidence: `src/features/home/pages/HomePage.jsx`, `src/components/capability/CapabilitySnapshotCard.jsx`; server priority DUE → IN_PROGRESS → READY → REPORT_READY → CAPABILITY_SUMMARY → GET_STARTED/NOTHING_ASSIGNED; SponsoredByCard stays in the campus shell (§9.5); vitest `src/features/student/studentPages.test.jsx`
+- [x] C4.05 Assessments list §10 (Active/Completed/Upcoming, scope labels) — evidence: `src/features/assessments/pages/AssessmentsPage.jsx`, `components/{AssessmentAssignmentCard,AssessmentStatusTimeline}.jsx`; server tabs incl. UPCOMING/EXPIRED, drafts hidden (`campusStudent.test.js` "C4.05")
+- [x] C4.06 Assessment Briefing §11 + system check route (reuse existing device checks); sponsored disclosure acknowledgement persisted in consent_records — evidence: `BriefingPage.jsx` (10 sections), `SystemCheckPage.jsx` + `src/lib/deviceCheck.js` (K54); `POST /api/v1/assessment-assignments/:id/acknowledge` → `consent_records` CAMPUS_ASSESSMENT_DISCLOSURE with copy version (stale version 409, idempotent); start reasons named (K52); e2e sponsored journey reads the stored consent row
+- [x] C4.07 Capabilities page §13 — evidence: `src/features/capabilities/pages/CapabilitiesPage.jsx` (definition, level + sufficiency, observed behaviours, source, priority, related practice, history; no score/percent)
+- [x] C4.08 Evidence explorer §15 (formal vs practice visually distinct, filters) — evidence: `src/features/evidence/pages/EvidencePage.jsx`, `src/components/evidence/{EvidenceTracePanel,ObservedBehaviorCard}.jsx` (practice = dashed border + "Practice evidence"); URL filters sanitised client-side, validated server-side (K55)
+- [x] C4.09 Development overview (plan read; missions arrive Phase 8) and Growth page honest states — evidence: `DevelopmentPage.jsx` (≤3 evidence-backed priorities; missions "not available here yet"), `GrowthPage.jsx` (§17 non-comparable copy)
+- [x] C4.10 Explore Roles V2 §18 (self-reported vs demonstrated, no %, no auto-evaluate) — evidence: `src/features/exploration/pages/ExplorePage.jsx`, `src/components/capability/RoleExplorationCard.jsx`, `POST /api/v1/me/role-exploration` (flag `PRISM_ROLE_EXPLORATION_V2`; null interests → no evaluation; roles without a reason dropped); `/app/explore` renders V2 when its flag is on
+- [x] C4.11 Sharing (list/revoke grants) + Settings (profile, privacy, accessibility preferences) — evidence: `SharingPage.jsx` (+ confirm modal), `GET /me/share-grants` (no token hash) + `POST /me/share-grants/:id/revoke` (owner-only, 404 otherwise); `SettingsPage.jsx` + `PreferencesEffect.jsx` (`user_preferences`; reduced motion / larger text applied app-wide)
+- [x] C4.12 Campus student routes `/app/campus/:organizationId/*` with scoped data only — evidence: `src/app/AppRouter.jsx` (home, assignments, assignment briefing/system-check, development, growth; unknown → home) under WorkspaceGuard; server scoping by `X-Prism-Workspace` (K55); e2e sponsored journey confirms the sponsored assignment never appears in personal
+- [x] C4.13 Product telemetry events §46 (no PII/transcripts) — evidence: `src/lib/telemetry.js` (`track`, allow-list), `src/api/telemetry.js`, `POST /api/v1/telemetry` → `product_events` (pseudonymous `actor_hash`, K56); tests drop email/name/transcript/url props and store no user id; wired: invite_received, membership_accepted, briefing_opened
+- [x] C4.14 Tests: API read models, component tests, Playwright student journeys, axe, mobile widths — evidence: `server/test/campusStudent.test.js` (11), repo contract +2 per adapter, vitest `studentPages.test.jsx` (22) + router tests updated, e2e `tests/e2e/campus-student.spec.js` (@critical: desktop + Pixel 7 personal journey with axe/overflow on every route; sponsored acknowledgement on the campus store); `campus-shell.spec.js` updated for the data-backed home
+- [x] C4.15 Gates PASS, reviewer + UX auditor PASS, commit `feat(campus-p04): ...` — evidence: gates `audit-results/campus-gates/phase-04.json` PASS (server 516/499 pass 0 fail, DB 21/21 on real Postgres, python 57, vitest 164, build, static audit, campus-scan clean, e2e 41); Prism Campus Reviewer FAIL (3 blocking: gate evidence, missing `share_grant.revoked` audit, held/invalidated sessions counted) → fixed (K59, K60) → PASS; Prism Campus UX Auditor FAIL (3 blocking: guard state without h1, acknowledgement focus loss, 360px top-bar overlap) → fixed → PASS (axe 0 serious/critical and no overflow on every Phase 4 route at 360–1440); `git diff --stat 6ccb0fe -- server/db/migrations server/prompts src/pages server/routes/assessment.js server/lib/scenarioBank.js` empty (legacy + committed migrations/prompts untouched); commit on `campus/p04-student-app`
 
 ## Phase 5 — Assessment Workspace V3
 
@@ -342,12 +342,22 @@ Format: date · id · decision · reason · spec/charter § · reversible.
 | 2026-09-25 | K49 | A personal session (no scope row) is readable by an organization only through the owner's explicit, unexpired, unrevoked share grant naming that session; the owner is looked up from the session store. The share-grant create/revoke API arrives with Phase 6 (C6.03) | Spec §36.3 | Spec §36 | Yes |
 | 2026-09-25 | K50 | Phase 3 review hardening: (a) staff invites carrying a cohort/department require the inviter's own `cohorts.read` reach (no delegating access you do not hold) and departments must belong to the org; (b) share-grant reads need `students.read` over the owner's cohort/department — a grant to an org is not a grant to every staff member; (c) memberships of non-ACTIVE organizations authorize nothing; (d) org-invite tokens are redacted from request logs; (e) acceptance writes consent first and refuses SUSPENDED/REMOVED members; (f) ledger closing events check the open reservation inside the locked write and concurrent same-key inserts replay; reserve keys are namespaced per user; (g) partial unique index for PERSONAL workspace rows; (h) invite email is not sent without `PUBLIC_APP_URL` | Reviewer findings (2 blocking, 10 warnings) | Contract §4–§6, spec §53 | Yes |
 | 2026-09-25 | K42 | Artifact saves: unknown `artifactId` → 404 `ARTIFACT_NOT_FOUND` (never `ok:true`); the evidence write happens before the session state changes; an evidence-ledger PG read failure now throws (outage ≠ insufficient evidence) | Reviewer notes; fail closed on errors | Spec §33.1, §53 | Yes |
+| 2026-09-25 | K51 | `assessment_definitions` already exists (0022, keyed `assessment_definition_id`), so 0030 extends it (description, measures, not_measured, integrity_modes) instead of creating a second table. Definitions/forms are DERIVED in code from the frozen bank — `prism-workplace-core` (general pool, one FROZEN form per active scenario, SERVER_SELECTED) plus one FIXED_FORM definition per governed-bank entry — and mirrored by an idempotent seed; the 0022 family rows are untouched; no scenario id/title is written in domain code | Avoid a duplicate catalog; K1 frozen bank | Spec §30.6, K1 | Yes |
+| 2026-09-25 | K52 | Phase 4 start/resume/report targets: personal legacy entitlements continue into the existing legacy flow (`/verify-identity?session=` or `/briefing?session=` per `PRISM_SKIP_VERIFICATION`), other personal entitlements → `/payment`; resume/report links point to the legacy pages; a sponsored start names `SPONSORED_START_UNAVAILABLE` (or the entitlement reason) until the V3 sponsored start lands (C5.03) — never a dead button | Workspace V3 is Phase 5; Report V3 is Phase 6 | Spec §11, §12, §50 | Yes |
+| 2026-09-25 | K53 | Local DB gates now run on a throwaway REAL Postgres (`PRISM/.tools/pgembed/serve.mjs`, embedded-postgres, UTF8, port 55433): the PGlite socket server desynced after error responses (stray CommandComplete, empty result rows), making constraint-violation assertions flaky. On real multi-connection Postgres the fire-and-forget `audit_log` insert can land after the next query, so `adminPhase2.db.test.js` now polls exactly like `adminPhase3` (exact-count assertions unchanged) | Reliable DB evidence; supersedes K26 locally | Testing rules | Yes |
+| 2026-09-25 | K54 | The system check is a new pure module (`src/lib/deviceCheck.js`) rendered by `SystemCheckPage`: the legacy pages hold no reusable device-check component (inline `getUserMedia` in immutable legacy `Assessment.jsx`/`PhoneProctor.jsx`), so nothing was duplicated from a component. No media permission is requested until the user presses "Test microphone"; tracks stop immediately; the camera is checked only for PROCTORED | Spec §11 item 9; voice = STT input only | Spec §11 | Yes |
+| 2026-09-25 | K55 | Student reads are partitioned by the active workspace: PERSONAL sees only personal-scope sessions/assignments; CAMPUS_STUDENT only its organization's sponsored ones (and only the §6.3 sections). The evidence explorer's personal/sponsored filter is expressed by the workspace (the `scope` query is still validated and applied server-side); invalid URL filters are ignored client-side and rejected (422) server-side | Never mix sponsored and personal | Spec §4.3, §10, §15 | Yes |
+| 2026-09-25 | K56 | Product events (`product_events`) are pseudonymous: `actor_hash` = HMAC-SHA256(`PRISM_TELEMETRY_KEY`, user id), null when the key is not configured (no weakly keyed hash); props are an allow-list of ids/enums/counts/timestamps on client AND server; the table is NOT in the identity-plane exemption | No PII in analytics | Spec §46 | Yes |
+| 2026-09-25 | K57 | Personal assignment rows are an idempotent mirror written on read (insert-if-absent, forward-only roster state) keyed by a deterministic hash (`pa_…`, also the `personal_key`) with `created_by = 'SYSTEM'`, so no raw user id sits in the assignment row (the roster table is identity plane) and legacy records are never written | C4.02 idempotency | Contract §6 | Yes |
+| 2026-09-25 | K58 | The student API is dark with the shell (`PRISM_APP_SHELL_V3` off → 404), Explore V2 with `PRISM_ROLE_EXPLORATION_V2`; preferences and share grants need only the campus store (503 otherwise), not `PRISM_CAMPUS_ENABLED`; personal reads keep working without the store (K18) | Dark routes; B2C without campus | Spec §49 | Yes |
+| 2026-09-25 | K59 | Sessions an administrator has held (`admin_session_states.review_state='held'`) or invalidated are never formal evidence: excluded from capabilities, evidence, focus, exploration and growth, counted as `excludedCount`, and their cards say "under review". The lookup fails closed (a read error is a 500, never "not held") | Reviewer blocking finding; integrity routes to human review | Charter §14, spec §33 | Yes |
+| 2026-09-25 | K60 | With `PRISM_CAMPUS_ENABLED` on, workspace-scoped student reads require the campus store (503 otherwise), because a session's sponsorship is only knowable from it; with campus off they run without it (B2C). Student privacy actions write the decision trail: `share_grant.revoked` and `campus.assessment_disclosure.acknowledged` (request id, no user id). Acknowledgement refuses ended assignments (409) and reuses the sponsor's consent record for the same copy version, so a retry never writes a second one. Campus funnel telemetry events are accepted only from CAMPUS_ADMIN workspaces | Reviewer findings | Contract §10, spec §36, §46 | Yes |
 
 ## Risks
 
 | Risk | Severity | Owner | Mitigation | Blocking |
 | --- | --- | --- | --- | --- |
-| Local Postgres unavailable → DB-gated suites SKIPPED locally | P2 | Operator | PGlite throwaway DB runs them locally (K26); CI Postgres service runs them in CI | No |
+| Local Postgres unavailable → DB-gated suites SKIPPED locally | P2 | Operator | Throwaway embedded real Postgres runs them locally (K53; PGlite K26 retired for gates); CI Postgres service runs them in CI | No |
 | Capability level labels not yet finalised by measurement governance | P1 | Psychometrics (HA-C002) | Labels live in one governed constant marked PROVISIONAL | Campus rollout |
 | Legacy `/explore` had 21 serious axe issues and "Prism Next" copy | P3 | Engineering | Resolved in Phase 2: page rebuilt on the design system; axe-clean in `campus-insufficient.spec.js`; Explore V2 (C4.10) replaces it | No |
 | No capability can be SUFFICIENT until sufficiency thresholds are approved | P1 | Psychometrics (HA-C002) | Reports show PROVISIONAL / INSUFFICIENT honestly (K35) | Campus rollout |
@@ -355,9 +365,12 @@ Format: date · id · decision · reason · spec/charter § · reversible.
 | Legacy `/api/assessment/report/:id/v2` and `/employee` have no authentication/ownership check (pre-existing): anyone with a session id sees the candidate name and, once judged evidence exists, verbatim quotes | P1 | Engineering | Phase 3 scope/permission middleware + Phase 6 owner/sponsor-only report API (C6.02) replace these routes | Campus rollout |
 | Legacy workspace calls `/start` on every load, so a refresh restarts the conversation (pre-existing) | P2 | Engineering | Phase 5 resume/idempotent session contract (C5.02, C5.06, C5.10) | Workspace V3 flip |
 | `ScoreReport` `?demo=1` sample hard-codes a name and invented scores; server maps `jobFamilyId` STUDAI-JF-MKT-L1 → marketing scenario at `/start` (pre-existing) | P2 | Engineering | Phase 4 assignment catalogue supplies assessment ids; Phase 6 report rebuild removes the demo sample | Campus rollout |
-| Candidate erasure (`DELETE /api/assessment/candidate-data`) does not yet cascade to campus identity-plane rows (memberships, invites, consents, entitlements, share grants) | P1 | Engineering | Add campus rows to the erasure cascade with retention rules (Phase 12 C12.04/retention policy); append-only ledgers keep pseudonymised history per RETENTION_POLICY_v1 | Campus rollout |
+| Candidate erasure (`DELETE /api/assessment/candidate-data`) does not yet cascade to campus identity-plane rows (memberships, invites, consents, entitlements, share grants, assignment roster rows, `user_preferences`) | P1 | Engineering | Add campus rows to the erasure cascade with retention rules (Phase 12 C12.04/retention policy); append-only ledgers keep pseudonymised history per RETENTION_POLICY_v1 | Campus rollout |
 | Invite acceptance performs several writes without one transaction (consent, membership, workspace, cohort, invite status); a mid-way failure leaves a retryable partial state | P3 | Engineering | Consent is written first (once per copy version), membership/workspace/cohort writes are upserts and the invite is marked ACCEPTED last, so re-accepting completes it | No |
 | Share grants are not revoked when a student leaves an organization; ALL-scope staff could still read a shared session until the grant expires | P2 | Engineering | Phase 6 share-grant API (C6.03): revoke org grants on membership removal and require an ACTIVE student membership | Campus rollout |
+| Student home/assessments derive personal assignments on every read (a few queries per entitlement/session) | P3 | Engineering | Insert-if-absent keeps writes rare; revisit with pagination/caching in Phase 12 performance work | No |
+| `PRISM_TELEMETRY_KEY` unset → product events carry no actor hash, so funnels cannot be de-duplicated per person | P3 | Operator | Provision the key with the other secrets before the shell flip (config only; no code change) | Shell flip |
+| Practice evidence has no source yet; the explorer's practice kind is always empty | P3 | Engineering | Phase 8 missions write practice evidence | No |
 
 ## Session handoff
 

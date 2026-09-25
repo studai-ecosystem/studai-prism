@@ -137,13 +137,15 @@ test('T0 gate: research tables define no PII columns and never reference user_id
     // twin of v1_payments: it maps a redeemer to their minted session so
     // seats are one-per-person; it is in the erasure cascade and never joins
     // research tables.
-    // The Prism Campus identity/authorization plane (migrations 0026–0029)
-    // holds membership, invitation, entitlement, consent, sharing and
-    // access-audit rows keyed by account id — its purpose is WHO may see WHAT.
+    // The Prism Campus identity/authorization plane (migrations 0026–0031)
+    // holds membership, invitation, entitlement, consent, sharing,
+    // access-audit, assignment-roster and account-preference rows keyed by
+    // account id — its purpose is WHO may see or do WHAT. product_events
+    // (0031) is NOT exempt: it is pseudonymous and stays guarded.
     // Named explicitly (no prefix wildcard) so research tables stay guarded.
     const CAMPUS_IDENTITY_PLANE = new Set([
       'cohort_members', 'organization_memberships', 'organization_invites', 'entitlements',
-      'entitlement_consumptions', 'consent_records',
+      'entitlement_consumptions', 'consent_records', 'assessment_assignment_students', 'user_preferences',
     ])
     const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)]
     for (const [, name, body] of tables) {

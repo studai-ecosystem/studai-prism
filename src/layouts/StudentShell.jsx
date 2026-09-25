@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Outlet, useParams } from 'react-router-dom'
 import { AppShell } from './AppShell.jsx'
 import { SponsoredByCard } from '../components/campus/SponsoredByCard.jsx'
+import { PreferencesEffect } from '../features/settings/PreferencesEffect.jsx'
+import { Skeleton } from '../components/ui/Skeleton.jsx'
 import { STUDENT_NAV, STUDENT_NAV_FOOTER, STUDENT_BOTTOM_NAV } from '../components/navigation/navConfig.js'
 import { useWorkspace, PERSONAL_FALLBACK } from '../app/providers/WorkspaceProvider.jsx'
 
@@ -26,11 +28,15 @@ export function StudentShell({ children }) {
   const items = organizationId ? campusScope(STUDENT_NAV) : STUDENT_NAV
   const bottom = organizationId ? campusScope(STUDENT_BOTTOM_NAV) : STUDENT_BOTTOM_NAV
   const footer = organizationId ? STUDENT_NAV_FOOTER.filter((i) => i.id === 'help') : STUDENT_NAV_FOOTER
+  // Never render a personal page while another workspace is still active:
+  // its first queries would carry the wrong workspace header.
+  const switching = !organizationId && active.type !== 'PERSONAL'
 
   return (
     <AppShell navLabel="Primary" items={items} footerItems={footer} bottomItems={bottom}>
+      <PreferencesEffect />
       {organizationId && active.type === 'CAMPUS_STUDENT' && <SponsoredByCard organizationName={active.organizationName || active.name} />}
-      {children || <Outlet />}
+      {switching ? <Skeleton label="Switching to your personal workspace" /> : (children || <Outlet />)}
     </AppShell>
   )
 }

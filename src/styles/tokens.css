@@ -50,3 +50,8 @@
   animation-duration: 0.01ms !important;
   transition-duration: 0.01ms !important;
 }
+
+/* Account preference "Larger text" (C4.11): scales rem-based type app-wide. */
+html.prism-large-text {
+  font-size: 112.5%;
+}

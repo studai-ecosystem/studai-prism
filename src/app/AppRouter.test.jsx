@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import AppRouter from './AppRouter.jsx'
 import { renderApp, mockFetch, meBody, signIn } from '../test/utils.jsx'
+import { studentRoutes } from '../test/studentFixtures.js'
 
 const licence = { email: 'synthetic@test.local', completed: 0, pendingSessionId: null, canPurchase: true, mode: 'dummy' }
 
@@ -68,10 +69,9 @@ describe('AppRouter — mixed and all-on flag combinations never loop and keep l
     expect(screen.queryByRole('heading', { level: 1, name: 'Report' })).not.toBeInTheDocument()
   })
 
-  it('all flags on: explore, mission and workspace placeholders each offer a working legacy link', async () => {
+  it('all flags on: mission and workspace placeholders each offer a working legacy link', async () => {
     const flags = { PRISM_APP_SHELL_V3: true, PRISM_ROLE_EXPLORATION_V2: true, PRISM_DEVELOPMENT_V2: true, PRISM_ASSESSMENT_WORKSPACE_V3: true }
     for (const [route, title, href] of [
-      ['/explore', 'Explore Roles', '/explore?legacy=1'],
       ['/missions/MIS-1', 'Mission', '/missions/MIS-1?legacy=1'],
       ['/workspace/sess-5', 'Assessment', '/workspace/sess-5?legacy=1'],
     ]) {
@@ -84,9 +84,21 @@ describe('AppRouter — mixed and all-on flag combinations never loop and keep l
     }
   })
 
+  it('Explore V2 on: /explore moves to the V3 page with two separate panels and evaluates nothing up front', async () => {
+    signIn()
+    const spy = mockFetch({ ...studentRoutes(), '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true, PRISM_ROLE_EXPLORATION_V2: true } }) })
+    renderApp(app, { route: '/explore' })
+    expect(await screen.findByRole('heading', { level: 2, name: 'What you enjoy' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'What Prism observed' })).toBeInTheDocument()
+    expect(screen.getByTestId('where')).toHaveTextContent('/app/explore')
+    expect(screen.getByRole('button', { name: 'Show roles' })).toBeDisabled()
+    expect(spy.mock.calls.some(([u]) => String(u).includes('role-exploration'))).toBe(false)
+    expect(document.body.textContent).not.toMatch(/\d+\s*%/)
+  })
+
   it('navigating into a V3 route that mounts its own shell still moves focus to its heading', async () => {
     signIn()
-    mockFetch({ '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true, PRISM_ROLE_EXPLORATION_V2: true } }), '/api/': pendingApi })
+    mockFetch({ ...studentRoutes(), '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true, PRISM_ROLE_EXPLORATION_V2: true } }), '/api/': pendingApi })
     renderApp(app, { route: '/app/home' })
     const nav = await screen.findByRole('navigation', { name: 'Primary' })
     await userEvent.click(within(nav).getByRole('link', { name: 'Explore Roles' }))
@@ -113,15 +125,17 @@ describe('AppRouter — mixed and all-on flag combinations never loop and keep l
 })
 
 describe('AppRouter — PRISM_APP_SHELL_V3 on', () => {
-  const shellOn = () => mockFetch({ '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true } }) })
+  const shellOn = () => mockFetch({ ...studentRoutes(), '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true } }) })
 
-  it('/app moves to /app/home inside the new shell with honest empty states', async () => {
+  it('/app moves to /app/home inside the new shell with a data-backed home', async () => {
     signIn()
     shellOn()
     renderApp(app, { route: '/app' })
-    expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening), Synthetic$/ })).toBeInTheDocument()
     expect(screen.getByTestId('where')).toHaveTextContent('/app/home')
-    expect(screen.getByText('No assessments yet')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Take your first Prism assessment' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Start an assessment' })).toHaveAttribute('href', '/payment')
+    expect(document.title).toBe('Home · Prism')
     expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#main')
     expect(document.getElementById('main')).toBeInTheDocument()
   })

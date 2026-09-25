@@ -131,4 +131,75 @@ export function runCampusRepoContract(test, label, getRepos) {
     await assert.rejects(repos.scopes.createSessionScope({ sessionId: `${sid}-p`, ownerUserId: owner, sponsorType: 'PERSONAL', sponsorOrganizationId: org.id, workspaceId: 'personal', visibilityPolicy: 'OWNER_AND_SPONSOR', createdBy: owner }), { code: 'VALIDATION_FAILED' })
     assert.equal(await repos.scopes.getSessionScope('never-scoped'), null)
   })
+
+  test(`${label}: assessment catalog seeds idempotently; assignments enforce sponsor and roster rules`, async () => {
+    const repos = await getRepos()
+    const defId = `syn-def-${randomUUID().slice(0, 8)}`
+    const catalog = {
+      definitions: [{ id: defId, title: 'Synthetic Definition', jobFamily: 'GENERAL', status: 'active', durationMinutes: 35, description: 'Synthetic.', measures: ['CAP-L1-REASONING'], notMeasured: ['PERSONALITY'], integrityModes: ['STANDARD'] }],
+      forms: [{ id: `${defId}:syn-scn:1.0.0`, definitionId: defId, version: '1.0.0', scenarioId: 'syn-scn', jobFamilyId: null, capabilityIds: ['CAP-L1-REASONING'], status: 'FROZEN', frozenAt: new Date().toISOString() }],
+    }
+    await repos.assessments.seedCatalog(catalog)
+    await repos.assessments.seedCatalog(catalog)
+    assert.equal((await repos.assessments.listDefinitions()).filter((d) => d.id === defId).length, 1)
+    assert.equal((await repos.assessments.listForms(defId)).length, 1)
+
+    const owner = uid()
+    const pid = `pa_${randomUUID().replace(/-/g, '')}`
+    const personal = { id: pid, definitionId: defId, formPolicy: 'SERVER_SELECTED', sponsorType: 'PERSONAL', personalKey: pid, integrityPolicy: 'STANDARD', accommodationsPolicy: {}, reminderPolicy: {}, createdBy: owner, status: 'ACTIVE' }
+    const a1 = await repos.assessments.ensurePersonalAssignment(personal)
+    const a2 = await repos.assessments.ensurePersonalAssignment(personal)
+    assert.equal(a1.id, a2.id)
+    await assert.rejects(repos.assessments.createAssignment({ ...personal, id: `${pid}x`, personalKey: `${pid}x`, organizationId: null, sponsorType: 'INSTITUTION' }), { code: 'VALIDATION_FAILED' })
+    await assert.rejects(repos.assessments.createAssignment({ ...personal, id: `${pid}y`, personalKey: `${pid}y`, formPolicy: 'FIXED_FORM' }), { code: 'VALIDATION_FAILED' })
+
+    const s1 = await repos.assessments.addStudent({ assignmentId: pid, userId: owner, status: 'ASSIGNED' })
+    const s2 = await repos.assessments.addStudent({ assignmentId: pid, userId: owner, status: 'ASSIGNED' })
+    assert.equal(s1.status, 'ASSIGNED')
+    assert.equal(s2.createdAt, s1.createdAt)
+    await assert.rejects(repos.assessments.updateStudent({ assignmentId: pid, userId: owner, patch: { status: 'IN_PROGRESS' } }), { code: 'VALIDATION_FAILED' })
+    const started = await repos.assessments.updateStudent({ assignmentId: pid, userId: owner, patch: { status: 'IN_PROGRESS', sessionId: 'sess-syn', startedAt: new Date().toISOString() } })
+    assert.equal(started.sessionId, 'sess-syn')
+
+    const org = await repos.organizations.createOrganization({ name: 'Synthetic Assign Org', slug: slug(), organizationType: 'COLLEGE', status: 'ACTIVE' })
+    const sponsored = await repos.assessments.createAssignment({
+      id: randomUUID(), definitionId: defId, formPolicy: 'SERVER_SELECTED', sponsorType: 'INSTITUTION', organizationId: org.id,
+      windowStart: new Date().toISOString(), windowEnd: new Date(Date.now() + day).toISOString(), integrityPolicy: 'PROCTORED',
+      accommodationsPolicy: { requestable: true }, reminderPolicy: { enabled: false }, createdBy: 'owner', status: 'ACTIVE',
+      targets: [{ targetType: 'USER', targetId: owner }],
+    })
+    assert.deepEqual((await repos.assessments.listTargets(sponsored.id)).map((t) => t.targetType), ['USER'])
+    await repos.assessments.addStudent({ assignmentId: sponsored.id, userId: owner, status: 'ASSIGNED' })
+    assert.deepEqual((await repos.assessments.listAssignmentsForUser({ userId: owner })).map((a) => a.id), [pid])
+    const orgList = await repos.assessments.listAssignmentsForUser({ userId: owner, organizationId: org.id })
+    assert.deepEqual(orgList.map((a) => a.id), [sponsored.id])
+    assert.equal(orgList[0].student.status, 'ASSIGNED')
+    assert.equal((await repos.assessments.getAssignmentForUser(sponsored.id, 'someone-else')), null)
+    await assert.rejects(repos.assessments.createAssignment({ ...personal, id: randomUUID(), sponsorType: 'INSTITUTION', personalKey: null, organizationId: org.id, windowStart: new Date(Date.now() + day).toISOString(), windowEnd: new Date().toISOString() }), { code: 'VALIDATION_FAILED' })
+  })
+
+  test(`${label}: preferences upsert per account; product events store only what they are given`, async () => {
+    const repos = await getRepos()
+    const user = uid()
+    assert.equal(await repos.preferences.getPreferences(user), null)
+    await repos.preferences.savePreferences(user, { reducedMotion: true, largerText: false })
+    const saved = await repos.preferences.savePreferences(user, { reducedMotion: true, largerText: true })
+    assert.equal(saved.largerText, true)
+    assert.equal((await repos.preferences.getPreferences(user)).reducedMotion, true)
+
+    const event = `briefing_opened`
+    const before = (await repos.productEvents.list({ event })).length
+    const row = await repos.productEvents.append({ event, actorHash: 'hash-1', workspaceType: 'PERSONAL', organizationId: null, props: { scope: 'PERSONAL' }, occurredAt: new Date().toISOString() })
+    assert.deepEqual(row.props, { scope: 'PERSONAL' })
+    assert.equal((await repos.productEvents.list({ event })).length, before + 1)
+
+    const org = await repos.organizations.createOrganization({ name: 'Synthetic Grant Org', slug: slug(), organizationType: 'COLLEGE', status: 'ACTIVE' })
+    const g = await repos.sharing.createShareGrant({ ownerUserId: user, recipientType: 'ORGANIZATION', recipientOrganizationId: org.id, expiresAt: new Date(Date.now() + day).toISOString(), resources: [{ resourceType: 'ASSESSMENT_REPORT', resourceId: 'sess-g', disclosureLevel: 'FULL' }] })
+    const listed = await repos.sharing.listShareGrantsForOwner(user)
+    assert.equal(listed.length, 1)
+    assert.equal(listed[0].id, g.id)
+    assert.equal(listed[0].recipientOrganizationName, 'Synthetic Grant Org')
+    assert.deepEqual(listed[0].resources, [{ resourceType: 'ASSESSMENT_REPORT', resourceId: 'sess-g', disclosureLevel: 'FULL' }])
+    assert.deepEqual(await repos.sharing.listShareGrantsForOwner(uid()), [])
+  })
 }

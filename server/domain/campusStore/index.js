@@ -15,6 +15,10 @@ import { createAuditRepoMemory } from '../audit/repository.memory.js'
 import { createAuditRepoPg } from '../audit/repository.pg.js'
 import { createScopesRepoMemory } from '../scopes/repository.memory.js'
 import { createScopesRepoPg } from '../scopes/repository.pg.js'
+import { createAssessmentsRepoMemory } from '../assessments/repository.memory.js'
+import { createAssessmentsRepoPg } from '../assessments/repository.pg.js'
+import { createPreferencesRepoMemory, createPreferencesRepoPg } from '../preferences/repository.js'
+import { createProductEventsRepoMemory, createProductEventsRepoPg } from '../telemetry/events.js'
 
 export function createMemoryCampusRepos(options = {}) {
   const db = options.db || createMemoryDb(options)
@@ -28,6 +32,9 @@ export function createMemoryCampusRepos(options = {}) {
     sharing: createSharingRepoMemory(db),
     audit: createAuditRepoMemory(db),
     scopes: createScopesRepoMemory(db),
+    assessments: createAssessmentsRepoMemory(db),
+    preferences: createPreferencesRepoMemory(db),
+    productEvents: createProductEventsRepoMemory(db),
   }
 }
 
@@ -42,5 +49,8 @@ export function createPgCampusRepos({ query, getPool }) {
     sharing: createSharingRepoPg(deps),
     audit: createAuditRepoPg(deps),
     scopes: createScopesRepoPg(deps),
+    assessments: createAssessmentsRepoPg(deps),
+    preferences: createPreferencesRepoPg(deps),
+    productEvents: createProductEventsRepoPg(deps),
   }
 }

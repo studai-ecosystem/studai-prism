@@ -87,7 +87,9 @@ const ContactPage = named(() => import('../pages/legal/LegalPages.jsx'), 'Contac
 // ── New application pages (dark behind flags) ───────────────────────────────
 const HomePage = lazy(() => import('../features/home/pages/HomePage.jsx'))
 const AssessmentsPage = lazy(() => import('../features/assessments/pages/AssessmentsPage.jsx'))
-const AssignmentUnavailablePage = lazy(() => import('../features/assessments/pages/AssignmentUnavailablePage.jsx'))
+const BriefingPage = lazy(() => import('../features/assessments/pages/BriefingPage.jsx'))
+const SystemCheckPage = lazy(() => import('../features/assessments/pages/SystemCheckPage.jsx'))
+const ExplorePage = lazy(() => import('../features/exploration/pages/ExplorePage.jsx'))
 const CapabilitiesPage = lazy(() => import('../features/capabilities/pages/CapabilitiesPage.jsx'))
 const EvidencePage = lazy(() => import('../features/evidence/pages/EvidencePage.jsx'))
 const DevelopmentPage = lazy(() => import('../features/development/pages/DevelopmentPage.jsx'))
@@ -201,8 +203,8 @@ export default function AppRouter() {
           <Route element={studentShell}>
             <Route path="/app/home" element={<HomePage />} />
             <Route path="/app/assessments" element={<AssessmentsPage />} />
-            <Route path="/app/assessments/:assignmentId/briefing" element={<AssignmentUnavailablePage title="Assessment briefing" />} />
-            <Route path="/app/assessments/:assignmentId/system-check" element={<AssignmentUnavailablePage title="System check" />} />
+            <Route path="/app/assessments/:assignmentId/briefing" element={<BriefingPage />} />
+            <Route path="/app/assessments/:assignmentId/system-check" element={<SystemCheckPage />} />
             <Route path="/app/capabilities" element={<CapabilitiesPage />} />
             <Route path="/app/evidence" element={<EvidencePage />} />
             <Route path="/app/development" element={<DevelopmentPage />} />
@@ -213,7 +215,7 @@ export default function AppRouter() {
           <Route path="/app/assessment/:sessionId" element={<V3Route flag="PRISM_ASSESSMENT_WORKSPACE_V3" legacyPath="/workspace/:sessionId" page={<AssessmentShell><div className="mx-auto w-full max-w-3xl px-4 py-8"><NotYetAvailablePage title="Assessment" legacyPattern="/workspace/:sessionId" /></div></AssessmentShell>} />} />
           <Route path="/app/reports/:sessionId" element={<V3Route flag="PRISM_STUDENT_REPORT_V3" requiresShell legacyPath="/report/:sessionId/v2" page={inShell(<NotYetAvailablePage title="Report" legacyPattern="/report/:sessionId/v2" />)} />} />
           <Route path="/app/development/missions/:missionId" element={<V3Route flag="PRISM_DEVELOPMENT_V2" requiresShell legacyPath="/missions/:missionId" page={inShell(<NotYetAvailablePage title="Mission" legacyPattern="/missions/:missionId" />)} />} />
-          <Route path="/app/explore" element={<V3Route flag="PRISM_ROLE_EXPLORATION_V2" requiresShell legacyPath="/explore" page={inShell(<NotYetAvailablePage title="Explore Roles" legacyPattern="/explore" />)} />} />
+          <Route path="/app/explore" element={<V3Route flag="PRISM_ROLE_EXPLORATION_V2" requiresShell legacyPath="/explore" page={inShell(<ExplorePage />)} />} />
           <Route path="/app/*" element={<ShellGate><Navigate to="/app/home" replace /></ShellGate>} />
 
           {/* Campus invitation (spec §37.2): sign-in first, so a signed-out
@@ -231,8 +233,11 @@ export default function AppRouter() {
             <Route index element={<Navigate to="home" replace />} />
             <Route path="home" element={<HomePage />} />
             <Route path="assignments" element={<AssessmentsPage />} />
+            <Route path="assignments/:assignmentId/briefing" element={<BriefingPage />} />
+            <Route path="assignments/:assignmentId/system-check" element={<SystemCheckPage />} />
             <Route path="development" element={<DevelopmentPage />} />
             <Route path="growth" element={<GrowthPage />} />
+            <Route path="*" element={<Navigate to="home" replace />} />
           </Route>
 
           {/* Campus administration (spec §6.4). */}

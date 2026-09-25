@@ -11,8 +11,8 @@ for (const width of WIDTHS) {
     await signInSynthetic(page, CAMPUS_BASE_URL, `shell-${width}`)
     await page.goto(`${CAMPUS_BASE_URL}/app`)
     await expect(page).toHaveURL(/\/app\/home$/)
-    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
-    await expect(page.getByText('No assessments yet')).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening), Synthetic$/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Take your first Prism assessment' })).toBeVisible()
     await expectNoHorizontalOverflow(page)
 
     if (width < 768) {
@@ -40,7 +40,7 @@ test('CAMPUS-SHELL-02 @critical @campus keyboard: skip link first, then into mai
   await page.setViewportSize({ width: 1440, height: 900 })
   await signInSynthetic(page, CAMPUS_BASE_URL, 'shell-kbd')
   await page.goto(`${CAMPUS_BASE_URL}/app/home`)
-  await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening), Synthetic$/ })).toBeVisible()
   await page.keyboard.press('Tab')
   const skip = page.getByRole('link', { name: 'Skip to main content' })
   await expect(skip).toBeFocused()
@@ -87,10 +87,10 @@ test('CAMPUS-SHELL-04 @critical @campus flags off: legacy /app launcher is uncha
 
 test('CAMPUS-SHELL-05 @critical @campus V3 placeholders keep the legacy page reachable (?legacy=1, no loop)', async ({ page }) => {
   await signInSynthetic(page, CAMPUS_BASE_URL, 'shell-legacy-link')
-  await page.goto(`${CAMPUS_BASE_URL}/explore`)
-  await expect(page).toHaveURL(/\/app\/explore$/)
+  await page.goto(`${CAMPUS_BASE_URL}/missions/synthetic-mission`)
+  await expect(page).toHaveURL(/\/app\/development\/missions\/synthetic-mission$/)
   await page.getByRole('link', { name: 'Open the current version' }).click()
-  await expect(page).toHaveURL(/\/explore\?legacy=1$/)
+  await expect(page).toHaveURL(/\/missions\/synthetic-mission\?legacy=1$/)
   await page.waitForTimeout(300)
-  await expect(page).toHaveURL(/\/explore\?legacy=1$/)
+  await expect(page).toHaveURL(/\/missions\/synthetic-mission\?legacy=1$/)
 })

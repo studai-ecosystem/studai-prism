@@ -11,6 +11,8 @@ import { createWorkspacesRouter } from './workspaces.js'
 import { createOrganizationsRouter } from './organizations.js'
 import { createOrgInvitesRouter } from './orgInvites.js'
 import { createEntitlementsRouter } from './entitlements.js'
+import { createStudentRouter } from './student.js'
+import { createTelemetryRouter } from './telemetry.js'
 
 export function createV1Router(deps = {}) {
   const requireUser = deps.requireUser || defaultRequireUser
@@ -29,6 +31,8 @@ export function createV1Router(deps = {}) {
   router.use(createEntitlementsRouter({ requireUser, campus }))
   router.use(createOrganizationsRouter({ requireUser, campus }))
   router.use(createOrgInvitesRouter({ requireUser, campus }))
+  router.use(createStudentRouter({ requireUser, campus }))
+  router.use(createTelemetryRouter({ requireUser, campus }))
 
   router.use(notFound)
   router.use(createErrorHandler(logger))

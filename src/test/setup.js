@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest'
 import { afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
+import { setTelemetrySender } from '../lib/telemetry.js'
+
+// Product telemetry is fire-and-forget; unit tests assert it explicitly.
+setTelemetrySender(() => {})
 
 afterEach(() => {
   cleanup()

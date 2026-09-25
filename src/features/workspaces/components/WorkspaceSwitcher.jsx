@@ -49,7 +49,7 @@ export function WorkspaceSwitcher() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <span id={`${listId}-label`} className="sr-only">Workspace</span>
       <button
         ref={btnRef}
@@ -59,7 +59,7 @@ export function WorkspaceSwitcher() {
         aria-labelledby={`${listId}-label ${listId}-value`}
         onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); openList() } }}
-        className="inline-flex max-w-[14rem] items-center gap-2 rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-surface px-3 py-1.5 text-sm font-medium text-prism-ink hover:bg-prism-subtle"
+        className="inline-flex max-w-[8.5rem] items-center gap-2 rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-surface px-3 py-1.5 text-sm font-medium text-prism-ink hover:bg-prism-subtle sm:max-w-[14rem]"
       >
         <span id={`${listId}-value`} className="truncate">{workspaceLabel(active)}</span>
         <ChevronsUpDown size={14} aria-hidden="true" className="shrink-0 text-prism-ink-subtle" />

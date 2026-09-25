@@ -20,7 +20,16 @@ export function WorkspaceGuard({ param = 'organizationId', type, children }) {
   }, [match, active.id, switchTo])
 
   if (loading) return <Skeleton variant="page" label="Loading workspace" />
-  if (!match) return <><DocumentTitle title="Not available" /><UnauthorizedState /></>
+  if (!match) {
+    // Outside any shell: still one h1 inside <main> so the state is announced.
+    return (
+      <main id="main" className="mx-auto w-full max-w-3xl px-4 py-10">
+        <DocumentTitle title="Not available" />
+        <h1 className="mb-6 text-2xl font-semibold text-prism-ink">Workspace not available</h1>
+        <UnauthorizedState />
+      </main>
+    )
+  }
   if (match.id !== active.id) return <Skeleton variant="page" label="Switching workspace" />
   return children
 }

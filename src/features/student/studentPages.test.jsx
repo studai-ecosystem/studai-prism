@@ -1,0 +1,365 @@
+// C4.04–C4.11, C4.13 — student pages in every state (loading, error,
+// unauthorized, empty, data), scope labels, sponsored acknowledgement,
+// practice-vs-formal distinction, telemetry allow-list and device checks.
+import { describe, it, expect, vi } from 'vitest'
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Routes, Route } from 'react-router-dom'
+import { renderApp, mockFetch, meBody, signIn, jsonResponse } from '../../test/utils.jsx'
+import { studentRoutes, home, card, briefing, describedCapabilities, growth } from '../../test/studentFixtures.js'
+import HomePage from '../home/pages/HomePage.jsx'
+import AssessmentsPage from '../assessments/pages/AssessmentsPage.jsx'
+import BriefingPage from '../assessments/pages/BriefingPage.jsx'
+import SystemCheckPage from '../assessments/pages/SystemCheckPage.jsx'
+import CapabilitiesPage from '../capabilities/pages/CapabilitiesPage.jsx'
+import EvidencePage from '../evidence/pages/EvidencePage.jsx'
+import GrowthPage from '../growth/pages/GrowthPage.jsx'
+import DevelopmentPage from '../development/pages/DevelopmentPage.jsx'
+import SharingPage from '../sharing/pages/SharingPage.jsx'
+import SettingsPage from '../settings/pages/SettingsPage.jsx'
+import ExplorePage from '../exploration/pages/ExplorePage.jsx'
+import { applyPreferences } from '../settings/PreferencesEffect.jsx'
+import { allowedProps, track, setTelemetrySender } from '../../lib/telemetry.js'
+import { checkScreen, checkConnection, checkMediaSupport, summarise, testMicrophone } from '../../lib/deviceCheck.js'
+import { SPONSORED_DISCLOSURE_VERSION } from '../../lib/copy/student.js'
+
+const CAMPUS_WS = { id: '11111111-1111-4111-8111-111111111111', type: 'CAMPUS_STUDENT', name: 'Synthetic University', organizationId: '22222222-2222-4222-8222-222222222222', organizationName: 'Synthetic University', visibilityPolicy: 'OWNER_AND_SPONSOR', permissions: [] }
+const PERSONAL_WS = { id: 'personal', type: 'PERSONAL', name: 'Personal', organizationId: null, organizationName: null, visibilityPolicy: 'OWNER_ONLY' }
+
+function render(page, { path = '/p', route = '/p', routes = {}, campus = false } = {}) {
+  signIn()
+  if (campus) sessionStorage.setItem('prismActiveWorkspace', CAMPUS_WS.id)
+  const spy = mockFetch({ ...studentRoutes(routes), '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true }, workspaces: [PERSONAL_WS, CAMPUS_WS] }) })
+  const out = renderApp(<Routes><Route path={path} element={page} /></Routes>, { route })
+  return { ...out, spy }
+}
+
+const error500 = () => jsonResponse(500, { error: { code: 'INTERNAL', message: 'x', requestId: 'req-500' } })
+const forbidden = () => jsonResponse(403, { error: { code: 'FORBIDDEN', message: 'no', requestId: 'req-403' } })
+const pending = () => new Promise(() => {})
+const noPercent = () => expect(document.body.textContent).not.toMatch(/\d\s*%/)
+
+describe('Student Home (§9)', () => {
+  it('loading keeps the h1 and announces loading', async () => {
+    render(<HomePage />, { routes: { '/api/v1/me/home': pending } })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
+    expect(screen.getByText('Loading your home…')).toBeInTheDocument()
+  })
+  it('an error offers retry with a reference', async () => {
+    render(<HomePage />, { routes: { '/api/v1/me/home': error500 } })
+    expect(await screen.findByText('Reference: req-500', {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
+  })
+  it('a forbidden workspace shows the unavailable state', async () => {
+    render(<HomePage />, { routes: { '/api/v1/me/home': forbidden } })
+    expect(await screen.findByText('This page is not available')).toBeInTheDocument()
+  })
+  it('a due sponsored assessment is the primary action, with the campus privacy note', async () => {
+    const data = home({
+      workspace: { id: CAMPUS_WS.id, type: 'CAMPUS_STUDENT', name: 'Synthetic University', organizationName: 'Synthetic University' },
+      primaryAction: { kind: 'ASSESSMENT_DUE', assignmentId: 'a-1', title: 'Prism Workplace Simulation', scope: 'SPONSORED', dueAt: '2026-10-04T10:00:00.000Z', to: '/app/campus/x/assignments/a-1/briefing' },
+      sponsor: { organizationId: CAMPUS_WS.organizationId, organizationName: 'Synthetic University', programName: null },
+    })
+    render(<HomePage />, { campus: true, routes: { '/api/v1/me/home': data } })
+    expect(await screen.findByText(/Synthetic University can see sponsored results here/)).toBeInTheDocument()
+    expect(await screen.findByText('Sponsored by Synthetic University')).toBeInTheDocument()
+    expect(screen.getByText('Due soon')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open briefing' })).toHaveAttribute('href', '/app/campus/x/assignments/a-1/briefing')
+    expect(screen.getAllByTestId('capability-snapshot')).toHaveLength(5)
+    expect(screen.queryByRole('link', { name: /See details/ })).not.toBeInTheDocument()
+    noPercent()
+  })
+  it('focus areas are listed (max three) with their provisional level', async () => {
+    const data = home({ focus: [{ capabilityId: 'CAP-L1-REASONING', name: 'Reasoning & Decision Quality', level: { band: 'DEVELOPING', label: 'Developing' }, status: 'PROVISIONAL', basedOn: null }], primaryAction: { kind: 'CAPABILITY_SUMMARY', to: '/app/capabilities' } })
+    render(<HomePage />, { routes: { '/api/v1/me/home': data } })
+    expect(await screen.findByText('1. Develop Reasoning & Decision Quality')).toBeInTheDocument()
+    expect(screen.getByText('Developing (provisional)')).toBeInTheDocument()
+  })
+})
+
+describe('Assessments list (§10)', () => {
+  it('always shows the scope; empty tabs explain themselves', async () => {
+    const data = { data: {
+      active: [card(), card({ id: 'a-s', scope: 'SPONSORED', sponsor: { organizationId: 'o', name: 'Synthetic University' }, dueAt: '2026-10-04T10:00:00.000Z', acknowledgementRequired: true, cta: { kind: 'START', to: '/x' } })],
+      completed: [],
+      upcoming: [],
+    } }
+    render(<AssessmentsPage />, { routes: { '/api/v1/me/assessments': data } })
+    const cards = await screen.findAllByTestId('assignment-card')
+    expect(within(cards[0]).getByText('Personal assessment')).toBeInTheDocument()
+    expect(within(cards[1]).getByText('Sponsored by Synthetic University')).toBeInTheDocument()
+    expect(within(cards[1]).getByText(/^Due /)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Upcoming (0)' }))
+    expect(screen.getByRole('heading', { name: 'Nothing scheduled' })).toBeInTheDocument()
+  })
+  it('an empty personal list offers the start flow', async () => {
+    render(<AssessmentsPage />)
+    expect(await screen.findByRole('heading', { name: 'Nothing to take right now' })).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Start an assessment' })[0]).toHaveAttribute('href', '/payment')
+  })
+})
+
+describe('Briefing (§11)', () => {
+  const path = '/app/assessments/:assignmentId/briefing'
+  const route = '/app/assessments/a-1/briefing'
+  it('shows all ten sections for a personal assessment and continues to the system check', async () => {
+    const events = []
+    setTelemetrySender((e) => events.push(e))
+    render(<BriefingPage />, { path, route, routes: { '/api/v1/assessment-assignments/': briefing() } })
+    for (const n of ['What this assessment measures', 'What it does not measure', 'How the simulation works', 'Estimated duration', 'Allowed tools and resources', 'Integrity requirements (Standard)', 'Accessibility and adjustments', 'Who can see the result', 'Technical check', 'Start']) {
+      expect(await screen.findByRole('heading', { level: 2, name: new RegExp(n.replace(/[()]/g, '\\$&')) })).toBeInTheDocument()
+    }
+    expect(screen.getByText('Your facial expressions, voice tone or emotions')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Continue to system check' })).toHaveAttribute('href', '/app/assessments/a-1/system-check')
+    await waitFor(() => expect(events.map((e) => e.event)).toContain('briefing_opened'))
+    expect(events[0].props).toEqual({ assignmentId: 'a-1', scope: 'PERSONAL', surface: 'BRIEFING' })
+    setTelemetrySender(() => {})
+  })
+  it('a sponsored briefing requires an explicit acknowledgement sent with the copy version', async () => {
+    const sponsored = briefing({
+      assignment: { id: 'a-2', scope: 'SPONSORED', sponsor: { organizationId: 'o', name: 'Synthetic University' }, acknowledgementRequired: true },
+      rest: {
+        sponsorship: { scope: 'SPONSORED', sponsorName: 'Synthetic University', disclosureCopyVersion: SPONSORED_DISCLOSURE_VERSION, acknowledged: false, acknowledgedAt: null },
+        start: { allowed: false, reason: 'ACKNOWLEDGEMENT_REQUIRED', to: null },
+      },
+    })
+    const { spy } = render(<BriefingPage />, {
+      path, route: '/app/assessments/a-2/briefing', campus: true,
+      routes: { '/api/v1/assessment-assignments/a-2/acknowledge': { data: { acknowledged: true } }, '/api/v1/assessment-assignments/': sponsored },
+    })
+    // The campus workspace activates once /api/v1/me has loaded.
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Assessments' })).toHaveAttribute('href', `/app/campus/${CAMPUS_WS.organizationId}/assignments`))
+    const disclosure = await screen.findByTestId('sponsored-disclosure')
+    expect(disclosure).toHaveTextContent('This assessment is sponsored by Synthetic University.')
+    expect(disclosure).toHaveTextContent('Your personal Prism assessments and private activity are not shared automatically.')
+    const confirm = await screen.findByRole('button', { name: 'Confirm' })
+    expect(confirm).toBeDisabled()
+    expect(screen.getByText('Confirm you have read who can see this assessment to continue.')).toBeInTheDocument()
+    await userEvent.click(screen.getByLabelText('I understand what Synthetic University can and cannot see'))
+    await userEvent.click(confirm)
+    await waitFor(() => expect(spy.mock.calls.some(([u]) => String(u).endsWith('/a-2/acknowledge'))).toBe(true))
+    const call = spy.mock.calls.find(([u]) => String(u).endsWith('/a-2/acknowledge'))
+    expect(JSON.parse(call[1].body)).toEqual({ copyVersion: SPONSORED_DISCLOSURE_VERSION, acknowledged: true })
+    expect(call[1].headers['X-Prism-Workspace']).toBe(CAMPUS_WS.id)
+  })
+  it('a changed disclosure version cannot be acknowledged from stale copy', async () => {
+    const stale = briefing({
+      assignment: { id: 'a-3', scope: 'SPONSORED', sponsor: { organizationId: 'o', name: 'Synthetic University' }, acknowledgementRequired: true },
+      rest: { sponsorship: { scope: 'SPONSORED', sponsorName: 'Synthetic University', disclosureCopyVersion: 'campus-assessment-disclosure.v9', acknowledged: false, acknowledgedAt: null }, start: { allowed: false, reason: 'ACKNOWLEDGEMENT_REQUIRED', to: null } },
+    })
+    render(<BriefingPage />, { path, route: '/app/assessments/a-3/briefing', routes: { '/api/v1/assessment-assignments/': stale } })
+    expect(await screen.findByText('This disclosure was updated')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument()
+  })
+  it('an unknown assignment keeps the heading and says it is not available', async () => {
+    render(<BriefingPage />, { path, route })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Assessment briefing' })).toBeInTheDocument()
+    expect(await screen.findByText('This page is not available')).toBeInTheDocument()
+  })
+})
+
+describe('System check (§11 item 9)', () => {
+  it('lists the checks and links to the server-provided start', async () => {
+    render(<SystemCheckPage />, { path: '/app/assessments/:assignmentId/system-check', route: '/app/assessments/a-1/system-check', routes: { '/api/v1/assessment-assignments/': briefing() } })
+    expect(await screen.findByText('Browser')).toBeInTheDocument()
+    expect(await screen.findByText('Prism can be reached.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Begin assessment' })).toHaveAttribute('href', '/briefing?session=sess-x')
+  })
+  it('device check helpers', async () => {
+    expect(checkScreen(1280).status).toBe('PASS')
+    expect(checkScreen(400, { needsLargeScreen: true }).status).toBe('WARN')
+    expect(checkConnection(false, true).status).toBe('FAIL')
+    expect(checkConnection(true, false).status).toBe('FAIL')
+    expect(checkMediaSupport(undefined, { needsCamera: true }).map((r) => r.status)).toEqual(['WARN', 'FAIL'])
+    expect(summarise([{ status: 'PASS' }, { status: 'WARN' }])).toBe('WARN')
+    const stop = vi.fn()
+    const ok = await testMicrophone({ getUserMedia: async () => ({ getTracks: () => [{ stop }] }) })
+    expect(ok.status).toBe('PASS')
+    expect(stop).toHaveBeenCalled()
+    expect((await testMicrophone({ getUserMedia: async () => { throw new Error('denied') } })).status).toBe('WARN')
+  })
+})
+
+describe('Capabilities (§13) and Evidence (§15)', () => {
+  it('described capabilities show level, sufficiency and observations; others explain why not', async () => {
+    render(<CapabilitiesPage />, { routes: { '/api/v1/me/capabilities': describedCapabilities() } })
+    const cards = await screen.findAllByTestId('capability-detail')
+    expect(cards).toHaveLength(5)
+    expect(within(cards[0]).getByText('Developing (provisional)')).toBeInTheDocument()
+    expect(within(cards[0]).getByText('Development priority')).toBeInTheDocument()
+    expect(within(cards[0]).getByText('“I would first separate the complaint data”')).toBeInTheDocument()
+    expect(within(cards[1]).getAllByText('Insufficient evidence').length).toBeGreaterThan(0)
+    expect(within(cards[1]).getAllByText('No evidence was recorded for this capability.').length).toBeGreaterThan(0)
+    noPercent()
+  })
+  it('no completed assessment → the empty state with the start flow', async () => {
+    render(<CapabilitiesPage />)
+    expect(await screen.findByText('You do not have a formal capability profile yet.')).toBeInTheDocument()
+  })
+  it('formal and practice evidence are labelled differently; filters go to the server', async () => {
+    const data = { data: {
+      items: [
+        { id: 'u1', kind: 'FORMAL', sessionId: 's1', assessmentTitle: 'Prism Workplace Simulation', scope: 'PERSONAL', date: '2026-09-20T10:00:00.000Z', candidateAction: { quote: 'I would first separate', turn: 1, artifactId: null }, observedBehavior: 'Separated symptoms', capability: { id: 'CAP-L1-REASONING', name: 'Reasoning & Decision Quality' }, rubricAnchor: { criteria: 'Explicitly identifies assumptions' }, evidenceStatus: 'PROVISIONAL' },
+        { id: 'p1', kind: 'PRACTICE', date: '2026-09-21T10:00:00.000Z', observedBehavior: 'Practised structuring', capability: { id: 'CAP-L1-COMMUNICATION', name: 'Communication & Structure' } },
+      ],
+      total: 2,
+      facets: { capabilities: [{ id: 'CAP-L1-REASONING', name: 'Reasoning & Decision Quality' }], assessments: [{ sessionId: 's1', title: 'Prism Workplace Simulation', completedAt: '2026-09-20T10:00:00.000Z' }] },
+      practiceAvailable: true,
+    } }
+    const { spy } = render(<EvidencePage />, { routes: { '/api/v1/me/evidence': data } })
+    const formal = await screen.findByText('Formal assessment', { selector: 'span' })
+    expect(formal.closest('article')).toHaveAttribute('data-kind', 'FORMAL')
+    expect(screen.getByText('Practice evidence', { selector: 'span' }).closest('article')).toHaveAttribute('data-kind', 'PRACTICE')
+    expect(document.querySelector('[data-kind="PRACTICE"]').className).toMatch(/border-dashed/)
+    await userEvent.selectOptions(screen.getByLabelText('Type'), 'FORMAL')
+    await waitFor(() => expect(spy.mock.calls.some(([u]) => String(u).includes('/api/v1/me/evidence?kind=FORMAL'))).toBe(true))
+    expect(screen.getByLabelText('Type')).toBeInTheDocument()
+  })
+})
+
+describe('Development, Growth, Sharing, Settings', () => {
+  it('development: no plan and no missions are stated honestly', async () => {
+    render(<DevelopmentPage />)
+    expect(await screen.findByRole('heading', { name: 'No development focus yet' })).toBeInTheDocument()
+    expect(screen.getByText(/Practice missions are not available here yet/)).toBeInTheDocument()
+  })
+  it('growth: a later but non-comparable assessment says why no change is shown', async () => {
+    render(<GrowthPage />, { routes: { '/api/v1/me/growth': growth('FORMS_NOT_VALIDATED_FOR_COMPARISON', [{ sessionId: 's2', title: 'Prism Workplace Simulation', completedAt: '2026-09-25T10:00:00.000Z' }, { sessionId: 's1', title: 'Prism Workplace Simulation', completedAt: '2026-09-01T10:00:00.000Z' }]) } })
+    expect(await screen.findByText('A later assessment exists, but these forms are not yet validated for direct growth comparison.')).toBeInTheDocument()
+    noPercent()
+  })
+  it('sharing: lists grants and revokes after confirmation', async () => {
+    const grants = { data: { items: [{ id: '33333333-3333-4333-8333-333333333333', recipient: { type: 'ORGANIZATION', organizationName: 'Synthetic University' }, resources: [{ resourceType: 'ASSESSMENT_REPORT', resourceId: 's1', disclosureLevel: 'SUMMARY' }], createdAt: '2026-09-20T10:00:00.000Z', expiresAt: '2026-12-20T10:00:00.000Z', revokedAt: null, status: 'ACTIVE' }] } }
+    const { spy } = render(<SharingPage />, { routes: { '/api/v1/me/share-grants/33333333-3333-4333-8333-333333333333/revoke': { data: { status: 'REVOKED' } }, '/api/v1/me/share-grants': grants } })
+    expect(await screen.findByText('Assessment report — summary')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Revoke access for Synthetic University/ }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Revoke access' }))
+    await waitFor(() => expect(spy.mock.calls.some(([u, init]) => String(u).endsWith('/revoke') && init.method === 'POST')).toBe(true))
+  })
+  it('settings: accessibility switches save to the account', async () => {
+    const { spy } = render(<SettingsPage />, { routes: { '/api/v1/me/preferences': (u) => jsonResponse(200, { data: { reducedMotion: false, largerText: false, updatedAt: null } }) } })
+    const sw = await screen.findByRole('switch', { name: 'Larger text' })
+    await userEvent.click(sw)
+    await waitFor(() => expect(spy.mock.calls.some(([u, init]) => String(u).endsWith('/api/v1/me/preferences') && init.method === 'PUT')).toBe(true))
+    const put = spy.mock.calls.find(([, init]) => init.method === 'PUT')
+    expect(JSON.parse(put[1].body)).toEqual({ reducedMotion: false, largerText: true })
+    expect(put[1].headers['X-Prism-Workspace']).toBeUndefined()
+  })
+  it('preferences apply to the document', () => {
+    const root = document.createElement('html')
+    applyPreferences({ reducedMotion: true, largerText: true }, root)
+    expect(root.classList.contains('prism-reduced-motion')).toBe(true)
+    expect(root.classList.contains('prism-large-text')).toBe(true)
+    applyPreferences({ reducedMotion: false, largerText: false }, root)
+    expect(root.className).toBe('')
+  })
+})
+
+describe('Every student page keeps its h1 through loading, error and unauthorized states', () => {
+  const PAGES = [
+    ['Assessments', <AssessmentsPage key="a" />, '/api/v1/me/assessments'],
+    ['My Capabilities', <CapabilitiesPage key="c" />, '/api/v1/me/capabilities'],
+    ['Evidence', <EvidencePage key="e" />, '/api/v1/me/evidence'],
+    ['Development', <DevelopmentPage key="d" />, '/api/v1/me/development-plan'],
+    ['Growth', <GrowthPage key="g" />, '/api/v1/me/growth'],
+    ['Sharing', <SharingPage key="s" />, '/api/v1/me/share-grants'],
+    ['Explore Roles', <ExplorePage key="x" />, '/api/v1/me/capabilities'],
+  ]
+  for (const [title, page, url] of PAGES) {
+    it(`${title}: loading → error → unauthorized`, async () => {
+      const a = render(page, { routes: { [url]: pending } })
+      expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument()
+      expect(screen.getByText(/…$/, { selector: '.sr-only' })).toBeInTheDocument()
+      a.unmount()
+      const b = render(page, { routes: { [url]: error500 } })
+      expect(await screen.findByText('Reference: req-500', {}, { timeout: 4000 })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument()
+      b.unmount()
+      render(page, { routes: { [url]: forbidden } })
+      expect(await screen.findByText('This page is not available')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument()
+    })
+  }
+})
+
+describe('Explore Roles V2 (§18)', () => {
+  it('evaluates only after interests are chosen and labels both kinds of reason', async () => {
+    const result = { data: {
+      selfReported: { interests: ['I'] },
+      demonstrated: [],
+      recommendations: [{
+        roleId: 'SYN', title: 'Synthetic Role', basis: 'BOTH',
+        selfReportedReasons: ['You said you enjoy Investigative work, which is central to Synthetic Role.'],
+        demonstratedReasons: ['Your assessment evidence shows developing Reasoning & Decision Quality (provisional).'],
+        unknowns: ['No formal evidence yet for Campaign Analytics.'],
+        nextStep: { type: 'FORMAL_ASSESSMENT', label: 'Complete an assessment that covers the capabilities we have no evidence for yet.' },
+      }],
+      evaluated: true,
+    } }
+    const { spy } = render(<ExplorePage />, { routes: { '/api/v1/me/role-exploration': result, '/api/v1/me/capabilities': describedCapabilities() } })
+    const show = await screen.findByRole('button', { name: 'Show roles' })
+    expect(show).toBeDisabled()
+    expect(screen.getByText('Developing (provisional)')).toBeInTheDocument()
+    expect(spy.mock.calls.some(([u]) => String(u).includes('role-exploration'))).toBe(false)
+    await userEvent.click(screen.getByLabelText('Investigating and analysing'))
+    await userEvent.click(show)
+    expect(await screen.findByRole('heading', { name: 'Synthetic Role' })).toBeInTheDocument()
+    const post = spy.mock.calls.find(([u]) => String(u).includes('role-exploration'))
+    expect(JSON.parse(post[1].body)).toEqual({ interests: { I: 1 } })
+    expect(screen.getByText('You said')).toBeInTheDocument()
+    expect(screen.getByText('Prism observed')).toBeInTheDocument()
+    expect(screen.getByText('What remains unknown')).toBeInTheDocument()
+    noPercent()
+    expect(document.body.textContent).not.toMatch(/\bmatch\b|\bfit\b/i)
+  })
+  it('at most three interests can be chosen', async () => {
+    render(<ExplorePage />)
+    for (const label of ['Hands-on, practical work', 'Investigating and analysing', 'Creating and designing']) {
+      await userEvent.click(await screen.findByLabelText(label))
+    }
+    expect(screen.getByLabelText('Helping and teaching people')).toBeDisabled()
+  })
+})
+
+describe('Accessibility details', () => {
+  it('after acknowledging, focus moves to the announced confirmation', async () => {
+    let acknowledged = false
+    const sponsored = () => jsonResponse(200, briefing({
+      assignment: { id: 'a-9', scope: 'SPONSORED', sponsor: { organizationId: 'o', name: 'Synthetic University' }, acknowledgementRequired: true, acknowledged },
+      rest: {
+        sponsorship: { scope: 'SPONSORED', sponsorName: 'Synthetic University', disclosureCopyVersion: SPONSORED_DISCLOSURE_VERSION, acknowledged, acknowledgedAt: acknowledged ? '2026-10-01T10:00:00.000Z' : null },
+        start: { allowed: false, reason: acknowledged ? 'SPONSORED_START_UNAVAILABLE' : 'ACKNOWLEDGEMENT_REQUIRED', to: null },
+      },
+    }))
+    render(<BriefingPage />, {
+      path: '/app/assessments/:assignmentId/briefing', route: '/app/assessments/a-9/briefing',
+      routes: { '/api/v1/assessment-assignments/a-9/acknowledge': () => { acknowledged = true; return jsonResponse(200, { data: { acknowledged: true } }) }, '/api/v1/assessment-assignments/': sponsored },
+    })
+    await userEvent.click(await screen.findByLabelText('I understand what Synthetic University can and cannot see'))
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+    const confirmation = await screen.findByText('You confirmed you have read this.')
+    expect(confirmation).toHaveAttribute('role', 'status')
+    await waitFor(() => expect(confirmation).toHaveFocus())
+  })
+  it('a held result is marked under review on its card', async () => {
+    const data = { data: { active: [], completed: [card({ id: 'c-1', status: 'COMPLETED', tab: 'COMPLETED', underReview: true, cta: { kind: 'NONE', to: null } })], upcoming: [] } }
+    render(<AssessmentsPage />, { routes: { '/api/v1/me/assessments': data } })
+    await userEvent.click(await screen.findByRole('tab', { name: 'Completed (1)' }))
+    expect(screen.getByText(/under review and is not included in your capabilities/)).toBeInTheDocument()
+  })
+})
+
+describe('Product telemetry (§46)', () => {
+  it('only allow-listed props leave the browser; unknown events are ignored', () => {
+    expect(allowedProps({ assignmentId: 'a-1', scope: 'PERSONAL', email: 'x@test.local', transcript: 'my answer', url: '/app/campus-invite/token', count: 3 }))
+      .toEqual({ assignmentId: 'a-1', scope: 'PERSONAL', count: 3 })
+    const sent = []
+    setTelemetrySender((e) => sent.push(e))
+    expect(track('typed_an_answer', { text: 'x' })).toBe(false)
+    expect(track('report_viewed', { sessionId: 'sess-1', name: 'Synthetic Student' })).toBe(true)
+    expect(sent).toHaveLength(1)
+    expect(sent[0].props).toEqual({ sessionId: 'sess-1' })
+    setTelemetrySender(() => {})
+  })
+})

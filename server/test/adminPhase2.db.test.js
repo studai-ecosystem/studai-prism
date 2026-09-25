@@ -162,12 +162,21 @@ test('Phase 2 admin plane end-to-end', { skip }, async (t) => {
   assert.equal(sessDetail.json.summary.consentVersion, 'p2-test')
   assert.equal(sessDetail.json.integrity.events.length, 1)
 
-  // Score-affecting decisions land in the assessment audit_log too.
-  const trailHold = await query(
-    `SELECT COUNT(*) FROM audit_log WHERE event_type = 'session_review_hold' AND session_id = $1::uuid`,
-    [sid],
-  )
-  assert.equal(Number(trailHold.rows[0].count), 1, 'review hold recorded in the decision trail')
+  // Score-affecting decisions land in the assessment audit_log too. auditLog()
+  // is fire-and-forget by design, so poll briefly (same as adminPhase3) — on a
+  // real multi-connection Postgres the insert may commit after this tick (K53).
+  const trailCount = async (eventType, sessionId) => {
+    const read = async () => Number((await query(
+      'SELECT COUNT(*) FROM audit_log WHERE event_type = $1 AND session_id = $2::uuid',
+      [eventType, sessionId],
+    )).rows[0].count)
+    for (let i = 0; i < 20; i++) {
+      if ((await read()) >= 1) break
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    return read()
+  }
+  assert.equal(await trailCount('session_review_hold', sid), 1, 'review hold recorded in the decision trail')
 
   const inval = await call('POST', `/api/admin/sessions/${sid}/invalidate`, opsAdmin, { reason: 'confirmed impersonation during review' })
   assert.equal(inval.status, 200)
@@ -219,11 +228,7 @@ test('Phase 2 admin plane end-to-end', { skip }, async (t) => {
   assert.ok(!('previousOverall' in (reportDetail.json.report.correction || {})), 'no composite lineage on the ops surface')
   assert.ok(!('overall' in (reportDetail.json.report.scores || {})), 'ops detail carries no composite')
 
-  const trailSup = await query(
-    `SELECT COUNT(*) FROM audit_log WHERE event_type = 'report_superseded' AND session_id = $1::uuid`,
-    [sid],
-  )
-  assert.equal(Number(trailSup.rows[0].count), 1, 'supersession recorded in the decision trail')
+  assert.equal(await trailCount('report_superseded', sid), 1, 'supersession recorded in the decision trail')
 
   // Auditor is structurally read-only on this plane.
   const auditorMutation = await call('POST', `/api/admin/reports/${sid}/hold`, auditor, { reason: 'x' })

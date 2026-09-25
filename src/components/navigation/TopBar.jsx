@@ -38,7 +38,7 @@ export function TopBar({ onOpenNav, navLabel = 'Open navigation' }) {
         </Badge>
         <span className="hidden lg:inline-flex"><PrivacyScopeBadge workspace={active} /></span>
       </div>
-      <div className="ml-auto">
+      <div className="ml-auto shrink-0">
         <DropdownMenu
           label="Account menu"
           trigger={(

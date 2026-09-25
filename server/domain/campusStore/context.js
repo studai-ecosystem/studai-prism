@@ -10,6 +10,27 @@ import { createInviteService } from '../memberships/inviteService.js'
 import { createSessionScopeService } from '../scopes/sessionScope.js'
 import { createDataAccessAudit } from '../audit/dataAccess.js'
 import { createRequireCampus, createRequireOrgPermission } from '../permissions/middleware.js'
+import { createCatalogService } from '../assessments/catalogService.js'
+import { createAssignmentService } from '../assessments/assignmentService.js'
+import { createSessionDirectory } from '../student/sessionDirectory.js'
+import { createStudentReadModels } from '../student/readModels.js'
+import { createTelemetryService } from '../telemetry/events.js'
+import { auditLog } from '../../lib/telemetry.js'
+
+// Legacy sources the student read models consult (read-only). Tests inject
+// synthetic ones; the app wires the v1 store (defaultContext.js).
+export const EMPTY_LEGACY_SOURCES = Object.freeze({
+  listEntitlements: async () => [],
+  listSessionIds: async () => [],
+  getSession: async () => null,
+  getReport: async () => null,
+  paths: {
+    purchase: '/payment',
+    start: (sessionId) => `/briefing?session=${encodeURIComponent(sessionId)}`,
+    resume: (sessionId, bank) => (bank ? `/workspace/${encodeURIComponent(sessionId)}` : `/assessment?session=${encodeURIComponent(sessionId)}`),
+    report: (sessionId, bank) => (bank ? `/report/${encodeURIComponent(sessionId)}/v2` : `/score?session=${encodeURIComponent(sessionId)}`),
+  },
+})
 
 export function createCampusContext({
   repos,
@@ -21,14 +42,36 @@ export function createCampusContext({
   tokenFactory,
   sessionOwner,
   audit,
+  legacy = EMPTY_LEGACY_SOURCES,
+  scenarioSource = async () => ({ generalScenarios: [], bankScenarios: {} }),
+  evidence = { units: async () => [] },
+  practice,
+  roles = { evaluate: async () => [] },
+  hashActor,
 } = {}) {
   const campusAvailable = () => isEnabled('PRISM_CAMPUS_ENABLED') && campusStoreAvailable()
   const workspaceService = createWorkspaceService({ repos, campusAvailable })
+  const resolver = createEntitlementResolver({ repos, legacyLookup, clock })
+  // Student read models use the store only when it is actually available.
+  const liveRepos = () => (repos && campusStoreAvailable() ? repos : null)
+  const storeView = new Proxy({}, { get: (_t, key) => liveRepos()?.[key] })
+  const catalog = createCatalogService({ repos: storeView, scenarioSource })
+  const directory = createSessionDirectory({ repos: storeView, legacy })
+  const assignments = createAssignmentService({ repos: storeView, catalog, directory, legacy, resolver, clock })
   return {
     repos,
     campusAvailable,
+    // Account-level features (preferences, share grants) need only the store.
+    storeAvailable: () => Boolean(liveRepos()),
+    store: storeView,
+    // Decision-trail writer for student-initiated privacy actions.
+    audit: audit || auditLog,
     workspaceService,
-    resolver: createEntitlementResolver({ repos, legacyLookup, clock }),
+    resolver,
+    catalog,
+    assignments,
+    student: createStudentReadModels({ directory, catalog, assignments, evidence, practice, roles, legacy, clock }),
+    telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }),
     ledger: createEntitlementLedger({ repos, clock, ...(audit ? { audit } : {}) }),
     invites: createInviteService({ repos, sendInviteEmail, inviteUrlFor, clock, ...(tokenFactory ? { tokenFactory } : {}), ...(audit ? { audit } : {}) }),
     sessionScopes: createSessionScopeService({ repos, clock, ...(sessionOwner ? { sessionOwner } : {}) }),
