@@ -455,4 +455,48 @@ export function runCampusRepoContract(test, label, getRepos) {
     assert.equal((await repos.analytics.saveSettings({ organizationId: org.id, minAggregateGroupSize: 15, updatedBy: 'owner2' })).updatedBy, 'owner2')
     assert.equal((await repos.analytics.getSettings(org.id)).minAggregateGroupSize, 15)
   })
+
+  test(`${label}: billing — contracts (compare-and-set), read-only pricing, invoice export record, usage ledger`, async () => {
+    const repos = await getRepos()
+    const bl = repos.billing
+    const org = await repos.organizations.createOrganization({ name: 'Synthetic Billing Org', slug: slug(), organizationType: 'UNIVERSITY', status: 'ACTIVE' })
+    assert.ok((await repos.organizations.listOrganizations()).some((o) => o.id === org.id))
+    const tz = process.env.TZ
+    process.env.TZ = 'Asia/Kolkata'
+    let c
+    try {
+      c = await bl.createContract({ organizationId: org.id, name: 'Synthetic contract', termStart: '2026-09-01', termEnd: '2027-03-31', includedSeats: 2, billableEvent: 'ASSESSMENT_COMPLETED', components: { platformFee: true }, createdBy: 'admin:ops' })
+      assert.deepEqual([c.status, c.termStart, c.termEnd, c.entitlementId], ['DRAFT', '2026-09-01', '2027-03-31', null])
+      assert.deepEqual((await bl.getContract(c.id)).components, { platformFee: true })
+    } finally {
+      if (tz === undefined) delete process.env.TZ
+      else process.env.TZ = tz
+    }
+    const ent = await repos.entitlements.createEntitlement({
+      id: c.id, organizationId: org.id, sourceType: 'INSTITUTION_SPONSORSHIP', sourceReferenceId: `contract:${c.id}`, productCode: 'PRISM_CAMPUS_ASSESSMENT', quantity: 2,
+      validFrom: new Date(Date.now() - day).toISOString(), validUntil: new Date(Date.now() + day).toISOString(), status: 'ACTIVE', metadata: { contractId: c.id, billableEvent: 'ASSESSMENT_COMPLETED' },
+    })
+    assert.equal(ent.id, c.id)
+    await assert.rejects(repos.entitlements.createEntitlement({ id: c.id, organizationId: org.id, sourceType: 'INSTITUTION_SPONSORSHIP', productCode: 'X', quantity: 1, validFrom: new Date().toISOString(), status: 'ACTIVE' }), { code: 'CONFLICT' })
+    const active = await bl.transitionContract(c.id, ['DRAFT'], { status: 'ACTIVE', entitlementId: ent.id, activatedBy: 'admin:ops', activatedAt: new Date().toISOString() })
+    assert.deepEqual([active.status, active.entitlementId], ['ACTIVE', ent.id])
+    assert.equal(await bl.transitionContract(c.id, ['DRAFT'], { status: 'ACTIVE' }), null, 'compare-and-set: only from the expected status')
+    assert.deepEqual((await bl.listContracts(org.id)).map((x) => x.id), [c.id])
+    assert.equal(await bl.getPricing(c.id), null, 'no price row unless finance adds one')
+    assert.equal((await repos.entitlements.setStatus(ent.id, 'SUSPENDED')).status, 'SUSPENDED')
+    assert.equal(await repos.entitlements.setStatus(ent.id, 'REVOKED', ['ACTIVE']), null, 'compare-and-set: only from the expected status')
+    assert.equal((await repos.entitlements.setStatus(ent.id, 'ACTIVE', ['SUSPENDED'])).status, 'ACTIVE')
+
+    await repos.entitlements.appendEvent({ entitlementId: ent.id, userId: 'u1', organizationId: org.id, sessionId: 's1', event: 'RESERVED', idempotencyKey: `b-${ent.id}-1` })
+    await repos.entitlements.appendEvent({ entitlementId: ent.id, userId: 'u1', organizationId: org.id, sessionId: 's1', event: 'CONSUMED', idempotencyKey: `b-${ent.id}-2`, requireOpenReservation: true })
+    const personal = await repos.entitlements.createEntitlement({ userId: 'u1', sourceType: 'PERSONAL_PURCHASE', productCode: 'PRISM_PERSONAL', quantity: 1, validFrom: new Date(Date.now() - day).toISOString(), status: 'ACTIVE' })
+    await repos.entitlements.appendEvent({ entitlementId: personal.id, userId: 'u1', sessionId: 'sp', event: 'RESERVED', idempotencyKey: `b-${personal.id}` })
+    const usage = await bl.usageEvents({ organizationId: org.id })
+    assert.deepEqual(usage.map((e) => e.event).sort(), ['CONSUMED', 'RESERVED'], 'sponsored seats only; personal purchases never appear')
+    assert.equal((await bl.usageEvents({ organizationId: org.id, entitlementIds: [ent.id], from: new Date(Date.now() + day).toISOString() })).length, 0)
+
+    const x = await bl.appendInvoiceExport({ organizationId: org.id, contractId: c.id, periodStart: '2026-10-01', periodEnd: '2026-10-31', billableEvent: 'ASSESSMENT_COMPLETED', billableCount: 1, createdBy: 'owner' })
+    assert.deepEqual([x.periodStart, x.periodEnd, x.billableCount], ['2026-10-01', '2026-10-31', 1])
+    assert.deepEqual((await bl.listInvoiceExports(org.id)).map((r) => r.id), [x.id])
+  })
 }

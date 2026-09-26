@@ -25,11 +25,20 @@ export function createEntitlementsRepoMemory(db) {
       }
       if (row.sourceType === 'INSTITUTION_SPONSORSHIP' && !row.organizationId) throw new ApiError('VALIDATION_FAILED', 'Sponsorship needs an organization.')
       if (!['INSTITUTION_SPONSORSHIP', 'PARTNER_GRANT'].includes(row.sourceType) && !row.userId) throw new ApiError('VALIDATION_FAILED', 'Personal entitlements need a user.')
+      if (db.entitlements.has(row.id)) throw new ApiError('CONFLICT', 'This entitlement already exists.')
       db.entitlements.set(row.id, row)
       return clone(row)
     },
     async getEntitlement(id) {
       return clone(db.entitlements.get(String(id)) || null)
+    },
+    // Status only (a contract's pool); seats and the ledger never change here.
+    // With `fromStatuses`, a compare-and-set: null when the row is elsewhere.
+    async setStatus(id, status, fromStatuses = null) {
+      const row = db.entitlements.get(String(id))
+      if (!row || (fromStatuses && !fromStatuses.includes(row.status))) return null
+      row.status = status
+      return clone(row)
     },
     async listEntitlements({ userId, organizationId, sourceTypes } = {}) {
       return [...db.entitlements.values()]

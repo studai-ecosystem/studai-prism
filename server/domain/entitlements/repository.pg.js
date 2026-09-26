@@ -29,11 +29,21 @@ export function createEntitlementsRepoPg({ query, getPool }) {
         return ent(rows[0])
       } catch (err) {
         if (err.code === '23514') throw new ApiError('VALIDATION_FAILED', 'Entitlement is not valid for its source type.')
+        if (err.code === '23505') throw new ApiError('CONFLICT', 'This entitlement already exists.')
         throw err
       }
     },
     async getEntitlement(id) {
       const { rows } = await query('SELECT * FROM entitlements WHERE id = $1', [id])
+      return ent(rows[0]) || null
+    },
+    // Status only (a contract's pool); seats and the ledger never change here.
+    // With `fromStatuses`, a compare-and-set: null when the row is elsewhere.
+    async setStatus(id, status, fromStatuses = null) {
+      const { rows } = await query(
+        'UPDATE entitlements SET status = $2, updated_at = now() WHERE id = $1 AND ($3::text[] IS NULL OR status = ANY($3::text[])) RETURNING *',
+        [id, status, fromStatuses],
+      )
       return ent(rows[0]) || null
     },
     async listEntitlements({ userId, organizationId, sourceTypes } = {}) {

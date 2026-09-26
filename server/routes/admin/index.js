@@ -49,6 +49,7 @@ import privacyRouter from './privacy.js'
 import auditRouter from './audit.js'
 import accommodationsRouter from './accommodations.js'
 import marginRouter from './margin.js'
+import organizationsRouter from './organizations.js'
 
 const router = Router()
 
@@ -133,5 +134,7 @@ router.use('/audit', auditRouter)
 router.use('/accommodations', accommodationsRouter)
 // Charter Phase 5 — commercial readiness (§23 contribution margin).
 router.use('/margin', marginRouter)
+// Campus Phase 11 — campus organizations, sponsorship pools and contracts.
+router.use('/organizations', organizationsRouter)
 
 export default router

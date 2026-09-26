@@ -6,6 +6,13 @@
 import { ApiError } from '../http/errors.js'
 import { auditLog } from '../../lib/telemetry.js'
 
+// When a sponsored seat is finalised (spec §31.2): a contract-minted pool
+// carries its billable event in metadata; any other pool uses the default
+// (a completed eligible assessment).
+export const BILLABLE_EVENTS = Object.freeze(['ASSESSMENT_STARTED', 'ASSESSMENT_COMPLETED', 'REPORT_GENERATED'])
+export const DEFAULT_BILLABLE_EVENT = 'ASSESSMENT_COMPLETED'
+export const billableEventOf = (entitlement) => (BILLABLE_EVENTS.includes(entitlement?.metadata?.billableEvent) ? entitlement.metadata.billableEvent : DEFAULT_BILLABLE_EVENT)
+
 function assertScope(entitlement, resolution, user) {
   const scope = resolution?.scope || {}
   if (entitlement.sourceType === 'INSTITUTION_SPONSORSHIP') {
@@ -21,7 +28,7 @@ function assertScope(entitlement, resolution, user) {
 }
 
 export function createEntitlementLedger({ repos, clock = () => new Date(), audit = auditLog }) {
-  return {
+  const ledger = {
     async reserve({ resolution, user, sessionId, idempotencyKey }) {
       if (!idempotencyKey) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
       const key = `reserve:${user.id}:${idempotencyKey}`
@@ -65,5 +72,15 @@ export function createEntitlementLedger({ repos, clock = () => new Date(), audit
       })
       return { consumption, replayed }
     },
+
+    // Consume now only if `event` is this pool's billable event (e.g. a
+    // contract billed on ASSESSMENT_STARTED closes the seat at start). The
+    // completion path always consumes, so a seat is never left open.
+    async finalizeOn(event, { entitlementId, user, sessionId }) {
+      const entitlement = entitlementId ? await repos.entitlements.getEntitlement(entitlementId) : null
+      if (!entitlement || billableEventOf(entitlement) !== event) return null
+      return ledger.consume({ entitlementId, user, sessionId })
+    },
   }
+  return ledger
 }

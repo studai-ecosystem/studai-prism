@@ -154,6 +154,14 @@ export function createAssessmentSessionService({
         if (!(await legacy.getSession(sessionId))) {
           await engine.start({ sessionId, scenarioId, authorization, client, requestId })
         }
+        // A contract billed on start closes the seat once the engine has
+        // started — before the start is recorded, so a failure here is retried
+        // by the next start instead of leaving the seat open (K99).
+        if (sponsored && entitlementId) {
+          await ledger.finalizeOn('ASSESSMENT_STARTED', { entitlementId, user, sessionId }).catch((err) => {
+            if (err?.code !== 'CONFLICT') throw err
+          })
+        }
         await repos.sessionIo.putClientEvent({
           sessionId, clientEventId: START_EVENT, kind: 'START',
           response: { assignmentId, sponsored, entitlementId, idempotencyKey: String(idempotencyKey).slice(0, 80) },

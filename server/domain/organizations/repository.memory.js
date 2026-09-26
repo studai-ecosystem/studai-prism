@@ -14,6 +14,9 @@ export function createOrganizationsRepoMemory(db) {
     async getOrganization(id) {
       return clone(db.organizations.get(String(id)) || null)
     },
+    async listOrganizations() {
+      return [...db.organizations.values()].sort((a, b) => String(a.name).localeCompare(String(b.name))).map(clone)
+    },
     async createDepartment({ id, organizationId, name, code = null }) {
       const row = { id: id || db.id(), organizationId, campusId: null, name, code, status: 'ACTIVE', createdAt: now() }
       db.departments.set(row.id, row)

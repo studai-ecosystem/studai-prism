@@ -18,6 +18,7 @@ import { transcriptFrom } from '../domain/assessments/sessionContract.js'
 import { personalAssignmentId } from '../domain/assessments/assignmentService.js'
 import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../domain/sharing/copyVersions.js'
 import { ApiError } from '../domain/http/errors.js'
+import { fromLegacyEntitlement } from '../domain/entitlements/legacyAdapter.js'
 
 // Enabled inside this test process only (K2).
 process.env.PRISM_CAMPUS_ENABLED = 'true'
@@ -245,6 +246,41 @@ test('C5.03 (K69): a failed sponsored start keeps its seat; the retry reuses it 
     await w.call('student', 'POST', `/assessment-sessions/${sid}/finish`, { early: true }, s.ws)
     events = (await w.repos.entitlements.listConsumptions(s.entitlement.id)).map((c) => c.event)
     assert.deepEqual(events.sort(), ['CONSUMED', 'RESERVED'])
+  } finally { w.close() }
+})
+
+test('C11.02/C11.07: a contract billed on start closes the seat when the engine starts; students see no price and no contract', async () => {
+  const w = await world()
+  try {
+    const s = await sponsored(w, { entitlement: false })
+    const c = await w.campus.billing.createContract(w.org.id, { name: 'Synthetic start-billed pilot', termStart: '2026-09-01', termEnd: '2027-03-31', includedSeats: 2, billableEvent: 'ASSESSMENT_STARTED' }, { adminId: 'ops-synthetic' })
+    await w.campus.billing.activateContract(c.id, { adminId: 'ops-synthetic' })
+    await w.call('student', 'POST', `/assessment-assignments/${s.assignment.id}/acknowledge`, { copyVersion: CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION, acknowledged: true }, s.ws)
+    const started = await w.call('student', 'POST', `/assessment-assignments/${s.assignment.id}/start`, { consent: CONSENT }, { ...s.ws, 'Idempotency-Key': 'k-contract' })
+    assert.equal(started.status, 201)
+    const sid = started.body.data.sessionId
+    const events = async () => (await w.repos.entitlements.listConsumptions(c.id)).map((e) => e.event).sort()
+    assert.deepEqual(await events(), ['CONSUMED', 'RESERVED'], 'billed on start: the seat is final once the engine has started')
+    const gate = w.state.payments.find((p) => p.sessionId === sid)
+    assert.deepEqual([gate.mode, gate.amount], ['campus', 0], 'only the zero-amount engine-gate record (K67), never a purchase')
+    assert.equal(fromLegacyEntitlement(gate), null, 'the engine-gate record is never read as a personal entitlement')
+    assert.equal(w.state.payments.filter((p) => p.sessionId === sid).length, 1, 'one record for the session')
+    assert.deepEqual(w.state.payments.filter((p) => p.mode !== 'campus').map((p) => p.sessionId), ['sess-personal-001'], 'no purchase is added')
+    await w.call('student', 'POST', `/assessment-sessions/${sid}/finish`, { early: true }, s.ws)
+    assert.deepEqual(await events(), ['CONSUMED', 'RESERVED'], 'finishing never consumes a second time')
+    // Deep scan of what the student receives in the campus workspace.
+    const priceKey = /^(price|prices|pricing|rate|fee|amount|currency|contract|contractId|platformFee|perAssessmentRate|reassessmentRate|billableEvent)$/i
+    const walk = (v, path = '') => {
+      if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`))
+      else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { assert.ok(!priceKey.test(k), `student payload exposes ${path}.${k}`); walk(x, `${path}.${k}`) }
+    }
+    for (const p of ['/me/home', '/me/assessments', `/assessment-assignments/${s.assignment.id}`, `/assessment-sessions/${sid}`]) {
+      const r = await w.call('student', 'GET', p, null, s.ws)
+      assert.equal(r.status, 200, p)
+      walk(r.body)
+      assert.ok(!JSON.stringify(r.body).includes(c.id), `${p} leaks the contract`)
+    }
+    assert.equal((await w.call('student', 'GET', `/organizations/${w.org.id}/billing`, null, s.ws)).status, 404, 'students never read billing')
   } finally { w.close() }
 })
 

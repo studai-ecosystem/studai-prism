@@ -23,6 +23,7 @@ import { createDevelopmentService } from '../development/service.js'
 import { createGrowthService } from '../growth/service.js'
 import { createSessionEntryLoader } from '../growth/entries.js'
 import { createAnalyticsService } from '../analytics/service.js'
+import { createBillingService } from '../billing/service.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 // Account directory (read-only) for admin views: `{ id, name, email }` or null.
@@ -150,6 +151,7 @@ export function createCampusContext({
     development,
     growth,
     analytics,
+    billing: createBillingService({ repos: storeView, clock }),
     overviewExtras,
     // Effective scope of `permission` for an actor in an organization.
     scopeFor: (actor, organizationId, permission) => can(actor, permission, { organizationId }),

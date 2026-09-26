@@ -9,7 +9,8 @@ import { ApiError } from '../http/errors.js'
 import { can } from '../permissions/can.js'
 import { ROLES } from '../permissions/roles.js'
 import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../sharing/copyVersions.js'
-import { parseCsv, validateImport, IMPORT_LIMITS, csvCell } from './csv.js'
+import { validateImport, IMPORT_LIMITS, csvCell } from './csv.js'
+import { csvRosterAdapter } from '../integrations/sis/index.js'
 
 export const ONBOARDING_STEPS = Object.freeze(['profile', 'structure', 'team', 'students', 'program', 'assessment', 'schedule', 'privacy', 'launch'])
 export const STAFF_ROLES = Object.freeze(ROLES.filter((r) => !['STUDENT', 'PRISM_REVIEWER', 'STUDAI_ADMIN'].includes(r)))
@@ -433,7 +434,7 @@ export function createCampusAdminService({
       const pendingEmails = new Set((decision.scope === 'ALL'
         ? (await store().listOrgInvites(organizationId)).filter((i) => i.role === 'STUDENT' && i.status === 'PENDING' && new Date(i.expiresAt) > clock())
         : (await visibleStudents(organizationId, decision)).pending).map((i) => i.email))
-      const result = validateImport(parseCsv(csv), { cohortsByName: new Map(cohorts.map((c) => [c.name.toLowerCase(), c])), defaultCohort, memberEmails, pendingEmails })
+      const result = validateImport(csvRosterAdapter.readRows(csv), { cohortsByName: new Map(cohorts.map((c) => [c.name.toLowerCase(), c])), defaultCohort, memberEmails, pendingEmails })
       if (result.error) {
         const messages = { EMPTY_FILE: 'This file has no rows.', MISSING_EMAIL_COLUMN: 'The file needs an "email" column.', TOO_MANY_ROWS: `Import up to ${IMPORT_LIMITS.maxRows} students at a time.` }
         throw new ApiError('VALIDATION_FAILED', messages[result.error], { details: { reason: result.error } })

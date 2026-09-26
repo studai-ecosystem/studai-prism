@@ -29,6 +29,10 @@ export function createOrganizationsRepoPg({ query }) {
       const { rows } = await query('SELECT * FROM organizations WHERE id = $1', [id])
       return org(rows[0]) || null
     },
+    async listOrganizations() {
+      const { rows } = await query('SELECT * FROM organizations ORDER BY name ASC LIMIT 1000')
+      return rows.map(org)
+    },
     async createDepartment({ id, organizationId, name, code = null }) {
       const { rows } = await query(
         `INSERT INTO academic_departments (id, organization_id, name, code, status)

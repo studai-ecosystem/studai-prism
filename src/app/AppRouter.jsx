@@ -116,6 +116,9 @@ const CampusDevelopmentPage = lazy(() => import('../features/campus/pages/Campus
 const CampusReassessmentsPage = lazy(() => import('../features/campus/pages/CampusReassessmentsPage.jsx'))
 const CampusAnalyticsPage = lazy(() => import('../features/campus/pages/CampusAnalyticsPage.jsx'))
 const CampusReportsPage = lazy(() => import('../features/campus/pages/CampusReportsPage.jsx'))
+const CampusBillingPage = lazy(() => import('../features/campus/pages/CampusBillingPage.jsx'))
+const CampusIntegrationsPage = lazy(() => import('../features/campus/pages/CampusIntegrationsPage.jsx'))
+const AdminOrganizationsPage = lazy(() => import('../features/admin/AdminOrganizationsPage.jsx'))
 const MissionPlayerPage = lazy(() => import('../features/development/pages/MissionPlayerPage.jsx'))
 const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusInvitePage.jsx'))
 const StudentReportPage = lazy(() => import('../features/reports/pages/StudentReportPage.jsx'))
@@ -195,6 +198,7 @@ export default function AppRouter() {
             <Route path="payments" element={<AdminPayments />} />
             <Route path="invites" element={<AdminInvites />} />
             <Route path="margin" element={<AdminMargin />} />
+            <Route path="organizations" element={<AdminOrganizationsPage />} />
             <Route path="consents" element={<AdminRecords mode="consents" />} />
             <Route path="verifications" element={<AdminRecords mode="verifications" />} />
             <Route path="integrity" element={<AdminRecords mode="integrity" />} />
@@ -289,8 +293,8 @@ export default function AppRouter() {
             <Route path="reassessments" element={<FlagRoute flag="PRISM_GROWTH_ENABLED" onError="error" on={<CampusReassessmentsPage />} off={<CampusNotYetAvailablePage title="Reassessments" />} />} />
             <Route path="analytics" element={<FlagRoute flag="PRISM_CAMPUS_ANALYTICS" onError="error" on={<CampusAnalyticsPage />} off={<CampusNotYetAvailablePage title="Analytics" />} />} />
             <Route path="reports" element={<FlagRoute flag="PRISM_CAMPUS_ANALYTICS" onError="error" on={<CampusReportsPage />} off={<CampusNotYetAvailablePage title="Reports" />} />} />
-            <Route path="integrations" element={<CampusNotYetAvailablePage title="Integrations" />} />
-            <Route path="billing" element={<CampusNotYetAvailablePage title="Billing" />} />
+            <Route path="integrations" element={<CampusIntegrationsPage />} />
+            <Route path="billing" element={<CampusBillingPage />} />
             <Route path="*" element={<ParamRedirect to="/campus/:organizationId/overview" />} />
           </Route>
 

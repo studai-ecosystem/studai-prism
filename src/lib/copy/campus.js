@@ -49,6 +49,7 @@ export const AUDIT_ACTION_TEXT = Object.freeze({
   'invite.resent': 'Sent an invitation again',
   'report.exported': 'Exported a report or aggregate data',
   'analytics.settings.updated': 'Changed the analytics privacy threshold',
+  'billing.invoice_exported': 'Exported billing usage',
   'onboarding.completed': 'Completed setup',
   'intervention.assigned': 'Assigned practice missions to a cohort',
   'intervention.completed': 'Marked an intervention as completed',
@@ -92,6 +93,41 @@ export const REASSESSMENT_COPY = Object.freeze({
     PENDING: { short: 'Not yet approved', long: 'These assessment forms are not yet approved as comparable. Students will take the reassessment, but no growth change will be shown until a psychometric review approves the forms.' },
     REJECTED: { short: 'Not comparable', long: 'These assessment forms were reviewed and are not comparable. No growth change will be shown.' },
   },
+})
+
+// Campus billing + integrations (spec §38, §50 P11). Counts only; prices
+// appear only once finance has approved them (K5).
+export const BILLING_COPY = Object.freeze({
+  intro: 'Sponsored seats and usage for your contract. Students never see prices; sponsored students see "No payment required".',
+  contractStatus: { ACTIVE: 'Active', ENDED: 'Ended', CANCELLED: 'Cancelled' },
+  contractTone: { ACTIVE: 'positive', ENDED: 'neutral', CANCELLED: 'neutral' },
+  billableEvent: {
+    ASSESSMENT_STARTED: 'An assessment is billable when a student starts it.',
+    ASSESSMENT_COMPLETED: 'An assessment is billable when a student completes it.',
+    REPORT_GENERATED: 'An assessment is billable when its report is generated.',
+  },
+  components: {
+    platformFee: 'Platform access',
+    perCompletedAssessment: 'Per completed assessment',
+    reassessment: 'Reassessments',
+    reviewAllowance: 'Human review allowance',
+    customIntegrations: 'Custom integrations',
+    validationServices: 'Validation services',
+  },
+  pricingHidden: 'Prices are set in your signed agreement and are not shown here until StudAI finance confirms them.',
+  noContract: 'No sponsored seats yet. StudAI sets up your contract; contact your StudAI account team to begin.',
+  ledgerNote: 'Counts come from the sponsored-seat ledger. Months are in UTC.',
+  exportHelp: 'Download the billable count for one contract and period, for your finance team. Each download is recorded in the activity log.',
+})
+export const INTEGRATION_COPY = Object.freeze({
+  status: { AVAILABLE: 'Available', CONNECTED: 'Connected', NOT_CONNECTED: 'Not connected' },
+  tone: { AVAILABLE: 'positive', CONNECTED: 'positive', NOT_CONNECTED: 'neutral' },
+  detail: {
+    'sis-csv': 'Add students by uploading a CSV file of names and emails.',
+    'sis-direct': 'No direct connection to a student information system is set up.',
+    sso: 'No single sign-on is set up. Students and staff sign in with their own Prism account.',
+  },
+  contact: 'Contact StudAI to discuss a connection',
 })
 
 export const STUDENT_DETAIL_PRIVACY = 'This view contains only data available to this organization. Personal Prism activity is excluded unless the student explicitly shares it.'
