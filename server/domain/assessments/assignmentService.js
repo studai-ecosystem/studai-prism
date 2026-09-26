@@ -10,6 +10,12 @@ import { fromLegacyEntitlement } from '../entitlements/legacyAdapter.js'
 import { PERSONAL_SOURCES } from '../entitlements/resolver.js'
 import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../sharing/copyVersions.js'
 import { CORE_DEFINITION_ID, definitionForScenario, capabilityName } from './catalog.js'
+import { isEnabled } from '../flags/index.js'
+
+const workspaceV3 = () => isEnabled('PRISM_ASSESSMENT_WORKSPACE_V3')
+// The V3 player URL; sponsored sessions name their workspace so a new tab or
+// a refresh resolves the session in the right one.
+export const playerPath = (sessionId, workspaceId = null) => `/app/assessment/${encodeURIComponent(sessionId)}${workspaceId ? `?ws=${encodeURIComponent(workspaceId)}` : ''}`
 
 const PERSONAL_POLICY = Object.freeze({ accommodationsPolicy: { requestable: true }, reminderPolicy: { enabled: false } })
 const VISIBLE_SPONSORED = new Set(['SCHEDULED', 'ACTIVE', 'CLOSED'])
@@ -126,6 +132,7 @@ export function createAssignmentService({ repos, catalog, directory, legacy, res
     let cta = { kind: 'NONE', to: null }
     if (status === 'NOT_STARTED') cta = { kind: 'START', to: `${base}/briefing` }
     else if (status === 'UPCOMING') cta = { kind: 'VIEW_BRIEFING', to: `${base}/briefing` }
+    else if (status === 'IN_PROGRESS' && s.sessionId && workspaceV3()) cta = { kind: 'RESUME', to: playerPath(s.sessionId, sponsored ? workspace.id : null) }
     else if (status === 'IN_PROGRESS' && s.sessionId && !sponsored) cta = { kind: 'RESUME', to: paths.resume(s.sessionId, bank) }
     else if (status === 'COMPLETED' && s.sessionId && session?.hasReport) cta = { kind: 'VIEW_REPORT', to: paths.report(s.sessionId, bank) }
     return {
@@ -164,6 +171,12 @@ export function createAssignmentService({ repos, catalog, directory, legacy, res
   }
 
   return {
+    // The caller's assignment in this workspace with its card, or null.
+    async resolveItem(user, workspace, assignmentId) {
+      const item = await findItem(user, workspace, assignmentId)
+      return item ? { item, card: view(item, workspace, clock()) } : null
+    },
+
     async listForWorkspace(user, workspace) {
       const at = clock()
       const views = (await itemsFor(user, workspace)).map((i) => view(i, workspace, at))
@@ -186,20 +199,22 @@ export function createAssignmentService({ repos, catalog, directory, legacy, res
       if (card.status === 'COMPLETED') start = { allowed: false, reason: 'COMPLETED', to: null }
       else if (card.status === 'EXPIRED') start = { allowed: false, reason: 'CLOSED', to: null }
       else if (card.status === 'UPCOMING') start = { allowed: false, reason: 'NOT_OPEN', to: null }
-      else if (card.status === 'IN_PROGRESS') start = { allowed: Boolean(card.cta.to), reason: card.cta.to ? 'RESUME' : 'IN_PROGRESS', to: card.cta.to }
+      else if (card.status === 'IN_PROGRESS') start = { allowed: Boolean(card.cta.to), reason: card.cta.to ? 'RESUME' : 'IN_PROGRESS', to: card.cta.to, mode: workspaceV3() ? 'V3' : 'LEGACY' }
       else if (card.scope === 'PERSONAL') {
+        // With Workspace V3 on, a paid personal session starts in the V3
+        // player (the client POSTs /start); otherwise the legacy flow (K52).
         start = item.legacySessionId
-          ? { allowed: true, reason: 'ALLOWED', to: paths.start(item.legacySessionId) }
-          : { allowed: true, reason: 'ALLOWED', to: paths.purchase }
+          ? (workspaceV3() ? { allowed: true, reason: 'ALLOWED', to: null, mode: 'V3' } : { allowed: true, reason: 'ALLOWED', to: paths.start(item.legacySessionId), mode: 'LEGACY' })
+          : { allowed: true, reason: 'ALLOWED', to: paths.purchase, mode: 'LEGACY' }
       } else if (!card.acknowledged) {
         start = { allowed: false, reason: 'ACKNOWLEDGEMENT_REQUIRED', to: null }
       } else {
         const decision = await resolver.resolveEntitlement({ user, workspace, action: 'assessment.start', assignment: { assessmentDefinitionId: d.id } })
-        // Sponsored sessions start in the assessment workspace (Phase 5); until
-        // it exists the briefing says so rather than offering a dead button.
-        start = decision.allowed
-          ? { allowed: false, reason: 'SPONSORED_START_UNAVAILABLE', to: null }
-          : { allowed: false, reason: decision.reason, to: null }
+        if (!decision.allowed) start = { allowed: false, reason: decision.reason, to: null }
+        else if (workspaceV3()) start = { allowed: true, reason: 'ALLOWED', to: null, mode: 'V3' }
+        // Sponsored sessions start only in the V3 workspace; while it is dark
+        // the briefing says so rather than offering a dead button.
+        else start = { allowed: false, reason: 'SPONSORED_START_UNAVAILABLE', to: null }
       }
       return {
         assignment: card,

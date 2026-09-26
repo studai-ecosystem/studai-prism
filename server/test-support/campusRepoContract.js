@@ -202,4 +202,23 @@ export function runCampusRepoContract(test, label, getRepos) {
     assert.deepEqual(listed[0].resources, [{ resourceType: 'ASSESSMENT_REPORT', resourceId: 'sess-g', disclosureLevel: 'FULL' }])
     assert.deepEqual(await repos.sharing.listShareGrantsForOwner(uid()), [])
   })
+
+  test(`${label}: session I/O keeps the first client event and versions artifact writes`, async () => {
+    const repos = await getRepos()
+    const sid = `sess-${randomUUID()}`
+    assert.equal(await repos.sessionIo.getClientEvent(sid, 'evt-1'), null)
+    const first = await repos.sessionIo.putClientEvent({ sessionId: sid, clientEventId: 'evt-1', kind: 'MESSAGE', response: { n: 1 } })
+    const second = await repos.sessionIo.putClientEvent({ sessionId: sid, clientEventId: 'evt-1', kind: 'MESSAGE', response: { n: 2 } })
+    assert.deepEqual(first.response, { n: 1 })
+    assert.deepEqual(second.response, { n: 1 }, 'first writer wins')
+    assert.equal(await repos.sessionIo.latestArtifactVersion(sid, 'ART'), null)
+    await repos.sessionIo.appendArtifactVersion({ sessionId: sid, artifactId: 'ART', version: 1, content: { a: 1 }, savedBy: 'CANDIDATE' })
+    await repos.sessionIo.appendArtifactVersion({ sessionId: sid, artifactId: 'ART', version: 2, content: { a: 2 }, savedBy: 'CANDIDATE' })
+    await assert.rejects(repos.sessionIo.appendArtifactVersion({ sessionId: sid, artifactId: 'ART', version: 2, content: { a: 3 }, savedBy: 'CANDIDATE' }), { code: 'CONFLICT' })
+    await assert.rejects(repos.sessionIo.appendArtifactVersion({ sessionId: sid, artifactId: 'ART', version: 0, content: {}, savedBy: 'CANDIDATE' }), { code: 'VALIDATION_FAILED' })
+    assert.deepEqual((await repos.sessionIo.latestArtifactVersion(sid, 'ART')).content, { a: 2 })
+    await repos.sessionIo.appendArtifactVersion({ sessionId: sid, artifactId: 'OTHER', version: 1, content: { b: 1 }, savedBy: 'CANDIDATE' })
+    const latest = (await repos.sessionIo.listLatestArtifactVersions(sid)).sort((x, y) => x.artifactId.localeCompare(y.artifactId))
+    assert.deepEqual(latest.map((v) => [v.artifactId, v.version]), [['ART', 2], ['OTHER', 1]])
+  })
 }

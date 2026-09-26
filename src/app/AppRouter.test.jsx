@@ -69,19 +69,28 @@ describe('AppRouter — mixed and all-on flag combinations never loop and keep l
     expect(screen.queryByRole('heading', { level: 1, name: 'Report' })).not.toBeInTheDocument()
   })
 
-  it('all flags on: mission and workspace placeholders each offer a working legacy link', async () => {
+  it('all flags on: the mission placeholder offers a working legacy link; /workspace moves to the V3 player', async () => {
     const flags = { PRISM_APP_SHELL_V3: true, PRISM_ROLE_EXPLORATION_V2: true, PRISM_DEVELOPMENT_V2: true, PRISM_ASSESSMENT_WORKSPACE_V3: true }
-    for (const [route, title, href] of [
-      ['/missions/MIS-1', 'Mission', '/missions/MIS-1?legacy=1'],
-      ['/workspace/sess-5', 'Assessment', '/workspace/sess-5?legacy=1'],
-    ]) {
-      signIn()
-      mockFetch({ '/api/v1/me': meBody({ flags }), '/api/': pendingApi })
-      const { unmount } = renderApp(app, { route })
-      expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: 'Open the current version' })).toHaveAttribute('href', href)
-      unmount()
-    }
+    signIn()
+    mockFetch({ '/api/v1/me': meBody({ flags }), '/api/': pendingApi })
+    const { unmount } = renderApp(app, { route: '/missions/MIS-1' })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mission' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open the current version' })).toHaveAttribute('href', '/missions/MIS-1?legacy=1')
+    unmount()
+    signIn()
+    mockFetch({ '/api/v1/me': meBody({ flags }), '/api/': pendingApi })
+    renderApp(app, { route: '/workspace/sess-5' })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Assessment' })).toBeInTheDocument()
+    expect(screen.getByTestId('where')).toHaveTextContent('/app/assessment/sess-5')
+    expect(screen.getByText('Loading your assessment…')).toBeInTheDocument()
+  })
+
+  it('workspace flag on but shell off: /workspace stays on the legacy page (no loop)', async () => {
+    signIn()
+    mockFetch({ '/api/v1/me': meBody({ flags: { PRISM_ASSESSMENT_WORKSPACE_V3: true } }), '/api/': pendingApi })
+    renderApp(app, { route: '/workspace/sess-6' })
+    await new Promise((r) => setTimeout(r, 80))
+    expect(screen.getByTestId('where')).toHaveTextContent('/workspace/sess-6')
   })
 
   it('Explore V2 on: /explore moves to the V3 page with two separate panels and evaluates nothing up front', async () => {

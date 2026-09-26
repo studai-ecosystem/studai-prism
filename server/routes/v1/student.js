@@ -12,8 +12,9 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { asyncHandler } from '../../domain/http/asyncHandler.js'
 import { ApiError, ok } from '../../domain/http/errors.js'
-import { requireFlag, isEnabled } from '../../domain/flags/index.js'
+import { requireFlag } from '../../domain/flags/index.js'
 import { DEFAULT_PREFERENCES } from '../../domain/preferences/repository.js'
+import { studentScoped } from './studentScope.js'
 
 const ASSIGNMENT_ID = /^(pa_[0-9a-f]{32}|[0-9a-f-]{36})$/i
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -31,12 +32,6 @@ const Acknowledge = z.object({ copyVersion: z.string().min(1).max(80), acknowled
 const Preferences = z.object({ reducedMotion: z.boolean(), largerText: z.boolean() }).strict()
 const Interests = z.object({ interests: z.record(z.number().min(0).max(1)).nullable() }).strict()
 
-function studentWorkspace(req, _res, next) {
-  const type = req.workspace?.type
-  if (type === 'PERSONAL' || type === 'CAMPUS_STUDENT') return next()
-  return next(new ApiError('FORBIDDEN', 'This is not a student workspace.'))
-}
-
 function grantView(g, at) {
   const status = g.revokedAt ? 'REVOKED' : new Date(g.expiresAt) <= at ? 'EXPIRED' : 'ACTIVE'
   return {
@@ -53,12 +48,7 @@ function grantView(g, at) {
 export function createStudentRouter({ requireUser, campus, clock = () => new Date() }) {
   const router = Router()
   const shell = requireFlag('PRISM_APP_SHELL_V3')
-  // With campus on, a session's sponsorship is only knowable from the campus
-  // store: without it, sponsored sessions could look personal — fail closed.
-  const scopesKnowable = (_req, _res, next) => (isEnabled('PRISM_CAMPUS_ENABLED') && !campus.storeAvailable()
-    ? next(new ApiError('CAMPUS_STORE_UNAVAILABLE', 'This is temporarily unavailable.'))
-    : next())
-  const scoped = [shell, requireUser, scopesKnowable, campus.resolveWorkspace, studentWorkspace]
+  const scoped = [shell, ...studentScoped({ requireUser, campus })]
   const requireStore = (_req, _res, next) => (campus.storeAvailable()
     ? next()
     : next(new ApiError('CAMPUS_STORE_UNAVAILABLE', 'This feature is temporarily unavailable.')))

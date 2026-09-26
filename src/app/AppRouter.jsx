@@ -11,7 +11,6 @@ import { FlagRoute, LegacyAlias, V3Route } from './routing.jsx'
 import { RouteErrorBoundary, lazyWithRetry } from './RouteErrorBoundary.jsx'
 import { StudentShell } from '../layouts/StudentShell.jsx'
 import { CampusShell } from '../layouts/CampusShell.jsx'
-import { AssessmentShell } from '../layouts/AssessmentShell.jsx'
 
 const lazy = lazyWithRetry
 const named = (loader, name) => lazyWithRetry(() => loader().then((m) => ({ default: m[name] })))
@@ -89,6 +88,7 @@ const HomePage = lazy(() => import('../features/home/pages/HomePage.jsx'))
 const AssessmentsPage = lazy(() => import('../features/assessments/pages/AssessmentsPage.jsx'))
 const BriefingPage = lazy(() => import('../features/assessments/pages/BriefingPage.jsx'))
 const SystemCheckPage = lazy(() => import('../features/assessments/pages/SystemCheckPage.jsx'))
+const AssessmentPlayerPage = lazy(() => import('../features/assessments/pages/AssessmentPlayerPage.jsx'))
 const ExplorePage = lazy(() => import('../features/exploration/pages/ExplorePage.jsx'))
 const CapabilitiesPage = lazy(() => import('../features/capabilities/pages/CapabilitiesPage.jsx'))
 const EvidencePage = lazy(() => import('../features/evidence/pages/EvidencePage.jsx'))
@@ -212,7 +212,7 @@ export default function AppRouter() {
             <Route path="/app/sharing" element={<SharingPage />} />
             <Route path="/app/settings" element={<SettingsPage />} />
           </Route>
-          <Route path="/app/assessment/:sessionId" element={<V3Route flag="PRISM_ASSESSMENT_WORKSPACE_V3" legacyPath="/workspace/:sessionId" page={<AssessmentShell><div className="mx-auto w-full max-w-3xl px-4 py-8"><NotYetAvailablePage title="Assessment" legacyPattern="/workspace/:sessionId" /></div></AssessmentShell>} />} />
+          <Route path="/app/assessment/:sessionId" element={<V3Route flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell legacyPath="/workspace/:sessionId" page={<AuthGuard><AssessmentPlayerPage /></AuthGuard>} />} />
           <Route path="/app/reports/:sessionId" element={<V3Route flag="PRISM_STUDENT_REPORT_V3" requiresShell legacyPath="/report/:sessionId/v2" page={inShell(<NotYetAvailablePage title="Report" legacyPattern="/report/:sessionId/v2" />)} />} />
           <Route path="/app/development/missions/:missionId" element={<V3Route flag="PRISM_DEVELOPMENT_V2" requiresShell legacyPath="/missions/:missionId" page={inShell(<NotYetAvailablePage title="Mission" legacyPattern="/missions/:missionId" />)} />} />
           <Route path="/app/explore" element={<V3Route flag="PRISM_ROLE_EXPLORATION_V2" requiresShell legacyPath="/explore" page={inShell(<ExplorePage />)} />} />
@@ -267,7 +267,7 @@ export default function AppRouter() {
           <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           {/* Legacy URLs (spec §6.5): move to V3 only when its flag is on. */}
           <Route path="/explore" element={<LegacyAlias flag="PRISM_ROLE_EXPLORATION_V2" requiresShell v3Path="/app/explore" legacy={<ExploreMode />} />} />
-          <Route path="/workspace/:sessionId" element={<LegacyAlias flag="PRISM_ASSESSMENT_WORKSPACE_V3" v3Path="/app/assessment/:sessionId" legacy={<AssessmentWorkspace />} />} />
+          <Route path="/workspace/:sessionId" element={<LegacyAlias flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell v3Path="/app/assessment/:sessionId" legacy={<AssessmentWorkspace />} />} />
           <Route path="/report/:sessionId/v2" element={<LegacyAlias flag="PRISM_STUDENT_REPORT_V3" requiresShell v3Path="/app/reports/:sessionId" legacy={<StudentReportV2 />} />} />
           <Route path="/report/:sessionId/employee" element={<EmployeeReportV2 />} />
           <Route path="/missions" element={<DevelopmentMission />} />

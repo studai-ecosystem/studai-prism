@@ -46,7 +46,11 @@ async function personalJourney(page, { mobile = false } = {}) {
   await page.getByRole('link', { name: 'Continue to system check' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'System check' })).toBeVisible()
   await expect(page.getByText('Prism can be reached.')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Begin assessment' })).toHaveAttribute('href', new RegExp(`session=${dev.body.sessionId}$`))
+  // Workspace V3 is on in the harness: the start is the consent + idempotent
+  // start step (campus-workspace.spec.js walks it end to end).
+  await expect(page.getByRole('group', { name: 'Before you begin' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Begin assessment' })).toBeDisabled()
+  expect(dev.body.sessionId).toBeTruthy()
   await check()
 
   // Capabilities: nothing completed → honest empty state, every capability insufficient.

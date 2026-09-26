@@ -37,6 +37,17 @@ test('0030/0031: schema, CHECKs fail closed, down reverses, personal derivation 
   assert.ok((await columns('assessment_definitions')).includes('measures'))
   assert.equal((await columns('product_events')).includes('user_id'), false, 'product events hold no user id')
 
+  // 0032: client events and artifact versions never change once written.
+  const sid = `db-sess-${randomUUID()}`
+  await pool.query("INSERT INTO assessment_client_events (session_id, client_event_id, kind, response_json) VALUES ($1, 'e1', 'MESSAGE', '{}')", [sid])
+  await assert.rejects(pool.query("UPDATE assessment_client_events SET response_json = '{\"x\":1}' WHERE session_id = $1", [sid]))
+  await assert.rejects(pool.query("INSERT INTO assessment_client_events (session_id, client_event_id, kind, response_json) VALUES ($1, 'e2', 'GUESS', '{}')", [sid]))
+  await pool.query("INSERT INTO assessment_artifact_versions (session_id, artifact_id, version, content_json, saved_by) VALUES ($1, 'A', 1, '{}', 'CANDIDATE')", [sid])
+  await assert.rejects(pool.query("UPDATE assessment_artifact_versions SET version = 2 WHERE session_id = $1", [sid]))
+  // Erasure can still remove them (candidate words may be inside).
+  await pool.query('DELETE FROM assessment_client_events WHERE session_id = $1', [sid])
+  await pool.query('DELETE FROM assessment_artifact_versions WHERE session_id = $1', [sid])
+
   const reject = (sql, params) => assert.rejects(pool.query(sql, params), /check constraint|violates|null value/i)
   await reject("INSERT INTO assessment_forms (id, definition_id, version, scenario_id, capability_ids, status) VALUES ($1, 'prism-sim-gbo-l1', '1', 's', '{}', 'FROZEN')", [randomUUID()])
   await reject("INSERT INTO assessment_assignments (id, definition_id, form_policy, sponsor_type, integrity_policy, accommodations_policy, reminder_policy, created_by, status) VALUES ($1, 'prism-sim-gbo-l1', 'SERVER_SELECTED', 'PERSONAL', 'STANDARD', '{}', '{}', 'SYSTEM', 'ACTIVE')", [randomUUID()])

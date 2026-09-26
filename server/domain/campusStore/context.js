@@ -14,6 +14,7 @@ import { createCatalogService } from '../assessments/catalogService.js'
 import { createAssignmentService } from '../assessments/assignmentService.js'
 import { createSessionDirectory } from '../student/sessionDirectory.js'
 import { createStudentReadModels } from '../student/readModels.js'
+import { createAssessmentSessionService } from '../assessments/sessionService.js'
 import { createTelemetryService } from '../telemetry/events.js'
 import { auditLog } from '../../lib/telemetry.js'
 
@@ -24,6 +25,8 @@ export const EMPTY_LEGACY_SOURCES = Object.freeze({
   listSessionIds: async () => [],
   getSession: async () => null,
   getReport: async () => null,
+  getEntitlement: async () => null,
+  createEntitlement: async () => null,
   paths: {
     purchase: '/payment',
     start: (sessionId) => `/briefing?session=${encodeURIComponent(sessionId)}`,
@@ -48,6 +51,8 @@ export function createCampusContext({
   practice,
   roles = { evaluate: async () => [] },
   hashActor,
+  engine = null,
+  limitMs = 35 * 60 * 1000,
 } = {}) {
   const campusAvailable = () => isEnabled('PRISM_CAMPUS_ENABLED') && campusStoreAvailable()
   const workspaceService = createWorkspaceService({ repos, campusAvailable })
@@ -58,6 +63,9 @@ export function createCampusContext({
   const catalog = createCatalogService({ repos: storeView, scenarioSource })
   const directory = createSessionDirectory({ repos: storeView, legacy })
   const assignments = createAssignmentService({ repos: storeView, catalog, directory, legacy, resolver, clock })
+  const ledger = createEntitlementLedger({ repos, clock, ...(audit ? { audit } : {}) })
+  const sessionScopes = createSessionScopeService({ repos, clock, ...(sessionOwner ? { sessionOwner } : {}) })
+  const auditWriter = audit || auditLog
   return {
     repos,
     campusAvailable,
@@ -65,16 +73,21 @@ export function createCampusContext({
     storeAvailable: () => Boolean(liveRepos()),
     store: storeView,
     // Decision-trail writer for student-initiated privacy actions.
-    audit: audit || auditLog,
+    audit: auditWriter,
     workspaceService,
     resolver,
     catalog,
     assignments,
     student: createStudentReadModels({ directory, catalog, assignments, evidence, practice, roles, legacy, clock }),
     telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }),
-    ledger: createEntitlementLedger({ repos, clock, ...(audit ? { audit } : {}) }),
+    sessions: engine
+      ? createAssessmentSessionService({
+        repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter,
+      })
+      : null,
+    ledger,
     invites: createInviteService({ repos, sendInviteEmail, inviteUrlFor, clock, ...(tokenFactory ? { tokenFactory } : {}), ...(audit ? { audit } : {}) }),
-    sessionScopes: createSessionScopeService({ repos, clock, ...(sessionOwner ? { sessionOwner } : {}) }),
+    sessionScopes,
     dataAccess: createDataAccessAudit({ repos }),
     requireCampus: createRequireCampus({ campusStoreAvailable }),
     requireOrgPermission: createRequireOrgPermission({ workspaceService }),

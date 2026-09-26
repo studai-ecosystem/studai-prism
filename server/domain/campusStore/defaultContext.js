@@ -4,11 +4,23 @@
 import { isDbConfigured, query, getPool } from '../../db/pool.js'
 import { createPgCampusRepos } from './index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from './context.js'
-import { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport } from '../../lib/store.js'
+import { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport, getEntitlement, createEntitlement } from '../../lib/store.js'
 import { isMailEnabled, sendOrgInviteEmail } from '../../lib/mailer.js'
 import evidenceGraph from '../../lib/evidenceGraph.js'
 import roleAffinityEngine from '../../lib/roleAffinityEngine.js'
 import { PRE_APPROVED_SCENARIOS } from '../../lib/scenarioBank.js'
+import { createEngineAdapter, createRouterInvoker } from '../assessments/engine.js'
+
+// The unchanged engine router, bound on first use (the v1 router must not
+// import the engine at module load).
+let engineInvoke = null
+async function invokeEngine(args) {
+  if (!engineInvoke) {
+    const { default: router } = await import('../../routes/assessment.js')
+    engineInvoke = createRouterInvoker(router)
+  }
+  return engineInvoke(args)
+}
 
 // Legacy flow entry points (the V3 player replaces these in Phase 5).
 const legacyPaths = {
@@ -33,6 +45,8 @@ export function createDefaultCampusContext() {
       listSessionIds: (userId) => getSessionIdsByUser(userId),
       getSession: (sessionId) => getSession(sessionId),
       getReport: (sessionId) => getReport(sessionId),
+      getEntitlement: (sessionId) => getEntitlement(sessionId),
+      createEntitlement: (record) => createEntitlement(record),
       // Admin hold/invalidation (0012). Without a DB no such record can exist;
       // with one, a failed read is an error (never treated as "not held").
       adminState: async (sessionId) => {
@@ -50,5 +64,6 @@ export function createDefaultCampusContext() {
     },
     evidence: { units: (sessionId) => evidenceGraph.getEvidenceUnits(sessionId) },
     roles: { evaluate: ({ capabilityProfile, candidateInterests }) => roleAffinityEngine.computeRoleAffinity(capabilityProfile, candidateInterests) },
+    engine: createEngineAdapter({ invoke: invokeEngine }),
   })
 }

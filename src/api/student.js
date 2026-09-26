@@ -139,7 +139,7 @@ const BriefingSchema = z.object({
     acknowledged: z.boolean(),
     acknowledgedAt: z.string().nullable(),
   }),
-  start: z.object({ allowed: z.boolean(), reason: z.string(), to: z.string().nullable() }),
+  start: z.object({ allowed: z.boolean(), reason: z.string(), to: z.string().nullable(), mode: z.enum(['V3', 'LEGACY']).optional() }),
 })
 
 const ExplorationSchema = z.object({

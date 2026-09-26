@@ -105,9 +105,12 @@ export const SCALE_VERSION = 'prism-scale-v1'
 // Entitlement modes whose sessions are REAL candidates (calibration-eligible).
 // 'paid' = direct purchase; 'invite' = admin-issued group assessment link
 // (college cohorts); 'review_grant' = free reassessment granted after a human
-// review invalidated an assessment (charter §11 — still a real candidate).
+// review invalidated an assessment (charter §11 — still a real candidate);
+// 'campus' = a Prism Campus institution-sponsored session started through the
+// V3 workspace (campus decision K67 — a real student taking a formal
+// assessment; the sponsorship itself lives in the entitlement ledger).
 // Everything else (dummy/dev/admin_grant) stays synthetic.
-export const REAL_ENTITLEMENT_MODES = ['paid', 'invite', 'review_grant']
+export const REAL_ENTITLEMENT_MODES = ['paid', 'invite', 'review_grant', 'campus']
 
 // ── Charter §12: age gating ───────────────────────────────────────────────────
 // The pilot serves candidates aged 18+. The declaration is an explicit,
