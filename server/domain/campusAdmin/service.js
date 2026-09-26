@@ -212,6 +212,7 @@ export function createCampusAdminService({
     // Shared with other campus services (development interventions).
     cohortOf,
     orgAudit,
+    cohortInScope,
 
     // ── Overview (§20): counts only, within the caller's student scope ─────
     async overview(actor, organizationId) {

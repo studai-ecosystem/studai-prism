@@ -9,7 +9,7 @@
 import { evaluateProfile } from '../evidence/sufficiency.js'
 import { LEVEL_LABELS_STATUS } from '../evidence/levels.js'
 import { buildClaim, validateClaims, candidateTurnsFrom } from '../reports/claims.js'
-import { PRIMARY_CAPABILITY_IDS, capabilityInfo, definitionForScenario } from '../assessments/catalog.js'
+import { PRIMARY_CAPABILITY_IDS, capabilityInfo, definitionForScenario, formForSession } from '../assessments/catalog.js'
 import { RIASEC_KEYS, sanitizeInterests } from '../../lib/roleAffinityEngine.js'
 
 const ADMISSIBLE = new Set(['PROVISIONAL', 'SUFFICIENT'])
@@ -25,7 +25,7 @@ function verifiedQuote(unit, turns) {
   return turns.some((t) => normalise(t).includes(q)) ? excerpt.trim() : null
 }
 
-export function createStudentReadModels({ directory, catalog, assignments, evidence, practice = { list: async () => [] }, development = { enabled: () => false }, roles, legacy, clock = () => new Date() }) {
+export function createStudentReadModels({ directory, catalog, assignments, evidence, practice = { list: async () => [] }, development = { enabled: () => false }, growth = { enabled: () => false }, roles, legacy, clock = () => new Date() }) {
   // One entry per completed formal session in the workspace (newest first).
   // Held or invalidated sessions are never formal evidence (K59).
   async function formalSessions(user, workspace) {
@@ -42,6 +42,7 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
       out.push({
         session: s,
         definition,
+        form: formForSession(cat, s.scenarioId),
         units,
         turns: candidateTurnsFrom(s.history),
         decisions: evaluateProfile(units, { capabilityIds }),
@@ -235,11 +236,26 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
 
     async growth(user, workspace) {
       const entries = await formalSessions(user, workspace)
+      // Growth V2 (Phase 9): a change only across APPROVED equivalent forms with
+      // SUFFICIENT evidence in both sessions; otherwise an honest reason.
+      if (growth.enabled()) {
+        const g = await growth.growthFor(user, workspace, entries)
+        return {
+          ...g,
+          reassessments: await growth.reassessmentsFor(user, workspace),
+          interventions: await growth.interventionsFor(user, workspace),
+          growthEnabled: true,
+        }
+      }
       return {
         comparable: false,
         reason: entries.length >= 2 ? 'FORMS_NOT_VALIDATED_FOR_COMPARISON' : 'NEEDS_COMPARABLE_REASSESSMENT',
-        assessments: entries.map((e) => ({ sessionId: e.session.sessionId, title: e.definition?.title || null, completedAt: e.session.completedAt })),
+        assessments: entries.map((e) => ({ sessionId: e.session.sessionId, title: e.definition?.title || null, completedAt: e.session.completedAt, form: e.form ? { id: e.form.id, version: e.form.version } : null })),
+        comparison: null,
         changes: [],
+        reassessments: [],
+        interventions: [],
+        growthEnabled: false,
       }
     },
 

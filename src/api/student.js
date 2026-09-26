@@ -121,11 +121,41 @@ const PlanSchema = z.object({
   practiceEvidence: z.array(z.unknown()),
 })
 
+const GrowthSessionRef = z.object({
+  sessionId: z.string(), title: z.string().nullable(), completedAt: z.string().nullable(),
+  form: z.object({ id: z.string(), version: z.string() }).nullable().optional().default(null),
+})
+const BandLabel = z.object({ band: z.enum(['EARLY', 'DEVELOPING', 'DEMONSTRATED', 'STRONG']), label: z.string() })
+// A change is a level-label change on an approved comparable pair; there is
+// no score and no uncertainty until a validated method exists.
+const GrowthChange = z.object({
+  capabilityId: z.string(),
+  name: z.string().nullable(),
+  comparable: z.boolean(),
+  reason: z.string().optional(),
+  from: BandLabel.optional(),
+  to: BandLabel.optional(),
+  direction: z.enum(['HIGHER', 'SAME', 'LOWER']).optional(),
+  uncertainty: z.null().optional(),
+  uncertaintyStatus: z.literal('NOT_VALIDATED').optional(),
+})
 const GrowthSchema = z.object({
   comparable: z.boolean(),
-  reason: z.string(),
-  assessments: z.array(z.object({ sessionId: z.string(), title: z.string().nullable(), completedAt: z.string().nullable() })),
-  changes: z.array(z.unknown()),
+  reason: z.string().nullable(),
+  assessments: z.array(GrowthSessionRef),
+  comparison: z.object({
+    baseline: GrowthSessionRef,
+    reassessment: GrowthSessionRef,
+    formPair: z.object({ status: z.literal('APPROVED'), evidenceRef: z.string().nullable(), decidedAt: z.string().nullable() }),
+  }).nullable().optional().default(null),
+  changes: z.array(GrowthChange),
+  reassessments: z.array(z.object({
+    id: z.string(), name: z.string(), windowStart: z.string(), windowEnd: z.string(), status: z.string(), assignmentId: z.string(), rosterStatus: z.string().nullable(),
+    endedAt: z.string().nullable().optional().default(null),
+    comparability: z.enum(['APPROVED', 'PARTIAL', 'PENDING', 'REJECTED']).optional().default('PENDING'),
+  })).optional().default([]),
+  interventions: z.array(z.object({ id: z.string(), name: z.string(), startsOn: z.string(), endsOn: z.string(), status: z.string() })).optional().default([]),
+  growthEnabled: z.boolean().optional().default(false),
 })
 
 const BriefingSchema = z.object({

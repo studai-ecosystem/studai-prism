@@ -397,4 +397,52 @@ export function runCampusRepoContract(test, label, getRepos) {
     assert.equal((await dv.listAttempts({ userId: user })).length, 1, 'campus attempts stay out of the personal list')
     assert.equal((await dv.listAttempts({ userId: user, organizationId: org.id })).length, 1)
   })
+
+  test(`${label}: growth — equivalence registry, decision history, reassessment cycles, snapshots`, async () => {
+    const repos = await getRepos()
+    const gr = repos.growth
+    const defId = `syn-gdef-${randomUUID().slice(0, 8)}`
+    const fa = `${defId}:syn-a:1.0.0`
+    const fb = `${defId}:syn-b:1.0.0`
+    await repos.assessments.seedCatalog({
+      definitions: [{ id: defId, title: 'Synthetic Growth Definition', jobFamily: 'GENERAL', status: 'active', durationMinutes: 35, description: 'Synthetic.', measures: ['CAP-L1-REASONING'], notMeasured: ['PERSONALITY'], integrityModes: ['STANDARD'] }],
+      forms: [fa, fb].map((id, i) => ({ id, definitionId: defId, version: '1.0.0', scenarioId: `syn-${'ab'[i]}`, jobFamilyId: null, capabilityIds: ['CAP-L1-REASONING'], status: 'FROZEN', frozenAt: new Date().toISOString() })),
+    })
+    assert.equal(await gr.seedPendingPairs([{ formAId: fa, formBId: fb }, { formAId: fa, formBId: fa }]), 2)
+    assert.equal(await gr.seedPendingPairs([{ formAId: fa, formBId: fb }]), 0, 'seeding is idempotent')
+    assert.equal((await gr.getEquivalence(fa, fb)).status, 'PENDING')
+    await assert.rejects(gr.recordDecision({ formAId: fa, formBId: fb, status: 'APPROVED', evidenceRef: 'run-1', reason: 'Reviewed equating run', decidedBy: 'adm' }), { code: 'VALIDATION_FAILED' })
+    await assert.rejects(gr.recordDecision({ formAId: fa, formBId: `${fb}-x`, status: 'REJECTED', evidenceRef: 'run-1', reason: 'Reviewed equating run', decidedBy: 'adm' }), { code: 'NOT_FOUND' })
+    const rej = await gr.recordDecision({ formAId: fa, formBId: fb, status: 'REJECTED', evidenceRef: 'run-1', reason: 'Reviewed equating run', decidedBy: 'adm' })
+    assert.deepEqual([rej.status, rej.evidenceRef, rej.decidedBy], ['REJECTED', 'run-1', 'adm'])
+    const app = await gr.recordDecision({ formAId: fa, formBId: fb, status: 'APPROVED', evidenceRef: 'run-2', reason: 'Second equating run passed', decidedBy: 'adm2', approvalId: 'appr-1' })
+    assert.equal(app.status, 'APPROVED')
+    assert.deepEqual((await gr.listDecisions(fa, fb)).map((d) => [d.status, d.approvalId]), [['REJECTED', null], ['APPROVED', 'appr-1']])
+    assert.ok((await gr.listEquivalence()).some((p) => p.formAId === fa && p.formBId === fa && p.status === 'PENDING'))
+
+    const org = await repos.organizations.createOrganization({ name: 'Synthetic Growth Org', slug: slug(), organizationType: 'COLLEGE', status: 'ACTIVE' })
+    const mk = () => repos.assessments.createAssignment({
+      id: randomUUID(), definitionId: defId, formPolicy: 'SERVER_SELECTED', sponsorType: 'INSTITUTION', organizationId: org.id,
+      windowStart: new Date().toISOString(), windowEnd: new Date(Date.now() + day).toISOString(), integrityPolicy: 'STANDARD',
+      accommodationsPolicy: { requestable: true }, reminderPolicy: { enabled: false }, createdBy: 'owner', status: 'ACTIVE', targets: [],
+    })
+    const [base, re] = [await mk(), await mk()]
+    const window = { windowStart: new Date(Date.now() + day).toISOString(), windowEnd: new Date(Date.now() + 3 * day).toISOString() }
+    await assert.rejects(gr.createCycle({ organizationId: org.id, name: 'Bad', baselineAssignmentId: base.id, reassessmentAssignmentId: re.id, windowStart: window.windowEnd, windowEnd: window.windowStart, status: 'SCHEDULED', createdBy: 'owner' }), { code: 'VALIDATION_FAILED' })
+    const cy = await gr.createCycle({ organizationId: org.id, name: 'Synthetic cycle', baselineAssignmentId: base.id, reassessmentAssignmentId: re.id, ...window, status: 'SCHEDULED', createdBy: 'owner' })
+    await assert.rejects(gr.createCycle({ organizationId: org.id, name: 'Dup', baselineAssignmentId: base.id, reassessmentAssignmentId: re.id, ...window, status: 'SCHEDULED', createdBy: 'owner' }), { code: 'CONFLICT' })
+    assert.deepEqual((await gr.listCycles(org.id)).map((c) => c.id), [cy.id])
+    assert.equal((await gr.setCycleStatus(cy.id, 'CANCELLED')).status, 'CANCELLED')
+    assert.equal((await gr.getCycle(cy.id)).reassessmentAssignmentId, re.id)
+
+    const user = uid()
+    const snap = { userId: user, organizationId: org.id, capabilityId: 'CAP-L1-REASONING', baselineSessionId: 's-a', reassessmentSessionId: 's-b', formAId: fa, formBId: fb, fromBand: 'DEVELOPING', toBand: 'DEMONSTRATED', direction: 'HIGHER', uncertainty: null, rulesVersion: 'r1' }
+    assert.equal((await gr.recordSnapshot(snap)).created, true)
+    const again = await gr.recordSnapshot(snap)
+    assert.equal(again.created, false)
+    assert.equal(again.snapshot.direction, 'HIGHER')
+    await assert.rejects(gr.recordSnapshot({ ...snap, reassessmentSessionId: 's-c', formBId: `${fb}-missing` }), { code: 'VALIDATION_FAILED' })
+    assert.equal((await gr.listSnapshots({ userId: user, organizationId: org.id })).length, 1)
+    assert.equal((await gr.listSnapshots({ userId: user })).length, 0, 'sponsored snapshots stay out of the personal list')
+  })
 }

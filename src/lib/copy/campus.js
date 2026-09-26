@@ -52,6 +52,27 @@ export const AUDIT_ACTION_TEXT = Object.freeze({
   'intervention.assigned': 'Assigned practice missions to a cohort',
   'intervention.completed': 'Marked an intervention as completed',
   'intervention.cancelled': 'Cancelled an intervention',
+  'reassessment.created': 'Scheduled a reassessment',
+  'reassessment.closed': 'Closed a reassessment window',
+  'reassessment.cancelled': 'Cancelled a reassessment',
+})
+
+export const REASSESSMENT_COPY = Object.freeze({
+  scheduleIntro: 'The same cohorts take the same assessment again in a new window. Students are notified like any assigned assessment.',
+  noBaselines: 'There is no assessment to repeat yet. Assign an assessment to a cohort first.',
+  comparabilityNote: 'A change is shown to students and to you only when the assessment forms are approved as comparable by Prism\'s psychometric review and both assessments gathered enough evidence. Until then, students see their results without a change.',
+  pageNote: 'Prism never calculates a change across forms that are not approved as comparable. Outcome counts are shown only for groups of at least 10 students and never name or rank a student.',
+  noOutcomes: 'No capability change can be shown yet.',
+  suppressed: 'Hidden',
+  // Spec §27.2, verbatim.
+  suppressedNote: 'Data hidden because this segment is too small for aggregate reporting.',
+  endedNote: 'This reassessment has ended. Results already submitted are kept.',
+  comparability: {
+    APPROVED: { short: 'Forms approved', long: 'The assessment forms are approved as comparable. A change can be shown where both assessments gathered enough evidence.' },
+    PARTIAL: { short: 'Some forms approved', long: 'Only some form pairs are approved as comparable. Students who receive other forms will not see a change.' },
+    PENDING: { short: 'Not yet approved', long: 'These assessment forms are not yet approved as comparable. Students will take the reassessment, but no growth change will be shown until a psychometric review approves the forms.' },
+    REJECTED: { short: 'Not comparable', long: 'These assessment forms were reviewed and are not comparable. No growth change will be shown.' },
+  },
 })
 
 export const STUDENT_DETAIL_PRIVACY = 'This view contains only data available to this organization. Personal Prism activity is excluded unless the student explicitly shares it.'

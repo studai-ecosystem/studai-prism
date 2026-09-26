@@ -34,3 +34,12 @@ export function formatDate(iso) {
   const dateOnly = typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso)
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric', ...(dateOnly ? { timeZone: 'UTC' } : {}) })
 }
+
+// An instant with its time and the viewer's time-zone name (assessment
+// windows open and close at a moment, not on a day).
+export function formatDateTime(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })
+}

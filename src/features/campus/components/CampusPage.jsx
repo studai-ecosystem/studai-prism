@@ -1,6 +1,7 @@
 // Shared building blocks for campus administration pages: a page frame that
 // always renders the h1 + workspace context and the standard loading /
 // unauthorized / offline / error states, plus a small confirm dialog.
+import { useEffect, useRef } from 'react'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { Modal } from '../../../components/ui/Modal.jsx'
 import { Button } from '../../../components/ui/Button.jsx'
@@ -25,9 +26,13 @@ export function AssessmentStatus({ status }) {
   return <StatusChip tone={ASSESSMENT_STATUS_TONES[status] || 'neutral'} label={ASSESSMENT_STATUS_LABELS[status] || status} />
 }
 
+// Announced (role=alert) and scrolled into view, so an error from a footer
+// button inside a scrolling dialog is also seen.
 export function MutationError({ error }) {
+  const ref = useRef(null)
+  useEffect(() => { if (error) ref.current?.scrollIntoView?.({ block: 'nearest' }) }, [error])
   if (!error) return null
-  return <InlineNotice tone="blocked">{error.message}{error.requestId ? ` (Reference: ${error.requestId})` : ''}</InlineNotice>
+  return <div ref={ref} role="alert"><InlineNotice tone="blocked">{error.message}{error.requestId ? ` (Reference: ${error.requestId})` : ''}</InlineNotice></div>
 }
 
 export function ConfirmDialog({ open, title, description, confirmLabel, cancelLabel = 'Cancel', tone = 'primary', onConfirm, onClose, pending, error, children }) {

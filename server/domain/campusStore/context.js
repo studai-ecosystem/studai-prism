@@ -20,6 +20,8 @@ import { createReportService } from '../reports/v3/service.js'
 import { createTelemetryService } from '../telemetry/events.js'
 import { createCampusAdminService } from '../campusAdmin/service.js'
 import { createDevelopmentService } from '../development/service.js'
+import { createGrowthService } from '../growth/service.js'
+import { createSessionEntryLoader } from '../growth/entries.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 // Account directory (read-only) for admin views: `{ id, name, email }` or null.
@@ -97,6 +99,21 @@ export function createCampusContext({
     repos: storeView, users, invites, catalog, clock, audit: auditWriter, appUrl, ledger, ...(sendAssignmentEmail ? { sendAssignmentEmail } : {}),
     onRosterSync: (organizationId, cohortId, userId) => development.syncCohortMember(organizationId, cohortId, userId),
   })
+  const growth = createGrowthService({ repos: storeView, catalog, clock, audit: auditWriter, entryFor: createSessionEntryLoader({ catalog, evidence, legacy }) })
+  const growthOn = () => isEnabled('PRISM_GROWTH_ENABLED') && Boolean(liveRepos())
+  const growthReads = {
+    enabled: growthOn,
+    growthFor: (user, workspace, entries) => growth.growthFor(user, workspace, entries),
+    reassessmentsFor: (user, workspace) => growth.reassessmentsFor(user, workspace),
+    // The student's own intervention timeline in this campus workspace.
+    interventionsFor: async (user, workspace) => {
+      if (workspace.type !== 'CAMPUS_STUDENT' || !developmentOn()) return []
+      return (await liveRepos().development.listInterventionsForUser(user.id, workspace.organizationId))
+        .filter((i) => i.status !== 'CANCELLED')
+        .map((i) => ({ id: i.id, name: i.name, startsOn: i.startsOn, endsOn: i.endsOn, status: i.status }))
+        .sort((a, b) => String(a.startsOn).localeCompare(String(b.startsOn)))
+    },
+  }
   return {
     repos,
     campusAvailable,
@@ -109,7 +126,7 @@ export function createCampusContext({
     resolver,
     catalog,
     assignments,
-    student: createStudentReadModels({ directory, catalog, assignments, evidence, practice: practiceSource, development: developmentPlans, roles, legacy, clock }),
+    student: createStudentReadModels({ directory, catalog, assignments, evidence, practice: practiceSource, development: developmentPlans, growth: growthReads, roles, legacy, clock }),
     telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }),
     sessions: engine
       ? createAssessmentSessionService({
@@ -124,6 +141,7 @@ export function createCampusContext({
     invites,
     admin,
     development,
+    growth,
     // Effective scope of `permission` for an actor in an organization.
     scopeFor: (actor, organizationId, permission) => can(actor, permission, { organizationId }),
     sessionScopes,

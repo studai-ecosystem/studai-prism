@@ -70,6 +70,8 @@ export const PERMISSIONS = {
   'calibrations:read': 'View calibration runs',
   'calibrations:freeze': 'Freeze a reviewed calibration run (dual-approved)',
   'calibrations:apply': 'Apply a frozen calibration run (dual-approved)',
+  'equivalence:read': 'View the assessment form equivalence registry (growth comparability)',
+  'equivalence:decide': 'Approve (dual-approved) or reject a form pair as comparable for growth, citing evidence',
 
   // Human rating
   'raters:read': 'View rater roster, IRR, training progress',
@@ -171,6 +173,7 @@ export const ROLES = {
       'dashboard:read', 'scenarios:read', 'scenarios:manage', 'items:read', 'items:retire',
       'prompts:read', 'prompts:manage', 'prompts:publish',
       'psychometrics:read', 'calibrations:read', 'calibrations:freeze', 'calibrations:apply',
+      'equivalence:read', 'equivalence:decide',
       'raters:read', 'ratings:supersede', 'sessions:read', 'notes:write',
     ],
   },

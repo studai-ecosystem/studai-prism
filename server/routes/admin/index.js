@@ -33,6 +33,7 @@ import recordsRouter from './records.js'
 import searchRouter from './search.js'
 import bankRouter from './bank.js'
 import calibrationsRouter from './calibrations.js'
+import equivalenceRouter from './equivalence.js'
 import ratersRouter from './raters.js'
 import studiesRouter from './studies.js'
 import promptsRouter from './prompts.js'
@@ -111,6 +112,7 @@ router.use('/search', searchRouter)
 // Phase 3 — scientific administration.
 router.use('/bank', bankRouter)
 router.use('/calibrations', calibrationsRouter)
+router.use('/equivalence', equivalenceRouter)
 router.use('/raters', ratersRouter)
 router.use('/studies', studiesRouter)
 router.use('/prompts', promptsRouter)

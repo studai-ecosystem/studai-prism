@@ -120,6 +120,24 @@ export const GROWTH_REASON_COPY = {
     title: 'These assessments cannot be compared yet',
     description: 'A later assessment exists, but these forms are not yet validated for direct growth comparison.',
   },
+  EVIDENCE_NOT_SUFFICIENT_FOR_COMPARISON: {
+    title: 'Not enough evidence to show a change yet',
+    description: 'These assessments are approved as comparable, but a change is shown only when both of them gathered enough evidence for the same capability.',
+  },
+}
+
+export const GROWTH_COPY = {
+  directions: { HIGHER: 'Higher level than before', SAME: 'Same level as before', LOWER: 'Lower level than before' },
+  uncertainty: 'How precise this change is has not been validated yet, so no margin is shown.',
+  notCompared: {
+    EVIDENCE_NOT_SUFFICIENT_IN_BOTH: 'Not enough evidence in both assessments',
+    NOT_MEASURED_IN_BOTH: 'Not measured in both assessments',
+    DIFFERENT_EVIDENCE_RULES: 'The evidence rules changed between the assessments',
+    UNKNOWN_LEVEL: 'The level could not be read',
+  },
+  formApproved: 'These two assessment forms are approved as comparable.',
+  reassessmentNotComparable: 'This reassessment will not show a change yet: its assessment forms are not yet approved as comparable. Your results will still be reported.',
+  timelineTitle: 'Timeline',
 }
 
 export const RIASEC_COPY = {

@@ -101,6 +101,14 @@ export function definitionForScenario(catalog, scenarioId) {
   return bank ? bank.id : CORE_DEFINITION_ID
 }
 
+// The frozen form a stored session was taken on, or null when its scenario is
+// no longer in the catalog (then no growth comparison can use it).
+export function formForSession(catalog, scenarioId) {
+  if (!scenarioId) return null
+  const definitionId = definitionForScenario(catalog, scenarioId)
+  return catalog.forms.find((f) => f.definitionId === definitionId && f.scenarioId === scenarioId) || null
+}
+
 export function capabilityName(id) {
   return LAYER_1_TRANSFERABLE_CAPABILITIES[id]?.name || CONTEXTUAL[id]?.name || null
 }

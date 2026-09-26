@@ -109,7 +109,7 @@ function InterventionBuilder({ open, onClose }) {
           )}
           {errors.missionIds && <p role="alert" className="mt-1 text-xs font-medium text-prism-blocked">{errors.missionIds.message}</p>}
         </fieldset>
-        <Checkbox label="A reassessment is planned after this intervention" description="Scheduling reassessments arrives with the growth features." {...register('reassessmentPlanned')} />
+        <Checkbox label="A reassessment is planned after this intervention" description="Schedule it on the Reassessments page when the intervention ends." {...register('reassessmentPlanned')} />
         <MutationError error={create.error} />
       </form>
     </Modal>
