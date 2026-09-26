@@ -19,6 +19,7 @@ import { createAssessmentSessionService } from '../assessments/sessionService.js
 import { createReportService } from '../reports/v3/service.js'
 import { createTelemetryService } from '../telemetry/events.js'
 import { createCampusAdminService } from '../campusAdmin/service.js'
+import { createDevelopmentService } from '../development/service.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 // Account directory (read-only) for admin views: `{ id, name, email }` or null.
@@ -66,6 +67,7 @@ export function createCampusContext({
   users = EMPTY_USER_DIRECTORY,
   sendAssignmentEmail,
   appUrl = '',
+  missionEvaluator = null,
 } = {}) {
   const campusAvailable = () => isEnabled('PRISM_CAMPUS_ENABLED') && campusStoreAvailable()
   const workspaceService = createWorkspaceService({ repos, campusAvailable })
@@ -80,6 +82,11 @@ export function createCampusContext({
   const sessionScopes = createSessionScopeService({ repos, clock, ...(sessionOwner ? { sessionOwner } : {}) })
   const auditWriter = audit || auditLog
   const dataAccess = createDataAccessAudit({ repos })
+  const development = createDevelopmentService({ repos: storeView, evaluator: missionEvaluator, clock, audit: auditWriter })
+  const developmentOn = () => isEnabled('PRISM_DEVELOPMENT_V2') && Boolean(liveRepos())
+  // Practice evidence reaches the student read models only while Development V2 is on.
+  const practiceSource = practice || { list: async (user, workspace) => (developmentOn() ? development.listPractice(user, workspace) : []) }
+  const developmentPlans = { enabled: developmentOn, planFor: (user, workspace, priorities) => development.planFor(user, workspace, priorities) }
   // Late-bound: invites and sessions notify campus admin, which uses invites.
   let admin = null
   const invites = createInviteService({
@@ -88,6 +95,7 @@ export function createCampusContext({
   })
   admin = createCampusAdminService({
     repos: storeView, users, invites, catalog, clock, audit: auditWriter, appUrl, ledger, ...(sendAssignmentEmail ? { sendAssignmentEmail } : {}),
+    onRosterSync: (organizationId, cohortId, userId) => development.syncCohortMember(organizationId, cohortId, userId),
   })
   return {
     repos,
@@ -101,7 +109,7 @@ export function createCampusContext({
     resolver,
     catalog,
     assignments,
-    student: createStudentReadModels({ directory, catalog, assignments, evidence, practice, roles, legacy, clock }),
+    student: createStudentReadModels({ directory, catalog, assignments, evidence, practice: practiceSource, development: developmentPlans, roles, legacy, clock }),
     telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }),
     sessions: engine
       ? createAssessmentSessionService({
@@ -115,6 +123,7 @@ export function createCampusContext({
     }),
     invites,
     admin,
+    development,
     // Effective scope of `permission` for an actor in an organization.
     scopeFor: (actor, organizationId, permission) => can(actor, permission, { organizationId }),
     sessionScopes,

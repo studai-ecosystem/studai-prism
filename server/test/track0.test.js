@@ -144,11 +144,15 @@ test('T0 gate: research tables define no PII columns and never reference user_id
     // (0031) is NOT exempt: it is pseudonymous and stays guarded.
     // notifications (0034) are messages addressed to one account (who must
     // be told WHAT) — identity plane, in the erasure cascade (Phase 12).
+    // Development V2 (0035): an account's own practice attempts, practice
+    // evidence, plans and intervention memberships — owned by that account,
+    // never pooled into research tables.
     // Named explicitly (no prefix wildcard) so research tables stay guarded.
     const CAMPUS_IDENTITY_PLANE = new Set([
       'cohort_members', 'organization_memberships', 'organization_invites', 'entitlements',
       'entitlement_consumptions', 'consent_records', 'assessment_assignment_students', 'user_preferences',
       'notifications',
+      'mission_attempts', 'practice_evidence_units', 'development_plans', 'intervention_memberships',
     ])
     const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)]
     for (const [, name, body] of tables) {

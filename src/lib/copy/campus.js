@@ -49,6 +49,9 @@ export const AUDIT_ACTION_TEXT = Object.freeze({
   'invite.resent': 'Sent an invitation again',
   'report.exported': 'Exported the student directory',
   'onboarding.completed': 'Completed setup',
+  'intervention.assigned': 'Assigned practice missions to a cohort',
+  'intervention.completed': 'Marked an intervention as completed',
+  'intervention.cancelled': 'Cancelled an intervention',
 })
 
 export const STUDENT_DETAIL_PRIVACY = 'This view contains only data available to this organization. Personal Prism activity is excluded unless the student explicitly shares it.'

@@ -85,11 +85,14 @@ test('CAMPUS-SHELL-04 @critical @campus flags off: legacy /app launcher is uncha
   await expect(page).toHaveURL(`${LEGACY_BASE_URL}/`)
 })
 
-test('CAMPUS-SHELL-05 @critical @campus V3 placeholders keep the legacy page reachable (?legacy=1, no loop)', async ({ page }) => {
+test('CAMPUS-SHELL-05 @critical @campus legacy links alias to V3 and ?legacy=1 keeps the legacy page reachable (no loop)', async ({ page }) => {
   await signInSynthetic(page, CAMPUS_BASE_URL, 'shell-legacy-link')
+  // Phase 8 replaced the missions placeholder with the real player (K86):
+  // an unknown mission is an honest not-available state, never a mock.
   await page.goto(`${CAMPUS_BASE_URL}/missions/synthetic-mission`)
   await expect(page).toHaveURL(/\/app\/development\/missions\/synthetic-mission$/)
-  await page.getByRole('link', { name: 'Open the current version' }).click()
+  await expect(page.getByText('Mission not available')).toBeVisible()
+  await page.goto(`${CAMPUS_BASE_URL}/missions/synthetic-mission?legacy=1`)
   await expect(page).toHaveURL(/\/missions\/synthetic-mission\?legacy=1$/)
   await page.waitForTimeout(300)
   await expect(page).toHaveURL(/\/missions\/synthetic-mission\?legacy=1$/)

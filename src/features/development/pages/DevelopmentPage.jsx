@@ -19,6 +19,7 @@ export default function DevelopmentPage() {
   const state = queryStateView(query, { label: 'Loading your development plan' })
   if (state) return <div>{header}{state}</div>
   const plan = query.data
+  const missionPath = (id) => (active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/development/missions/${id}` : `/app/development/missions/${id}`)
   return (
     <div className="space-y-6">
       {header}
@@ -49,14 +50,43 @@ export default function DevelopmentPage() {
       </section>
       <section aria-labelledby="missions-title" className="space-y-3">
         <h2 id="missions-title" className="text-lg font-semibold text-prism-ink">{DEVELOPMENT_COPY.missionsSoon.title}</h2>
-        {plan.missions.length === 0 ? (
-          <p className="text-sm text-prism-ink-muted">{DEVELOPMENT_COPY.missionsSoon.description}</p>
+        {!plan.missionsAvailable ? (
+          <p className="text-sm text-prism-ink-muted">{active.type === 'CAMPUS_STUDENT' && plan.missionsEnabled ? DEVELOPMENT_COPY.missions.campusCatalogueEmpty : DEVELOPMENT_COPY.missionsSoon.description}</p>
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {plan.missions.map((m) => <li key={m.id}><MissionCard mission={m} to={`/app/development/missions/${m.id}`} /></li>)}
-          </ul>
+          <>
+            <p className="text-sm text-prism-ink-muted">{DEVELOPMENT_COPY.missions.practiceNote}</p>
+            {active.type === 'CAMPUS_STUDENT' && <p className="text-sm text-prism-ink-muted">{DEVELOPMENT_COPY.missions.campusPrivacy(active.organizationName || 'Your institution')}</p>}
+            <h3 className="text-base font-semibold text-prism-ink">{DEVELOPMENT_COPY.missions.recommendedTitle}</h3>
+            {plan.missions.length === 0 ? (
+              <p className="text-sm text-prism-ink-muted">{DEVELOPMENT_COPY.missions.noRecommended}</p>
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {plan.missions.map((m) => <li key={m.id}><MissionCard mission={m} to={missionPath(m.id)} headingLevel={4} /></li>)}
+              </ul>
+            )}
+            <h3 className="text-base font-semibold text-prism-ink">{DEVELOPMENT_COPY.missions.catalogueTitle}</h3>
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {plan.catalogue.map((m) => <li key={m.id}><MissionCard mission={m} to={missionPath(m.id)} headingLevel={4} /></li>)}
+            </ul>
+          </>
         )}
       </section>
+      {plan.completedMissions.length > 0 && (
+        <section aria-labelledby="attempts-title" className="space-y-3">
+          <h2 id="attempts-title" className="text-lg font-semibold text-prism-ink">{DEVELOPMENT_COPY.missions.completedTitle}</h2>
+          <ul className="space-y-2">
+            {plan.completedMissions.map((a) => (
+              <li key={a.attemptId}>
+                <Card className="p-4">
+                  <p className="text-sm font-semibold text-prism-ink">{a.title || 'Practice mission'}</p>
+                  <p className="text-sm text-prism-ink-muted">{a.summary || 'Feedback not available'}</p>
+                  {formatDate(a.submittedAt) && <p className="text-xs text-prism-ink-subtle">{formatDate(a.submittedAt)}</p>}
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {plan.practiceEvidence.length > 0 && (
         <section aria-labelledby="practice-title" className="space-y-3">
           <h2 id="practice-title" className="text-lg font-semibold text-prism-ink">Practice evidence</h2>

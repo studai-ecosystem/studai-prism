@@ -3,7 +3,10 @@
 import { ApiError } from '../http/errors.js'
 import { iso, withTransaction } from '../campusStore/pgUtil.js'
 
-const date = (v) => (v == null ? null : (v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10)))
+// node-pg parses DATE as local midnight: read it back with local getters so a
+// server east of UTC does not move the day back (toISOString would).
+const pad = (n) => String(n).padStart(2, '0')
+const date = (v) => (v == null ? null : (v instanceof Date ? `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())}` : String(v).slice(0, 10)))
 const campus = (r) => r && ({ id: r.id, organizationId: r.organization_id, name: r.name, status: r.status, createdAt: iso(r.created_at) })
 const department = (r) => r && ({ ...campus(r), campusId: r.campus_id, code: r.code })
 const academicProgram = (r) => r && ({ ...campus(r), departmentId: r.department_id, degreeLevel: r.degree_level, durationYears: r.duration_years })

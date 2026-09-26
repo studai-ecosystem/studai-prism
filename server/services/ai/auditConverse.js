@@ -3,7 +3,14 @@
 // NODE_ENV=test and PRISM_AUDIT_AI=true.
 const dimensions = ['criticalThinking', 'communication', 'collaboration', 'problemSolving', 'aiDigitalFluency']
 
-function textFor(task) {
+function textFor(task, request) {
+  if (task === 'mission_evaluator') {
+    // Deterministic harness answer: every asked criterion is "not observed"
+    // with high confidence, so only deterministic checks can demonstrate.
+    const system = (request?.system || []).map((s) => s.text || '').join('\n')
+    const ids = [...system.matchAll(/"criterion_id":"([A-Z0-9_-]+)"/g)].map((m) => m[1])
+    return JSON.stringify({ criteria: [...new Set(ids)].map((id) => ({ criterion_id: id, observed: false, confidence: 0.9, quote: '' })) })
+  }
   if (task === 'opening' || task === 'conversation') {
     return JSON.stringify({
       messages: [{ speaker: 'Facilitator', role: 'Project Lead', content: 'What would you do first, and what evidence would you need before deciding?' }],
@@ -29,7 +36,7 @@ function textFor(task) {
 }
 
 export async function auditConverse(request) {
-  const text = textFor(request?.requestMetadata?.task)
+  const text = textFor(request?.requestMetadata?.task, request)
   return {
     output: { message: { content: [{ text }] } },
     stopReason: 'end_turn',

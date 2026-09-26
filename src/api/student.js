@@ -103,12 +103,20 @@ const EvidenceSchema = z.object({
   practiceAvailable: z.boolean(),
 })
 
+const PlanMission = z.object({
+  id: z.string(), title: z.string(), targetCapabilityName: z.string().nullable(), estimatedMinutes: z.number(),
+  intervention: z.object({ id: z.string(), name: z.string(), endsOn: z.string().nullable() }).nullable(),
+  latestAttempt: z.object({ id: z.string(), status: z.string(), summary: z.string().nullable(), submittedAt: z.string().nullable() }).nullable(),
+}).passthrough()
+
 const PlanSchema = z.object({
   status: z.enum(['FOCUS_FROM_EVIDENCE', 'NO_PLAN']),
   priorities: z.array(Focus).max(3),
-  missions: z.array(z.unknown()),
-  completedMissions: z.array(z.unknown()),
+  missions: z.array(PlanMission),
+  catalogue: z.array(PlanMission).optional().default([]),
+  completedMissions: z.array(z.object({ attemptId: z.string(), missionId: z.string(), title: z.string().nullable(), status: z.string(), summary: z.string().nullable(), submittedAt: z.string().nullable() }).passthrough()),
   missionsAvailable: z.boolean(),
+  missionsEnabled: z.boolean().optional().default(false),
   upcomingReassessment: z.unknown().nullable(),
   practiceEvidence: z.array(z.unknown()),
 })

@@ -112,8 +112,9 @@ const CampusSettingsPage = lazy(() => import('../features/campus/pages/CampusSet
 const CampusOnboardingPage = lazy(() => import('../features/campus/pages/CampusOnboardingPage.jsx'))
 const CampusReportPage = lazy(() => import('../features/campus/pages/CampusReportPage.jsx'))
 const CampusNotYetAvailablePage = lazy(() => import('../features/campus/pages/CampusNotYetAvailablePage.jsx'))
+const CampusDevelopmentPage = lazy(() => import('../features/campus/pages/CampusDevelopmentPage.jsx'))
+const MissionPlayerPage = lazy(() => import('../features/development/pages/MissionPlayerPage.jsx'))
 const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusInvitePage.jsx'))
-const NotYetAvailablePage = lazy(() => import('../features/shared/NotYetAvailablePage.jsx'))
 const StudentReportPage = lazy(() => import('../features/reports/pages/StudentReportPage.jsx'))
 const SharedReportPage = lazy(() => import('../features/reports/pages/SharedReportPage.jsx'))
 
@@ -231,7 +232,7 @@ export default function AppRouter() {
           </Route>
           <Route path="/app/assessment/:sessionId" element={<V3Route flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell legacyPath="/workspace/:sessionId" page={<AuthGuard><AssessmentPlayerPage /></AuthGuard>} />} />
           <Route path="/app/reports/:sessionId" element={<V3Route flag="PRISM_STUDENT_REPORT_V3" requiresShell legacyPath="/report/:sessionId/v2" page={inShell(<StudentReportPage />)} />} />
-          <Route path="/app/development/missions/:missionId" element={<V3Route flag="PRISM_DEVELOPMENT_V2" requiresShell legacyPath="/missions/:missionId" page={inShell(<NotYetAvailablePage title="Mission" legacyPattern="/missions/:missionId" />)} />} />
+          <Route path="/app/development/missions/:missionId" element={<V3Route flag="PRISM_DEVELOPMENT_V2" requiresShell legacyPath="/missions/:missionId" page={inShell(<MissionPlayerPage />)} />} />
           <Route path="/app/explore" element={<V3Route flag="PRISM_ROLE_EXPLORATION_V2" requiresShell legacyPath="/explore" page={inShell(<ExplorePage />)} />} />
           <Route path="/app/*" element={<ShellGate><Navigate to="/app/home" replace /></ShellGate>} />
 
@@ -253,6 +254,7 @@ export default function AppRouter() {
             <Route path="assignments/:assignmentId/briefing" element={<BriefingPage />} />
             <Route path="assignments/:assignmentId/system-check" element={<SystemCheckPage />} />
             <Route path="development" element={<DevelopmentPage />} />
+            <Route path="development/missions/:missionId" element={<FlagRoute flag="PRISM_DEVELOPMENT_V2" onError="error" on={<MissionPlayerPage />} off={<ParamRedirect to="/app/campus/:organizationId/development" />} />} />
             <Route path="growth" element={<GrowthPage />} />
             <Route path="reports/:sessionId" element={<FlagRoute flag="PRISM_STUDENT_REPORT_V3" onError="error" on={<StudentReportPage />} off={<Navigate to="../home" replace />} />} />
             <Route path="*" element={<ParamRedirect to="/app/campus/:organizationId/home" />} />
@@ -280,7 +282,7 @@ export default function AppRouter() {
             <Route path="settings" element={<CampusSettingsPage />} />
             <Route path="reports/:sessionId" element={<FlagRoute flag="PRISM_STUDENT_REPORT_V3" onError="error" on={<CampusReportPage />} off={<ParamRedirect to="/campus/:organizationId/overview" />} />} />
             {/* Sections of later phases (spec §19.1 nav): an honest page, never a loop. */}
-            <Route path="development" element={<CampusNotYetAvailablePage title="Development" />} />
+            <Route path="development" element={<FlagRoute flag="PRISM_DEVELOPMENT_V2" onError="error" on={<CampusDevelopmentPage />} off={<CampusNotYetAvailablePage title="Development" />} />} />
             <Route path="reassessments" element={<CampusNotYetAvailablePage title="Reassessments" />} />
             <Route path="analytics" element={<CampusNotYetAvailablePage title="Analytics" />} />
             <Route path="reports" element={<CampusNotYetAvailablePage title="Reports" />} />

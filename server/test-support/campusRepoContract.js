@@ -327,4 +327,74 @@ export function runCampusRepoContract(test, label, getRepos) {
     assert.equal(log.length, 2)
     assert.deepEqual(log.find((e) => e.action === 'cohort.created').details, { name: 'x' })
   })
+
+  test(`${label}: development — mission versions, attempts, practice ledger, plans, interventions`, async () => {
+    const repos = await getRepos()
+    const dv = repos.development
+    const mid = `MIS-SYN-${randomUUID().slice(0, 6).toUpperCase()}`
+    const content = { mission_id: mid, version: 1, title: 'Synthetic mission' }
+    const seeded = await dv.seedMissionVersion({ missionId: mid, targetCapabilityId: 'CAP-L1-REASONING', version: 1, status: 'PUBLISHED', schemaVersion: 's1', content, contentHash: 'h1', publishedAt: new Date().toISOString() })
+    assert.equal(seeded.version, 1)
+    assert.equal((await dv.seedMissionVersion({ missionId: mid, targetCapabilityId: 'CAP-L1-REASONING', version: 1, status: 'PUBLISHED', schemaVersion: 's1', content, contentHash: 'h1', publishedAt: new Date().toISOString() })).contentHash, 'h1')
+    await assert.rejects(dv.seedMissionVersion({ missionId: mid, targetCapabilityId: 'CAP-L1-REASONING', version: 1, status: 'PUBLISHED', schemaVersion: 's1', content: { ...content, title: 'x' }, contentHash: 'h2', publishedAt: new Date().toISOString() }), { code: 'CONFLICT' })
+    assert.ok((await dv.listPublishedMissions()).some((v) => v.missionId === mid))
+
+    const user = uid()
+    const first = await dv.createAttempt({ userId: user, missionId: mid, missionVersion: 1, work: { A: { text: '' } }, idempotencyKey: 'k1' })
+    assert.equal(first.replayed, false)
+    const again = await dv.createAttempt({ userId: user, missionId: mid, missionVersion: 1, work: { A: { text: '' } }, idempotencyKey: 'k1' })
+    assert.equal(again.attempt.id, first.attempt.id)
+    assert.equal(again.replayed, true)
+    const saved = await dv.saveAttemptWork(first.attempt.id, { expectedVersion: 1, work: { A: { text: 'hello' } } })
+    assert.equal(saved.attempt.version, 2)
+    assert.equal((await dv.saveAttemptWork(first.attempt.id, { expectedVersion: 1, work: {} })).conflict, 'VERSION')
+    const hinted = await dv.saveAttemptWork(first.attempt.id, { expectedVersion: 2, hintsUsed: 1 })
+    assert.equal(hinted.attempt.hintsUsed, 1)
+    assert.deepEqual(hinted.attempt.work, { A: { text: 'hello' } })
+    const done = await dv.completeAttempt(first.attempt.id, { status: 'EVALUATED', evaluation: { summary: 's' }, submittedAt: new Date().toISOString() })
+    assert.equal(done.replayed, false)
+    assert.equal((await dv.completeAttempt(first.attempt.id, { status: 'EVALUATED', evaluation: {}, submittedAt: new Date().toISOString() })).replayed, true)
+    assert.equal((await dv.saveAttemptWork(first.attempt.id, { expectedVersion: done.attempt.version, work: {} })).conflict, 'SUBMITTED')
+    assert.equal((await dv.listAttempts({ userId: user })).length, 1)
+
+    const unit = { attemptId: first.attempt.id, userId: user, missionId: mid, missionVersion: 1, capabilityId: 'CAP-L1-REASONING', behaviorId: 'B', criterionId: 'C', sourceType: 'MISSION_PRACTICE', checkType: 'DETERMINISTIC', excerpt: null, provenance: { v: 1 } }
+    assert.equal((await dv.appendPracticeUnits([unit, unit])).length, 1)
+    await assert.rejects(dv.appendPracticeUnits([{ ...unit, criterionId: 'D', sourceType: 'FORMAL' }]), { code: 'VALIDATION_FAILED' })
+    assert.equal((await dv.listPracticeUnits({ userId: user })).length, 1)
+
+    const p1 = await dv.upsertPlan({ userId: user, sourceSessionId: 'sess-a', items: [{ capabilityId: 'CAP-L1-REASONING' }] })
+    const p1b = await dv.upsertPlan({ userId: user, sourceSessionId: 'sess-a', items: [{ capabilityId: 'CAP-L1-REASONING' }] })
+    assert.equal(p1.id, p1b.id)
+    assert.deepEqual(p1.items.map((i) => i.capabilityId), ['CAP-L1-REASONING'])
+    const p2 = await dv.upsertPlan({ userId: user, sourceSessionId: 'sess-b', items: [] })
+    assert.notEqual(p2.id, p1.id)
+
+    const org = await repos.organizations.createOrganization({ name: 'Synthetic Dev Org', slug: slug(), organizationType: 'COLLEGE', status: 'ACTIVE' })
+    const cohort = await repos.organizations.createCohort({ organizationId: org.id, name: 'Dev Cohort' })
+    // Calendar days survive a server east of UTC (node-pg reads DATE as local midnight).
+    const tz = process.env.TZ
+    process.env.TZ = 'Asia/Kolkata'
+    let iv
+    try {
+      iv = await dv.createIntervention({ organizationId: org.id, name: 'Sprint', targetCapabilityId: 'CAP-L1-REASONING', cohortId: cohort.id, startsOn: '2026-10-01', endsOn: '2026-10-29', status: 'ACTIVE', missionIds: [mid], reassessmentPlanned: false, createdBy: 'owner' })
+      assert.deepEqual([iv.startsOn, iv.endsOn], ['2026-10-01', '2026-10-29'])
+      const read = await dv.getIntervention(iv.id)
+      assert.deepEqual([read.startsOn, read.endsOn], ['2026-10-01', '2026-10-29'])
+      const program = await repos.campusAdmin.createProgram({ organizationId: org.id, name: 'Dates', status: 'DRAFT', startsOn: '2026-10-01', endsOn: '2027-03-31', reportingPolicy: {}, sponsorshipScope: {}, createdBy: 'owner' })
+      assert.deepEqual([program.startsOn, program.endsOn], ['2026-10-01', '2027-03-31'])
+    } finally {
+      if (tz === undefined) delete process.env.TZ
+      else process.env.TZ = tz
+    }
+    assert.deepEqual(iv.missionIds, [mid])
+    await dv.addInterventionMember(iv.id, user)
+    await dv.addInterventionMember(iv.id, user)
+    assert.equal((await dv.listInterventionMembers(iv.id)).length, 1)
+    assert.deepEqual((await dv.listInterventionsForUser(user, org.id)).map((x) => x.id), [iv.id])
+    assert.equal((await dv.setInterventionStatus(iv.id, 'COMPLETED')).status, 'COMPLETED')
+    const campusAttempt = await dv.createAttempt({ userId: user, missionId: mid, missionVersion: 1, organizationId: org.id, interventionId: iv.id, work: {}, idempotencyKey: 'k2' })
+    assert.deepEqual((await dv.listAttemptsForIntervention(iv.id)).map((a) => a.id), [campusAttempt.attempt.id])
+    assert.equal((await dv.listAttempts({ userId: user })).length, 1, 'campus attempts stay out of the personal list')
+    assert.equal((await dv.listAttempts({ userId: user, organizationId: org.id })).length, 1)
+  })
 }

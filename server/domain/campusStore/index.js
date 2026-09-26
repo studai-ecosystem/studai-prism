@@ -23,6 +23,8 @@ import { createSessionIoRepoMemory, createSessionIoRepoPg } from '../assessments
 import { createReportVersionsRepoMemory, createReportVersionsRepoPg } from '../reports/v3/repository.js'
 import { createCampusAdminRepoMemory } from '../campusAdmin/repository.memory.js'
 import { createCampusAdminRepoPg } from '../campusAdmin/repository.pg.js'
+import { createDevelopmentRepoMemory } from '../development/repository.memory.js'
+import { createDevelopmentRepoPg } from '../development/repository.pg.js'
 
 export function createMemoryCampusRepos(options = {}) {
   const db = options.db || createMemoryDb(options)
@@ -42,6 +44,7 @@ export function createMemoryCampusRepos(options = {}) {
     sessionIo: createSessionIoRepoMemory(db),
     reportVersions: createReportVersionsRepoMemory(db),
     campusAdmin: createCampusAdminRepoMemory(db),
+    development: createDevelopmentRepoMemory(db),
   }
 }
 
@@ -62,5 +65,6 @@ export function createPgCampusRepos({ query, getPool }) {
     sessionIo: createSessionIoRepoPg(deps),
     reportVersions: createReportVersionsRepoPg(deps),
     campusAdmin: createCampusAdminRepoPg(deps),
+    development: createDevelopmentRepoPg(deps),
   }
 }

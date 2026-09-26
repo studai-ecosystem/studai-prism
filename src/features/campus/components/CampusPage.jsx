@@ -30,7 +30,7 @@ export function MutationError({ error }) {
   return <InlineNotice tone="blocked">{error.message}{error.requestId ? ` (Reference: ${error.requestId})` : ''}</InlineNotice>
 }
 
-export function ConfirmDialog({ open, title, description, confirmLabel, tone = 'primary', onConfirm, onClose, pending, error, children }) {
+export function ConfirmDialog({ open, title, description, confirmLabel, cancelLabel = 'Cancel', tone = 'primary', onConfirm, onClose, pending, error, children }) {
   return (
     <Modal
       open={open}
@@ -40,7 +40,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel, tone = '
       size="sm"
       footer={(
         <>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{cancelLabel}</Button>
           <Button variant={tone} onClick={onConfirm} loading={pending}>{confirmLabel}</Button>
         </>
       )}

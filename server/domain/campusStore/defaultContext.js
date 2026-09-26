@@ -11,6 +11,13 @@ import evidenceGraph from '../../lib/evidenceGraph.js'
 import roleAffinityEngine from '../../lib/roleAffinityEngine.js'
 import { PRE_APPROVED_SCENARIOS } from '../../lib/scenarioBank.js'
 import { createEngineAdapter, createRouterInvoker } from '../assessments/engine.js'
+import { createMissionEvaluator } from '../development/evaluator.js'
+
+// The AI gateway, bound on first use (no provider SDK at module load).
+async function completeViaGateway(params, options) {
+  const { createCompletion } = await import('../../services/ai/completionService.js')
+  return createCompletion(params, options)
+}
 
 // The unchanged engine router, bound on first use (the v1 router must not
 // import the engine at module load).
@@ -73,5 +80,6 @@ export function createDefaultCampusContext() {
     evidence: { units: (sessionId) => evidenceGraph.getEvidenceUnits(sessionId) },
     roles: { evaluate: ({ capabilityProfile, candidateInterests }) => roleAffinityEngine.computeRoleAffinity(capabilityProfile, candidateInterests) },
     engine: createEngineAdapter({ invoke: invokeEngine }),
+    missionEvaluator: createMissionEvaluator({ complete: completeViaGateway }),
   })
 }

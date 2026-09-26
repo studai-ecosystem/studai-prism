@@ -70,14 +70,20 @@ describe('AppRouter — mixed and all-on flag combinations never loop and keep l
     expect(screen.queryByRole('heading', { level: 1, name: 'Your report' })).not.toBeInTheDocument()
   })
 
-  it('all flags on: the mission placeholder offers a working legacy link; /workspace moves to the V3 player', async () => {
+  it('all flags on: /missions moves to the V3 mission player (legacy still reachable); /workspace moves to the V3 player', async () => {
     const flags = { PRISM_APP_SHELL_V3: true, PRISM_ROLE_EXPLORATION_V2: true, PRISM_DEVELOPMENT_V2: true, PRISM_ASSESSMENT_WORKSPACE_V3: true }
     signIn()
     mockFetch({ '/api/v1/me': meBody({ flags }), '/api/': pendingApi })
     const { unmount } = renderApp(app, { route: '/missions/MIS-1' })
-    expect(await screen.findByRole('heading', { level: 1, name: 'Mission' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Open the current version' })).toHaveAttribute('href', '/missions/MIS-1?legacy=1')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Practice mission' })).toBeInTheDocument()
+    expect(screen.getByTestId('where')).toHaveTextContent('/app/development/missions/MIS-1')
     unmount()
+    signIn()
+    mockFetch({ '/api/v1/me': meBody({ flags }), '/api/': pendingApi })
+    const legacy = renderApp(app, { route: '/missions/MIS-1?legacy=1' })
+    await new Promise((r) => setTimeout(r, 80))
+    expect(screen.getByTestId('where')).toHaveTextContent('/missions/MIS-1')
+    legacy.unmount()
     signIn()
     mockFetch({ '/api/v1/me': meBody({ flags }), '/api/': pendingApi })
     renderApp(app, { route: '/workspace/sess-5' })

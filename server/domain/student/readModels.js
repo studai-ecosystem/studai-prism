@@ -25,7 +25,7 @@ function verifiedQuote(unit, turns) {
   return turns.some((t) => normalise(t).includes(q)) ? excerpt.trim() : null
 }
 
-export function createStudentReadModels({ directory, catalog, assignments, evidence, practice = { list: async () => [] }, roles, legacy, clock = () => new Date() }) {
+export function createStudentReadModels({ directory, catalog, assignments, evidence, practice = { list: async () => [] }, development = { enabled: () => false }, roles, legacy, clock = () => new Date() }) {
   // One entry per completed formal session in the workspace (newest first).
   // Held or invalidated sessions are never formal evidence (K59).
   async function formalSessions(user, workspace) {
@@ -217,12 +217,17 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
     async developmentPlan(user, workspace) {
       const caps = await capabilities(user, workspace)
       const priorities = focusFrom(caps.items)
+      // Development V2 (Phase 8): recommended and catalogue missions plus past
+      // attempts. Practice never feeds back into `priorities` (formal only).
+      const v2 = development.enabled() ? await development.planFor(user, workspace, priorities) : null
       return {
         status: priorities.length ? 'FOCUS_FROM_EVIDENCE' : 'NO_PLAN',
         priorities,
-        missions: [],
-        completedMissions: [],
-        missionsAvailable: false,
+        missions: v2 ? v2.recommended : [],
+        catalogue: v2 ? v2.catalogue : [],
+        completedMissions: v2 ? v2.completed : [],
+        missionsAvailable: Boolean(v2 && v2.catalogue.length),
+        missionsEnabled: Boolean(v2),
         upcomingReassessment: null,
         practiceEvidence: await practice.list(user, workspace),
       }

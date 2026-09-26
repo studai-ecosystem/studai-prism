@@ -141,4 +141,23 @@ export const DEVELOPMENT_COPY = {
     title: 'Practice missions',
     description: 'Practice missions are not available here yet. When they are, practice evidence is always labelled separately from formal results.',
   },
+  missions: {
+    recommendedTitle: 'Recommended for your priorities',
+    noRecommended: 'No practice mission matches your current priorities yet. You can still try any mission below.',
+    catalogueTitle: 'All practice missions',
+    campusCatalogueEmpty: 'Your institution has not assigned any practice missions here yet.',
+    completedTitle: 'Your practice attempts',
+    practiceNote: 'Practice feedback checks specific behaviours in your work. It is not a formal assessment and never changes your formal results.',
+    campusPrivacy: (institution) => `${institution} sees only whether you started and finished each assigned mission — never your answers or feedback.`,
+  },
+  player: {
+    practiceLabel: 'Practice mission',
+    whatIsChecked: 'What will be checked',
+    submitConfirmTitle: 'Submit this attempt?',
+    submitConfirmBody: 'You will see feedback for each behaviour. You cannot edit this attempt afterwards, but you can start a new one.',
+    resultTitle: 'Feedback',
+    retry: 'Try again',
+    results: { OBSERVED: 'Shown', NOT_OBSERVED: 'Not shown yet', UNCERTAIN: 'Could not be checked' },
+    unavailable: 'Part of the feedback could not be produced right now. Nothing was guessed: those behaviours are not counted either way.',
+  },
 }

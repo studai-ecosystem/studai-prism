@@ -31,6 +31,8 @@ export function consentPreviewFor(organizationName) {
 export function createCampusAdminService({
   repos, users, invites, catalog, clock = () => new Date(), audit = () => {},
   sendAssignmentEmail = async () => false, appUrl = '', ledger = null,
+  // Called whenever a student is (re)attached to a cohort (Phase 8 interventions).
+  onRosterSync = async () => {},
 }) {
   const store = () => repos.campusAdmin
   const nowIso = () => clock().toISOString()
@@ -144,6 +146,7 @@ export function createCampusAdminService({
         await repos.assessments.addStudent({ assignmentId: a.id, userId, status: 'ASSIGNED' })
       }
     }
+    await onRosterSync(organizationId, cohortId, userId)
   }
 
   async function notify({ userId, organizationId, kind, payload }) {
@@ -206,6 +209,9 @@ export function createCampusAdminService({
 
   return {
     syncRoster,
+    // Shared with other campus services (development interventions).
+    cohortOf,
+    orgAudit,
 
     // ── Overview (§20): counts only, within the caller's student scope ─────
     async overview(actor, organizationId) {
