@@ -19,6 +19,7 @@ from jobs import (
     conformal_refresh,
     dif_audit,
     equate,
+    evidence_agreement_v3,
     evidence_onepager,
     growth_curve,
     irt_fit,
@@ -52,6 +53,8 @@ ORDER = [
     ("steering_s1", steering_s1),
     ("agreement_s2", agreement_s2),
     ("retest_s3", retest_s3),
+    # Campus C12.01: V3 evidence double-rating agreement (insufficient until rated).
+    ("evidence_agreement_v3", evidence_agreement_v3),
     # Phase 3 artifacts — render whatever the registry now holds, honestly.
     ("bias_audit", bias_audit),
     ("evidence_onepager", evidence_onepager),

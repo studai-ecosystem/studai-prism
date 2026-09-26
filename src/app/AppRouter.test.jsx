@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
@@ -13,6 +13,16 @@ function Where() {
 }
 
 const app = <><AppRouter /><Where /></>
+
+// Dark-route redirects wait on the lazy legacy chunk. Warm it once so a cold
+// gate run does not spend the assertion window on the first import (K106).
+beforeAll(async () => {
+  await Promise.all([
+    import('../pages/LandingPage.jsx'),
+    import('../pages/ShellHome.jsx'),
+    import('../features/home/pages/HomePage.jsx'),
+  ])
+})
 
 describe('AppRouter — flags off (default)', () => {
   it('/app renders the legacy launcher unchanged', async () => {

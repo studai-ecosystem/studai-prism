@@ -13,6 +13,29 @@ export function syntheticEmail(label) {
   return `${label}-${Date.now()}-${seq}@test.local`
 }
 
+// WebKit follows Safari's default keyboard behaviour: links are not in the Tab
+// order (Safari's "Press Tab to highlight each item" setting is off, and
+// Playwright's WebKit offers no Option+Tab equivalent). Keyboard checks Tab to
+// every other control in every browser; in WebKit a link is focused directly
+// and then operated with the keyboard (Enter), like a Safari user who turned
+// that setting on (manual check M4).
+export const linksTabbable = (page) => page.context().browser()?.browserType().name() !== 'webkit'
+
+// Move keyboard focus to `locator` with Tab and assert it got there.
+export async function keyboardFocus(page, locator, max = 90) {
+  await expect(locator).toBeVisible()
+  if (!linksTabbable(page) && await locator.evaluate((el) => el.tagName === 'A')) {
+    await locator.focus()
+    await expect(locator).toBeFocused()
+    return
+  }
+  for (let i = 0; i < max; i += 1) {
+    if (await locator.evaluate((el) => el === document.activeElement)) return
+    await page.keyboard.press('Tab')
+  }
+  throw new Error(`keyboard focus never reached ${locator}`)
+}
+
 // API calls go through Playwright's request context against the page's
 // origin, so they never race a client-side navigation (a page.evaluate fetch
 // dies with "Execution context was destroyed" if the app redirects meanwhile).

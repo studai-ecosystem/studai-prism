@@ -11,6 +11,7 @@ const FABRICATED = /\d+\s*%|±|Score:|Rubric Level|Standard Error|Readiness (Lev
 // A real marketing session started through the API (the server's own store),
 // memoised per worker. `consent: false` gives an entitled but unconsented id.
 const seeded = {}
+const owners = {}
 async function seedSession(request, { consent = true } = {}) {
   const key = consent ? 'started' : 'unconsented'
   if (seeded[key]) return seeded[key]
@@ -19,7 +20,7 @@ async function seedSession(request, { consent = true } = {}) {
     data: { name: 'Synthetic Reality Seed', email, college: 'Synthetic College', year: 'Final Year', password: 'candidate-pass-1!', ageConfirmed: true },
   })
   expect(reg.status()).toBe(201)
-  const { token } = await reg.json()
+  const { token, user } = await reg.json()
   const headers = { Authorization: `Bearer ${token}` }
   const ent = await request.post('/api/payment/dev-session', { headers })
   expect(ent.status()).toBe(200)
@@ -29,6 +30,20 @@ async function seedSession(request, { consent = true } = {}) {
     expect((await request.post('/api/assessment/start', { headers, data: { sessionId, scenarioId: 'prism-sim-mkt-l1' } })).status()).toBe(200)
   }
   seeded[key] = sessionId
+  owners[sessionId] = { token, user }
+  return sessionId
+}
+
+// Legacy reports are readable only by the session owner (Campus Phase 12,
+// S7): sign the browser in as the seeded owner, then open the report.
+async function openOwnReport(page, request, view = 'v2') {
+  const sessionId = await seedSession(request)
+  await page.goto('/')
+  await page.evaluate(({ token, user }) => {
+    localStorage.setItem('prism_token', token)
+    localStorage.setItem('prism_user', JSON.stringify(user))
+  }, owners[sessionId])
+  await page.goto(`/report/${sessionId}/${view}`)
   return sessionId
 }
 
@@ -213,31 +228,40 @@ test.describe('Reality & truth audit (PN-E2E-01 to PN-E2E-30)', () => {
 
   // ── Student Report V2 ──────────────────────────────────────────────────────
   test('PN-E2E-17 Report V2 renders capability sections from session data', async ({ page, request }) => {
-    await page.goto(`/report/${await seedSession(request)}/v2`)
+    const sessionId = await openOwnReport(page, request)
     await expect(page.getByRole('heading', { name: 'Capability report' })).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole('heading', { name: 'Core capabilities' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Role capabilities' })).toBeVisible()
+    // Nobody else can read it: signed out, the API answers "not found".
+    for (const view of ['v2', 'employee']) expect((await request.get(`/api/assessment/report/${sessionId}/${view}`)).status()).toBe(404)
+    // Nor can another signed-in account.
+    const other = await request.post('/api/auth/register', {
+      data: { name: 'Synthetic Other Account', email: `reality-other-${Date.now()}-${Math.random().toString(16).slice(2)}@test.local`, college: 'Synthetic College', year: 'Final Year', password: 'candidate-pass-1!', ageConfirmed: true },
+    })
+    expect(other.status()).toBe(201)
+    const otherHeaders = { Authorization: `Bearer ${(await other.json()).token}` }
+    for (const view of ['v2', 'employee']) expect((await request.get(`/api/assessment/report/${sessionId}/${view}`, { headers: otherHeaders })).status()).toBe(404)
   })
 
   test('PN-E2E-18 Roles appear only when evidence supports them', async ({ page, request }) => {
-    await page.goto(`/report/${await seedSession(request)}/v2`)
+    await openOwnReport(page, request)
     await expect(page.getByText('Roles are suggested here only when your assessment evidence supports them.')).toBeVisible({ timeout: 10000 })
   })
 
   test('PN-E2E-19 Missing evidence shown honestly', async ({ page, request }) => {
-    await page.goto(`/report/${await seedSession(request)}/v2`)
+    await openOwnReport(page, request)
     await expect(page.getByRole('heading', { name: 'Not enough evidence yet to describe your capabilities' })).toBeVisible({ timeout: 10000 })
   })
 
   test('PN-E2E-20 No fit percentages or precision in the report', async ({ page, request }) => {
-    await page.goto(`/report/${await seedSession(request)}/v2`)
+    await openOwnReport(page, request)
     await expect(page.getByRole('heading', { name: 'Capability report' })).toBeVisible({ timeout: 10000 })
     expect(await page.innerText('main')).not.toMatch(FABRICATED)
   })
 
   // ── Development missions ───────────────────────────────────────────────────
   test('PN-E2E-21 No mission is recommended from a fabricated gap', async ({ page, request }) => {
-    await page.goto(`/report/${await seedSession(request)}/v2`)
+    await openOwnReport(page, request)
     await expect(page.getByRole('heading', { name: 'Capability report' })).toBeVisible({ timeout: 10000 })
     await expect(page.locator('text=MIS-MKT-EXP-01')).toHaveCount(0)
   })
@@ -259,7 +283,7 @@ test.describe('Reality & truth audit (PN-E2E-01 to PN-E2E-30)', () => {
 
   // ── Mode C: workplace view ─────────────────────────────────────────────────
   test('PN-E2E-24 Workplace view shows no readiness claims', async ({ page, request }) => {
-    await page.goto(`/report/${await seedSession(request)}/employee`)
+    await openOwnReport(page, request, 'employee')
     await expect(page.getByRole('heading', { name: 'Workplace view' })).toBeVisible({ timeout: 10000 })
     expect(await page.innerText('main')).not.toMatch(FABRICATED)
   })

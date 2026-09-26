@@ -82,6 +82,9 @@ test.describe('@critical @campus student application — personal journey', () =
 
 test.describe('@critical @campus student application — personal journey (Pixel 7)', () => {
   // Chromium project: take Pixel 7's viewport/touch/UA without switching browser.
+  // Axe on every route of this journey exceeds the 60s default on Firefox
+  // (the first full run timed out at 1.0m with the journey still in progress).
+  test.describe.configure({ timeout: 180_000 })
   const { defaultBrowserType: _browser, ...pixel7 } = devices['Pixel 7']
   test.use(pixel7)
   test('mobile: the same journey without horizontal overflow', async ({ page }) => {

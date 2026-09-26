@@ -119,6 +119,7 @@ const CampusReportsPage = lazy(() => import('../features/campus/pages/CampusRepo
 const CampusBillingPage = lazy(() => import('../features/campus/pages/CampusBillingPage.jsx'))
 const CampusIntegrationsPage = lazy(() => import('../features/campus/pages/CampusIntegrationsPage.jsx'))
 const AdminOrganizationsPage = lazy(() => import('../features/admin/AdminOrganizationsPage.jsx'))
+const EvidenceRatingPage = lazy(() => import('../features/validation/EvidenceRatingPage.jsx'))
 const MissionPlayerPage = lazy(() => import('../features/development/pages/MissionPlayerPage.jsx'))
 const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusInvitePage.jsx'))
 const StudentReportPage = lazy(() => import('../features/reports/pages/StudentReportPage.jsx'))
@@ -312,6 +313,7 @@ export default function AppRouter() {
           <Route path="/score" element={<ScoreReport />} />
           <Route path="/verify/:id" element={<Verify />} />
           <Route path="/rater" element={<RaterWorkbench />} />
+          <Route path="/rater/evidence" element={<EvidenceRatingPage />} />
           <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           {/* Legacy URLs (spec §6.5): move to V3 only when its flag is on. */}
           <Route path="/explore" element={<LegacyAlias flag="PRISM_ROLE_EXPLORATION_V2" requiresShell v3Path="/app/explore" legacy={<ExploreMode />} />} />

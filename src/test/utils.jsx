@@ -24,14 +24,24 @@ export function meBody({ flags = {}, workspaces, permissions = [] } = {}) {
   }
 }
 
-// Routes fetch calls by URL prefix. Unknown URLs fail loudly.
+// Routes fetch calls by URL prefix. The longest matching prefix wins, and an
+// absolute URL matches on its path, so a broad `/api/` hang cannot swallow
+// `/api/v1/me` (that left FlagRoute on "Loading" until the assertion timed out).
 export function mockFetch(routes) {
+  const entries = Object.entries(routes).sort((a, b) => b[0].length - a[0].length)
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
-    const u = String(url)
-    for (const [prefix, handler] of Object.entries(routes)) {
-      if (u.startsWith(prefix)) return typeof handler === 'function' ? handler(u) : jsonResponse(200, handler)
+    const raw = String(url?.url || url)
+    let path = raw
+    try {
+      const parsed = new URL(raw, 'http://test.local')
+      path = `${parsed.pathname}${parsed.search}`
+    } catch { /* already a path */ }
+    for (const [prefix, handler] of entries) {
+      if (raw.startsWith(prefix) || path.startsWith(prefix)) {
+        return typeof handler === 'function' ? handler(raw) : jsonResponse(200, handler)
+      }
     }
-    throw new Error(`unexpected fetch ${u}`)
+    throw new Error(`unexpected fetch ${raw}`)
   })
 }
 

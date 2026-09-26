@@ -3,7 +3,7 @@
 // distributions, major gaps, intervention activity, reassessment status and
 // recommended next actions. Aggregate only — no personal Prism data, no names,
 // no ranking. Generating a report is recorded in the activity log.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Panel } from '../../../components/ui/Card.jsx'
 import { Button } from '../../../components/ui/Button.jsx'
@@ -84,11 +84,12 @@ export default function CampusReportsPage() {
     e.preventDefault()
     if (kind !== 'EXECUTIVE' && !target) { setError(kind === 'DEPARTMENT' ? 'Choose a department.' : 'Choose a cohort.'); document.getElementById('report-target')?.focus(); return }
     setError(null)
-    run.mutate(kind === 'EXECUTIVE' ? {} : kind === 'DEPARTMENT' ? { departmentId: target } : { cohortId: target }, {
-      onSuccess: () => requestAnimationFrame(() => document.getElementById('report-title')?.focus()),
-    })
+    run.mutate(kind === 'EXECUTIVE' ? {} : kind === 'DEPARTMENT' ? { departmentId: target } : { cohortId: target })
   }
   const r = run.data
+  // Move focus to the new report once it is on the page (a frame scheduled
+  // from onSuccess can run before React has rendered it).
+  useEffect(() => { if (r) document.getElementById('report-title')?.focus() }, [r])
   return (
     <CampusPage title="Reports" description="Aggregate reports for leadership and departments. No personal data and no ranking.">
       <div className="space-y-6">

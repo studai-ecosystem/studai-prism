@@ -499,4 +499,26 @@ export function runCampusRepoContract(test, label, getRepos) {
     assert.deepEqual([x.periodStart, x.periodEnd, x.billableCount], ['2026-10-01', '2026-10-31', 1])
     assert.deepEqual((await bl.listInvoiceExports(org.id)).map((r) => r.id), [x.id])
   })
+
+  test(`${label}: validation — rating items unique per evidence ref; ratings append-only, one per rater, level xor cannot-rate`, async () => {
+    const repos = await getRepos()
+    const vr = repos.validation
+    const hex = () => randomUUID().replace(/-/g, '').padEnd(64, '0').slice(0, 64)
+    const ref = hex()
+    const input = { evidenceRef: ref, sessionRef: hex(), capabilityId: 'CAP-L1-REASONING', sourceType: 'DIALOGUE_TURN', behaviorAnchorId: null, excerpt: 'I would {{candidate}} check first.', aiLevel: 3, aiStatus: 'PROVISIONAL', rubricVersion: 'r1', enqueuedBy: 'admin:x' }
+    const first = await vr.upsertItem(input)
+    assert.equal(first.created, true)
+    const again = await vr.upsertItem({ ...input, excerpt: 'changed' })
+    assert.deepEqual([again.created, again.item.id, again.item.excerpt], [false, first.item.id, 'I would {{candidate}} check first.'])
+    assert.equal((await vr.getItem(first.item.id)).aiLevel, 3)
+    assert.ok((await vr.listItems()).some((i) => i.id === first.item.id))
+    const r = await vr.appendRating({ itemId: first.item.id, raterId: 'rater-1', level: 4, cannotRate: false })
+    assert.deepEqual([r.level, r.cannotRate], [4, false])
+    await assert.rejects(vr.appendRating({ itemId: first.item.id, raterId: 'rater-1', level: 2, cannotRate: false }), { code: 'CONFLICT' })
+    await assert.rejects(vr.appendRating({ itemId: first.item.id, raterId: 'rater-2', level: 3, cannotRate: true }), { code: 'VALIDATION_FAILED' })
+    await assert.rejects(vr.appendRating({ itemId: first.item.id, raterId: 'rater-2', level: 6, cannotRate: false }), { code: 'VALIDATION_FAILED' })
+    await assert.rejects(vr.appendRating({ itemId: randomUUID(), raterId: 'rater-2', level: 3, cannotRate: false }), { code: 'NOT_FOUND' })
+    assert.equal((await vr.appendRating({ itemId: first.item.id, raterId: 'rater-2', level: null, cannotRate: true })).cannotRate, true)
+    assert.deepEqual((await vr.listRatings()).filter((x) => x.itemId === first.item.id).map((x) => x.raterId).sort(), ['rater-1', 'rater-2'])
+  })
 }

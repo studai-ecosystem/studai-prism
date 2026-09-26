@@ -24,6 +24,9 @@ async function startPersonalV3(page, label) {
   await card.getByRole('link', { name: /Open briefing/ }).click()
   await page.getByRole('link', { name: 'Continue to system check' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'System check' })).toBeVisible()
+  // Wait for the device check to render its results: they appear above the
+  // consent items and move them, and a click during that shift can miss.
+  await expect(page.getByText('Prism can be reached.')).toBeVisible()
   const begin = page.getByRole('button', { name: 'Begin assessment' })
   await expect(begin).toBeDisabled()
   for (const item of ASSESSMENT_CONSENT_ITEMS) await page.getByLabel(item.label).check()
@@ -95,6 +98,14 @@ test.describe('@critical @campus assessment workspace V3 — personal start and 
     // Starting again from the briefing resumes the same session.
     await page.goto(`${CAMPUS_BASE_URL}/app/assessments`)
     await expect(page.getByTestId('assignment-card').first()).toContainText('In progress')
+
+    // S9: a V3 session is closed on the legacy session routes — anonymous
+    // erasure and a legacy restart/answer get 404, even with the owner's token,
+    // and the session is intact.
+    expect((await api(page, `/api/assessment/data/${sessionId}`, { method: 'DELETE' })).status).toBe(404)
+    expect((await api(page, '/api/assessment/start', { method: 'POST', token: student.token, body: { sessionId } })).status).toBe(404)
+    expect((await api(page, '/api/assessment/message', { method: 'POST', token: student.token, body: { sessionId, text: 'Synthetic legacy answer' } })).status).toBe(404)
+    expect((await contractOf(page, student.token, sessionId)).progress.exchanges).toBe(2)
   })
 })
 

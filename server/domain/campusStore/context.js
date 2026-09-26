@@ -24,6 +24,7 @@ import { createGrowthService } from '../growth/service.js'
 import { createSessionEntryLoader } from '../growth/entries.js'
 import { createAnalyticsService } from '../analytics/service.js'
 import { createBillingService } from '../billing/service.js'
+import { createValidationService } from '../validation/service.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 // Account directory (read-only) for admin views: `{ id, name, email }` or null.
@@ -152,6 +153,15 @@ export function createCampusContext({
     growth,
     analytics,
     billing: createBillingService({ repos: storeView, clock }),
+    // Blinded human double-rating of V3 evidence (identity tokenised).
+    validation: createValidationService({
+      repos: storeView, evidence,
+      candidateNameFor: async (sessionId) => {
+        const s = await legacy.getSession(sessionId)
+        return s?.userId ? (await users.findById(s.userId))?.name || null : null
+      },
+      sessionState: async (sessionId) => (legacy.adminState ? legacy.adminState(sessionId) : null),
+    }),
     overviewExtras,
     // Effective scope of `permission` for an actor in an organization.
     scopeFor: (actor, organizationId, permission) => can(actor, permission, { organizationId }),

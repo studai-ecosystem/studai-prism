@@ -50,6 +50,7 @@ import auditRouter from './audit.js'
 import accommodationsRouter from './accommodations.js'
 import marginRouter from './margin.js'
 import organizationsRouter from './organizations.js'
+import validationRouter from './validation.js'
 
 const router = Router()
 
@@ -136,5 +137,7 @@ router.use('/accommodations', accommodationsRouter)
 router.use('/margin', marginRouter)
 // Campus Phase 11 — campus organizations, sponsorship pools and contracts.
 router.use('/organizations', organizationsRouter)
+// Campus Phase 12 — blinded double-rating queue for V3 evidence (dark behind PRISM_V3_RATING_QUEUE).
+router.use('/validation', validationRouter)
 
 export default router

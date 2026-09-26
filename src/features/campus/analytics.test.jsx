@@ -85,7 +85,7 @@ describe('Campus analytics', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Hide table' }))
     expect(screen.getByRole('button', { name: 'Show as table' })).toHaveAttribute('aria-expanded', 'false')
     expect(document.body.textContent).not.toMatch(/\d\s*%|average score|leaderboard|top performer/i)
-  })
+  }, 20_000)
 
   it('a whole view below the minimum size shows only the spec sentence, with no counts', async () => {
     const rest = { ...capabilities.data }

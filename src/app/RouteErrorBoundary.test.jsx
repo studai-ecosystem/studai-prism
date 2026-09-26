@@ -53,4 +53,16 @@ describe('RouteErrorBoundary + lazyWithRetry', () => {
     expect(reload).toHaveBeenCalledTimes(1)
     spy.mockRestore()
   })
+
+  it('a chunk request aborted by a navigation away never triggers a reload (it would cancel that navigation)', async () => {
+    sessionStorage.clear()
+    const reload = mockReload()
+    window.dispatchEvent(new Event('beforeunload'))
+    const Aborted = lazyWithRetry(() => Promise.reject(new TypeError('error loading dynamically imported module: /assets/b.js')))
+    render(<RouteErrorBoundary><Suspense fallback={<p>loading</p>}><Aborted /></Suspense></RouteErrorBoundary>)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(reload).not.toHaveBeenCalled()
+    expect(screen.getByText('loading')).toBeInTheDocument()
+    window.dispatchEvent(new Event('pageshow'))
+  })
 })

@@ -75,6 +75,7 @@ export const PERMISSIONS = {
   'calibrations:apply': 'Apply a frozen calibration run (dual-approved)',
   'equivalence:read': 'View the assessment form equivalence registry (growth comparability)',
   'equivalence:decide': 'Approve (dual-approved) or reject a form pair as comparable for growth, citing evidence',
+  'validation:manage': 'Queue a session\'s V3 evidence units for blinded human double-rating (identity-free, audited)',
 
   // Human rating
   'raters:read': 'View rater roster, IRR, training progress',
@@ -178,6 +179,7 @@ export const ROLES = {
       'prompts:read', 'prompts:manage', 'prompts:publish',
       'psychometrics:read', 'calibrations:read', 'calibrations:freeze', 'calibrations:apply',
       'equivalence:read', 'equivalence:decide',
+      'validation:manage',
       'raters:read', 'ratings:supersede', 'sessions:read', 'notes:write',
     ],
   },

@@ -59,6 +59,8 @@ export const FLAG_CATALOGUE = [
   { key: 'PRISM_DEVELOPMENT_V2', risk: 'high', owner: 'psychometrics', description: 'Campus V1: Development Engine V2 missions, plans and interventions (practice evidence only).', dataGate: 'mission evaluator prompt review + operator flip (HA-C001)' },
   { key: 'PRISM_GROWTH_ENABLED', risk: 'high', owner: 'psychometrics', description: 'Campus V1: reassessment cycles and growth comparison (approved-equivalent forms only).', dataGate: 'form equivalence approved (HA-C004) + operator flip (HA-C001)' },
   { key: 'PRISM_ROLE_EXPLORATION_V2', risk: 'medium', owner: 'product', description: 'Campus V1: Explore Roles V2 (self-reported vs demonstrated, no percentages).', dataGate: 'copy review + operator flip (HA-C001)' },
+  // Campus Phase 12 validation tooling (not a product surface). Default OFF.
+  { key: 'PRISM_V3_RATING_QUEUE', risk: 'medium', owner: 'psychometrics', description: 'Blinded human double-rating queue for V3 evidence units (/api/validation, /api/admin/validation, /rater/evidence).', dataGate: 'DATABASE_URL + 0039 + qualified raters + rating protocol approved by the psychometrics lead (HA-C008)' },
 ]
 
 export async function seedFlagRegistry() {

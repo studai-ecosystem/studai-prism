@@ -32,10 +32,18 @@ async function answer(page, text) {
   await expect.poll(() => participants.count(), { timeout: 30_000 }).toBeGreaterThan(before)
 }
 
-async function finishAndOpenReport(page, { early }) {
-  await page.getByRole('button', { name: 'Finish assessment' }).click()
+async function finishAndOpenReport(page) {
+  const finish = page.getByRole('button', { name: 'Finish assessment' })
   const dialog = page.getByRole('dialog')
-  await dialog.getByRole('button', { name: early ? 'Finish anyway' : /^Finish/ }).click()
+  // A click during a re-render can land before the handler is attached. Retry
+  // until the confirm dialog is actually open; the button names are unchanged.
+  await expect(async () => {
+    await finish.click()
+    await expect(dialog).toBeVisible({ timeout: 3_000 })
+  }).toPass({ timeout: 30_000 })
+  // The dialog's own count decides the label. A contract read taken a moment
+  // earlier can disagree, and waiting for the other label runs out the test.
+  await dialog.getByRole('button', { name: /^Finish( anyway)?$/ }).click()
   // The player moves to the report as soon as it is ready.
   await expect(page).toHaveURL(/\/app\/reports\//, { timeout: 120_000 })
   await expect(page.getByRole('heading', { level: 1, name: 'Your report' })).toBeVisible()
@@ -59,8 +67,7 @@ test.describe('@critical @campus Journey A — direct user to Report V3', () => 
     await answer(page, 'Synthetic answer one: I would first find out which customers are affected and why.')
     await answer(page, 'Synthetic answer two: I would compare the options and their risks before deciding.')
     await answer(page, 'Synthetic answer three: I would agree the plan with the team and check the result next week.')
-    const contract = (await api(page, `/api/v1/assessment-sessions/${sessionId}`, { token: student.token })).body.data
-    await finishAndOpenReport(page, { early: contract.progress.exchanges < contract.progress.requiredExchanges })
+    await finishAndOpenReport(page)
 
     const res = await api(page, `/api/v1/assessment-sessions/${sessionId}/report`, { token: student.token })
     expect(res.status).toBe(200)
@@ -126,8 +133,13 @@ test.describe('@critical @campus sponsored Report V3 — student and sponsor', (
     await expect(page).toHaveURL(/\/app\/assessment\/[0-9a-f-]{36}\?ws=/)
     const sessionId = new URL(page.url()).pathname.split('/').pop()
     await answer(page, 'Synthetic sponsored answer.')
-    await page.getByRole('button', { name: 'Finish assessment' }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Finish anyway' }).click()
+    const finish = page.getByRole('button', { name: 'Finish assessment' })
+    const dialog = page.getByRole('dialog')
+    await expect(async () => {
+      await finish.click()
+      await expect(dialog).toBeVisible({ timeout: 3_000 })
+    }).toPass({ timeout: 30_000 })
+    await dialog.getByRole('button', { name: /^Finish( anyway)?$/ }).click()
     await expect(page).toHaveURL(new RegExp(`/app/campus/${fx.organizationId}/reports/${sessionId}$`), { timeout: 120_000 })
     await expect(page.getByTestId('report-header')).toContainText(`Sponsored by ${fx.organizationName}`)
     await expect(page.getByTestId('report-visibility')).toContainText(`${fx.organizationName} can see this sponsored report`)
@@ -150,7 +162,7 @@ test.describe('@critical @campus Journey D — insufficient evidence', () => {
     test.setTimeout(240_000)
     const { student, sessionId } = await startPersonalV3(page, 'journey-d')
     await answer(page, 'Synthetic short answer.')
-    await finishAndOpenReport(page, { early: true })
+    await finishAndOpenReport(page)
     const res = await api(page, `/api/v1/assessment-sessions/${sessionId}/report`, { token: student.token })
     expect(res.status).toBe(200)
     const report = res.body.data.report

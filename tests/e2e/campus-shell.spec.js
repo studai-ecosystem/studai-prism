@@ -1,7 +1,7 @@
 // Prism Campus C1.17 — application shell at 360/768/1024/1440, keyboard
 // navigation, axe, and the flags-off legacy /app regression.
 import { test, expect } from '@playwright/test'
-import { CAMPUS_BASE_URL, LEGACY_BASE_URL, signInSynthetic, expectNoSeriousAxe, expectNoHorizontalOverflow } from './campusHelpers.js'
+import { CAMPUS_BASE_URL, LEGACY_BASE_URL, signInSynthetic, expectNoSeriousAxe, expectNoHorizontalOverflow, linksTabbable } from './campusHelpers.js'
 
 const WIDTHS = [360, 768, 1024, 1440]
 
@@ -15,15 +15,25 @@ for (const width of WIDTHS) {
     await expect(page.getByRole('heading', { name: 'Take your first Prism assessment' })).toBeVisible()
     await expectNoHorizontalOverflow(page)
 
-    if (width < 768) {
+    // Which navigation is shown follows the browser's own `md` media query:
+    // WebKit with classic (non-overlay) scrollbars measures the page without
+    // the scrollbar, so at 768px a long page is below `md` (quick nav) and a
+    // short page, with no scrollbar, is at `md` (side nav). Each step uses the
+    // navigation the browser is actually showing.
+    const isDesktop = () => page.evaluate(() => window.matchMedia('(min-width: 768px)').matches)
+    if (!(await isDesktop())) {
       const quick = page.getByRole('navigation', { name: 'Quick navigation' })
       await expect(quick).toBeVisible()
       await quick.getByRole('link', { name: 'Assess' }).click()
       await expect(page.getByRole('heading', { level: 1, name: 'Assessments' })).toBeVisible()
-      await page.getByRole('button', { name: 'More' }).click()
-      const drawer = page.getByRole('dialog', { name: 'More' })
-      await expect(drawer).toBeVisible()
-      await drawer.getByRole('link', { name: 'My Capabilities' }).click()
+      if (await isDesktop()) {
+        await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'My Capabilities' }).click()
+      } else {
+        await page.getByRole('button', { name: 'More' }).click()
+        const drawer = page.getByRole('dialog', { name: 'More' })
+        await expect(drawer).toBeVisible()
+        await drawer.getByRole('link', { name: 'My Capabilities' }).click()
+      }
       await expect(page.getByText('You do not have a formal capability profile yet.')).toBeVisible()
     } else {
       const nav = page.getByRole('navigation', { name: 'Primary' })
@@ -41,14 +51,21 @@ test('CAMPUS-SHELL-02 @critical @campus keyboard: skip link first, then into mai
   await signInSynthetic(page, CAMPUS_BASE_URL, 'shell-kbd')
   await page.goto(`${CAMPUS_BASE_URL}/app/home`)
   await expect(page.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening), Synthetic$/ })).toBeVisible()
-  await page.keyboard.press('Tab')
   const skip = page.getByRole('link', { name: 'Skip to main content' })
+  // WebKit keeps links out of the Tab order (Safari default, see keyboardFocus):
+  // there the skip link is focused directly and the into-main Tab step, whose
+  // targets on this page are links, is left to the other browsers.
+  const tabsLinks = linksTabbable(page)
+  if (tabsLinks) await page.keyboard.press('Tab')
+  else await skip.focus()
   await expect(skip).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page.locator('#main')).toBeFocused()
-  await page.keyboard.press('Tab')
-  const focusedInMain = await page.evaluate(() => document.getElementById('main').contains(document.activeElement))
-  expect(focusedInMain).toBe(true)
+  if (tabsLinks) {
+    await page.keyboard.press('Tab')
+    const focusedInMain = await page.evaluate(() => document.getElementById('main').contains(document.activeElement))
+    expect(focusedInMain).toBe(true)
+  }
 
   // Account menu is keyboard operable.
   const account = page.getByRole('button', { name: 'Account menu' })

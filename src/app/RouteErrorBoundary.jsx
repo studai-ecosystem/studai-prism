@@ -5,6 +5,20 @@ import { DocumentTitle } from '../components/ui/DocumentTitle.jsx'
 
 const RELOAD_KEY = 'prismChunkReloadAt'
 
+// A navigation away (link, refresh, back) aborts in-flight chunk requests,
+// which Firefox reports as a chunk-load failure. Reloading then would cancel
+// the navigation the person asked for, so a failure right after the page
+// started unloading is left alone. The window is short (3 s) because
+// beforeunload also fires when a "leave this page?" prompt is then cancelled.
+let unloadingAt = 0
+if (typeof window !== 'undefined') {
+  const mark = () => { unloadingAt = Date.now() }
+  window.addEventListener('beforeunload', mark)
+  window.addEventListener('pagehide', mark)
+  window.addEventListener('pageshow', () => { unloadingAt = 0 })
+}
+const isUnloading = () => unloadingAt > 0 && Date.now() - unloadingAt < 3_000
+
 export function isChunkLoadError(err) {
   const msg = String(err?.message || err || '')
   return err?.name === 'ChunkLoadError' || /dynamically imported module|Importing a module script failed|Loading chunk .* failed|error loading dynamically imported/i.test(msg)
@@ -20,6 +34,7 @@ export function lazyWithRetry(loader) {
       sessionStorage.removeItem(RELOAD_KEY)
       return mod
     } catch (err) {
+      if (isChunkLoadError(err) && isUnloading()) return new Promise(() => {})
       const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0)
       if (isChunkLoadError(err) && Date.now() - last > 60_000) {
         sessionStorage.setItem(RELOAD_KEY, String(Date.now()))
