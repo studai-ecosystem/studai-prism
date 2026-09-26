@@ -221,4 +221,33 @@ export function runCampusRepoContract(test, label, getRepos) {
     const latest = (await repos.sessionIo.listLatestArtifactVersions(sid)).sort((x, y) => x.artifactId.localeCompare(y.artifactId))
     assert.deepEqual(latest.map((v) => [v.artifactId, v.version]), [['ART', 2], ['OTHER', 1]])
   })
+
+  test(`${label}: report versions are append-only per session and unique per content; link grants resolve by hash`, async () => {
+    const repos = await getRepos()
+    const sid = `sess-${randomUUID()}`
+    assert.equal(await repos.reportVersions.latest(sid), null)
+    await repos.reportVersions.append({ sessionId: sid, version: 1, contentHash: 'h1', builderVersion: 'b', report: { a: 1 } })
+    await assert.rejects(repos.reportVersions.append({ sessionId: sid, version: 2, contentHash: 'h1', builderVersion: 'b', report: { a: 1 } }), { code: 'CONFLICT' })
+    await assert.rejects(repos.reportVersions.append({ sessionId: sid, version: 1, contentHash: 'h2', builderVersion: 'b', report: { a: 2 } }), { code: 'CONFLICT' })
+    await repos.reportVersions.append({ sessionId: sid, version: 2, contentHash: 'h2', builderVersion: 'b', report: { a: 2 } })
+    assert.equal((await repos.reportVersions.latest(sid)).version, 2)
+    assert.deepEqual((await repos.reportVersions.findByHash(sid, 'h1')).report, { a: 1 })
+    assert.equal(await repos.reportVersions.findByHash(sid, 'nope'), null)
+
+    const owner = uid()
+    const hash = `hash-${randomUUID()}`
+    const g = await repos.sharing.createShareGrant({ ownerUserId: owner, recipientType: 'LINK', tokenHash: hash, expiresAt: new Date(Date.now() + day).toISOString(), resources: [{ resourceType: 'ASSESSMENT_REPORT', resourceId: sid, disclosureLevel: 'SUMMARY' }] })
+    const found = await repos.sharing.findGrantByTokenHash(hash)
+    assert.equal(found.id, g.id)
+    assert.deepEqual(found.resources, [{ resourceType: 'ASSESSMENT_REPORT', resourceId: sid, disclosureLevel: 'SUMMARY' }])
+    assert.equal(await repos.sharing.findGrantByTokenHash('unknown-hash'), null)
+
+    // Institution grants report the disclosure the student chose, per grant.
+    const org = await repos.organizations.createOrganization({ name: 'Synthetic Disclosure Org', slug: slug(), organizationType: 'COLLEGE', status: 'ACTIVE' })
+    const exp = new Date(Date.now() + day).toISOString()
+    await repos.sharing.createShareGrant({ ownerUserId: owner, recipientType: 'ORGANIZATION', recipientOrganizationId: org.id, expiresAt: exp, resources: [{ resourceType: 'ASSESSMENT_REPORT', resourceId: sid, disclosureLevel: 'SUMMARY' }] })
+    await repos.sharing.createShareGrant({ ownerUserId: owner, recipientType: 'ORGANIZATION', recipientOrganizationId: org.id, expiresAt: exp, resources: [{ resourceType: 'ASSESSMENT_REPORT', resourceId: sid, disclosureLevel: 'FULL' }] })
+    const active = await repos.sharing.findActiveOrgGrants({ ownerUserId: owner, organizationId: org.id, resourceType: 'ASSESSMENT_REPORT', resourceId: sid, at: new Date().toISOString() })
+    assert.deepEqual(active.map((a) => a.disclosureLevel).sort(), ['FULL', 'SUMMARY'])
+  })
 }

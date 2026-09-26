@@ -99,6 +99,8 @@ const SettingsPage = lazy(() => import('../features/settings/pages/SettingsPage.
 const CampusOverviewPage = lazy(() => import('../features/campus/pages/CampusOverviewPage.jsx'))
 const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusInvitePage.jsx'))
 const NotYetAvailablePage = lazy(() => import('../features/shared/NotYetAvailablePage.jsx'))
+const StudentReportPage = lazy(() => import('../features/reports/pages/StudentReportPage.jsx'))
+const SharedReportPage = lazy(() => import('../features/reports/pages/SharedReportPage.jsx'))
 
 // Legacy guard — behaviour preserved exactly (redirects to /register).
 function RequireAuth({ children }) {
@@ -213,7 +215,7 @@ export default function AppRouter() {
             <Route path="/app/settings" element={<SettingsPage />} />
           </Route>
           <Route path="/app/assessment/:sessionId" element={<V3Route flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell legacyPath="/workspace/:sessionId" page={<AuthGuard><AssessmentPlayerPage /></AuthGuard>} />} />
-          <Route path="/app/reports/:sessionId" element={<V3Route flag="PRISM_STUDENT_REPORT_V3" requiresShell legacyPath="/report/:sessionId/v2" page={inShell(<NotYetAvailablePage title="Report" legacyPattern="/report/:sessionId/v2" />)} />} />
+          <Route path="/app/reports/:sessionId" element={<V3Route flag="PRISM_STUDENT_REPORT_V3" requiresShell legacyPath="/report/:sessionId/v2" page={inShell(<StudentReportPage />)} />} />
           <Route path="/app/development/missions/:missionId" element={<V3Route flag="PRISM_DEVELOPMENT_V2" requiresShell legacyPath="/missions/:missionId" page={inShell(<NotYetAvailablePage title="Mission" legacyPattern="/missions/:missionId" />)} />} />
           <Route path="/app/explore" element={<V3Route flag="PRISM_ROLE_EXPLORATION_V2" requiresShell legacyPath="/explore" page={inShell(<ExplorePage />)} />} />
           <Route path="/app/*" element={<ShellGate><Navigate to="/app/home" replace /></ShellGate>} />
@@ -237,6 +239,7 @@ export default function AppRouter() {
             <Route path="assignments/:assignmentId/system-check" element={<SystemCheckPage />} />
             <Route path="development" element={<DevelopmentPage />} />
             <Route path="growth" element={<GrowthPage />} />
+            <Route path="reports/:sessionId" element={<FlagRoute flag="PRISM_STUDENT_REPORT_V3" onError="error" on={<StudentReportPage />} off={<Navigate to="../home" replace />} />} />
             <Route path="*" element={<Navigate to="home" replace />} />
           </Route>
 
@@ -270,6 +273,7 @@ export default function AppRouter() {
           <Route path="/workspace/:sessionId" element={<LegacyAlias flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell v3Path="/app/assessment/:sessionId" legacy={<AssessmentWorkspace />} />} />
           <Route path="/report/:sessionId/v2" element={<LegacyAlias flag="PRISM_STUDENT_REPORT_V3" requiresShell v3Path="/app/reports/:sessionId" legacy={<StudentReportV2 />} />} />
           <Route path="/report/:sessionId/employee" element={<EmployeeReportV2 />} />
+          <Route path="/shared/:token" element={<SharedReportPage />} />
           <Route path="/missions" element={<DevelopmentMission />} />
           <Route path="/missions/:missionId" element={<LegacyAlias flag="PRISM_DEVELOPMENT_V2" requiresShell v3Path="/app/development/missions/:missionId" legacy={<DevelopmentMission />} />} />
           <Route path="*" element={<Navigate to="/" replace />} />

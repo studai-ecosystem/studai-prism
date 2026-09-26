@@ -54,19 +54,20 @@ describe('AppRouter — mixed and all-on flag combinations never loop and keep l
     expect(screen.getByTestId('where')).toHaveTextContent('/report/sess-9/v2')
   })
 
-  it('all flags on: the V3 placeholder links to the legacy page with ?legacy=1, which renders legacy', async () => {
+  it('all flags on: /report/:id/v2 moves to Report V3; ?legacy=1 still renders the legacy page (no loop)', async () => {
     const flags = { PRISM_APP_SHELL_V3: true, PRISM_STUDENT_REPORT_V3: true, PRISM_ROLE_EXPLORATION_V2: true, PRISM_DEVELOPMENT_V2: true, PRISM_ASSESSMENT_WORKSPACE_V3: true }
     signIn()
     mockFetch({ '/api/v1/me': meBody({ flags }), '/api/': pendingApi })
-    renderApp(app, { route: '/report/sess-7/v2' })
-    expect(await screen.findByRole('heading', { level: 1, name: 'Report' })).toBeInTheDocument()
+    const { unmount } = renderApp(app, { route: '/report/sess-7/v2' })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your report' })).toBeInTheDocument()
     expect(screen.getByTestId('where')).toHaveTextContent('/app/reports/sess-7')
-    const link = screen.getByRole('link', { name: 'Open the current version' })
-    expect(link).toHaveAttribute('href', '/report/sess-7/v2?legacy=1')
-    await userEvent.click(link)
-    await new Promise((r) => setTimeout(r, 50))
+    unmount()
+    signIn()
+    mockFetch({ '/api/v1/me': meBody({ flags }), '/api/': pendingApi })
+    renderApp(app, { route: '/report/sess-7/v2?legacy=1' })
+    await new Promise((r) => setTimeout(r, 80))
     expect(screen.getByTestId('where')).toHaveTextContent('/report/sess-7/v2')
-    expect(screen.queryByRole('heading', { level: 1, name: 'Report' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Your report' })).not.toBeInTheDocument()
   })
 
   it('all flags on: the mission placeholder offers a working legacy link; /workspace moves to the V3 player', async () => {

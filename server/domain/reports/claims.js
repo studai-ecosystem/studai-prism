@@ -43,6 +43,15 @@ export function candidateTurnsFrom(history = []) {
     .map((m) => m.content.replace(CANDIDATE_PREFIX, ''))
 }
 
+// A unit's dialogue excerpt, only when it is a verbatim part of a stored
+// candidate turn; otherwise null (never an invented quote).
+export function verifiedQuote(unit, turns = []) {
+  const excerpt = unit?.candidate_action_json?.dialogue_excerpt
+  if (typeof excerpt !== 'string' || !excerpt.trim()) return null
+  const q = normalise(excerpt)
+  return turns.some((t) => normalise(t).includes(q)) ? excerpt.trim() : null
+}
+
 /**
  * @param claims       built claims
  * @param evidenceIndex Map<evidenceId, unit> of the session's admissible units

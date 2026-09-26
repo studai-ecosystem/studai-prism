@@ -7,6 +7,7 @@ import { asyncHandler } from '../../domain/http/asyncHandler.js'
 import { ApiError, ok } from '../../domain/http/errors.js'
 import { INVITABLE_ROLES } from '../../domain/permissions/roles.js'
 import { permissionsForRole } from '../../domain/permissions/matrix.js'
+import { requireFlag } from '../../domain/flags/index.js'
 
 const ORG_ID = /^[0-9a-f-]{36}$/i
 const CreateInvites = z.object({
@@ -69,6 +70,16 @@ export function createOrganizationsRouter({ requireUser, campus }) {
       visibilityPolicy: scope.visibilityPolicy,
       access: access.via,
     })
+  }))
+
+  // Student Report V3 of one sponsored (or student-shared) session. Same
+  // authorization as above; the read is audited before the report is built.
+  router.get('/organizations/:orgId/sessions/:sessionId/report', requireFlag('PRISM_STUDENT_REPORT_V3'), requireOrgPermission('org.overview.read'), asyncHandler(async (req, res) => {
+    const sessionId = String(req.params.sessionId)
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/.test(sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
+    const org = await campus.repos.organizations.getOrganization(req.params.orgId)
+    if (!org || org.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', 'Not found')
+    return ok(res, await campus.reports.forSponsor({ req, actor: req.actor, organizationId: org.id, sessionId }))
   }))
 
   return router

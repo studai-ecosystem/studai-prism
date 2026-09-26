@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+// Active traps, most recent last: when focus is lost only the topmost one acts.
+const activeTraps = []
 
 // Traps Tab focus inside `ref` while `active`, closes on Escape and returns
 // focus to the previously focused element when deactivated.
@@ -17,7 +19,16 @@ export function useFocusTrap(active, { onEscape, initialFocusRef } = {}) {
     const first = initialFocusRef?.current || focusables()[0] || node
     first?.focus?.()
 
+    const token = {}
+    activeTraps.push(token)
+    // Listens on the document so a keypress still works when the focused
+    // element was removed (focus fell to <body>): Tab comes back inside and
+    // Escape still closes. Keys from other dialogs are left alone.
     function onKeyDown(e) {
+      const current = document.activeElement
+      const inside = Boolean(node && current && node.contains(current))
+      const lost = !current || current === document.body
+      if (!inside && !(lost && activeTraps[activeTraps.length - 1] === token)) return
       if (e.key === 'Escape') {
         e.stopPropagation()
         escapeRef.current?.()
@@ -31,17 +42,22 @@ export function useFocusTrap(active, { onEscape, initialFocusRef } = {}) {
       }
       const firstEl = items[0]
       const lastEl = items[items.length - 1]
-      if (e.shiftKey && document.activeElement === firstEl) {
+      if (!inside) {
+        e.preventDefault()
+        ;(e.shiftKey ? lastEl : firstEl).focus()
+      } else if (e.shiftKey && current === firstEl) {
         e.preventDefault()
         lastEl.focus()
-      } else if (!e.shiftKey && document.activeElement === lastEl) {
+      } else if (!e.shiftKey && current === lastEl) {
         e.preventDefault()
         firstEl.focus()
       }
     }
-    node?.addEventListener('keydown', onKeyDown)
+    document.addEventListener('keydown', onKeyDown)
     return () => {
-      node?.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('keydown', onKeyDown)
+      const at = activeTraps.indexOf(token)
+      if (at >= 0) activeTraps.splice(at, 1)
       if (previous && typeof previous.focus === 'function') previous.focus()
     }
   }, [active, initialFocusRef])

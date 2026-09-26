@@ -34,13 +34,22 @@ export function createSharingRepoMemory(db) {
       row.revokedAt = row.revokedAt || revokedAt
       return clone(row)
     },
-    // Active (unexpired, unrevoked) grants from `ownerUserId` to `organizationId` naming the resource.
+    // A link grant by its token hash, with its resources (expiry/revocation are
+    // checked by the caller so the reason can be audited).
+    async findGrantByTokenHash(tokenHash) {
+      const g = [...db.shareGrants.values()].find((x) => x.tokenHash && x.tokenHash === tokenHash)
+      if (!g) return null
+      return { ...clone(g), resources: db.shareGrantResources.filter((r) => r.shareGrantId === g.id).map(({ shareGrantId: _s, ...r }) => clone(r)) }
+    },
+    // Active (unexpired, unrevoked) grants from `ownerUserId` to `organizationId` naming the resource,
+    // each with the disclosure level the student chose for that resource.
     async findActiveOrgGrants({ ownerUserId, organizationId, resourceType, resourceId, at }) {
       return [...db.shareGrants.values()]
         .filter((g) => g.ownerUserId === ownerUserId && g.recipientType === 'ORGANIZATION' && g.recipientOrganizationId === organizationId
           && !g.revokedAt && new Date(g.expiresAt) > new Date(at))
-        .filter((g) => db.shareGrantResources.some((r) => r.shareGrantId === g.id && r.resourceType === resourceType && r.resourceId === String(resourceId)))
-        .map(clone)
+        .map((g) => ({ g, r: db.shareGrantResources.find((x) => x.shareGrantId === g.id && x.resourceType === resourceType && x.resourceId === String(resourceId)) }))
+        .filter(({ r }) => r)
+        .map(({ g, r }) => ({ ...clone(g), disclosureLevel: r.disclosureLevel }))
     },
   }
 }

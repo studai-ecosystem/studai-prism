@@ -24,11 +24,19 @@ export const SUFFICIENCY_REASON_COPY = {
   RUBRIC_NOT_CALIBRATED: 'The scoring guide for this capability is still being calibrated.',
   RULES_NOT_APPROVED: 'The rules for describing this capability are still provisional.',
   HUMAN_REVIEW_REQUIRED: 'A person needs to review this evidence before it is described.',
+  CLAIM_NOT_VERIFIED: 'The evidence for this could not be checked against your session, so no level is shown.',
 }
 
 export const GENERIC_REASON = 'There is not yet enough reliable evidence to describe this capability.'
 
-export function reasonText(code) {
+// Wording for readers other than the student (sponsor, share link).
+const THIRD_PERSON_REASON_COPY = {
+  NO_ADMISSIBLE_EVIDENCE: 'The evidence recorded could not be checked against what the student actually did.',
+  CLAIM_NOT_VERIFIED: 'The evidence for this could not be checked against the session, so no level is shown.',
+}
+
+export function reasonText(code, { audience = 'OWNER' } = {}) {
+  if (audience !== 'OWNER' && THIRD_PERSON_REASON_COPY[code]) return THIRD_PERSON_REASON_COPY[code]
   return SUFFICIENCY_REASON_COPY[code] || GENERIC_REASON
 }
 

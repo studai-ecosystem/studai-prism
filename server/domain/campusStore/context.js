@@ -15,6 +15,7 @@ import { createAssignmentService } from '../assessments/assignmentService.js'
 import { createSessionDirectory } from '../student/sessionDirectory.js'
 import { createStudentReadModels } from '../student/readModels.js'
 import { createAssessmentSessionService } from '../assessments/sessionService.js'
+import { createReportService } from '../reports/v3/service.js'
 import { createTelemetryService } from '../telemetry/events.js'
 import { auditLog } from '../../lib/telemetry.js'
 
@@ -53,6 +54,7 @@ export function createCampusContext({
   hashActor,
   engine = null,
   limitMs = 35 * 60 * 1000,
+  shareTokenFactory,
 } = {}) {
   const campusAvailable = () => isEnabled('PRISM_CAMPUS_ENABLED') && campusStoreAvailable()
   const workspaceService = createWorkspaceService({ repos, campusAvailable })
@@ -66,6 +68,7 @@ export function createCampusContext({
   const ledger = createEntitlementLedger({ repos, clock, ...(audit ? { audit } : {}) })
   const sessionScopes = createSessionScopeService({ repos, clock, ...(sessionOwner ? { sessionOwner } : {}) })
   const auditWriter = audit || auditLog
+  const dataAccess = createDataAccessAudit({ repos })
   return {
     repos,
     campusAvailable,
@@ -86,9 +89,12 @@ export function createCampusContext({
       })
       : null,
     ledger,
+    reports: createReportService({
+      repos: storeView, legacy, catalog, evidence, sessionScopes, dataAccess, scenarioSource, audit: auditWriter, clock, ...(shareTokenFactory ? { tokenFactory: shareTokenFactory } : {}),
+    }),
     invites: createInviteService({ repos, sendInviteEmail, inviteUrlFor, clock, ...(tokenFactory ? { tokenFactory } : {}), ...(audit ? { audit } : {}) }),
     sessionScopes,
-    dataAccess: createDataAccessAudit({ repos }),
+    dataAccess,
     requireCampus: createRequireCampus({ campusStoreAvailable }),
     requireOrgPermission: createRequireOrgPermission({ workspaceService }),
     resolveWorkspace: createResolveWorkspace({ workspaceService }),

@@ -16,6 +16,12 @@ const workspaceV3 = () => isEnabled('PRISM_ASSESSMENT_WORKSPACE_V3')
 // The V3 player URL; sponsored sessions name their workspace so a new tab or
 // a refresh resolves the session in the right one.
 export const playerPath = (sessionId, workspaceId = null) => `/app/assessment/${encodeURIComponent(sessionId)}${workspaceId ? `?ws=${encodeURIComponent(workspaceId)}` : ''}`
+// Report V3 (shell + report flag) or the legacy report page. Sponsored
+// reports open inside their organization's campus student workspace.
+export const reportV3 = () => isEnabled('PRISM_APP_SHELL_V3') && isEnabled('PRISM_STUDENT_REPORT_V3')
+export const reportPath = (legacyPaths, sessionId, bank, organizationId = null) => (reportV3()
+  ? (organizationId ? `/app/campus/${encodeURIComponent(organizationId)}/reports/${encodeURIComponent(sessionId)}` : `/app/reports/${encodeURIComponent(sessionId)}`)
+  : legacyPaths.report(sessionId, bank))
 
 const PERSONAL_POLICY = Object.freeze({ accommodationsPolicy: { requestable: true }, reminderPolicy: { enabled: false } })
 const VISIBLE_SPONSORED = new Set(['SCHEDULED', 'ACTIVE', 'CLOSED'])
@@ -134,7 +140,7 @@ export function createAssignmentService({ repos, catalog, directory, legacy, res
     else if (status === 'UPCOMING') cta = { kind: 'VIEW_BRIEFING', to: `${base}/briefing` }
     else if (status === 'IN_PROGRESS' && s.sessionId && workspaceV3()) cta = { kind: 'RESUME', to: playerPath(s.sessionId, sponsored ? workspace.id : null) }
     else if (status === 'IN_PROGRESS' && s.sessionId && !sponsored) cta = { kind: 'RESUME', to: paths.resume(s.sessionId, bank) }
-    else if (status === 'COMPLETED' && s.sessionId && session?.hasReport) cta = { kind: 'VIEW_REPORT', to: paths.report(s.sessionId, bank) }
+    else if (status === 'COMPLETED' && s.sessionId && session?.hasReport) cta = { kind: 'VIEW_REPORT', to: reportPath(paths, s.sessionId, bank, sponsored ? workspace.organizationId : null) }
     return {
       id: a.id,
       definitionId: d.id,

@@ -76,12 +76,18 @@ export function createSessionScopeService({ repos, clock = () => new Date(), ses
         ownerUserId: scope.ownerUserId, organizationId, resourceType: 'ASSESSMENT_REPORT', resourceId: sessionId, at: clock().toISOString(),
       })
       if (grants.length === 0) return null
+      // A grant only works while its owner is still an ACTIVE student of the
+      // organization: leaving the institution ends what it can see.
+      const ownerMemberships = await repos.memberships.listMembershipsForUser(scope.ownerUserId)
+      if (!ownerMemberships.some((m) => m.organizationId === organizationId && m.status === 'ACTIVE' && m.role === 'STUDENT')) return null
       const cohorts = await repos.organizations.listCohortsForUser(organizationId, scope.ownerUserId)
       const targets = cohorts.length ? cohorts : [{ id: null, departmentId: null }]
       const inScope = targets.some((c) => can(actor, 'students.read', {
         organizationId, ownerUserId: scope.ownerUserId, cohortId: c.id, departmentId: c.departmentId,
       }).allowed)
-      if (inScope) return { scope, via: 'SHARE_GRANT' }
+      // The widest disclosure among the student's active grants applies.
+      const disclosure = grants.some((g) => g.disclosureLevel === 'FULL') ? 'FULL' : 'SUMMARY'
+      if (inScope) return { scope, via: 'SHARE_GRANT', disclosure }
       return null
     },
   }

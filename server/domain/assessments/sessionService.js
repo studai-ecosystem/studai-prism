@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto'
 import { ApiError } from '../http/errors.js'
 import { buildSessionContract, scenarioView } from './sessionContract.js'
+import { reportPath } from './assignmentService.js'
 
 const START_EVENT = 'start'
 const CANDIDATE = 'CANDIDATE'
@@ -180,7 +181,7 @@ export function createAssessmentSessionService({
         versions,
         limitMs,
         now: clock(),
-        reportPath: legacy.paths.report(sessionId, Object.prototype.hasOwnProperty.call(scenarios.bankScenarios || {}, session.scenarioId)),
+        reportPath: reportPath(legacy.paths, sessionId, Object.prototype.hasOwnProperty.call(scenarios.bankScenarios || {}, session.scenarioId), sponsored ? workspace.organizationId : null),
       })
     },
 

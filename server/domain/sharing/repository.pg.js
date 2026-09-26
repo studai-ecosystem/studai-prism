@@ -57,14 +57,20 @@ export function createSharingRepoPg({ query, getPool }) {
       )
       return grant(rows[0]) || null
     },
+    async findGrantByTokenHash(tokenHash) {
+      const { rows } = await query('SELECT * FROM share_grants WHERE token_hash = $1', [tokenHash])
+      if (!rows[0]) return null
+      const { rows: res } = await query('SELECT * FROM share_grant_resources WHERE share_grant_id = $1 ORDER BY resource_type, resource_id', [rows[0].id])
+      return { ...grant(rows[0]), resources: res.map((x) => ({ resourceType: x.resource_type, resourceId: x.resource_id, disclosureLevel: x.disclosure_level })) }
+    },
     async findActiveOrgGrants({ ownerUserId, organizationId, resourceType, resourceId, at }) {
       const { rows } = await query(
-        `SELECT g.* FROM share_grants g JOIN share_grant_resources r ON r.share_grant_id = g.id
+        `SELECT g.*, r.disclosure_level FROM share_grants g JOIN share_grant_resources r ON r.share_grant_id = g.id
          WHERE g.owner_user_id = $1 AND g.recipient_type = 'ORGANIZATION' AND g.recipient_organization_id = $2
            AND g.revoked_at IS NULL AND g.expires_at > $5 AND r.resource_type = $3 AND r.resource_id = $4`,
         [ownerUserId, organizationId, resourceType, String(resourceId), at],
       )
-      return rows.map(grant)
+      return rows.map((r) => ({ ...grant(r), disclosureLevel: r.disclosure_level }))
     },
   }
 }

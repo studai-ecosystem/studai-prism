@@ -48,6 +48,13 @@ test('0030/0031: schema, CHECKs fail closed, down reverses, personal derivation 
   await pool.query('DELETE FROM assessment_client_events WHERE session_id = $1', [sid])
   await pool.query('DELETE FROM assessment_artifact_versions WHERE session_id = $1', [sid])
 
+  // 0033: report versions never change once written; one row per content.
+  await pool.query("INSERT INTO student_report_versions (session_id, version, content_hash, builder_version, report_json) VALUES ($1, 1, 'h1', 'b', '{}')", [sid])
+  await assert.rejects(pool.query("UPDATE student_report_versions SET report_json = '{\"x\":1}' WHERE session_id = $1", [sid]))
+  await assert.rejects(pool.query("INSERT INTO student_report_versions (session_id, version, content_hash, builder_version, report_json) VALUES ($1, 2, 'h1', 'b', '{}')", [sid]))
+  await assert.rejects(pool.query("INSERT INTO student_report_versions (session_id, version, content_hash, builder_version, report_json) VALUES ($1, 0, 'h0', 'b', '{}')", [sid]))
+  await pool.query('DELETE FROM student_report_versions WHERE session_id = $1', [sid])
+
   const reject = (sql, params) => assert.rejects(pool.query(sql, params), /check constraint|violates|null value/i)
   await reject("INSERT INTO assessment_forms (id, definition_id, version, scenario_id, capability_ids, status) VALUES ($1, 'prism-sim-gbo-l1', '1', 's', '{}', 'FROZEN')", [randomUUID()])
   await reject("INSERT INTO assessment_assignments (id, definition_id, form_policy, sponsor_type, integrity_policy, accommodations_policy, reminder_policy, created_by, status) VALUES ($1, 'prism-sim-gbo-l1', 'SERVER_SELECTED', 'PERSONAL', 'STANDARD', '{}', '{}', 'SYSTEM', 'ACTIVE')", [randomUUID()])
