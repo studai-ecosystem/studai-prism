@@ -250,4 +250,81 @@ export function runCampusRepoContract(test, label, getRepos) {
     const active = await repos.sharing.findActiveOrgGrants({ ownerUserId: owner, organizationId: org.id, resourceType: 'ASSESSMENT_REPORT', resourceId: sid, at: new Date().toISOString() })
     assert.deepEqual(active.map((a) => a.disclosureLevel).sort(), ['FULL', 'SUMMARY'])
   })
+
+  test(`${label}: campus admin — structure, cohorts, programs, imports, onboarding, notifications, org audit`, async () => {
+    const repos = await getRepos()
+    const ca = repos.campusAdmin
+    const org = await repos.organizations.createOrganization({ name: 'Synthetic Admin Org', slug: slug(), organizationType: 'UNIVERSITY', status: 'ACTIVE' })
+    const campus = await ca.createStructure('campus', { organizationId: org.id, name: 'North' })
+    const dept = await ca.createStructure('department', { organizationId: org.id, name: 'Commerce', campusId: campus.id, code: 'COM' })
+    const prog = await ca.createStructure('academicProgram', { organizationId: org.id, name: 'B.Com', departmentId: dept.id, degreeLevel: 'UG', durationYears: 3 })
+    await ca.createStructure('batch', { organizationId: org.id, name: '2024-27', programId: prog.id, startYear: 2024, endYear: 2027 })
+    await assert.rejects(ca.createStructure('batch', { organizationId: org.id, name: 'Bad', startYear: 2027, endYear: 2024 }), { code: 'VALIDATION_FAILED' })
+    const structure = await ca.listStructure(org.id)
+    assert.deepEqual([structure.campuses.length, structure.departments.length, structure.academicPrograms.length, structure.batches.length], [1, 1, 1, 1])
+
+    const cohort = await ca.createCohort({ organizationId: org.id, departmentId: dept.id, academicProgramId: prog.id, name: 'Commerce 2027', semester: 'S5', tags: ['final-year'] })
+    const user = uid()
+    await repos.organizations.addCohortMember({ cohortId: cohort.id, userId: user })
+    let cohorts = await ca.listCohorts(org.id)
+    assert.equal(cohorts.find((c) => c.id === cohort.id).memberCount, 1)
+    assert.equal((await ca.updateCohort(cohort.id, { name: 'Commerce 2027 A' })).name, 'Commerce 2027 A')
+    assert.deepEqual((await ca.listCohortMembershipsForOrg(org.id)).map((m) => m.userId), [user])
+    await ca.removeCohortMember(cohort.id, user)
+    cohorts = await ca.listCohorts(org.id)
+    assert.equal(cohorts.find((c) => c.id === cohort.id).memberCount, 0)
+    assert.equal(await ca.removeCohortMember(cohort.id, uid()), null)
+
+    const m = await repos.memberships.upsertMembership({ organizationId: org.id, userId: user, role: 'PLACEMENT_OFFICER', status: 'ACTIVE' })
+    assert.equal((await ca.getMembership(m.id)).role, 'PLACEMENT_OFFICER')
+    assert.equal((await ca.setMembershipStatus(m.id, 'REMOVED')).status, 'REMOVED')
+    assert.equal((await ca.listOrgMemberships(org.id)).length, 1)
+
+    const program = await ca.createProgram({ organizationId: org.id, name: 'Readiness', status: 'DRAFT', startsOn: '2026-10-01', endsOn: '2027-03-31', reportingPolicy: { shareSponsoredReports: true, aggregateOnly: false }, sponsorshipScope: { assessments: true, development: false, reassessment: false }, createdBy: 'owner' })
+    await assert.rejects(ca.createProgram({ organizationId: org.id, name: 'Bad', status: 'DRAFT', startsOn: '2027-01-01', endsOn: '2026-01-01', reportingPolicy: {}, sponsorshipScope: {}, createdBy: 'owner' }), { code: 'VALIDATION_FAILED' })
+    await ca.setProgramCohorts(program.id, [cohort.id, cohort.id])
+    assert.deepEqual(await ca.listProgramCohorts(program.id), [cohort.id])
+    assert.equal((await ca.updateProgram(program.id, { status: 'ACTIVE' })).status, 'ACTIVE')
+    assert.deepEqual((await ca.listPrograms(org.id)).map((p) => p.id), [program.id])
+
+    const job = await ca.createImportJob({
+      organizationId: org.id, uploadedBy: 'owner', fileName: 'students.csv', totals: { rows: 2, invite: 1, alreadyMember: 0, errors: 1 },
+      rows: [
+        { rowNumber: 2, raw: { email: 'a@test.local' }, normalized: { email: 'a@test.local', cohortId: cohort.id }, errors: [], action: 'INVITE' },
+        { rowNumber: 3, raw: { email: 'bad' }, normalized: null, errors: ['EMAIL_INVALID'], action: 'ERROR' },
+      ],
+    })
+    assert.equal(job.status, 'PREVIEW')
+    assert.deepEqual((await ca.listImportRows(job.id)).map((r) => r.action), ['INVITE', 'ERROR'])
+    assert.equal((await ca.claimImportCommit(job.id, 'k1')).claimed, true)
+    await ca.releaseImportClaim(job.id, 'other-key')
+    assert.equal((await ca.claimImportCommit(job.id, 'k1')).inFlight, true, 'another key cannot release the claim')
+    await ca.releaseImportClaim(job.id, 'k1')
+    assert.equal((await ca.claimImportCommit(job.id, 'k1')).claimed, true, 'released claim can be taken again')
+    assert.equal((await ca.claimImportCommit(job.id, 'k1')).inFlight, true)
+    assert.equal((await ca.claimImportCommit(job.id, 'k2')).claimed, false)
+    const committed = await ca.commitImportJob(job.id, { commitKey: 'k1', totals: { ...job.totals, invited: 1, skipped: 1, failed: 0 }, outcomes: { 2: 'INVITED', 3: 'SKIPPED' } })
+    assert.equal(committed.job.status, 'COMMITTED')
+    assert.equal(committed.replayed, false)
+    assert.equal((await ca.commitImportJob(job.id, { commitKey: 'k1', totals: {}, outcomes: {} })).replayed, true)
+    assert.deepEqual((await ca.listImportRows(job.id)).map((r) => r.outcome), ['INVITED', 'SKIPPED'])
+
+    assert.equal(await ca.getOnboarding(org.id), null)
+    await ca.saveOnboarding({ organizationId: org.id, completedSteps: ['profile'], data: {}, updatedBy: 'owner' })
+    const ob = await ca.saveOnboarding({ organizationId: org.id, completedSteps: ['profile', 'structure', 'profile'], data: { x: 1 }, updatedBy: 'owner' })
+    assert.deepEqual(ob.completedSteps, ['profile', 'structure'])
+    assert.deepEqual((await ca.getOnboarding(org.id)).data, { x: 1 })
+
+    const n = await ca.createNotification({ userId: user, organizationId: org.id, kind: 'IMPORT_COMPLETE', payload: { invited: 1 } })
+    assert.equal(n.readAt, null)
+    assert.equal(await ca.markNotificationRead(n.id, uid()), null)
+    assert.ok((await ca.markNotificationRead(n.id, user)).readAt)
+    assert.equal((await ca.listNotifications(user)).length, 1)
+
+    await ca.appendOrgAudit({ organizationId: org.id, actorUserId: 'owner', action: 'cohort.created', targetType: 'COHORT', targetId: cohort.id, details: { name: 'x' } })
+    await ca.appendOrgAudit({ organizationId: org.id, actorUserId: 'owner', action: 'program.created', targetType: 'PROGRAM', targetId: program.id })
+    const log = await ca.listOrgAudit(org.id)
+    assert.equal(log.length, 2)
+    assert.deepEqual(log.find((e) => e.action === 'cohort.created').details, { name: 'x' })
+  })
 }

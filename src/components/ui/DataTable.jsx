@@ -21,14 +21,23 @@ export function DataTable({
   selectable = false,
   selected = [],
   onSelectedChange,
+  isRowSelectable = () => true,
+  rowLabel = (r) => String(rowKey(r)),
   className,
 }) {
-  const allIds = rows.map(rowKey)
-  const allSelected = selectable && rows.length > 0 && allIds.every((id) => selected.includes(id))
+  const allIds = rows.filter(isRowSelectable).map(rowKey)
+  const allSelected = selectable && allIds.length > 0 && allIds.every((id) => selected.includes(id))
   const toggle = (id) => onSelectedChange?.(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
 
   return (
-    <div className={cx('overflow-x-auto rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface', className)}>
+    // On narrow screens the table scrolls sideways: the region is focusable
+    // so keyboard users can scroll it too (WCAG 2.1.1, axe scrollable-region-focusable).
+    <div
+      role="region"
+      aria-label={typeof caption === 'string' ? caption : 'Table'}
+      tabIndex={0}
+      className={cx('relative overflow-x-auto rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--prism-accent)]', className)}
+    >
       <table className="min-w-full border-collapse text-left text-sm" aria-busy={loading || undefined}>
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-prism-subtle text-prism-ink-muted">
@@ -39,6 +48,8 @@ export function DataTable({
                   type="checkbox"
                   aria-label="Select all rows"
                   checked={allSelected}
+                  disabled={allIds.length === 0}
+                  ref={(el) => { if (el) el.indeterminate = !allSelected && allIds.some((id) => selected.includes(id)) }}
                   onChange={() => onSelectedChange?.(allSelected ? [] : allIds)}
                   className="h-4 w-4 accent-[var(--prism-accent)]"
                 />
@@ -71,7 +82,9 @@ export function DataTable({
               <tr key={id} className="border-t border-prism-border">
                 {selectable && (
                   <td className="px-3 py-2">
-                    <input type="checkbox" aria-label={`Select row ${id}`} checked={selected.includes(id)} onChange={() => toggle(id)} className="h-4 w-4 accent-[var(--prism-accent)]" />
+                    {isRowSelectable(r) && (
+                      <input type="checkbox" aria-label={`Select ${rowLabel(r)}`} checked={selected.includes(id)} onChange={() => toggle(id)} className="h-4 w-4 accent-[var(--prism-accent)]" />
+                    )}
                   </td>
                 )}
                 {columns.map((c) => (

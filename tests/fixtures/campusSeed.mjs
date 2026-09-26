@@ -91,3 +91,27 @@ export async function listConsentRecords({ databaseUrl, userId }) {
   const repos = await reposFor(databaseUrl)
   return repos.sharing.listConsents(userId)
 }
+
+// Journey C: invitation emails are not delivered in the harness, so the test
+// writes one extra cohort invitation with a known token (hash stored only).
+export async function seedCohortInvite({ databaseUrl, organizationId, cohortId, email, invitedBy }) {
+  const repos = await reposFor(databaseUrl)
+  const { hashToken } = await import('../../server/domain/memberships/inviteService.js')
+  const token = randomBytes(32).toString('base64url')
+  await repos.memberships.createInvite({
+    organizationId, email: String(email).toLowerCase(), role: 'STUDENT', cohortId, tokenHash: hashToken(token), invitedBy,
+    expiresAt: new Date(Date.now() + 86400000).toISOString(),
+  })
+  return { token }
+}
+
+// Journey C: an owner-only organization (no student invitation).
+export async function seedOrganization({ databaseUrl, ownerUserId }) {
+  const repos = await reposFor(databaseUrl)
+  const suffix = randomUUID().slice(0, 8)
+  const org = await repos.organizations.createOrganization({
+    name: `Synthetic Campus ${suffix}`, slug: `synthetic-campus-${suffix}`, organizationType: 'UNIVERSITY', status: 'ACTIVE',
+  })
+  await repos.memberships.upsertMembership({ organizationId: org.id, userId: ownerUserId, role: 'ORG_OWNER', status: 'ACTIVE' })
+  return { organizationId: org.id, organizationName: org.name }
+}

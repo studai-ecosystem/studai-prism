@@ -26,6 +26,8 @@ export function createInviteService({
   clock = () => new Date(),
   tokenFactory = defaultToken,
   audit = auditLog,
+  // Called after a student joins a cohort (roster sync for live assignments).
+  onCohortJoined = async () => {},
 }) {
   async function assertMayInvite({ actor, orgId, role, cohort, departmentId }) {
     if (!INVITABLE_ROLES.includes(role)) throw new ApiError('VALIDATION_FAILED', 'This role cannot be invited.')
@@ -157,7 +159,10 @@ export function createInviteService({
         departmentId: invite.departmentId, scope, invitedBy: invite.invitedBy,
       })
       const workspace = await repos.workspaces.upsertWorkspace({ type, ownerUserId: user.id, organizationId: invite.organizationId, name: invite.organizationName })
-      if (invite.role === 'STUDENT' && invite.cohortId) await repos.organizations.addCohortMember({ cohortId: invite.cohortId, userId: user.id, addedBy: invite.invitedBy })
+      if (invite.role === 'STUDENT' && invite.cohortId) {
+        await repos.organizations.addCohortMember({ cohortId: invite.cohortId, userId: user.id, addedBy: invite.invitedBy })
+        await onCohortJoined({ organizationId: invite.organizationId, cohortId: invite.cohortId, userId: user.id })
+      }
       await repos.memberships.updateInvite(invite.id, { status: 'ACCEPTED', acceptedBy: user.id, acceptedAt: clock().toISOString() })
       audit('campus.membership.changed', null, { action: 'ACCEPTED', organizationId: invite.organizationId, role: invite.role, userId: user.id })
       return { workspaceId: workspace.id, workspaceType: type, organizationId: invite.organizationId, role: invite.role, alreadyAccepted: false }

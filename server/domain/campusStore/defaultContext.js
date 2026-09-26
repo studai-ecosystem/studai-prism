@@ -5,7 +5,8 @@ import { isDbConfigured, query, getPool } from '../../db/pool.js'
 import { createPgCampusRepos } from './index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from './context.js'
 import { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport, getEntitlement, createEntitlement } from '../../lib/store.js'
-import { isMailEnabled, sendOrgInviteEmail } from '../../lib/mailer.js'
+import { isMailEnabled, sendOrgInviteEmail, sendCampusAssignmentEmail } from '../../lib/mailer.js'
+import { findUserById, findUserByEmail } from '../../lib/db.js'
 import evidenceGraph from '../../lib/evidenceGraph.js'
 import roleAffinityEngine from '../../lib/roleAffinityEngine.js'
 import { PRE_APPROVED_SCENARIOS } from '../../lib/scenarioBank.js'
@@ -39,6 +40,13 @@ export function createDefaultCampusContext() {
     // Without a configured public URL there is no safe absolute link to send.
     sendInviteEmail: async (msg) => (isMailEnabled() && base ? sendOrgInviteEmail(msg) : false),
     inviteUrlFor: (token) => `${base}/app/campus-invite/${encodeURIComponent(token)}`,
+    sendAssignmentEmail: async (msg) => (isMailEnabled() && base ? sendCampusAssignmentEmail(msg) : false),
+    appUrl: base,
+    // Only the fields admin views need; never password hashes or profile data.
+    users: {
+      findById: async (id) => { const u = await findUserById(id); return u ? { id: u.id, name: u.name || null, email: u.email || null } : null },
+      findByEmail: async (email) => { const u = await findUserByEmail(email); return u ? { id: u.id, name: u.name || null, email: u.email || null } : null },
+    },
     sessionOwner: async (sessionId) => (await getSession(sessionId).catch(() => null))?.userId || null,
     legacy: {
       listEntitlements: (userId) => listEntitlementsByUser(userId),

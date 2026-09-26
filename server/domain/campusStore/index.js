@@ -21,6 +21,8 @@ import { createPreferencesRepoMemory, createPreferencesRepoPg } from '../prefere
 import { createProductEventsRepoMemory, createProductEventsRepoPg } from '../telemetry/events.js'
 import { createSessionIoRepoMemory, createSessionIoRepoPg } from '../assessments/sessionIoRepository.js'
 import { createReportVersionsRepoMemory, createReportVersionsRepoPg } from '../reports/v3/repository.js'
+import { createCampusAdminRepoMemory } from '../campusAdmin/repository.memory.js'
+import { createCampusAdminRepoPg } from '../campusAdmin/repository.pg.js'
 
 export function createMemoryCampusRepos(options = {}) {
   const db = options.db || createMemoryDb(options)
@@ -39,6 +41,7 @@ export function createMemoryCampusRepos(options = {}) {
     productEvents: createProductEventsRepoMemory(db),
     sessionIo: createSessionIoRepoMemory(db),
     reportVersions: createReportVersionsRepoMemory(db),
+    campusAdmin: createCampusAdminRepoMemory(db),
   }
 }
 
@@ -58,5 +61,6 @@ export function createPgCampusRepos({ query, getPool }) {
     productEvents: createProductEventsRepoPg(deps),
     sessionIo: createSessionIoRepoPg(deps),
     reportVersions: createReportVersionsRepoPg(deps),
+    campusAdmin: createCampusAdminRepoPg(deps),
   }
 }

@@ -94,6 +94,14 @@ export async function fetchStudentReport(sessionId) {
   return data
 }
 
+// A sponsored (or student-shared) report read by an authorized staff member.
+export async function fetchSponsorReport(organizationId, sessionId) {
+  const { data } = await request(`/api/v1/organizations/${encodeURIComponent(organizationId)}/sessions/${encodeURIComponent(sessionId)}/report`, {
+    schema: ReportResponse, defaultErrorMessage: 'This report could not be loaded.',
+  })
+  return data
+}
+
 export async function fetchSharedReport(token) {
   const { data } = await request(`/api/v1/shared/${encodeURIComponent(token)}`, {
     workspace: false, auth: false, schema: ReportResponse, defaultErrorMessage: 'This report could not be loaded.',

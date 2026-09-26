@@ -10,6 +10,7 @@ import { createInviteService } from '../memberships/inviteService.js'
 import { createSessionScopeService } from '../scopes/sessionScope.js'
 import { createDataAccessAudit } from '../audit/dataAccess.js'
 import { createRequireCampus, createRequireOrgPermission } from '../permissions/middleware.js'
+import { can } from '../permissions/can.js'
 import { createCatalogService } from '../assessments/catalogService.js'
 import { createAssignmentService } from '../assessments/assignmentService.js'
 import { createSessionDirectory } from '../student/sessionDirectory.js'
@@ -17,7 +18,14 @@ import { createStudentReadModels } from '../student/readModels.js'
 import { createAssessmentSessionService } from '../assessments/sessionService.js'
 import { createReportService } from '../reports/v3/service.js'
 import { createTelemetryService } from '../telemetry/events.js'
+import { createCampusAdminService } from '../campusAdmin/service.js'
 import { auditLog } from '../../lib/telemetry.js'
+
+// Account directory (read-only) for admin views: `{ id, name, email }` or null.
+export const EMPTY_USER_DIRECTORY = Object.freeze({
+  findById: async () => null,
+  findByEmail: async () => null,
+})
 
 // Legacy sources the student read models consult (read-only). Tests inject
 // synthetic ones; the app wires the v1 store (defaultContext.js).
@@ -55,6 +63,9 @@ export function createCampusContext({
   engine = null,
   limitMs = 35 * 60 * 1000,
   shareTokenFactory,
+  users = EMPTY_USER_DIRECTORY,
+  sendAssignmentEmail,
+  appUrl = '',
 } = {}) {
   const campusAvailable = () => isEnabled('PRISM_CAMPUS_ENABLED') && campusStoreAvailable()
   const workspaceService = createWorkspaceService({ repos, campusAvailable })
@@ -69,6 +80,15 @@ export function createCampusContext({
   const sessionScopes = createSessionScopeService({ repos, clock, ...(sessionOwner ? { sessionOwner } : {}) })
   const auditWriter = audit || auditLog
   const dataAccess = createDataAccessAudit({ repos })
+  // Late-bound: invites and sessions notify campus admin, which uses invites.
+  let admin = null
+  const invites = createInviteService({
+    repos, sendInviteEmail, inviteUrlFor, clock, ...(tokenFactory ? { tokenFactory } : {}), ...(audit ? { audit } : {}),
+    onCohortJoined: ({ organizationId, cohortId, userId }) => admin.syncRoster(organizationId, cohortId, userId),
+  })
+  admin = createCampusAdminService({
+    repos: storeView, users, invites, catalog, clock, audit: auditWriter, appUrl, ledger, ...(sendAssignmentEmail ? { sendAssignmentEmail } : {}),
+  })
   return {
     repos,
     campusAvailable,
@@ -86,13 +106,17 @@ export function createCampusContext({
     sessions: engine
       ? createAssessmentSessionService({
         repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter,
+        onSponsoredCompleted: ({ organizationId, assignmentId }) => admin.checkCompletionThresholds(organizationId, assignmentId),
       })
       : null,
     ledger,
     reports: createReportService({
       repos: storeView, legacy, catalog, evidence, sessionScopes, dataAccess, scenarioSource, audit: auditWriter, clock, ...(shareTokenFactory ? { tokenFactory: shareTokenFactory } : {}),
     }),
-    invites: createInviteService({ repos, sendInviteEmail, inviteUrlFor, clock, ...(tokenFactory ? { tokenFactory } : {}), ...(audit ? { audit } : {}) }),
+    invites,
+    admin,
+    // Effective scope of `permission` for an actor in an organization.
+    scopeFor: (actor, organizationId, permission) => can(actor, permission, { organizationId }),
     sessionScopes,
     dataAccess,
     requireCampus: createRequireCampus({ campusStoreAvailable }),

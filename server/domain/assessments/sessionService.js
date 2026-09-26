@@ -42,6 +42,8 @@ function createSessionLocks() {
 export function createAssessmentSessionService({
   repos, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes,
   clock = () => new Date(), limitMs, audit = () => {},
+  // Called once a sponsored roster row turns COMPLETED (completion notifications).
+  onSponsoredCompleted = async () => {},
 }) {
   const withLock = createSessionLocks()
 
@@ -87,6 +89,8 @@ export function createAssessmentSessionService({
       const row = await repos.assessments.getAssignmentForUser(assignmentId, user.id)
       if (row && row.student.status !== 'COMPLETED') {
         await repos.assessments.updateStudent({ assignmentId, userId: user.id, patch: { status: 'COMPLETED', sessionId, completedAt: clock().toISOString() } })
+        // A notification failure never blocks the student's report.
+        await Promise.resolve(onSponsoredCompleted({ organizationId: row.organizationId, assignmentId })).catch(() => {})
       }
     }
   }

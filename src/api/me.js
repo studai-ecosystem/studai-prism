@@ -8,7 +8,8 @@ export const WorkspaceSchema = z.object({
   name: z.string(),
   organizationId: z.string().nullable(),
   organizationName: z.string().nullable().optional(),
-  visibilityPolicy: z.string().optional(),
+  // Staff (CAMPUS_ADMIN) workspaces have no student visibility policy: null.
+  visibilityPolicy: z.string().nullable().optional(),
   role: z.string().nullable().optional(),
   permissions: z.array(z.string()).optional(),
 }).passthrough()

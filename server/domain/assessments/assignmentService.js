@@ -130,7 +130,9 @@ export function createAssignmentService({ repos, catalog, directory, legacy, res
     if (s.status === 'COMPLETED') status = 'COMPLETED'
     else if (sponsored && (a.status === 'CLOSED' || (dueAt && new Date(dueAt) <= at) || s.status === 'EXPIRED')) status = 'EXPIRED'
     else if (s.status === 'IN_PROGRESS') status = 'IN_PROGRESS'
-    else if (sponsored && (a.status === 'SCHEDULED' || (opensAt && new Date(opensAt) > at))) status = 'UPCOMING'
+    // A SCHEDULED window opens by itself at windowStart (K77); without a
+    // start time it stays closed until an admin opens it.
+    else if (sponsored && ((opensAt && new Date(opensAt) > at) || (a.status === 'SCHEDULED' && !opensAt))) status = 'UPCOMING'
     else status = 'NOT_STARTED'
     const tab = status === 'COMPLETED' || status === 'EXPIRED' ? 'COMPLETED' : status === 'UPCOMING' ? 'UPCOMING' : 'ACTIVE'
     const base = sponsored ? `/app/campus/${workspace.organizationId}/assignments/${a.id}` : `/app/assessments/${a.id}`

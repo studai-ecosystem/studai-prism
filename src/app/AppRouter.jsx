@@ -7,7 +7,7 @@ import { useAuth } from './providers/AuthProvider.jsx'
 import { Skeleton } from '../components/ui/Skeleton.jsx'
 import { AuthGuard } from './guards/AuthGuard.jsx'
 import { WorkspaceGuard } from './guards/WorkspaceGuard.jsx'
-import { FlagRoute, LegacyAlias, V3Route } from './routing.jsx'
+import { FlagRoute, LegacyAlias, V3Route, ParamRedirect } from './routing.jsx'
 import { RouteErrorBoundary, lazyWithRetry } from './RouteErrorBoundary.jsx'
 import { StudentShell } from '../layouts/StudentShell.jsx'
 import { CampusShell } from '../layouts/CampusShell.jsx'
@@ -97,6 +97,21 @@ const GrowthPage = lazy(() => import('../features/growth/pages/GrowthPage.jsx'))
 const SharingPage = lazy(() => import('../features/sharing/pages/SharingPage.jsx'))
 const SettingsPage = lazy(() => import('../features/settings/pages/SettingsPage.jsx'))
 const CampusOverviewPage = lazy(() => import('../features/campus/pages/CampusOverviewPage.jsx'))
+const CampusStudentsPage = lazy(() => import('../features/campus/pages/CampusStudentsPage.jsx'))
+const CampusStudentDetailPage = lazy(() => import('../features/campus/pages/CampusStudentDetailPage.jsx'))
+const CampusCohortsPage = lazy(() => import('../features/campus/pages/CampusCohortsPage.jsx'))
+const CampusCohortDetailPage = lazy(() => import('../features/campus/pages/CampusCohortDetailPage.jsx'))
+const CampusImportPage = lazy(() => import('../features/campus/pages/CampusImportPage.jsx'))
+const CampusProgramsPage = lazy(() => import('../features/campus/pages/CampusProgramsPage.jsx'))
+const CampusProgramDetailPage = lazy(() => import('../features/campus/pages/CampusProgramDetailPage.jsx'))
+const CampusAssessmentsPage = lazy(() => import('../features/campus/pages/CampusAssessmentsPage.jsx'))
+const CampusAssignWizardPage = lazy(() => import('../features/campus/pages/CampusAssignWizardPage.jsx'))
+const CampusAssignmentDetailPage = lazy(() => import('../features/campus/pages/CampusAssignmentDetailPage.jsx'))
+const CampusMembersPage = lazy(() => import('../features/campus/pages/CampusMembersPage.jsx'))
+const CampusSettingsPage = lazy(() => import('../features/campus/pages/CampusSettingsPage.jsx'))
+const CampusOnboardingPage = lazy(() => import('../features/campus/pages/CampusOnboardingPage.jsx'))
+const CampusReportPage = lazy(() => import('../features/campus/pages/CampusReportPage.jsx'))
+const CampusNotYetAvailablePage = lazy(() => import('../features/campus/pages/CampusNotYetAvailablePage.jsx'))
 const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusInvitePage.jsx'))
 const NotYetAvailablePage = lazy(() => import('../features/shared/NotYetAvailablePage.jsx'))
 const StudentReportPage = lazy(() => import('../features/reports/pages/StudentReportPage.jsx'))
@@ -240,7 +255,7 @@ export default function AppRouter() {
             <Route path="development" element={<DevelopmentPage />} />
             <Route path="growth" element={<GrowthPage />} />
             <Route path="reports/:sessionId" element={<FlagRoute flag="PRISM_STUDENT_REPORT_V3" onError="error" on={<StudentReportPage />} off={<Navigate to="../home" replace />} />} />
-            <Route path="*" element={<Navigate to="home" replace />} />
+            <Route path="*" element={<ParamRedirect to="/app/campus/:organizationId/home" />} />
           </Route>
 
           {/* Campus administration (spec §6.4). */}
@@ -250,7 +265,28 @@ export default function AppRouter() {
           >
             <Route index element={<Navigate to="overview" replace />} />
             <Route path="overview" element={<CampusOverviewPage />} />
-            <Route path="*" element={<Navigate to="overview" replace />} />
+            <Route path="setup" element={<CampusOnboardingPage />} />
+            <Route path="students" element={<CampusStudentsPage />} />
+            <Route path="students/:studentId" element={<CampusStudentDetailPage />} />
+            <Route path="cohorts" element={<CampusCohortsPage />} />
+            <Route path="cohorts/import" element={<CampusImportPage />} />
+            <Route path="cohorts/:cohortId" element={<CampusCohortDetailPage />} />
+            <Route path="programs" element={<CampusProgramsPage />} />
+            <Route path="programs/:programId" element={<CampusProgramDetailPage />} />
+            <Route path="assessments" element={<CampusAssessmentsPage />} />
+            <Route path="assessments/assign" element={<CampusAssignWizardPage />} />
+            <Route path="assessments/:assignmentId" element={<CampusAssignmentDetailPage />} />
+            <Route path="members" element={<CampusMembersPage />} />
+            <Route path="settings" element={<CampusSettingsPage />} />
+            <Route path="reports/:sessionId" element={<FlagRoute flag="PRISM_STUDENT_REPORT_V3" onError="error" on={<CampusReportPage />} off={<ParamRedirect to="/campus/:organizationId/overview" />} />} />
+            {/* Sections of later phases (spec §19.1 nav): an honest page, never a loop. */}
+            <Route path="development" element={<CampusNotYetAvailablePage title="Development" />} />
+            <Route path="reassessments" element={<CampusNotYetAvailablePage title="Reassessments" />} />
+            <Route path="analytics" element={<CampusNotYetAvailablePage title="Analytics" />} />
+            <Route path="reports" element={<CampusNotYetAvailablePage title="Reports" />} />
+            <Route path="integrations" element={<CampusNotYetAvailablePage title="Integrations" />} />
+            <Route path="billing" element={<CampusNotYetAvailablePage title="Billing" />} />
+            <Route path="*" element={<ParamRedirect to="/campus/:organizationId/overview" />} />
           </Route>
 
           <Route path="/invite/:token" element={<InviteRedeem />} />
