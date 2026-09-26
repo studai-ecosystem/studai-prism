@@ -249,7 +249,8 @@ export function createGrowthService({ repos, catalog, clock = () => new Date(), 
     },
 
     // ── Campus growth outcomes (comparable only; §17, §27) ──────────────
-    async outcomes(actor, organizationId, { admin, cycleId = null }) {
+    async outcomes(actor, organizationId, { admin, cycleId = null, minGroupSize: orgMin = null }) {
+      const min = orgMin ?? minGroupSize
       const approved = await approvedPairs()
       const permission = 'analytics.read'
       const cycles = cycleId ? [(await this.getCycle(actor, organizationId, cycleId, { admin, permission })).cycle] : (await this.listCycles(actor, organizationId, { admin, permission })).map((s) => ({ id: s.id }))
@@ -291,14 +292,14 @@ export function createGrowthService({ repos, catalog, clock = () => new Date(), 
           }
         }
         // Small groups are suppressed whole: never a partial number (§27).
-        const capabilities = [...byCapability.values()].sort((a, b) => String(a.name).localeCompare(String(b.name))).map((a) => (a.n >= minGroupSize
+        const capabilities = [...byCapability.values()].sort((a, b) => String(a.name).localeCompare(String(b.name))).map((a) => (a.n >= min
           ? { capabilityId: a.capabilityId, name: a.name, n: a.n, higher: a.HIGHER, same: a.SAME, lower: a.LOWER, suppressed: false }
           : { capabilityId: a.capabilityId, name: a.name, suppressed: true, reason: 'SMALL_GROUP' }))
         out.push({
           cycle: { id: summary.id, name: summary.name, status: summary.status, comparability: summary.comparability },
           counts,
           capabilities,
-          minGroupSize,
+          minGroupSize: min,
           method: 'Level-label change between the baseline and reassessment, counted only for students whose two assessment forms are approved as comparable and who gathered enough evidence in both. Groups smaller than the minimum size are not shown.',
         })
       }

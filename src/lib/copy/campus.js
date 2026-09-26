@@ -47,7 +47,8 @@ export const AUDIT_ACTION_TEXT = Object.freeze({
   'role.changed': 'Changed a team role',
   'member.removed': 'Removed a team member',
   'invite.resent': 'Sent an invitation again',
-  'report.exported': 'Exported the student directory',
+  'report.exported': 'Exported a report or aggregate data',
+  'analytics.settings.updated': 'Changed the analytics privacy threshold',
   'onboarding.completed': 'Completed setup',
   'intervention.assigned': 'Assigned practice missions to a cohort',
   'intervention.completed': 'Marked an intervention as completed',
@@ -57,11 +58,29 @@ export const AUDIT_ACTION_TEXT = Object.freeze({
   'reassessment.cancelled': 'Cancelled a reassessment',
 })
 
+export const ANALYTICS_COPY = Object.freeze({
+  // Spec §27.2, verbatim.
+  suppressed: 'Data hidden because this segment is too small for aggregate reporting.',
+  hidden: 'Hidden',
+  scopeNote: 'Counts cover sponsored assessments of the students you are responsible for. Each student counts once, by their latest completed sponsored assessment. Personal Prism activity is never included.',
+  provisionalNote: 'Level labels are provisional until measurement governance finalises them.',
+  noRanking: 'Prism does not rank students or combine capabilities into one score.',
+  underReview: (n) => `${n} ${n === 1 ? 'assessment is' : 'assessments are'} under review and not counted.`,
+  needs: (needs, of) => `${needs} of ${of} assessed students need further evidence or development`,
+  empty: 'No completed sponsored assessments match these filters yet.',
+  showTable: 'Show as table',
+  hideTable: 'Hide table',
+  filtersNotApplied: 'The filters above do not apply to this view; it covers every intervention and reassessment you are responsible for.',
+  heatmapKey: 'Each cell shows how many assessed students need further evidence or development in that capability. Darker cells: at least a quarter, darkest: at least half.',
+  statusLabels: { SUFFICIENT: 'Enough evidence', PROVISIONAL: 'Provisional', INSUFFICIENT_EVIDENCE: 'Not enough evidence', HUMAN_REVIEW_REQUIRED: 'Under human review' },
+  thresholdHelp: (floor, def) => `Groups with fewer students than this are hidden in every aggregate view and export. The recommended value is ${def}; it cannot be lower than ${floor}.`,
+})
+
 export const REASSESSMENT_COPY = Object.freeze({
   scheduleIntro: 'The same cohorts take the same assessment again in a new window. Students are notified like any assigned assessment.',
   noBaselines: 'There is no assessment to repeat yet. Assign an assessment to a cohort first.',
   comparabilityNote: 'A change is shown to students and to you only when the assessment forms are approved as comparable by Prism\'s psychometric review and both assessments gathered enough evidence. Until then, students see their results without a change.',
-  pageNote: 'Prism never calculates a change across forms that are not approved as comparable. Outcome counts are shown only for groups of at least 10 students and never name or rank a student.',
+  pageNote: 'Prism never calculates a change across forms that are not approved as comparable. Outcome counts are shown only for groups at or above your organization’s minimum group size (10 students unless an owner changes it) and never name or rank a student.',
   noOutcomes: 'No capability change can be shown yet.',
   suppressed: 'Hidden',
   // Spec §27.2, verbatim.

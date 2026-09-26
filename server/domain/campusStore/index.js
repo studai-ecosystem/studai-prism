@@ -27,6 +27,7 @@ import { createDevelopmentRepoMemory } from '../development/repository.memory.js
 import { createDevelopmentRepoPg } from '../development/repository.pg.js'
 import { createGrowthRepoMemory } from '../growth/repository.memory.js'
 import { createGrowthRepoPg } from '../growth/repository.pg.js'
+import { createAnalyticsRepoMemory, createAnalyticsRepoPg } from '../analytics/repository.js'
 
 export function createMemoryCampusRepos(options = {}) {
   const db = options.db || createMemoryDb(options)
@@ -48,6 +49,7 @@ export function createMemoryCampusRepos(options = {}) {
     campusAdmin: createCampusAdminRepoMemory(db),
     development: createDevelopmentRepoMemory(db),
     growth: createGrowthRepoMemory(db),
+    analytics: createAnalyticsRepoMemory(db),
   }
 }
 
@@ -70,5 +72,6 @@ export function createPgCampusRepos({ query, getPool }) {
     campusAdmin: createCampusAdminRepoPg(deps),
     development: createDevelopmentRepoPg(deps),
     growth: createGrowthRepoPg(deps),
+    analytics: createAnalyticsRepoPg(deps),
   }
 }

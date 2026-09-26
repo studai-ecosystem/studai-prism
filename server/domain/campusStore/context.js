@@ -22,6 +22,7 @@ import { createCampusAdminService } from '../campusAdmin/service.js'
 import { createDevelopmentService } from '../development/service.js'
 import { createGrowthService } from '../growth/service.js'
 import { createSessionEntryLoader } from '../growth/entries.js'
+import { createAnalyticsService } from '../analytics/service.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 // Account directory (read-only) for admin views: `{ id, name, email }` or null.
@@ -101,6 +102,12 @@ export function createCampusContext({
   })
   const growth = createGrowthService({ repos: storeView, catalog, clock, audit: auditWriter, entryFor: createSessionEntryLoader({ catalog, evidence, legacy }) })
   const growthOn = () => isEnabled('PRISM_GROWTH_ENABLED') && Boolean(liveRepos())
+  const analytics = createAnalyticsService({ repos: storeView, entryFor: createSessionEntryLoader({ catalog, evidence, legacy }), growth })
+  // Overview cards that later phases fill (counts only; null while dark).
+  const overviewExtras = async (organizationId) => ({
+    missionsActive: developmentOn() ? (await liveRepos().development.listInterventions(organizationId)).filter((i) => i.status === 'ACTIVE').length : null,
+    reassessmentsDue: growthOn() ? (await liveRepos().growth.listCycles(organizationId)).filter((c) => ['SCHEDULED', 'ACTIVE'].includes(c.status) && new Date(c.windowEnd) > clock()).length : null,
+  })
   const growthReads = {
     enabled: growthOn,
     growthFor: (user, workspace, entries) => growth.growthFor(user, workspace, entries),
@@ -142,6 +149,8 @@ export function createCampusContext({
     admin,
     development,
     growth,
+    analytics,
+    overviewExtras,
     // Effective scope of `permission` for an actor in an organization.
     scopeFor: (actor, organizationId, permission) => can(actor, permission, { organizationId }),
     sessionScopes,

@@ -445,4 +445,14 @@ export function runCampusRepoContract(test, label, getRepos) {
     assert.equal((await gr.listSnapshots({ userId: user, organizationId: org.id })).length, 1)
     assert.equal((await gr.listSnapshots({ userId: user })).length, 0, 'sponsored snapshots stay out of the personal list')
   })
+
+  test(`${label}: analytics settings — per-organization minimum group size with a floor`, async () => {
+    const repos = await getRepos()
+    const org = await repos.organizations.createOrganization({ name: 'Synthetic Analytics Org', slug: slug(), organizationType: 'COLLEGE', status: 'ACTIVE' })
+    assert.equal(await repos.analytics.getSettings(org.id), null, 'no row → the documented default applies')
+    await assert.rejects(repos.analytics.saveSettings({ organizationId: org.id, minAggregateGroupSize: 4, updatedBy: 'owner' }), { code: 'VALIDATION_FAILED' })
+    assert.equal((await repos.analytics.saveSettings({ organizationId: org.id, minAggregateGroupSize: 12, updatedBy: 'owner' })).minAggregateGroupSize, 12)
+    assert.equal((await repos.analytics.saveSettings({ organizationId: org.id, minAggregateGroupSize: 15, updatedBy: 'owner2' })).updatedBy, 'owner2')
+    assert.equal((await repos.analytics.getSettings(org.id)).minAggregateGroupSize, 15)
+  })
 }

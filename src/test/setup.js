@@ -23,6 +23,16 @@ if (!window.IntersectionObserver) {
   }
 }
 
+// jsdom has no layout engine; charts and dialogs only need the interface.
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  globalThis.ResizeObserver = window.ResizeObserver
+}
+
 if (!window.matchMedia) {
   window.matchMedia = (query) => ({
     matches: false,

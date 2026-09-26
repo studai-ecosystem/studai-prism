@@ -75,7 +75,11 @@ export function createCampusAdminRouter({ requireUser, campus }) {
   const base = [requireCampus, requireUser]
   const perm = (p) => [...base, requireOrgPermission(p)]
 
-  router.get('/organizations/:orgId/overview', ...perm('org.overview.read'), asyncHandler(async (req, res) => ok(res, await svc().overview(req.actor, org(req)))))
+  router.get('/organizations/:orgId/overview', ...perm('org.overview.read'), asyncHandler(async (req, res) => {
+    const base = await svc().overview(req.actor, org(req))
+    const extras = campus.overviewExtras ? await campus.overviewExtras(org(req)) : {}
+    return ok(res, { ...base, ...extras })
+  }))
 
   router.get('/organizations/:orgId/students', ...perm('students.read'), asyncHandler(async (req, res) => {
     const q = parse(ListStudents, req.query, 'One of the filters is not valid.')

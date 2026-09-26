@@ -57,7 +57,8 @@ export function createGrowthRouter({ requireUser, campus }) {
   router.get('/organizations/:orgId/analytics/growth', ...gate('analytics.read'), asyncHandler(async (req, res) => {
     const q = z.object({ cycleId: z.string().regex(UUID).optional() }).strict().safeParse(req.query || {})
     if (!q.success) throw new ApiError('VALIDATION_FAILED', 'One of the filters is not valid.')
-    return ok(res, await svc().outcomes(req.actor, req.params.orgId, { ...deps(), cycleId: q.data.cycleId || null }))
+    const minGroupSize = campus.analytics ? await campus.analytics.minGroupSize(req.params.orgId) : undefined
+    return ok(res, await svc().outcomes(req.actor, req.params.orgId, { ...deps(), cycleId: q.data.cycleId || null, minGroupSize }))
   }))
 
   return router
