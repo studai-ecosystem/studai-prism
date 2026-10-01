@@ -9,6 +9,7 @@ import StoryPanel from '../components/story/StoryPanel.jsx'
 import StoryThread from '../components/story/StoryThread.jsx'
 import StoryDimensions from '../components/story/StoryDimensions.jsx'
 import StoryCredential from '../components/story/StoryCredential.jsx'
+import StoryLoop from '../components/story/StoryLoop.jsx'
 import StoryHonesty from '../components/story/StoryHonesty.jsx'
 import StoryPaths from '../components/story/StoryPaths.jsx'
 import Pricing from '../components/Pricing.jsx'
@@ -53,17 +54,18 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="bg-[var(--color-paper)] min-h-screen overflow-x-hidden">
+    <main className="bg-prism-canvas min-h-screen overflow-x-hidden">
       <Nav onGetAssessed={handleGetAssessed} />
       <ClaimsProvider>
         <HeroThesis onGetAssessed={handleGetAssessed} onSeeHow={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} />
-        {/* The story — nine acts, scroll as time. Anchor ids keep the nav honest. */}
+        {/* The story — ten acts, scroll as time. Anchor ids keep the nav honest. */}
         <StoryProblem />
         <StoryRoom />
         <div id="how-it-works"><StoryPanel /></div>
         <StoryThread />
         <div id="dimensions"><StoryDimensions /></div>
         <StoryCredential />
+        <StoryLoop />
         <StoryHonesty />
         <div id="who-its-for"><StoryPaths onGetAssessed={handleGetAssessed} /></div>
       </ClaimsProvider>

@@ -52,20 +52,20 @@ export default function AdminBank() {
       <Notice>{notice}</Notice>
 
       {freeze && (
-        <div className={`mb-4 rounded-[10px] border p-4 flex items-start gap-3 ${freeze.bankFrozen ? 'border-[var(--color-info)] bg-[var(--color-info-surface)]' : 'border-[var(--color-line)] bg-[var(--color-surface)]'}`}>
-          <Snowflake size={16} className="text-[var(--color-info)] mt-0.5" aria-hidden="true" />
+        <div className={`mb-4 rounded-[10px] border p-4 flex items-start gap-3 ${freeze.bankFrozen ? 'border-[var(--status-info-ink)] bg-[var(--status-info-soft)]' : 'border-[var(--prism-border)] bg-[var(--prism-surface)]'}`}>
+          <Snowflake size={16} className="text-[var(--status-info-ink)] mt-0.5" aria-hidden="true" />
           <div>
-            <p className="font-sans text-sm text-[var(--color-ink)]">
+            <p className="font-sans text-sm text-[var(--prism-ink)]">
               {freeze.bankFrozen
                 ? 'Bank FROZEN — no scenario or item creation is available anywhere in this console.'
                 : `Bank freeze lifted by frozen IRT run ${String(freeze.unfrozenBy?.runId || '').slice(0, 8)} (${when(freeze.unfrozenBy?.at)}). Scenario authoring tooling ships with the post-calibration roadmap.`}
             </p>
-            <p className="mt-1 font-mono text-[11px] text-[var(--color-ink-muted)]">{freeze.rule}</p>
+            <p className="mt-1 font-mono text-[11px] text-[var(--prism-ink-muted)]">{freeze.rule}</p>
           </div>
         </div>
       )}
 
-      <h2 className="font-display text-base text-[var(--color-ink)] mb-2">Scenarios</h2>
+      <h2 className="font-display text-base text-[var(--prism-ink)] mb-2">Scenarios</h2>
       <DataTable
         rowKey={(s) => s.scenario_key}
         onRowClick={(s) => setFilter({ ...filter, scenarioKey: s.scenario_key })}
@@ -82,7 +82,7 @@ export default function AdminBank() {
       />
 
       <div className="mt-6 flex items-center justify-between flex-wrap gap-2">
-        <h2 className="font-display text-base text-[var(--color-ink)]">Items & probes</h2>
+        <h2 className="font-display text-base text-[var(--prism-ink)]">Items & probes</h2>
         <Toolbar onRefresh={load}>
           {filter.scenarioKey && (
             <button type="button" className={btn} onClick={() => setFilter({ ...filter, scenarioKey: '' })}>

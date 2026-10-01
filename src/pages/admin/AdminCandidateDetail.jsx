@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Pill, btn, btnDanger, field, when, actWithReason } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Pill, btn, btnDanger, field, when, actWithReason, askText } from './ui.jsx'
 
 // ── /admin/candidates/:id — candidate 360° (Phase 2) ─────────────────────────
 // Tabs: Overview · Assessments · Reports · Payments · Consent · Verification ·
@@ -36,7 +36,7 @@ export default function AdminCandidateDetail() {
 
   if (!data && !error) {
     return (
-      <div className="p-8 flex items-center gap-2 font-sans text-sm text-[var(--color-ink-muted)]">
+      <div className="p-8 flex items-center gap-2 font-sans text-sm text-[var(--prism-ink-muted)]">
         <Loader2 size={15} className="animate-spin" aria-hidden="true" /> Loading candidate…
       </div>
     )
@@ -71,7 +71,7 @@ export default function AdminCandidateDetail() {
 
   const saveProfile = async () => {
     await run(async () => {
-      const reason = window.prompt('Reason for this profile edit (audited):')
+      const reason = await askText('Reason for this profile edit (audited):')
       if (!reason) return null
       return adminFetch(`/api/admin/users/${id}`, { method: 'PATCH', body: { ...draft, reason } })
     }, 'Profile updated.')
@@ -95,8 +95,8 @@ export default function AdminCandidateDetail() {
             key={t} type="button" onClick={() => setTab(t)}
             className={`rounded-[6px] px-3 py-1.5 font-sans text-[13px] border ${
               tab === t
-                ? 'border-[var(--color-accent)] text-[var(--color-ink)] bg-[var(--color-surface)]'
-                : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                ? 'border-[var(--prism-signal)] text-[var(--prism-ink)] bg-[var(--prism-surface)]'
+                : 'border-[var(--prism-border)] text-[var(--prism-ink-muted)] hover:text-[var(--prism-ink)]'
             }`}
           >
             {t}
@@ -106,12 +106,12 @@ export default function AdminCandidateDetail() {
 
       {tab === 'Overview' && (
         <div className="grid gap-4 md:grid-cols-2">
-          <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Profile</h2>
+          <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">Profile</h2>
             {editing ? (
               <div className="grid gap-2">
                 {['name', 'college', 'year'].map((k) => (
-                  <label key={k} className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+                  <label key={k} className="font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
                     {k}
                     <input className={`${field} w-full mt-1`} value={draft[k]} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} />
                   </label>
@@ -122,23 +122,23 @@ export default function AdminCandidateDetail() {
                 </div>
               </div>
             ) : (
-              <dl className="font-sans text-sm text-[var(--color-ink)] space-y-1">
-                <div><dt className="inline text-[var(--color-ink-muted)]">Email: </dt><dd className="inline font-mono text-[12px]">{user.email}</dd></div>
-                <div><dt className="inline text-[var(--color-ink-muted)]">College: </dt><dd className="inline">{user.college || '—'}</dd></div>
-                <div><dt className="inline text-[var(--color-ink-muted)]">Year: </dt><dd className="inline">{user.year || '—'}</dd></div>
-                <div><dt className="inline text-[var(--color-ink-muted)]">Created: </dt><dd className="inline">{when(user.createdAt)}</dd></div>
+              <dl className="font-sans text-sm text-[var(--prism-ink)] space-y-1">
+                <div><dt className="inline text-[var(--prism-ink-muted)]">Email: </dt><dd className="inline font-mono text-[12px]">{user.email}</dd></div>
+                <div><dt className="inline text-[var(--prism-ink-muted)]">College: </dt><dd className="inline">{user.college || '—'}</dd></div>
+                <div><dt className="inline text-[var(--prism-ink-muted)]">Year: </dt><dd className="inline">{user.year || '—'}</dd></div>
+                <div><dt className="inline text-[var(--prism-ink-muted)]">Created: </dt><dd className="inline">{when(user.createdAt)}</dd></div>
               </dl>
             )}
             {!editing && canWrite && (
               <button type="button" className={`${btn} mt-3`} onClick={() => setEditing(true)}>Edit profile</button>
             )}
-            <p className="mt-2 font-mono text-[10px] text-[var(--color-ink-muted)]">
+            <p className="mt-2 font-mono text-[10px] text-[var(--prism-ink-muted)]">
               Email changes require a verified workflow (Phase 6) — not editable here.
             </p>
           </section>
 
-          <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Account actions</h2>
+          <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">Account actions</h2>
             <div className="flex flex-wrap gap-2">
               {canSuspend && user.accountState !== 'suspended' && (
                 <button type="button" className={btnDanger}
@@ -171,19 +171,19 @@ export default function AdminCandidateDetail() {
                 </button>
               )}
             </div>
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mt-4 mb-2">Support notes</h2>
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mt-4 mb-2">Support notes</h2>
             {notes.length === 0 ? (
-              <p className="font-sans text-sm text-[var(--color-ink-muted)]">No notes.</p>
+              <p className="font-sans text-sm text-[var(--prism-ink-muted)]">No notes.</p>
             ) : (
               notes.map((n) => (
-                <p key={n.note_id} className="font-sans text-[13px] text-[var(--color-ink)] border-b border-[var(--color-line)] last:border-0 py-1.5">
-                  {n.body} <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">— {n.author}, {when(n.created_at)}</span>
+                <p key={n.note_id} className="font-sans text-[13px] text-[var(--prism-ink)] border-b border-[var(--prism-border)] last:border-0 py-1.5">
+                  {n.body} <span className="font-mono text-[10px] text-[var(--prism-ink-muted)]">— {n.author}, {when(n.created_at)}</span>
                 </p>
               ))
             )}
             <button type="button" className={`${btn} mt-2`}
               onClick={() => run(async () => {
-                const body = window.prompt('Note (internal, never shown to the candidate):')
+                const body = await askText('Note (internal, never shown to the candidate):')
                 if (!body) return null
                 return adminFetch(`/api/admin/users/${id}/notes`, { method: 'POST', body: { body } })
               }, 'Note added.')}>
@@ -194,40 +194,40 @@ export default function AdminCandidateDetail() {
       )}
 
       {tab === 'Assessments' && (
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] divide-y divide-[var(--color-line)]">
-          {sessions.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--color-ink-muted)]">No sessions.</p> :
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] divide-y divide-[var(--prism-border)]">
+          {sessions.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--prism-ink-muted)]">No sessions.</p> :
             sessions.map((s) => (
               <button key={s.sessionId} type="button" onClick={() => navigate(`/admin/sessions/${s.sessionId}`)}
-                className="w-full text-left p-3 hover:bg-[var(--color-paper)] flex items-center justify-between gap-3 flex-wrap">
-                <span className="font-mono text-[12px] text-[var(--color-ink)]">{s.sessionId.slice(0, 13)}…</span>
-                <span className="font-sans text-[13px] text-[var(--color-ink-muted)]">{s.scenarioId || '—'} · {s.language}</span>
+                className="w-full text-left p-3 hover:bg-[var(--prism-canvas)] flex items-center justify-between gap-3 flex-wrap">
+                <span className="font-mono text-[12px] text-[var(--prism-ink)]">{s.sessionId.slice(0, 13)}…</span>
+                <span className="font-sans text-[13px] text-[var(--prism-ink-muted)]">{s.scenarioId || '—'} · {s.language}</span>
                 <Pill tone={s.completedAt ? 'ok' : 'info'}>{s.completedAt ? 'completed' : 'active'}</Pill>
-                <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{when(s.startedAt)}</span>
+                <span className="font-mono text-[11px] text-[var(--prism-ink-muted)]">{when(s.startedAt)}</span>
               </button>
             ))}
         </section>
       )}
 
       {tab === 'Reports' && (
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] divide-y divide-[var(--color-line)]">
-          {reports.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--color-ink-muted)]">No reports issued.</p> :
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] divide-y divide-[var(--prism-border)]">
+          {reports.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--prism-ink-muted)]">No reports issued.</p> :
             reports.map((r) => (
               <div key={r.sessionId} className="p-3 flex items-center justify-between gap-3 flex-wrap">
-                <Link to={`/admin/reports/${r.sessionId}`} className="font-mono text-[12px] text-[var(--color-accent)] underline">
+                <Link to={`/admin/reports/${r.sessionId}`} className="font-mono text-[12px] text-[var(--prism-signal)] underline">
                   {r.sessionId.slice(0, 13)}…
                 </Link>
-                <span className="font-sans text-[12px] text-[var(--color-ink-muted)]">{r.scenario || 'report issued'}</span>
+                <span className="font-sans text-[12px] text-[var(--prism-ink-muted)]">{r.scenario || 'report issued'}</span>
                 {r.corrected && <Pill tone="warn">corrected</Pill>}
                 {r.flaggedForReview && <Pill tone="warn">flagged</Pill>}
-                <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{when(r.issuedAt)}</span>
+                <span className="font-mono text-[11px] text-[var(--prism-ink-muted)]">{when(r.issuedAt)}</span>
               </div>
             ))}
         </section>
       )}
 
       {tab === 'Payments' && (
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] divide-y divide-[var(--color-line)]">
-          {sessions.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--color-ink-muted)]">No entitlements.</p> :
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] divide-y divide-[var(--prism-border)]">
+          {sessions.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--prism-ink-muted)]">No entitlements.</p> :
             sessions.map((s) => {
               const ent = perSession[s.sessionId]?.entitlement
               if (!ent) return null
@@ -236,7 +236,7 @@ export default function AdminCandidateDetail() {
                   <span className="font-mono text-[12px]">{s.sessionId.slice(0, 13)}…</span>
                   <Pill tone={ent.mode === 'paid' ? 'ok' : 'muted'}>{ent.mode}</Pill>
                   <span className="tabular-nums">{ent.amount != null ? `₹${(ent.amount / 100).toFixed(2)}` : '—'}</span>
-                  <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{ent.paymentId || 'no payment id'}</span>
+                  <span className="font-mono text-[11px] text-[var(--prism-ink-muted)]">{ent.paymentId || 'no payment id'}</span>
                   <Pill tone={ent.consumed ? 'muted' : 'info'}>{ent.consumed ? 'consumed' : 'unused'}</Pill>
                 </div>
               )
@@ -245,18 +245,18 @@ export default function AdminCandidateDetail() {
       )}
 
       {tab === 'Consent' && (
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] divide-y divide-[var(--color-line)]">
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] divide-y divide-[var(--prism-border)]">
           {sessions.every((s) => !perSession[s.sessionId]?.consent) ? (
-            <p className="p-4 font-sans text-sm text-[var(--color-ink-muted)]">No consent records.</p>
+            <p className="p-4 font-sans text-sm text-[var(--prism-ink-muted)]">No consent records.</p>
           ) : (
             sessions.map((s) => {
               const c = perSession[s.sessionId]?.consent
               if (!c) return null
               return (
                 <div key={s.sessionId} className="p-3 font-sans text-[13px]">
-                  <p className="font-mono text-[12px] text-[var(--color-ink)]">{s.sessionId.slice(0, 13)}… · v{c.version || '?'} · {when(c.at)}</p>
-                  <p className="text-[var(--color-ink-muted)] mt-1">{(c.scopes || []).join(', ') || 'no scopes'}</p>
-                  <p className="font-mono text-[10px] text-[var(--color-ink-muted)] mt-1">Consent records are read-only. Withdrawals arrive via the privacy workflow (Phase 6).</p>
+                  <p className="font-mono text-[12px] text-[var(--prism-ink)]">{s.sessionId.slice(0, 13)}… · v{c.version || '?'} · {when(c.at)}</p>
+                  <p className="text-[var(--prism-ink-muted)] mt-1">{(c.scopes || []).join(', ') || 'no scopes'}</p>
+                  <p className="font-mono text-[10px] text-[var(--prism-ink-muted)] mt-1">Consent records are read-only. Withdrawals arrive via the privacy workflow (Phase 6).</p>
                 </div>
               )
             })
@@ -265,9 +265,9 @@ export default function AdminCandidateDetail() {
       )}
 
       {tab === 'Verification' && (
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] divide-y divide-[var(--color-line)]">
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] divide-y divide-[var(--prism-border)]">
           {sessions.every((s) => !perSession[s.sessionId]?.verification) ? (
-            <p className="p-4 font-sans text-sm text-[var(--color-ink-muted)]">No verification records.</p>
+            <p className="p-4 font-sans text-sm text-[var(--prism-ink-muted)]">No verification records.</p>
           ) : (
             sessions.map((s) => {
               const v = perSession[s.sessionId]?.verification
@@ -279,7 +279,7 @@ export default function AdminCandidateDetail() {
                   <span>name match: {v.nameMatch ? 'yes' : 'no'}</span>
                   {v.pii === 'masked'
                     ? <Pill tone="muted">identity fields masked</Pill>
-                    : <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{v.fullName} · DOB {v.dob} · Aadhaar •••• {v.aadhaarLast4}</span>}
+                    : <span className="font-mono text-[11px] text-[var(--prism-ink-muted)]">{v.fullName} · DOB {v.dob} · Aadhaar •••• {v.aadhaarLast4}</span>}
                 </div>
               )
             })
@@ -288,35 +288,35 @@ export default function AdminCandidateDetail() {
       )}
 
       {tab === 'Credentials' && (
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] divide-y divide-[var(--color-line)]">
-          {credentials.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--color-ink-muted)]">No credentials issued.</p> :
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] divide-y divide-[var(--prism-border)]">
+          {credentials.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--prism-ink-muted)]">No credentials issued.</p> :
             credentials.map((c) => (
               <div key={c.credential_id} className="p-3 flex items-center gap-3 flex-wrap font-sans text-[13px]">
                 <span className="font-mono text-[12px]">{String(c.credential_id).slice(0, 13)}…</span>
                 <Pill tone={c.status === 'active' ? 'ok' : c.status === 'revoked' ? 'danger' : 'warn'}>{c.status}</Pill>
-                <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{c.schema_version} · {when(c.issued_at)}</span>
-                <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">Lifecycle actions live in the credential console (Phase 4).</span>
+                <span className="font-mono text-[11px] text-[var(--prism-ink-muted)]">{c.schema_version} · {when(c.issued_at)}</span>
+                <span className="font-mono text-[10px] text-[var(--prism-ink-muted)]">Lifecycle actions live in the credential console (Phase 4).</span>
               </div>
             ))}
         </section>
       )}
 
       {tab === 'Audit' && (
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] divide-y divide-[var(--color-line)]">
-          {audit.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--color-ink-muted)]">No admin events for this candidate.</p> :
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] divide-y divide-[var(--prism-border)]">
+          {audit.length === 0 ? <p className="p-4 font-sans text-sm text-[var(--prism-ink-muted)]">No admin events for this candidate.</p> :
             audit.map((a, i) => (
               <div key={i} className="p-3 font-sans text-[13px] flex items-center gap-3 flex-wrap">
-                <span className="font-mono text-[12px] text-[var(--color-ink)]">{a.action}</span>
-                <span className="text-[var(--color-ink-muted)]">{a.admin_email}</span>
-                {a.reason && <span className="text-[var(--color-ink-muted)]">“{a.reason}”</span>}
-                <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{when(a.created_at)}</span>
+                <span className="font-mono text-[12px] text-[var(--prism-ink)]">{a.action}</span>
+                <span className="text-[var(--prism-ink-muted)]">{a.admin_email}</span>
+                {a.reason && <span className="text-[var(--prism-ink-muted)]">“{a.reason}”</span>}
+                <span className="font-mono text-[11px] text-[var(--prism-ink-muted)]">{when(a.created_at)}</span>
               </div>
             ))}
           {timeline.length > 0 && (
             <div className="p-3">
-              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-1">Assessment timeline (pseudonymous spine)</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-1">Assessment timeline (pseudonymous spine)</p>
               {timeline.map((t) => (
-                <p key={t.session_id} className="font-mono text-[11px] text-[var(--color-ink-muted)]">
+                <p key={t.session_id} className="font-mono text-[11px] text-[var(--prism-ink-muted)]">
                   #{t.attempt_no} {t.scenario_key} · {t.scale_version} · {t.language} {t.is_synthetic ? '· synthetic' : ''} · {when(t.completed_at)}
                 </p>
               ))}

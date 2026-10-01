@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Pill, btn, field, when } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Pill, btn, field, when, askText } from './ui.jsx'
 
 // ── /admin/prompts — Prompt Registry (Phase 3) ───────────────────────────────
 // draft → testing → approved → production (dual-approved) → deprecated /
@@ -61,7 +61,7 @@ export default function AdminPrompts() {
     run(async () => {
       let reason
       if (status === 'production') {
-        reason = window.prompt('Reason for PUBLISHING to production (10+ chars — requires a pre-approved "publish_prompt" request for this version id):')
+        reason = await askText('Reason for PUBLISHING to production (10+ chars — requires a pre-approved "publish_prompt" request for this version id):')
         if (!reason) return null
       }
       return adminFetch(`/api/admin/prompts/versions/${v.version_id}/status`, {
@@ -71,9 +71,9 @@ export default function AdminPrompts() {
 
   const rollback = (v) =>
     run(async () => {
-      const toVersionId = window.prompt('Version id of the DEPRECATED predecessor to re-promote:')
+      const toVersionId = await askText('Version id of the DEPRECATED predecessor to re-promote:')
       if (!toVersionId) return null
-      const reason = window.prompt('Reason for the rollback (10+ chars, audited):')
+      const reason = await askText('Reason for the rollback (10+ chars, audited):')
       if (!reason) return null
       return adminFetch(`/api/admin/prompts/versions/${v.version_id}/rollback`, {
         method: 'POST', body: { toVersionId: toVersionId.trim(), reason },
@@ -106,19 +106,19 @@ export default function AdminPrompts() {
       <Notice>{notice}</Notice>
 
       {data?.drift?.length > 0 && (
-        <div className="mb-4 rounded-[10px] border border-[var(--color-reliability-moderate)] bg-[var(--color-warn-surface)] p-4">
-          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-reliability-moderate)]">File ↔ registry drift</p>
+        <div className="mb-4 rounded-[10px] border border-[var(--status-partial-ink)] bg-[var(--status-partial-soft)] p-4">
+          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--status-partial-ink)]">File ↔ registry drift</p>
           {data.drift.map((d, i) => (
-            <p key={i} className="font-sans text-[13px] text-[var(--color-ink)]">{d.file}: {d.problem}</p>
+            <p key={i} className="font-sans text-[13px] text-[var(--prism-ink)]">{d.file}: {d.problem}</p>
           ))}
         </div>
       )}
 
       <div className="grid gap-4 md:grid-cols-[280px_1fr]">
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-2 h-fit">
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-2 h-fit">
           {(data?.prompts || []).map((p) => (
             <button key={p.prompt_id} type="button" onClick={() => openPrompt(p.name)}
-              className={`w-full text-left rounded-[6px] px-3 py-2 font-mono text-[12px] hover:bg-[var(--color-paper)] ${detail?.prompt?.name === p.name ? 'bg-[var(--color-paper)] text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)]'}`}>
+              className={`w-full text-left rounded-[6px] px-3 py-2 font-mono text-[12px] hover:bg-[var(--prism-canvas)] ${detail?.prompt?.name === p.name ? 'bg-[var(--prism-canvas)] text-[var(--prism-ink)]' : 'text-[var(--prism-ink-muted)]'}`}>
               {p.name}
               <span className="float-right tabular-nums">{p.version_count}v</span>
             </button>
@@ -127,11 +127,11 @@ export default function AdminPrompts() {
 
         <section>
           {!detail ? (
-            <p className="font-sans text-sm text-[var(--color-ink-muted)] p-4">Select a prompt to inspect its versions.</p>
+            <p className="font-sans text-sm text-[var(--prism-ink-muted)] p-4">Select a prompt to inspect its versions.</p>
           ) : (
             <>
               <div className="flex items-center justify-between mb-2">
-                <h2 className="font-display text-base text-[var(--color-ink)]">{detail.prompt.name}</h2>
+                <h2 className="font-display text-base text-[var(--prism-ink)]">{detail.prompt.name}</h2>
                 {canManage && (
                   <button type="button" className={btn}
                     onClick={() => setDraftForm(draftForm ? null : { version: '', template: '' })}>
@@ -141,13 +141,13 @@ export default function AdminPrompts() {
               </div>
 
               {draftForm && (
-                <form onSubmit={createDraft} className="mb-3 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-                  <label className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+                <form onSubmit={createDraft} className="mb-3 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+                  <label className="font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
                     Version identifier (immutable — e.g. v2)
                     <input required pattern="v\d+" className={`${field} w-40 mt-1 block`} value={draftForm.version}
                       onChange={(e) => setDraftForm({ ...draftForm, version: e.target.value })} />
                   </label>
-                  <label className="block mt-3 font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+                  <label className="block mt-3 font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
                     Template ({'{{PLACEHOLDERS}}'} auto-extracted)
                     <textarea required rows={8} className={`${field} w-full mt-1 font-mono text-[12px]`} value={draftForm.template}
                       onChange={(e) => setDraftForm({ ...draftForm, template: e.target.value })} />
@@ -156,14 +156,14 @@ export default function AdminPrompts() {
                 </form>
               )}
 
-              <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] divide-y divide-[var(--color-line)]">
+              <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] divide-y divide-[var(--prism-border)]">
                 {detail.versions.map((v) => (
                   <div key={v.version_id} className="p-3 flex items-center gap-3 flex-wrap">
-                    <button type="button" className="font-mono text-[12px] text-[var(--color-accent)] underline" onClick={() => openVersion(v.version_id)}>
+                    <button type="button" className="font-mono text-[12px] text-[var(--prism-signal)] underline" onClick={() => openVersion(v.version_id)}>
                       {v.version} · {v.language}
                     </button>
                     <Pill tone={STATUS_TONE[v.status]}>{v.status}</Pill>
-                    <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">{v.source} · {when(v.created_at)}</span>
+                    <span className="font-mono text-[10px] text-[var(--prism-ink-muted)]">{v.source} · {when(v.created_at)}</span>
                     <span className="flex gap-1.5 ml-auto">
                       {canManage && v.status === 'draft' && (
                         <button type="button" className={btn} onClick={() => transition(v, 'testing')}>→ testing</button>
@@ -186,9 +186,9 @@ export default function AdminPrompts() {
               </div>
 
               {version && (
-                <div className="mt-3 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+                <div className="mt-3 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">
                       {version.name} {version.version} ({version.language}) · {version.status}
                       {version.variables?.length ? ` · vars: ${version.variables.join(', ')}` : ''}
                     </p>
@@ -203,12 +203,12 @@ export default function AdminPrompts() {
                     <textarea rows={14} className={`${field} w-full font-mono text-[12px]`} value={version.template}
                       onChange={(e) => setVersion({ ...version, template: e.target.value })} />
                   ) : (
-                    <pre className="max-h-96 overflow-auto rounded-[6px] bg-[var(--color-paper)] p-3 font-mono text-[11px] whitespace-pre-wrap text-[var(--color-ink)]">
+                    <pre className="max-h-96 overflow-auto rounded-[6px] bg-[var(--prism-canvas)] p-3 font-mono text-[11px] whitespace-pre-wrap text-[var(--prism-ink)]">
                       {version.template}
                     </pre>
                   )}
                   {version.status !== 'draft' && (
-                    <p className="mt-2 font-mono text-[10px] text-[var(--color-ink-muted)]">
+                    <p className="mt-2 font-mono text-[10px] text-[var(--prism-ink-muted)]">
                       This version is immutable ({version.status}). Corrections are new draft versions.
                     </p>
                   )}

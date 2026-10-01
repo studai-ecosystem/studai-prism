@@ -45,11 +45,11 @@ export function EvidenceTick({ children }) {
 export const evidenceThreadStyles = `
 .evidence-thread {
   display: grid;
-  grid-template-columns: max-content var(--space-6) 1fr;
+  grid-template-columns: minmax(0, max-content) var(--space-6) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-2);
 }
-.evidence-thread__claim { font-family: var(--font-utility); }
+.evidence-thread__claim { font-family: var(--font-utility); overflow-wrap: anywhere; }
 .evidence-thread__line {
   display: flex;
   flex-direction: column;
@@ -75,7 +75,7 @@ export const evidenceThreadStyles = `
   font-family: var(--font-body);
   font-size: var(--text-sm);
   line-height: var(--leading-base);
-  color: var(--color-ink-muted);
+  color: var(--prism-ink-muted);
   max-width: 52ch;
 }
 .evidence-thread__source-label {
@@ -92,7 +92,7 @@ export const evidenceThreadStyles = `
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-sm);
-  color: var(--color-ink-muted);
+  color: var(--prism-ink-muted);
 }
 .evidence-tick__mark {
   display: inline-block;
@@ -100,6 +100,10 @@ export const evidenceThreadStyles = `
   height: var(--thread-tick);
   border-left: var(--thread-stroke) solid var(--thread-color);
   border-bottom: var(--thread-stroke) solid var(--thread-color);
+}
+@media (max-width: 520px) {
+  .evidence-thread { grid-template-columns: minmax(0, 1fr); }
+  .evidence-thread__line { display: none; }
 }
 @media print {
   .evidence-thread__rail, .evidence-thread__tick, .evidence-tick__mark {

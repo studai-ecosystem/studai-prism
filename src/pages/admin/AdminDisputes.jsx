@@ -2,10 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { adminFetch, adminHasPermission, currentAdmin } from '../../lib/adminApi.js'
-import {
-  useAdminList, PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pager,
-  Pill, btn, field, when, mono,
-} from './ui.jsx'
+import { useAdminList, PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pager,
+  Pill, btn, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/disputes — dispute workspace (Phase 2, §10 state machine) ─────────
 
@@ -48,7 +46,7 @@ export function AdminDisputes() {
             key: 'age', label: 'Age',
             render: (d) => (
               typeof d.ageBusinessDays === 'number'
-                ? <span className={d.overdue ? 'text-[var(--color-reliability-low)] font-semibold' : ''}>{d.ageBusinessDays} bd{d.overdue ? ' · over target' : ''}</span>
+                ? <span className={d.overdue ? 'text-[var(--status-blocked-ink)] font-semibold' : ''}>{d.ageBusinessDays} bd{d.overdue ? ' · over target' : ''}</span>
                 : '—'
             ),
             className: 'font-mono text-[11px] whitespace-nowrap',
@@ -86,7 +84,7 @@ export function AdminDisputeDetail() {
 
   if (!data && !error) {
     return (
-      <div className="p-8 flex items-center gap-2 font-sans text-sm text-[var(--color-ink-muted)]">
+      <div className="p-8 flex items-center gap-2 font-sans text-sm text-[var(--prism-ink-muted)]">
         <Loader2 size={15} className="animate-spin" aria-hidden="true" /> Loading dispute…
       </div>
     )
@@ -107,11 +105,11 @@ export function AdminDisputeDetail() {
 
   const transition = (state) =>
     run(async () => {
-      const reason = window.prompt(`Reason for moving to '${state}' (audited):`)
+      const reason = await askText(`Reason for moving to '${state}' (audited):`)
       if (!reason) return null
       let decision
       if (state === 'resolved' || state === 'rejected') {
-        decision = window.prompt('Written decision (10+ characters, shown in the record):')
+        decision = await askText('Written decision (10+ characters, shown in the record):')
         if (!decision) return null
       }
       return adminFetch(`/api/admin/disputes/${sessionId}/transition`, {
@@ -127,35 +125,35 @@ export function AdminDisputeDetail() {
       <ErrorNotice error={error} />
       <Notice>{notice}</Notice>
 
-      <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Candidate statement (read-only)</h2>
-        <p className="font-sans text-sm text-[var(--color-ink)] whitespace-pre-wrap">{dispute.reason}</p>
-        <p className="mt-2 font-mono text-[11px] text-[var(--color-ink-muted)]">contact: {dispute.contact || '—'}</p>
+      <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+        <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">Candidate statement (read-only)</h2>
+        <p className="font-sans text-sm text-[var(--prism-ink)] whitespace-pre-wrap">{dispute.reason}</p>
+        <p className="mt-2 font-mono text-[11px] text-[var(--prism-ink-muted)]">contact: {dispute.contact || '—'}</p>
       </section>
 
       <div className="grid gap-4 md:grid-cols-2 mt-4">
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Related evidence</h2>
-          <ul className="font-sans text-[13px] text-[var(--color-ink)] space-y-1">
-            <li><Link className="text-[var(--color-accent)] underline" to={`/admin/sessions/${sessionId}`}>Session file →</Link></li>
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">Related evidence</h2>
+          <ul className="font-sans text-[13px] text-[var(--prism-ink)] space-y-1">
+            <li><Link className="text-[var(--prism-signal)] underline" to={`/admin/sessions/${sessionId}`}>Session file →</Link></li>
             <li>
               {related.report
-                ? <Link className="text-[var(--color-accent)] underline" to={`/admin/reports/${sessionId}`}>
+                ? <Link className="text-[var(--prism-signal)] underline" to={`/admin/reports/${sessionId}`}>
                     Report{related.report.corrected ? ' (corrected)' : ''} →
                   </Link>
                 : 'No report issued.'}
             </li>
             <li>{related.integrityEventCount} integrity event{related.integrityEventCount === 1 ? '' : 's'}</li>
           </ul>
-          <p className="mt-3 font-mono text-[10px] text-[var(--color-ink-muted)] leading-relaxed">
+          <p className="mt-3 font-mono text-[10px] text-[var(--prism-ink-muted)] leading-relaxed">
             Upholding a score dispute = raise a “supersede_report” approval, have a second administrator
             approve it, then apply the correction on the report page. This page never touches scores.
           </p>
         </section>
 
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Workflow</h2>
-          <p className="font-sans text-[13px] text-[var(--color-ink)]">
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">Workflow</h2>
+          <p className="font-sans text-[13px] text-[var(--prism-ink)]">
             Assignee: {workflow.assignedEmail || 'unassigned'}
             {workflow.decision && <><br />Decision: “{workflow.decision}” — {workflow.decidedBy}, {when(workflow.decidedAt)}</>}
           </p>
@@ -187,7 +185,7 @@ export function AdminDisputeDetail() {
                 {['upheld', 'invalidated_reassessment', 'superseded', 'second_review'].map((outcome) => (
                   <button key={outcome} type="button" className={btn}
                     onClick={() => run(async () => {
-                      const explanation = window.prompt(`Candidate-readable explanation for '${outcome}' (20+ chars):`)
+                      const explanation = await askText(`Candidate-readable explanation for '${outcome}' (20+ chars):`)
                       if (!explanation) return null
                       return adminFetch(`/api/admin/disputes/${sessionId}/decide`, {
                         method: 'POST', body: { outcome, explanation },
@@ -197,7 +195,7 @@ export function AdminDisputeDetail() {
                   </button>
                 ))}
               </div>
-              <p className="mt-2 font-mono text-[10px] text-[var(--color-ink-muted)]">
+              <p className="mt-2 font-mono text-[10px] text-[var(--prism-ink-muted)]">
                 Only legal §10 transitions are offered; the server enforces the machine regardless.
                 Reviewers work from the BLINDED packet — no candidate identity. 'invalidated_reassessment'
                 mints a free reassessment and revokes the shared credential; 'superseded' additionally
@@ -209,17 +207,17 @@ export function AdminDisputeDetail() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 mt-4 mb-10">
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Notes</h2>
-          {notes.length === 0 ? <p className="font-sans text-[13px] text-[var(--color-ink-muted)]">No notes.</p> :
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">Notes</h2>
+          {notes.length === 0 ? <p className="font-sans text-[13px] text-[var(--prism-ink-muted)]">No notes.</p> :
             notes.map((n) => (
-              <p key={n.note_id} className="font-sans text-[13px] text-[var(--color-ink)] py-1.5 border-b border-[var(--color-line)] last:border-0">
-                {n.body} <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">— {n.author}, {when(n.created_at)}</span>
+              <p key={n.note_id} className="font-sans text-[13px] text-[var(--prism-ink)] py-1.5 border-b border-[var(--prism-border)] last:border-0">
+                {n.body} <span className="font-mono text-[10px] text-[var(--prism-ink-muted)]">— {n.author}, {when(n.created_at)}</span>
               </p>
             ))}
           <button type="button" className={`${btn} mt-2`}
             onClick={() => run(async () => {
-              const body = window.prompt('Note (internal):')
+              const body = await askText('Note (internal):')
               if (!body) return null
               return adminFetch(`/api/admin/disputes/${sessionId}/notes`, { method: 'POST', body: { body } })
             }, 'Note added.')}>
@@ -227,13 +225,13 @@ export function AdminDisputeDetail() {
           </button>
         </section>
 
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">History</h2>
-          {audit.length === 0 ? <p className="font-sans text-[13px] text-[var(--color-ink-muted)]">No events.</p> :
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">History</h2>
+          {audit.length === 0 ? <p className="font-sans text-[13px] text-[var(--prism-ink-muted)]">No events.</p> :
             audit.map((a, i) => (
-              <p key={i} className="font-sans text-[13px] text-[var(--color-ink)] py-1 border-b border-[var(--color-line)] last:border-0">
+              <p key={i} className="font-sans text-[13px] text-[var(--prism-ink)] py-1 border-b border-[var(--prism-border)] last:border-0">
                 <span className="font-mono text-[12px]">{a.action}</span>
-                <span className="text-[var(--color-ink-muted)]"> — {a.admin_email}{a.reason ? `, “${a.reason}”` : ''}, {when(a.created_at)}</span>
+                <span className="text-[var(--prism-ink-muted)]"> — {a.admin_email}{a.reason ? `, “${a.reason}”` : ''}, {when(a.created_at)}</span>
               </p>
             ))}
         </section>

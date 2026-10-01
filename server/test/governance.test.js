@@ -2,6 +2,7 @@
 // (§9 identity assurance, §10 buyer access, §11 appeals, §12 age gating,
 //  §14 proctoring minimization, §18 access-control audit).
 
+import '../test-support/isolatedDataDir.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'

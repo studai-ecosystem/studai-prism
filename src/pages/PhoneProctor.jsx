@@ -172,9 +172,9 @@ export default function PhoneProctor() {
   }, [pairCode, startCamera])
 
   return (
-    <div className="min-h-screen bg-[var(--color-ink)] text-white flex flex-col items-center justify-center px-6 py-10">
+    <div className="min-h-screen bg-[var(--prism-ink)] text-white flex flex-col items-center justify-center px-6 py-10">
       <div className="w-full max-w-sm">
-        <div className="flex items-center gap-2 text-[var(--color-accent)]">
+        <div className="flex items-center gap-2 text-[var(--prism-signal)]">
           <Camera size={20} />
           <h1 className="font-sans text-base font-semibold">Prism proctor camera</h1>
         </div>
@@ -189,11 +189,11 @@ export default function PhoneProctor() {
           />
           {status !== 'streaming' && (
             <div className="flex aspect-[3/4] w-full items-center justify-center">
-              {status === 'starting' && <Loader2 size={32} className="animate-spin text-[var(--color-accent)]" />}
+              {status === 'starting' && <Loader2 size={32} className="animate-spin text-[var(--prism-signal)]" />}
               {(status === 'denied' || status === 'error') && (
-                <AlertTriangle size={32} className="text-amber-400" />
+                <AlertTriangle size={32} className="text-prism-partial-soft" />
               )}
-              {status === 'ended' && <CheckCircle2 size={32} className="text-green-400" />}
+              {status === 'ended' && <CheckCircle2 size={32} className="text-brand-green" />}
             </div>
           )}
         </div>
@@ -212,9 +212,9 @@ export default function PhoneProctor() {
 
         <div className="mt-5 flex items-start gap-2 rounded-xl bg-white/5 px-4 py-3">
           {status === 'streaming' || status === 'ended' ? (
-            <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-green-400" />
+            <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-brand-green" />
           ) : (
-            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-400" />
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-prism-partial-soft" />
           )}
           <p className="font-sans text-sm text-white/80">{message}</p>
         </div>
@@ -223,7 +223,7 @@ export default function PhoneProctor() {
           <button
             type="button"
             onClick={startCamera}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] px-4 py-3 font-sans text-sm font-bold text-[var(--color-ink)] transition-colors hover:bg-[var(--color-accent)]"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--prism-signal)] px-4 py-3 font-sans text-sm font-bold text-[var(--prism-ink)] transition-colors hover:bg-[var(--prism-signal)]"
           >
             <RefreshCw size={16} />
             Enable camera

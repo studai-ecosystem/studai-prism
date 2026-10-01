@@ -52,7 +52,7 @@ export default function AppHandoffModal({ open, onClose, onContinueInBrowser }) 
 
   return (
     <div
-      className="fixed inset-0 z-[130] bg-[var(--color-ink)]/60 backdrop-blur-sm flex items-center justify-center px-4"
+      className="fixed inset-0 z-[130] bg-[var(--prism-ink)]/60 backdrop-blur-sm flex items-center justify-center px-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -60,18 +60,18 @@ export default function AppHandoffModal({ open, onClose, onContinueInBrowser }) 
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md bg-[var(--color-surface)] border border-[var(--color-line)] rounded-[var(--radius-lg)] p-6 shadow-2xl"
+        className="relative w-full max-w-md bg-[var(--prism-surface)] border border-[var(--prism-border)] rounded-[var(--radius-lg)] p-6 shadow-2xl"
       >
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-4 right-4 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] cursor-pointer"
+          className="absolute top-4 right-4 text-[var(--prism-ink-muted)] hover:text-[var(--prism-ink)] cursor-pointer"
         >
           <X size={16} />
         </button>
 
-        <h2 className="font-serif text-xl text-[var(--color-ink)] mb-1.5">Where would you like to take it?</h2>
-        <p className="font-sans text-sm text-[var(--color-ink-muted)] mb-5">
+        <h2 className="font-serif text-xl text-[var(--prism-ink)] mb-1.5">Where would you like to take it?</h2>
+        <p className="font-sans text-sm text-[var(--prism-ink-muted)] mb-5">
           The Prism app is a dedicated exam window — no tabs, no distractions.
           Your account and licence work in both.
         </p>
@@ -79,7 +79,7 @@ export default function AppHandoffModal({ open, onClose, onContinueInBrowser }) 
         <div className="flex flex-col gap-2.5">
           <button
             onClick={openApp}
-            className="w-full flex items-center gap-3 p-3.5 rounded-[var(--radius-md)] bg-[var(--color-ink)] text-[var(--color-paper)] hover:opacity-90 transition-opacity cursor-pointer text-left"
+            className="w-full flex items-center gap-3 p-3.5 rounded-[var(--radius-md)] bg-[var(--prism-ink)] text-[var(--prism-canvas)] hover:opacity-90 transition-opacity cursor-pointer text-left"
           >
             <ExternalLink size={16} className="shrink-0" aria-hidden="true" />
             <span className="font-sans text-sm font-semibold">Open the Prism app</span>
@@ -88,24 +88,24 @@ export default function AppHandoffModal({ open, onClose, onContinueInBrowser }) 
 
           <a
             href="/download/Prism-Assessment-Setup.exe"
-            className="w-full flex items-center gap-3 p-3.5 rounded-[var(--radius-md)] border border-[var(--color-line)] text-[var(--color-ink)] hover:border-[var(--color-accent)] transition-colors cursor-pointer text-left"
+            className="w-full flex items-center gap-3 p-3.5 rounded-[var(--radius-md)] border border-[var(--prism-border)] text-[var(--prism-ink)] hover:border-[var(--prism-signal)] transition-colors cursor-pointer text-left"
           >
             <MonitorDown size={16} className="shrink-0" aria-hidden="true" />
             <span className="font-sans text-sm font-semibold">Download for Windows</span>
-            <span className="ml-auto font-mono text-[10px] text-[var(--color-ink-muted)]">1.4 MB</span>
+            <span className="ml-auto font-mono text-[10px] text-[var(--prism-ink-muted)]">1.4 MB</span>
           </a>
 
           <button
             onClick={continueBrowser}
-            className="w-full flex items-center gap-3 p-3.5 rounded-[var(--radius-md)] border border-[var(--color-line)] text-[var(--color-ink)] hover:border-[var(--color-accent)] transition-colors cursor-pointer text-left"
+            className="w-full flex items-center gap-3 p-3.5 rounded-[var(--radius-md)] border border-[var(--prism-border)] text-[var(--prism-ink)] hover:border-[var(--prism-signal)] transition-colors cursor-pointer text-left"
           >
             <Globe size={16} className="shrink-0" aria-hidden="true" />
             <span className="font-sans text-sm font-semibold">Continue in the browser</span>
-            <span className="ml-auto font-mono text-[10px] text-[var(--color-ink-muted)]">works fully</span>
+            <span className="ml-auto font-mono text-[10px] text-[var(--prism-ink-muted)]">works fully</span>
           </button>
         </div>
 
-        <p className="mt-4 font-mono text-[10px] text-[var(--color-ink-muted)] leading-relaxed">
+        <p className="mt-4 font-mono text-[10px] text-[var(--prism-ink-muted)] leading-relaxed">
           New installer, building its reputation: Windows may show a publisher
           notice on first run — choose "More info → Run anyway". Publisher
           verification (code signing) is in progress; the download always comes

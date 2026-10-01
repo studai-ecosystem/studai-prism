@@ -56,7 +56,9 @@ async function consentAndStart(page, label = 'journey') {
 // ── 1. Candidate Role Journey ────────────────────────────────────────────────
 test('ROLE-CANDIDATE complete operational journey', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('button, a').filter({ hasText: /get assessed|start|assessment|sign up/i }).first()).toBeVisible()
+  // getByRole ignores the collapsed mobile nav, whose "Get Assessed" button is
+  // hidden. The visible call to action ("Take the assessment") is the check.
+  await expect(page.getByRole('button', { name: /take the assessment|get assessed/i }).first()).toBeVisible()
 
   // Signup & Entitlement
   const candidate = await registerCandidate(page, 'candidate-role')

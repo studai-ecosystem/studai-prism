@@ -1,141 +1,64 @@
-import PageLayout, { PageHeading } from '../../components/PageLayout.jsx'
+import { Link } from 'react-router-dom'
+import DocumentLayout, { DocH, DocP, MethodCard, StudyStatus } from '../../components/DocumentLayout.jsx'
 
 const dimensions = [
-  {
-    num: '01',
-    name: 'Critical Thinking',
-    measures:
-      'How you frame a problem, identify gaps, and take a position under pressure.',
-    inConversation:
-      'Avatar asks a vague question. Do you ask for clarity or guess?',
-  },
-  {
-    num: '02',
-    name: 'Communication',
-    measures:
-      'How clearly and confidently you express your thinking — spoken and written.',
-    inConversation:
-      'Can you explain your decision in simple terms when Avatar 3 is confused?',
-  },
-  {
-    num: '03',
-    name: 'Collaborative Behaviour',
-    measures:
-      'Behaviour demonstrated while responding to other participants in a simulated workplace interaction — handling disagreement, listening, adapting.',
-    inConversation: 'Avatar 2 pushes back hard. Do you shut down or engage?',
-  },
-  {
-    num: '04',
-    name: 'Problem Solving',
-    measures:
-      'How you break down constraints, generate options, and move to resolution.',
-    inConversation:
-      'Avatar adds a budget cut mid-scenario. How do you adapt?',
-  },
-  {
-    num: '05',
-    name: 'AI & Digital Fluency',
-    measures:
-      'How fluently you work alongside AI — prompting, verifying, deciding.',
-    inConversation:
-      'Avatar mentions an AI tool is available. Do you use it well?',
-  },
+  { num: '01', name: 'Critical Thinking', measures: 'How you frame a problem, identify gaps, and take a position under pressure.', inConversation: 'Avatar asks a vague question. Do you ask for clarity or guess?' },
+  { num: '02', name: 'Communication', measures: 'How clearly and confidently you express your thinking \u2014 spoken and written.', inConversation: 'Can you explain your decision in simple terms when Avatar 3 is confused?' },
+  { num: '03', name: 'Collaborative Behaviour', measures: 'Behaviour demonstrated while responding to other participants in a simulated workplace interaction \u2014 handling disagreement, listening, adapting.', inConversation: 'Avatar 2 pushes back hard. Do you shut down or engage?' },
+  { num: '04', name: 'Problem Solving', measures: 'How you break down constraints, generate options, and move to resolution.', inConversation: 'Avatar adds a budget cut mid-scenario. How do you adapt?' },
+  { num: '05', name: 'AI & Digital Fluency', measures: 'How fluently you work alongside AI \u2014 prompting, verifying, deciding.', inConversation: 'Avatar mentions an AI tool is available. Do you use it well?' },
 ]
 
 const steps = [
-  {
-    num: '1',
-    text: 'Every response is captured in real time',
-  },
-  {
-    num: '2',
-    text: 'A panel of AI evaluators (Amazon Bedrock) analyses reasoning, structure, evidence, and adaptability',
-  },
-  {
-    num: '3',
-    text: 'A score is generated per dimension and combined into the Prism Score',
-  },
+  'Every response is captured in real time.',
+  'A panel of AI evaluators (Amazon Bedrock) analyses reasoning, structure, evidence, and adaptability.',
+  'A score is generated for each dimension, tied to the evidence behind it.',
 ]
 
 export default function ScienceBehindPrism() {
   return (
-    <PageLayout>
-      <section className="py-20 px-6 max-w-6xl mx-auto">
-        <PageHeading
-          title="The Science Behind Prism"
-          subtitle="How we measure 5 skill dimensions in a 30-minute AI conversation"
-        />
-      </section>
+    <DocumentLayout
+      title="The Science Behind Prism"
+      subtitle="How we measure 5 skill dimensions in a 30-minute AI conversation"
+      status={<StudyStatus status="progress">Formal validation study in progress</StudyStatus>}
+    >
+      <DocH>Why a conversation, not a test</DocH>
+      <DocP>
+        Traditional assessments measure memory. Prism measures thinking. A live AI conversation surfaces
+        how a person actually reasons, communicates, and collaborates &mdash; under real pressure, in real
+        time. No memorisation. No tricks. Just real capability.
+      </DocP>
 
-      {/* Section 1 — Why conversation not a test */}
-      <section className="py-12 px-6 max-w-6xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">
-            Why a conversation, not a test
-          </h2>
-          <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
-            Traditional assessments measure memory. Prism measures thinking. A
-            live AI conversation surfaces how a person actually reasons,
-            communicates, and collaborates — under real pressure, in real time.
-            No memorisation. No tricks. Just real capability.
-          </p>
-        </div>
-      </section>
+      <DocH id="dimensions">The 5 dimensions explained</DocH>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {dimensions.map((d) => (
+          <MethodCard key={d.num} label={d.num} title={d.name}>
+            <p>{d.measures}</p>
+            <p className="mt-3 italic">{d.inConversation}</p>
+          </MethodCard>
+        ))}
+      </div>
 
-      {/* Section 2 — The 5 dimensions */}
-      <section className="py-12 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
-          The 5 dimensions explained
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {dimensions.map((d) => (
-            <div
-              key={d.num}
-              className="bg-white rounded-2xl shadow-sm p-6 flex flex-col border-t-2 border-transparent hover:border-gold transition-colors"
-            >
-              <span className="text-3xl font-bold text-gold mb-3">{d.num}</span>
-              <h3 className="text-xl font-bold text-[var(--color-ink)] mb-3">{d.name}</h3>
-              <p className="text-[var(--color-ink-muted)] leading-relaxed mb-4">{d.measures}</p>
-              <p className="text-[var(--color-ink-muted)] italic leading-relaxed mt-auto">
-                {d.inConversation}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <DocH id="scoring">How scoring works</DocH>
+      <ol className="space-y-3">
+        {steps.map((text, i) => (
+          <li key={text} className="flex gap-3 rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface p-4">
+            <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-green text-sm font-bold text-brand-navy">{i + 1}</span>
+            <p className="text-base leading-relaxed text-prism-ink-muted">{text}</p>
+          </li>
+        ))}
+      </ol>
 
-      {/* Section 3 — How scoring works */}
-      <section className="py-12 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
-          How scoring works
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {steps.map((s) => (
-            <div
-              key={s.num}
-              className="bg-white rounded-2xl shadow-sm p-8 flex flex-col items-center text-center"
-            >
-              <div className="w-12 h-12 rounded-full bg-gold text-[var(--color-ink)] font-bold text-xl flex items-center justify-center mb-5">
-                {s.num}
-              </div>
-              <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">{s.text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Section 4 — Quote block */}
-      <section className="py-20 px-6 max-w-6xl mx-auto">
-        <blockquote className="bg-white rounded-2xl shadow-sm p-10 md:p-14 max-w-3xl mx-auto border-l-4 border-gold">
-          <p className="text-2xl md:text-3xl font-serif text-[var(--color-ink)] leading-snug">
-            “The best predictor of job performance is not where you studied. It
-            is how you think. Prism measures that.”
-          </p>
-          <footer className="mt-6 text-[var(--color-ink-muted)] font-semibold">
-            — StudAI One Research Team
-          </footer>
-        </blockquote>
-      </section>
-    </PageLayout>
+      <DocH id="pending">What is still pending</DocH>
+      <MethodCard label="Study status" title="Formal validation">
+        <p className="mb-3"><StudyStatus status="progress">In progress, not yet complete</StudyStatus></p>
+        <p>
+          Human co-rated sessions, item calibration and published agreement statistics are planned and have
+          not been completed. Until they are published, Prism reports carry an explicit AI panel consistency
+          label instead of statistical claims we cannot yet back. Details and the current status of each study are on the{' '}
+          <Link to="/research/validity" className="text-brand-green-ink underline underline-offset-4">scoring methodology page</Link>.
+        </p>
+      </MethodCard>
+    </DocumentLayout>
   )
 }

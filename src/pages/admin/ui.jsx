@@ -4,27 +4,32 @@
 // pagination + filters).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createRoot } from 'react-dom/client'
 import { Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import { adminFetch } from '../../lib/adminApi.js'
+import { TONES } from '../../components/ui/Badge.jsx'
+import { Modal } from '../../components/ui/Modal.jsx'
+import { Button } from '../../components/ui/Button.jsx'
+import { Input, Textarea } from '../../components/ui/FormControls.jsx'
 
 export const field =
-  'rounded-[6px] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-1.5 ' +
-  'font-sans text-[13px] text-[var(--color-ink)] outline-none focus:border-[var(--color-accent)]'
+  'rounded-[6px] border border-prism-border bg-prism-surface px-3 py-1.5 ' +
+  'font-sans text-[13px] text-prism-ink outline-none focus:border-brand-green-ink'
 
 export const btn =
-  'inline-flex items-center gap-1.5 rounded-[6px] border border-[var(--color-line)] px-3 py-1.5 ' +
-  'font-sans text-[13px] text-[var(--color-ink)] hover:border-[var(--color-accent)] disabled:opacity-50'
+  'inline-flex items-center gap-1.5 rounded-[6px] border border-prism-border px-3 py-1.5 ' +
+  'font-sans text-[13px] text-prism-ink hover:border-brand-green-ink disabled:opacity-50'
 
 export const btnDanger =
-  'inline-flex items-center gap-1.5 rounded-[6px] border border-[var(--color-danger)] px-3 py-1.5 ' +
-  'font-sans text-[13px] text-[var(--color-danger)] hover:opacity-80 disabled:opacity-50'
+  'inline-flex items-center gap-1.5 rounded-[6px] border border-prism-blocked px-3 py-1.5 ' +
+  'font-sans text-[13px] text-prism-blocked hover:opacity-80 disabled:opacity-50'
 
 export function PageHeader({ title, subtitle, children }) {
   return (
     <div className="flex items-start justify-between gap-3 mb-5 flex-wrap">
       <div>
-        <h1 className="font-display text-xl text-[var(--color-ink)]">{title}</h1>
-        {subtitle && <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">{subtitle}</p>}
+        <h1 className="font-display text-xl text-prism-ink">{title}</h1>
+        {subtitle && <p className="font-mono text-[11px] text-prism-ink-muted">{subtitle}</p>}
       </div>
       <div className="flex items-center gap-2">{children}</div>
     </div>
@@ -34,7 +39,7 @@ export function PageHeader({ title, subtitle, children }) {
 export function ErrorNotice({ error }) {
   if (!error) return null
   return (
-    <p role="alert" className="mb-4 rounded-[6px] border border-[var(--color-danger)] bg-[var(--color-danger-surface)] px-3 py-2 font-sans text-[13px] text-[var(--color-danger)]">
+    <p role="alert" className="mb-4 rounded-[6px] border border-prism-blocked bg-prism-blocked-soft px-3 py-2 font-sans text-[13px] text-prism-blocked">
       {error}
     </p>
   )
@@ -43,28 +48,30 @@ export function ErrorNotice({ error }) {
 export function Notice({ children }) {
   if (!children) return null
   return (
-    <p className="mb-4 rounded-[6px] border border-[var(--color-success)] bg-[var(--color-success-surface)] px-3 py-2 font-sans text-[13px] text-[var(--color-ink)]">
+    <p className="mb-4 rounded-[6px] border border-prism-positive bg-prism-positive-soft px-3 py-2 font-sans text-[13px] text-prism-ink">
       {children}
     </p>
   )
 }
 
-const PILL_STYLES = {
-  ok: 'text-[var(--color-success)] border-[var(--color-success)]',
-  info: 'text-[var(--color-info)] border-[var(--color-info)]',
-  warn: 'text-[var(--color-reliability-moderate)] border-[var(--color-reliability-moderate)]',
-  danger: 'text-[var(--color-danger)] border-[var(--color-danger)]',
-  muted: 'text-[var(--color-ink-muted)] border-[var(--color-line)]',
+// A status label always carries a text label and a shape marker, never colour alone.
+const PILL = {
+  ok: ['positive', '\u25CF'],
+  info: ['accent', '\u25C6'],
+  warn: ['partial', '\u25D0'],
+  danger: ['blocked', '\u25A0'],
+  muted: ['neutral', '\u00B7'],
 }
 
 export function Pill({ tone = 'muted', children }) {
+  const [semantic, marker] = PILL[tone] || PILL.muted
   return (
-    <span className={`inline-block rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] ${PILL_STYLES[tone] || PILL_STYLES.muted}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] ${TONES[semantic]}`}>
+      <span aria-hidden="true">{marker}</span>
       {children}
     </span>
   )
 }
-
 export function mono(v, len = 8) {
   return v == null ? '—' : String(v).slice(0, len)
 }
@@ -142,21 +149,22 @@ export function SearchBox({ value, onChange, placeholder = 'Search…' }) {
 }
 
 // columns: [{ key, label, render?(row), className? }]
-export function DataTable({ columns, rows, rowKey, empty = 'No records.', onRowClick, busy }) {
+export function DataTable({ columns, rows, rowKey, empty = 'No records.', onRowClick, busy, caption }) {
   if (busy && !rows) {
     return (
-      <div className="p-6 flex items-center gap-2 font-sans text-sm text-[var(--color-ink-muted)]">
+      <div className="p-6 flex items-center gap-2 font-sans text-sm text-prism-ink-muted">
         <Loader2 size={15} className="animate-spin" aria-hidden="true" /> Loading…
       </div>
     )
   }
   return (
-    <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] overflow-x-auto">
+    <div className="max-h-[70vh] overflow-auto rounded-[10px] border border-prism-border bg-prism-surface">
       <table className="w-full text-left">
+        {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
-          <tr className="border-b border-[var(--color-line)]">
+          <tr className="border-b border-prism-border">
             {columns.map((c) => (
-              <th key={c.key} className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] whitespace-nowrap">
+              <th key={c.key} scope="col" className="sticky top-0 bg-prism-subtle px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-prism-ink-muted whitespace-nowrap">
                 {c.label}
               </th>
             ))}
@@ -164,16 +172,16 @@ export function DataTable({ columns, rows, rowKey, empty = 'No records.', onRowC
         </thead>
         <tbody>
           {(rows || []).length === 0 ? (
-            <tr><td colSpan={columns.length} className="px-3 py-4 font-sans text-sm text-[var(--color-ink-muted)]">{empty}</td></tr>
+            <tr><td colSpan={columns.length} className="px-3 py-4 font-sans text-sm text-prism-ink-muted">{empty}</td></tr>
           ) : (
             rows.map((row) => (
               <tr
                 key={rowKey(row)}
-                className={`border-b border-[var(--color-line)] last:border-0 align-top ${onRowClick ? 'cursor-pointer hover:bg-[var(--color-paper)]' : ''}`}
+                className={`border-b border-prism-border last:border-0 align-top ${onRowClick ? 'cursor-pointer hover:bg-prism-subtle' : ''}`}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 {columns.map((c) => (
-                  <td key={c.key} className={`px-3 py-2 font-sans text-[13px] text-[var(--color-ink)] ${c.className || ''}`}>
+                  <td key={c.key} className={`px-3 py-1.5 font-sans text-[13px] text-prism-ink ${c.className || ''}`}>
                     {c.render ? c.render(row) : row[c.key] ?? '—'}
                   </td>
                 ))}
@@ -191,7 +199,7 @@ export function Pager({ data, onPage }) {
   if (!data) return null
   return (
     <div className="flex items-center justify-between mt-3">
-      <p className="font-mono text-[11px] text-[var(--color-ink-muted)] tabular-nums">
+      <p className="font-mono text-[11px] text-prism-ink-muted tabular-nums">
         {data.total} record{data.total === 1 ? '' : 's'} · page {data.page} of {pages}
       </p>
       <div className="flex gap-1.5">
@@ -206,9 +214,70 @@ export function Pager({ data, onPage }) {
   )
 }
 
-// Reason-gated action helper: prompts for the mandatory reason, POSTs, reloads.
+// In-app replacements for the browser prompt and confirm boxes: a labelled
+// dialog with a focus trap, Esc to cancel and focus returned to the opener.
+// They resolve like the originals: a string (or true) to continue, null (or
+// false) to cancel, so audited actions keep their mandatory-reason flow.
+function openDialog(render) {
+  return new Promise((resolve) => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const finish = (value) => { root.unmount(); host.remove(); resolve(value) }
+    root.render(render(finish))
+  })
+}
+
+const MULTILINE = /reason|note|decision|explanation|resolution|basis|purpose/i
+
+function TextDialog({ question, initial, onDone }) {
+  const [value, setValue] = useState(initial || '')
+  const Control = MULTILINE.test(question) ? Textarea : Input
+  return (
+    <Modal
+      open
+      onClose={() => onDone(null)}
+      title="Details needed"
+      size="sm"
+      footer={(
+        <>
+          <Button variant="secondary" onClick={() => onDone(null)}>Cancel</Button>
+          <Button onClick={() => onDone(value)}>Continue</Button>
+        </>
+      )}
+    >
+      <form onSubmit={(e) => { e.preventDefault(); onDone(value) }}>
+        <Control label={question} value={value} onChange={(e) => setValue(e.target.value)} autoFocus />
+      </form>
+    </Modal>
+  )
+}
+
+function ConfirmBox({ question, onDone }) {
+  const danger = /delete|erase|permanent|cannot be undone/i.test(question)
+  return (
+    <Modal
+      open
+      onClose={() => onDone(false)}
+      title={danger ? 'Please confirm' : 'Confirm'}
+      description={question}
+      size="sm"
+      footer={(
+        <>
+          <Button variant="secondary" onClick={() => onDone(false)}>Cancel</Button>
+          <Button variant={danger ? 'danger' : 'primary'} onClick={() => onDone(true)}>Confirm</Button>
+        </>
+      )}
+    />
+  )
+}
+
+export const askText = (question, initial = '') => openDialog((done) => <TextDialog question={question} initial={initial} onDone={done} />)
+export const askConfirm = (question) => openDialog((done) => <ConfirmBox question={question} onDone={done} />)
+
+// Reason-gated action helper: asks for the mandatory reason, POSTs, reloads.
 export async function actWithReason(path, body, promptText) {
-  const reason = window.prompt(promptText || 'Reason (recorded in the audit trail):')
+  const reason = await askText(promptText || 'Reason (recorded in the audit trail):')
   if (!reason) return null
   return adminFetch(path, { method: 'POST', body: { ...body, reason } })
 }

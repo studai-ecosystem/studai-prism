@@ -40,6 +40,7 @@ const NAV = [
     group: 'Commerce',
     items: [
       { to: '/admin/payments', label: 'Payments', icon: ClipboardList, permission: 'payments:read' },
+      { to: '/admin/organizations', label: 'Campus organizations', icon: Users, permission: 'organizations:read' },
       { to: '/admin/invites', label: 'Group invites', icon: ClipboardList, permission: 'invites:read' },
       { to: '/admin/margin', label: 'Contribution margin', icon: ClipboardList, permission: 'margin:read' },
     ],
@@ -124,24 +125,24 @@ export default function AdminShell() {
 
   if (state === 'loading') {
     return (
-      <div className="min-h-screen bg-[var(--color-paper)] flex items-center justify-center">
-        <Loader2 size={20} className="animate-spin text-[var(--color-ink-muted)]" aria-label="Loading" />
+      <div className="min-h-screen bg-prism-canvas flex items-center justify-center">
+        <Loader2 size={20} className="animate-spin text-prism-ink-muted" aria-label="Loading" />
       </div>
     )
   }
 
   if (state === 'dark') {
     return (
-      <div className="min-h-screen bg-[var(--color-paper)] flex items-center justify-center px-4">
-        <div className="max-w-md rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+      <div className="min-h-screen bg-prism-canvas flex items-center justify-center px-4">
+        <div className="max-w-md rounded-[10px] border border-prism-border bg-prism-surface p-6">
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle size={16} className="text-[var(--color-reliability-moderate)]" aria-hidden="true" />
-            <h1 className="font-display text-lg text-[var(--color-ink)]">Admin console not enabled</h1>
+            <AlertTriangle size={16} className="text-prism-partial" aria-hidden="true" />
+            <h1 className="font-display text-lg text-prism-ink">Admin console not enabled</h1>
           </div>
-          <p className="font-sans text-sm leading-relaxed text-[var(--color-ink-muted)]">
+          <p className="font-sans text-sm leading-relaxed text-prism-ink-muted">
             This deployment does not have <span className="font-mono text-[12px]">PRISM_ADMIN_CONSOLE=true</span> set.
             The read-only pilot cockpit remains available at{' '}
-            <a href="/admin/legacy-ops" className="text-[var(--color-accent)] underline">/admin/legacy-ops</a>.
+            <a href="/admin/legacy-ops" className="text-brand-green-ink underline">/admin/legacy-ops</a>.
           </p>
         </div>
       </div>
@@ -156,26 +157,26 @@ export default function AdminShell() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-paper)] flex">
+    <div className="min-h-screen bg-prism-canvas flex">
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <aside className="w-60 shrink-0 border-r border-[var(--color-line)] bg-[var(--color-surface)] flex flex-col">
-        <div className="px-4 py-4 border-b border-[var(--color-line)]">
+      <aside className="w-60 shrink-0 border-r border-prism-border bg-prism-surface flex flex-col">
+        <div className="px-4 py-4 border-b border-prism-border">
           <div className="flex items-center gap-2">
-            <ShieldCheck size={17} className="text-[var(--color-accent)]" aria-hidden="true" />
-            <span className="font-display text-[15px] text-[var(--color-ink)]">Prism Control Centre</span>
+            <ShieldCheck size={17} className="text-brand-green-ink" aria-hidden="true" />
+            <span className="font-display text-[15px] text-prism-ink">Prism Control Centre</span>
           </div>
           <div className="mt-2 flex items-center gap-2">
             <span
               className={`inline-block rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] border ${
                 environment === 'production'
-                  ? 'text-[var(--color-danger)] border-[var(--color-danger)]'
-                  : 'text-[var(--color-ink-muted)] border-[var(--color-line)]'
+                  ? 'text-prism-blocked border-prism-blocked'
+                  : 'text-prism-ink-muted border-prism-border'
               }`}
             >
               {environment || 'unknown'}
             </span>
             {admin?.isBreakGlass && (
-              <span className="inline-block rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] border text-[var(--color-danger)] border-[var(--color-danger)]">
+              <span className="inline-block rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] border text-prism-blocked border-prism-blocked">
                 break-glass
               </span>
             )}
@@ -188,7 +189,7 @@ export default function AdminShell() {
             if (!visible.length) return null
             return (
               <div key={group} className="mb-4">
-                <p className="px-2 mb-1 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+                <p className="px-2 mb-1 font-mono text-[10px] uppercase tracking-[0.08em] text-prism-ink-muted">
                   {group}
                 </p>
                 {visible.map((item) =>
@@ -200,8 +201,8 @@ export default function AdminShell() {
                       className={({ isActive }) =>
                         `flex items-center gap-2 rounded-[6px] px-2 py-1.5 font-sans text-[13px] ${
                           isActive
-                            ? 'bg-[var(--color-paper)] text-[var(--color-ink)] border border-[var(--color-line)]'
-                            : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                            ? 'bg-prism-canvas text-prism-ink border border-prism-border'
+                            : 'text-prism-ink-muted hover:text-prism-ink'
                         }`
                       }
                     >
@@ -211,7 +212,7 @@ export default function AdminShell() {
                   ) : (
                     <div
                       key={item.label}
-                      className="flex items-center justify-between gap-2 rounded-[6px] px-2 py-1.5 font-sans text-[13px] text-[var(--color-ink-muted)] opacity-60 cursor-not-allowed"
+                      className="flex items-center justify-between gap-2 rounded-[6px] px-2 py-1.5 font-sans text-[13px] text-prism-ink-muted opacity-60 cursor-not-allowed"
                       title={`Planned — ${item.planned}`}
                     >
                       <span className="flex items-center gap-2">
@@ -227,15 +228,15 @@ export default function AdminShell() {
           })}
         </nav>
 
-        <div className="border-t border-[var(--color-line)] px-4 py-3">
-          <p className="font-sans text-[13px] text-[var(--color-ink)] truncate">{admin?.name || admin?.email}</p>
-          <p className="font-mono text-[10px] text-[var(--color-ink-muted)] truncate">
+        <div className="border-t border-prism-border px-4 py-3">
+          <p className="font-sans text-[13px] text-prism-ink truncate">{admin?.name || admin?.email}</p>
+          <p className="font-mono text-[10px] text-prism-ink-muted truncate">
             {(admin?.roles || []).join(' · ') || 'no roles'}
           </p>
           <button
             type="button"
             onClick={signOut}
-            className="mt-2 inline-flex items-center gap-1.5 font-sans text-[12px] text-[var(--color-ink-muted)] hover:text-[var(--color-danger)]"
+            className="mt-2 inline-flex items-center gap-1.5 font-sans text-[12px] text-prism-ink-muted hover:text-prism-blocked"
           >
             <LogOut size={13} aria-hidden="true" /> Secure sign out
           </button>
@@ -284,55 +285,55 @@ function GlobalSearch() {
   const go = (path) => { setResults(null); setQ(''); navigate(path) }
 
   return (
-    <div className="border-b border-[var(--color-line)] bg-[var(--color-surface)] px-6 py-2 relative" ref={boxRef}>
+    <div className="border-b border-prism-border bg-prism-surface px-6 py-2 relative" ref={boxRef}>
       <form onSubmit={search} className="flex items-center gap-2 max-w-xl">
-        <Search size={14} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
+        <Search size={14} className="text-prism-ink-muted" aria-hidden="true" />
         <input
           aria-label="Global search"
           placeholder="Search candidates, sessions, payments, credentials, disputes…"
-          className="flex-1 bg-transparent font-sans text-[13px] text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-muted)]"
+          className="flex-1 bg-transparent font-sans text-[13px] text-prism-ink outline-none placeholder:text-prism-ink-muted"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        {busy && <Loader2 size={13} className="animate-spin text-[var(--color-ink-muted)]" aria-hidden="true" />}
+        {busy && <Loader2 size={13} className="animate-spin text-prism-ink-muted" aria-hidden="true" />}
       </form>
-      {error && <p className="mt-1 font-mono text-[10px] text-[var(--color-danger)]">{error}</p>}
+      {error && <p className="mt-1 font-mono text-[10px] text-prism-blocked">{error}</p>}
       {results && (
-        <div className="absolute left-6 right-6 top-full z-20 mt-1 max-w-xl rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] shadow-lg p-2 max-h-96 overflow-y-auto">
+        <div className="absolute left-6 right-6 top-full z-20 mt-1 max-w-xl rounded-[10px] border border-prism-border bg-prism-surface shadow-lg p-2 max-h-96 overflow-y-auto">
           {Object.entries(results).every(([, v]) => !v?.length) && (
-            <p className="p-2 font-sans text-[13px] text-[var(--color-ink-muted)]">No results you have permission to see.</p>
+            <p className="p-2 font-sans text-[13px] text-prism-ink-muted">No results you have permission to see.</p>
           )}
           {(results.users || []).map((u) => (
             <button key={u.id} type="button" onClick={() => go(`/admin/candidates/${u.id}`)}
-              className="w-full text-left p-2 rounded-[6px] hover:bg-[var(--color-paper)] font-sans text-[13px] text-[var(--color-ink)]">
-              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">candidate</span>
-              {u.name || u.email} <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{u.email}</span>
+              className="w-full text-left p-2 rounded-[6px] hover:bg-prism-canvas font-sans text-[13px] text-prism-ink">
+              <span className="font-mono text-[10px] uppercase text-prism-ink-muted mr-2">candidate</span>
+              {u.name || u.email} <span className="font-mono text-[11px] text-prism-ink-muted">{u.email}</span>
             </button>
           ))}
           {(results.sessions || []).map((s) => (
             <button key={s.sessionId} type="button" onClick={() => go(`/admin/sessions/${s.sessionId}`)}
-              className="w-full text-left p-2 rounded-[6px] hover:bg-[var(--color-paper)] font-sans text-[13px] text-[var(--color-ink)]">
-              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">session</span>
+              className="w-full text-left p-2 rounded-[6px] hover:bg-prism-canvas font-sans text-[13px] text-prism-ink">
+              <span className="font-mono text-[10px] uppercase text-prism-ink-muted mr-2">session</span>
               <span className="font-mono text-[12px]">{s.sessionId.slice(0, 18)}…</span> {s.scenarioId || ''}
             </button>
           ))}
           {(results.payments || []).map((p) => (
             <button key={p.sessionId} type="button" onClick={() => go('/admin/payments')}
-              className="w-full text-left p-2 rounded-[6px] hover:bg-[var(--color-paper)] font-sans text-[13px] text-[var(--color-ink)]">
-              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">payment</span>
+              className="w-full text-left p-2 rounded-[6px] hover:bg-prism-canvas font-sans text-[13px] text-prism-ink">
+              <span className="font-mono text-[10px] uppercase text-prism-ink-muted mr-2">payment</span>
               <span className="font-mono text-[12px]">{p.paymentId || p.sessionId}</span> · {p.mode}
             </button>
           ))}
           {(results.disputes || []).map((d) => (
             <button key={d.sessionId} type="button" onClick={() => go(`/admin/disputes/${d.sessionId}`)}
-              className="w-full text-left p-2 rounded-[6px] hover:bg-[var(--color-paper)] font-sans text-[13px] text-[var(--color-ink)]">
-              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">dispute</span>
+              className="w-full text-left p-2 rounded-[6px] hover:bg-prism-canvas font-sans text-[13px] text-prism-ink">
+              <span className="font-mono text-[10px] uppercase text-prism-ink-muted mr-2">dispute</span>
               <span className="font-mono text-[12px]">{d.sessionId.slice(0, 18)}…</span> · {d.status}
             </button>
           ))}
           {(results.credentials || []).map((c) => (
-            <div key={c.credential_id} className="p-2 font-sans text-[13px] text-[var(--color-ink)]">
-              <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)] mr-2">credential</span>
+            <div key={c.credential_id} className="p-2 font-sans text-[13px] text-prism-ink">
+              <span className="font-mono text-[10px] uppercase text-prism-ink-muted mr-2">credential</span>
               <span className="font-mono text-[12px]">{String(c.credential_id).slice(0, 18)}…</span> · {c.status}
             </div>
           ))}

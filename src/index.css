@@ -2,19 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Google Fonts are loaded in index.html ── */
-
-:root {
-  --bg-primary: var(--color-line);
-  --bg-secondary: var(--color-surface);
-  --bg-tertiary: var(--color-paper);
-  --card: var(--color-surface);
-  --gold: var(--color-accent);
-  --gold-light: var(--color-accent-bright);
-  --text-primary: var(--color-ink);
-  --text-secondary: var(--color-ink-muted);
-  --border: var(--color-line);
-}
+/* Brand colour, type and layout tokens live in src/design/tokens.css
+   (imported in main.jsx). Nothing in this file defines a colour. */
 
 * {
   box-sizing: border-box;
@@ -25,83 +14,24 @@ html {
 }
 
 body {
-  background-color: var(--bg-primary);
+  background-color: var(--surface-canvas);
   color: var(--text-primary);
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
 
-/* ── Custom scrollbar ── */
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: var(--color-line); }
-::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--surface-subtle); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand-navy); }
 
-/* ── Noise texture ── */
-.noise-bg::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-  opacity: 0.045;
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* ── Gold shimmer animation ── */
-@keyframes shimmer {
-  0%   { background-position: -200% center; }
-  100% { background-position:  200% center; }
-}
-
-.shimmer-btn {
-  background: linear-gradient(
-    90deg,
-    var(--color-accent) 0%,
-    var(--color-accent-bright) 30%,
-    var(--color-accent) 60%,
-    var(--color-accent-bright) 100%
-  );
-  background-size: 200% auto;
-  animation: shimmer 2.8s linear infinite;
-}
-
-/* ── Glow pulse for primary CTA ── */
-@keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 168, 76, 0); }
-  50%       { box-shadow: 0 0 24px 4px rgba(201, 168, 76, 0.25); }
-}
-
-.glow-pulse {
-  animation: glow-pulse 2.4s ease-in-out infinite;
-}
-
-/* ── Hero grid background ── */
-.hero-grid {
-  background-image:
-    linear-gradient(rgba(201,168,76,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(201,168,76,0.06) 1px, transparent 1px);
-  background-size: 64px 64px;
-}
-
-/* ── Tabular numbers ── */
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Score dimension bar animation ── */
-@keyframes bar-fill {
-  from { width: 0%; }
-}
-
-.bar-fill {
-  animation: bar-fill 1s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-/* ── Backdrop blur nav ── */
-.nav-blur {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+/* Legacy headings (class font-serif) now use the brand display face: the
+   wordmark is a heavy grotesque, so display type is bold with tight tracking. */
+@layer utilities {
+  .font-serif {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
 }

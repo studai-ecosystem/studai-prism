@@ -35,15 +35,15 @@ export default function Blog() {
 
       <section className="pb-20 px-6 max-w-6xl mx-auto">
         {status === 'loading' && (
-          <p className="text-center text-[var(--color-ink-muted)]">Loading insights…</p>
+          <p className="text-center text-[var(--prism-ink-muted)]">Loading insights…</p>
         )}
         {status === 'error' && (
-          <p className="text-center text-[var(--color-ink-muted)]">
+          <p className="text-center text-[var(--prism-ink-muted)]">
             Couldn’t load posts right now. Please try again later.
           </p>
         )}
         {status === 'ready' && posts.length === 0 && (
-          <p className="text-center text-[var(--color-ink-muted)]">No posts published yet.</p>
+          <p className="text-center text-[var(--prism-ink-muted)]">No posts published yet.</p>
         )}
         {status === 'ready' && posts.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -51,16 +51,16 @@ export default function Blog() {
               <Link
                 key={post.slug}
                 to={`/research/blog/${post.slug}`}
-                className="group bg-white rounded-2xl shadow-sm p-6 flex flex-col no-underline border-t-2 border-transparent hover:border-gold transition-colors"
+                className="group bg-prism-surface rounded-2xl shadow-sm p-6 flex flex-col no-underline border-t-2 border-transparent hover:border-brand-green transition-colors"
               >
-                <p className="text-xs font-semibold tracking-[0.15em] text-[var(--color-ink-muted)] uppercase mb-3">
+                <p className="text-xs font-semibold tracking-[0.15em] text-[var(--prism-ink-muted)] uppercase mb-3">
                   {post.date}
                 </p>
-                <h3 className="text-xl font-bold text-[var(--color-ink)] mb-3 leading-snug">
+                <h3 className="text-xl font-bold text-[var(--prism-ink)] mb-3 leading-snug">
                   {post.title}
                 </h3>
-                <p className="text-[var(--color-ink-muted)] leading-relaxed mb-6">{post.desc}</p>
-                <span className="mt-auto text-gold font-semibold group-hover:translate-x-1 transition-transform">
+                <p className="text-[var(--prism-ink-muted)] leading-relaxed mb-6">{post.desc}</p>
+                <span className="mt-auto text-brand-green-ink font-semibold group-hover:translate-x-1 transition-transform">
                   Read more →
                 </span>
               </Link>

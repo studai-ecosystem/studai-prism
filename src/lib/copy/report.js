@@ -1,0 +1,97 @@
+// Governed copy for Student Report V3 (spec §14, §36.3, §40). Plain language,
+// no scores, no readiness or hiring language, no percentages.
+export const REPORT_COPY = {
+  title: 'Your report',
+  sponsorTitle: 'Student report',
+  sharedTitle: 'Shared Prism report',
+  tabs: { summary: 'Summary', evidence: 'Evidence', development: 'Development', methodology: 'Methodology' },
+  summaryIntro: 'Each capability shows what was observed in this assessment and how much evidence there was. Where there was not enough evidence, the report says so instead of guessing.',
+  noDescribed: 'This assessment did not produce enough evidence to describe any capability yet. That is a statement about the evidence, not about you.',
+  seeEvidence: 'See evidence',
+  atAGlance: 'At a glance',
+  strengthsTitle: 'Strengths shown by the evidence',
+  noStrengths: 'No capability is described as demonstrated yet. Levels appear only where there is enough evidence.',
+  focusTitle: 'Where to focus',
+  focusTeaser: 'See the development priorities',
+  highlightsTitle: 'Evidence highlights',
+  highlightsAll: 'See all evidence',
+  growthLine: 'Change over time is shown only between assessments approved as comparable.',
+  growthLink: 'Open growth',
+  technicalDetails: 'Technical details',
+  evidenceIntro: 'Every conclusion in this report is linked to something you did in the assessment. Quotes are your exact words.',
+  noEvidence: 'There is no evidence to show for this report.',
+  developmentIntro: 'Up to three priorities, each based on evidence from this assessment.',
+  noPriorities: 'No development priority is based on this assessment yet. Priorities appear only where the evidence supports them.',
+  missionsLater: 'Recommended practice missions are not available here yet.',
+  reassessmentLater: 'Reassessment windows are not available here yet.',
+  methodologyIntro: 'How this report was produced.',
+  methodology: [
+    'Capabilities are described only when there is enough independent evidence from the assessment.',
+    'Level names are provisional while measurement governance finalises them.',
+    'Prism does not score personality, intelligence, emotion, voice tone or appearance.',
+    'There is no single overall score, and no ranking against other people.',
+  ],
+  notReadyTitle: 'Your report is not ready yet',
+  notReadyBody: 'Reports appear here after the assessment is finished and reviewed.',
+  underReviewTitle: 'This report is being reviewed',
+  underReviewBody: 'A person is checking this session. The report will appear when the review is complete.',
+  notAvailable: 'This report is not available',
+  sharedInvalid: 'This link is not valid or has expired',
+  sharedInvalidBody: 'Ask the person who shared it for a new link.',
+  visibility: {
+    OWNER_ONLY: 'Only you can see this report unless you share it.',
+    OWNER_AND_SPONSOR: (sponsor) => `${sponsor} can see this sponsored report. Your personal Prism results stay private.`,
+    SHARED_BY_STUDENT: 'The student chose to share this report with your institution.',
+  },
+  // Charter §9 identity-assurance levels (server lib/sharedConstants ASSURANCE_LEVELS).
+  identity: {
+    NOT_RECORDED: 'Identity level not recorded',
+    L1: 'Identity self-declared',
+    L2: 'Identity confirmed by an institution',
+    L3: 'Identity verified',
+  },
+  share: {
+    open: 'Share',
+    title: 'Share this report',
+    recipient: 'Who can see it',
+    link: 'Anyone with a private link',
+    organization: 'An institution I belong to',
+    disclosure: 'What they can see',
+    summary: 'Summary only — capability levels and evidence status, no quotes',
+    full: 'Full report — including evidence, your quotes and development priorities',
+    expiry: 'Share expires after',
+    create: 'Create share',
+    created: 'Share created',
+    linkOnce: 'Copy this link now. For your privacy it is shown only once.',
+    copy: 'Copy link',
+    copied: 'Copied',
+    active: 'Active shares',
+    none: 'This report is not shared.',
+    revoke: 'Revoke',
+    revoked: 'Share revoked',
+    manage: 'Manage all shares',
+  },
+  pdf: 'Download PDF',
+}
+
+// Second person for the student; neutral wording for anyone else reading.
+const AUDIENCE_COPY = {
+  OWNER: {
+    noDescribed: 'This assessment did not produce enough evidence to describe any capability yet. That is a statement about the evidence, not about you.',
+    evidenceIntro: 'Every conclusion in this report is linked to something you did in the assessment. Quotes are your exact words.',
+    fromWorkMaterials: 'From your work materials',
+  },
+  OTHER: {
+    noDescribed: 'This assessment did not produce enough evidence to describe any capability yet. That is a statement about the evidence, not about the student.',
+    evidenceIntro: 'Every conclusion in this report is linked to something the student did in the assessment. Quotes are the student\u2019s exact words.',
+    fromWorkMaterials: 'From the student\u2019s work materials',
+  },
+}
+export const reportCopyFor = (audience) => (audience === 'OWNER' ? AUDIENCE_COPY.OWNER : AUDIENCE_COPY.OTHER)
+
+export const SHARE_EXPIRY_OPTIONS = [
+  { value: '7', label: '7 days' },
+  { value: '30', label: '30 days' },
+  { value: '90', label: '90 days' },
+  { value: '180', label: '180 days (longest)' },
+]

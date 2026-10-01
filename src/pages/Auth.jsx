@@ -1,34 +1,63 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ShieldCheck, Loader2 } from 'lucide-react'
 import { login, register, isAuthenticated } from '../lib/session.js'
 import { AGE_DECLARATION_TEXT } from '../../server/lib/sharedConstants.js'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
+import { Button, Input, Select, Checkbox, Callout, InlineNotice } from '../components/ui/index.js'
+import { fetchOrgInvite } from '../api/campus.js'
+import { ROLE_LABELS } from '../lib/copy/privacy.js'
 
-const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional']
+const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional'].map((y) => ({ value: y, label: y }))
 
-function Field({ label, type = 'text', value, onChange, placeholder, required = true, autoComplete }) {
+// Only same-origin in-app paths are honoured (no open redirect).
+function safeNext(search) {
+  const raw = new URLSearchParams(search).get('next')
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return null
+  return raw
+}
+
+// A campus invitation arrives here as /login?next=/app/campus-invite/<token>.
+// The token is only ever used to ask the server who is inviting; it is never
+// shown, logged or sent anywhere else.
+function campusInviteToken(next) {
+  const m = /^\/app\/campus-invite\/([^/?#]+)/.exec(next || '')
+  return m ? decodeURIComponent(m[1]) : null
+}
+
+function InviteContext({ token }) {
+  const [state, setState] = useState({ status: 'loading', invite: null })
+  useEffect(() => {
+    let live = true
+    fetchOrgInvite(token)
+      .then((invite) => { if (live) setState({ status: 'ready', invite }) })
+      .catch(() => { if (live) setState({ status: 'unavailable', invite: null }) })
+    return () => { live = false }
+  }, [token])
+
+  if (state.status !== 'ready') return null
+  const { invite } = state
+  const closed = invite.expired || invite.status !== 'PENDING'
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="font-sans text-xs font-semibold text-[var(--color-ink)] tracking-wide">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        autoComplete={autoComplete}
-        className="w-full px-4 py-3 rounded-xl bg-[var(--color-paper)] border border-[var(--color-line)] font-sans text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
-      />
-    </label>
+    <Callout tone={closed ? 'partial' : 'info'} title={`${invite.organizationName} has invited you to Prism`} className="mb-6">
+      {closed
+        ? 'This invitation is no longer open. Ask your institution to send a new one.'
+        : (
+          <>
+            You are invited as {ROLE_LABELS[invite.role] || invite.role}.
+            {invite.emailHint ? ` Use the email address this was sent to (${invite.emailHint}).` : ' Use the email address this was sent to.'}
+            {' '}The invitation joins your own Prism account, so if you already have one, sign in instead of creating another.
+          </>
+        )}
+    </Callout>
   )
 }
 
 export default function Auth() {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const navigate = useNavigate()
   const isRegister = pathname !== '/login'
+  const next = safeNext(search)
+  const inviteToken = campusInviteToken(next)
 
   const [form, setForm] = useState({ name: '', email: '', college: '', year: '', password: '' })
   const [ageConfirmed, setAgeConfirmed] = useState(false)
@@ -38,16 +67,14 @@ export default function Auth() {
   // Reset error when switching tabs
   useEffect(() => setError(null), [pathname])
 
-  // Already signed in? There is nothing to do here — continue into the
-  // funnel instead of asking the user to log in again (every "Get Assessed"
-  // entry point funnels through this guard). An in-flight invite link wins
-  // over the paid flow — the candidate came here to claim a seat.
+  // Already signed in? Continue instead of asking again. An in-flight
+  // assessment invite wins over the paid flow: the candidate came to claim a seat.
   useEffect(() => {
     if (isAuthenticated()) {
       const invite = sessionStorage.getItem('prismInviteToken')
-      navigate(invite ? `/invite/${invite}` : '/payment', { replace: true })
+      navigate(invite ? `/invite/${invite}` : next || '/payment', { replace: true })
     }
-  }, [navigate])
+  }, [navigate, next])
 
   const update = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -63,10 +90,9 @@ export default function Auth() {
       setError('Please fill in all fields to register.')
       return
     }
-    // Charter §12: the pilot serves candidates aged 18+ — an explicit
-    // confirmation, not Terms fine print. No date of birth is collected.
+    // Pilot rule: adult candidates only, confirmed explicitly. No date of birth is collected.
     if (isRegister && !ageConfirmed) {
-      setError('Please confirm that you are 18 or older — Prism is currently available to adult candidates only.')
+      setError('Please confirm that you are 18 or older. Prism is currently available to adult candidates only.')
       return
     }
 
@@ -84,145 +110,91 @@ export default function Auth() {
 
     action
       .then(() => {
-        // An in-flight invite returns the candidate to their claimed seat;
-        // otherwise the paid flow continues into checkout, which mints the
-        // sessionId and then identity verification + proctoring.
+        // An in-flight assessment invite returns the candidate to their seat;
+        // otherwise continue to where they were going, or to checkout.
         const invite = sessionStorage.getItem('prismInviteToken')
-        navigate(invite ? `/invite/${invite}` : '/payment')
+        navigate(invite ? `/invite/${invite}` : next || '/payment')
       })
       .catch((err) => setError(err.message || 'Something went wrong. Please try again.'))
       .finally(() => setSubmitting(false))
   }
 
-  return (
-    <div className="min-h-screen bg-white text-[var(--color-ink)] flex flex-col">
-      {/* Minimal header */}
-      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[var(--color-line)]">
-        <Link to="/" aria-label="Prism home">
-          <PrismLogo size={32} />
-        </Link>
-      </header>
+  // The tabs keep ?next so switching never drops an invitation.
+  const tab = (active) => `flex-1 rounded-[var(--prism-radius-md)] py-2 text-center text-sm font-semibold transition-colors ${
+    active ? 'bg-prism-surface text-prism-ink shadow-sm' : 'text-prism-ink-muted hover:text-prism-ink'
+  }`
 
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md"
-        >
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-accent)]/10 mb-4">
-              <ShieldCheck size={22} className="text-[var(--color-accent)]" />
-            </div>
-            <h1 className="font-serif text-3xl text-[var(--color-ink)] mb-1">
-              {isRegister ? 'Create your account' : 'Welcome back'}
-            </h1>
-            <p className="font-sans text-sm text-[var(--color-ink-muted)]">
+  return (
+    <div className="prism-app flex min-h-screen flex-col bg-prism-canvas text-prism-ink">
+      <main id="main" className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md">
+          <div className="mb-8 flex justify-center">
+            <Link to="/" aria-label="Prism home"><PrismLogo variant="full" width={240} /></Link>
+          </div>
+
+          <div className="rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface p-6 shadow-sm md:p-8">
+            {inviteToken && <InviteContext token={inviteToken} />}
+
+            <h1 className="mb-1 text-2xl font-bold tracking-tight">{isRegister ? 'Create your account' : 'Welcome back'}</h1>
+            <p className="mb-6 text-sm text-prism-ink-muted">
               {isRegister ? 'Start your Prism assessment' : 'Sign in to continue'}
+            </p>
+
+            <div className="mb-6 flex rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-subtle p-1">
+              <Link to={{ pathname: '/login', search }} aria-current={!isRegister ? 'page' : undefined} className={tab(!isRegister)}>Login</Link>
+              <Link to={{ pathname: '/register', search }} aria-current={isRegister ? 'page' : undefined} className={tab(isRegister)}>Register</Link>
+            </div>
+
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+              {isRegister && (
+                <Input label="Full Name" value={form.name} onChange={update('name')} placeholder="Aditi Sharma" autoComplete="name" required />
+              )}
+              <Input label="Email" type="email" value={form.email} onChange={update('email')} placeholder="you@college.edu" autoComplete="email" required />
+              {isRegister && (
+                <>
+                  <Input label="College" value={form.college} onChange={update('college')} placeholder="IIT Madras" autoComplete="organization" required />
+                  <Select label="Year of Study" value={form.year} onChange={update('year')} options={YEARS} placeholder="Select year" required />
+                </>
+              )}
+              <Input
+                label="Password"
+                type="password"
+                value={form.password}
+                onChange={update('password')}
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
+                required
+              />
+
+              {isRegister && (
+                <Checkbox
+                  label={`${AGE_DECLARATION_TEXT} Prism is currently available to candidates aged 18 or older.`}
+                  checked={ageConfirmed}
+                  onChange={(e) => setAgeConfirmed(e.target.checked)}
+                />
+              )}
+
+              {error && <div role="alert"><InlineNotice tone="blocked">{error}</InlineNotice></div>}
+
+              <Button type="submit" size="lg" block loading={submitting} loadingLabel="Please wait...">
+                {isRegister ? 'Create account' : 'Sign in'}
+              </Button>
+            </form>
+
+            <p className="mt-6 text-center text-xs text-prism-ink-muted">
+              {isRegister ? 'Already have an account? ' : "Don't have an account? "}
+              <Link to={{ pathname: isRegister ? '/login' : '/register', search }} className="font-semibold text-brand-green-ink underline underline-offset-4">
+                {isRegister ? 'Login' : 'Register'}
+              </Link>
             </p>
           </div>
 
-          {/* Tabs */}
-          <div className="flex p-1 rounded-xl bg-[var(--color-paper)] border border-[var(--color-line)] mb-6">
-            <Link
-              to="/login"
-              className={`flex-1 text-center py-2 rounded-lg font-sans text-sm font-semibold transition-colors ${
-                !isRegister ? 'bg-white text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-ink-muted)]'
-              }`}
-            >
-              Login
-            </Link>
-            <Link
-              to="/register"
-              className={`flex-1 text-center py-2 rounded-lg font-sans text-sm font-semibold transition-colors ${
-                isRegister ? 'bg-white text-[var(--color-ink)] shadow-sm' : 'text-[var(--color-ink-muted)]'
-              }`}
-            >
-              Register
-            </Link>
-          </div>
-
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <AnimatePresence mode="popLayout">
-              {isRegister && (
-                <motion.div
-                  key="name"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                >
-                  <Field label="Full Name" value={form.name} onChange={update('name')} placeholder="Aditi Sharma" autoComplete="name" />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <Field label="Email" type="email" value={form.email} onChange={update('email')} placeholder="you@college.edu" autoComplete="email" />
-
-            <AnimatePresence mode="popLayout">
-              {isRegister && (
-                <motion.div
-                  key="reg-extra"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="flex flex-col gap-4"
-                >
-                  <Field label="College" value={form.college} onChange={update('college')} placeholder="IIT Madras" autoComplete="organization" />
-                  <label className="flex flex-col gap-1.5">
-                    <span className="font-sans text-xs font-semibold text-[var(--color-ink)] tracking-wide">Year of Study</span>
-                    <select
-                      value={form.year}
-                      onChange={update('year')}
-                      className="w-full px-4 py-3 rounded-xl bg-[var(--color-paper)] border border-[var(--color-line)] font-sans text-sm text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
-                    >
-                      <option value="" disabled>Select year</option>
-                      {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                  </label>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <Field label="Password" type="password" value={form.password} onChange={update('password')} placeholder="••••••••" autoComplete={isRegister ? 'new-password' : 'current-password'} />
-
-            {isRegister && (
-              <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={ageConfirmed}
-                  onChange={(e) => setAgeConfirmed(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
-                />
-                <span className="font-sans text-xs text-[var(--color-ink-muted)] leading-relaxed">
-                  {AGE_DECLARATION_TEXT} Prism is currently available to candidates aged 18 or older.
-                </span>
-              </label>
-            )}
-
-            {error && (
-              <p className="font-sans text-sm text-[var(--color-danger)] text-center">{error}</p>
-            )}
-
-            <motion.button
-              type="submit"
-              disabled={submitting}
-              className="mt-2 w-full py-3.5 rounded-xl bg-[var(--color-ink)] font-sans font-semibold text-sm text-[var(--color-paper)] tracking-wide hover:opacity-90 transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
-              whileHover={submitting ? {} : { scale: 1.01 }}
-              whileTap={submitting ? {} : { scale: 0.98 }}
-            >
-              {submitting && <Loader2 size={16} className="animate-spin" />}
-              {isRegister ? 'Create account → ' : 'Sign in → '}
-            </motion.button>
-          </form>
-
-          <p className="text-center font-sans text-xs text-[var(--color-ink-muted)] mt-6">
-            {isRegister ? 'Already have an account? ' : "Don't have an account? "}
-            <Link to={isRegister ? '/login' : '/register'} className="text-[var(--color-accent)] font-semibold hover:underline">
-              {isRegister ? 'Login' : 'Register'}
-            </Link>
+          <p className="mt-6 text-center text-xs text-prism-ink-subtle">
+            Your assessment conversation is processed for scoring only and is not shared with employers or
+            third parties without your consent. <Link to="/privacy" className="underline underline-offset-4">Privacy</Link>
+            {' '}&middot;{' '}<Link to="/terms" className="underline underline-offset-4">Terms</Link>
           </p>
-        </motion.div>
-      </div>
+        </div>
+      </main>
     </div>
   )
 }

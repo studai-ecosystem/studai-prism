@@ -1,5 +1,6 @@
-// src/lib/artifactStore.js — Lightweight Reactive State Manager for PRISM Next Work Artifacts
+// src/lib/artifactStore.js — Lightweight Reactive State Manager for assessment work artifacts
 import { useState, useEffect } from 'react'
+import { saveArtifact } from '../api/assessment.js'
 
 class ArtifactStore {
   constructor() {
@@ -62,40 +63,21 @@ class ArtifactStore {
     }
   }
 
+  // Resolves only when the server confirms the save; otherwise rejects so the
+  // caller can show "Not saved — retry" and keep the candidate's input.
   async persistArtifact(sessionId, artifactId, notes = '') {
     const target = this.artifacts.find(a => a.artifactId === artifactId)
-    if (!target) return null
+    if (!target) throw new Error('This work material is not part of the session.')
     this.isSaving = true
     this.notify()
-
     try {
-      const token = localStorage.getItem('token')
-      const headers = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
-
-      const res = await fetch(`/api/assessment/artifacts/${sessionId}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          artifactId,
-          updates: target.data,
-          notes
-        })
-      })
-
-      const data = await res.json()
-      if (data.ok && data.artifacts) {
-        this.artifacts = data.artifacts
-        delete this.dirtyDeltas[artifactId]
-      }
-      this.isSaving = false
-      this.notify()
+      const data = await saveArtifact({ sessionId, artifactId, updates: target.data, notes })
+      if (Array.isArray(data.artifacts)) this.artifacts = data.artifacts
+      delete this.dirtyDeltas[artifactId]
       return data
-    } catch (err) {
-      console.error('Failed to persist artifact delta', err)
+    } finally {
       this.isSaving = false
       this.notify()
-      throw err
     }
   }
 }

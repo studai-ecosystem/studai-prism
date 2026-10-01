@@ -19,11 +19,11 @@ const SRC = join(__dirname, '..', '..', 'src')
 const TOKEN_SOURCES = ['design/tokens.js', 'design/tokens.css']
 
 // The rebuild is COMPLETE: every page and component renders from tokens.
-// The two remaining entries are content assets, not UI code — the character
-// avatar illustrations and the brand logo mark, whose colors are artwork.
+// The one remaining entry is a content asset, not UI code: the character
+// avatar illustrations, whose colours are artwork. The brand logo is now the
+// official image asset (no hex in code), so it left this list.
 // RATCHET: shrink-only (an addition fails the test below).
 const LEGACY_ALLOWLIST = [
-  'components/ui/PrismLogo.jsx',
   'lib/characters.jsx',
 ]
 
@@ -70,9 +70,9 @@ test('PART A: tokens.js and tokens.css declare the same palette (lockstep)', asy
   }
 })
 
-test('PART A: multilingual type pair is actually loaded (PRISM_LANG-ready)', async () => {
+test('PART A: brand type (Inter) plus Devanagari and Tamil companions is actually loaded (PRISM_LANG-ready)', async () => {
   const html = await readFile(join(SRC, '..', 'index.html'), 'utf-8')
-  for (const family of ['Fraunces', 'Noto+Sans', 'Noto+Sans+Devanagari', 'Noto+Sans+Tamil', 'IBM+Plex+Mono']) {
+  for (const family of ['Inter', 'Noto+Sans+Devanagari', 'Noto+Sans+Tamil', 'IBM+Plex+Mono']) {
     assert.ok(html.includes(family), `index.html must load ${family}`)
   }
   const tokens = await readFile(join(SRC, 'design', 'tokens.js'), 'utf-8')
@@ -146,4 +146,45 @@ test('PART B: rebuilt Verify page renders zero raw hex and uses the measurement 
   for (const state of ['revoked', 'superseded', 'Signature check failed', 'provisional_uncalibrated', 'chain']) {
     assert.ok(verify.includes(state), `Verify handles state: ${state}`)
   }
+})
+// -- Phase M: one token system, no legacy styling -----------------------------
+// The old --color-* aliases are gone; pages use the brand and application
+// tokens (--prism-*, --brand-*, --status-*) or the matching Tailwind classes.
+// Stock Tailwind palette colours and decorative gradients are banned. The only
+// gradient left is the character avatar artwork.
+const GRADIENT_ALLOWED = ['lib/characters.jsx', 'pages/Briefing.jsx']
+
+async function sourceFiles() {
+  const files = await walk(SRC)
+  return files.filter((f) => !/\.test\.(jsx|js)$/.test(f) && !/^test\//.test(f))
+}
+
+test('PART M: the legacy --color-* aliases are gone', async () => {
+  const offenders = []
+  for (const f of await sourceFiles()) {
+    const text = await readFile(join(SRC, f), 'utf-8')
+    if (/--color-[a-z]/.test(text)) offenders.push(f)
+  }
+  assert.deepEqual(offenders, [], `legacy --color-* tokens in: ${offenders.join(', ')}`)
+})
+
+test('PART M: no stock Tailwind palette colours (status colours come from the status tokens)', async () => {
+  const rx = /\b(?:text|bg|border|ring|from|to|via|fill|stroke|divide|outline)-(?:red|green|amber|yellow|orange|blue|indigo|violet|purple|pink|rose|emerald|teal|cyan|sky|slate|gray|zinc|neutral|stone)-\d{2,3}\b/
+  const offenders = []
+  for (const f of await sourceFiles()) {
+    const text = await readFile(join(SRC, f), 'utf-8')
+    const m = text.match(rx)
+    if (m) offenders.push(`${f}: ${m[0]}`)
+  }
+  assert.deepEqual(offenders, [], offenders.join('\n'))
+})
+
+test('PART M: no decorative gradients outside the character artwork', async () => {
+  const offenders = []
+  for (const f of await sourceFiles()) {
+    if (GRADIENT_ALLOWED.includes(f)) continue
+    const text = await readFile(join(SRC, f), 'utf-8')
+    if (/(?:linear|radial|conic)-gradient\(|\bbg-gradient-/.test(text)) offenders.push(f)
+  }
+  assert.deepEqual(offenders, [], `gradients in: ${offenders.join(', ')}`)
 })

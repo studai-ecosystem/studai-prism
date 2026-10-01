@@ -51,6 +51,9 @@ export const PERMISSIONS = {
   'payments:grant': 'Grant a controlled entitlement with reason',
   'payments:revoke': 'Revoke an unused entitlement with reason',
   'payments:refund': 'Operate the refund workflow',
+  // Campus organizations (Campus Phase 11). Contract prices are never set here (K5).
+  'organizations:read': 'View campus organizations, membership counts, sponsorship seats and contracts',
+  'contracts:manage': 'Create, activate (mints sponsorship seats) and close campus contracts, with reason',
 
   // Group assessment invite links (college cohorts)
   'invites:read': 'View invite links, usage and redemption rosters',
@@ -70,6 +73,9 @@ export const PERMISSIONS = {
   'calibrations:read': 'View calibration runs',
   'calibrations:freeze': 'Freeze a reviewed calibration run (dual-approved)',
   'calibrations:apply': 'Apply a frozen calibration run (dual-approved)',
+  'equivalence:read': 'View the assessment form equivalence registry (growth comparability)',
+  'equivalence:decide': 'Approve (dual-approved) or reject a form pair as comparable for growth, citing evidence',
+  'validation:manage': 'Queue a session\'s V3 evidence units for blinded human double-rating (identity-free, audited)',
 
   // Human rating
   'raters:read': 'View rater roster, IRR, training progress',
@@ -146,6 +152,7 @@ export const ROLES = {
       'sessions:read', 'sessions:review', 'reports:read', 'reports:resend', 'reports:hold', 'reports:supersede',
       'disputes:read', 'disputes:manage', 'consents:read', 'verifications:read',
       'integrity:read', 'payments:read', 'content:read', 'flags:read', 'system:read',
+      'organizations:read',
       'credentials:read', 'replays:read', 'replays:flag', 'teamfit:read', 'teamfit:manage',
       'invites:read', 'invites:manage',
       'exports:create', 'notes:write',
@@ -171,6 +178,8 @@ export const ROLES = {
       'dashboard:read', 'scenarios:read', 'scenarios:manage', 'items:read', 'items:retire',
       'prompts:read', 'prompts:manage', 'prompts:publish',
       'psychometrics:read', 'calibrations:read', 'calibrations:freeze', 'calibrations:apply',
+      'equivalence:read', 'equivalence:decide',
+      'validation:manage',
       'raters:read', 'ratings:supersede', 'sessions:read', 'notes:write',
     ],
   },
@@ -200,6 +209,7 @@ export const ROLES = {
     description: 'Payments, entitlements, refunds, reconciliation, revenue reports.',
     permissions: [
       'dashboard:read', 'payments:read', 'payments:grant', 'payments:revoke', 'payments:refund',
+      'organizations:read', 'contracts:manage',
       'users:read', 'invites:read', 'margin:read', 'exports:create', 'notes:write',
     ],
   },

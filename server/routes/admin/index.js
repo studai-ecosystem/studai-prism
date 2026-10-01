@@ -33,6 +33,7 @@ import recordsRouter from './records.js'
 import searchRouter from './search.js'
 import bankRouter from './bank.js'
 import calibrationsRouter from './calibrations.js'
+import equivalenceRouter from './equivalence.js'
 import ratersRouter from './raters.js'
 import studiesRouter from './studies.js'
 import promptsRouter from './prompts.js'
@@ -48,6 +49,8 @@ import privacyRouter from './privacy.js'
 import auditRouter from './audit.js'
 import accommodationsRouter from './accommodations.js'
 import marginRouter from './margin.js'
+import organizationsRouter from './organizations.js'
+import validationRouter from './validation.js'
 
 const router = Router()
 
@@ -111,6 +114,7 @@ router.use('/search', searchRouter)
 // Phase 3 — scientific administration.
 router.use('/bank', bankRouter)
 router.use('/calibrations', calibrationsRouter)
+router.use('/equivalence', equivalenceRouter)
 router.use('/raters', ratersRouter)
 router.use('/studies', studiesRouter)
 router.use('/prompts', promptsRouter)
@@ -131,5 +135,9 @@ router.use('/audit', auditRouter)
 router.use('/accommodations', accommodationsRouter)
 // Charter Phase 5 — commercial readiness (§23 contribution margin).
 router.use('/margin', marginRouter)
+// Campus Phase 11 — campus organizations, sponsorship pools and contracts.
+router.use('/organizations', organizationsRouter)
+// Campus Phase 12 — blinded double-rating queue for V3 evidence (dark behind PRISM_V3_RATING_QUEUE).
+router.use('/validation', validationRouter)
 
 export default router

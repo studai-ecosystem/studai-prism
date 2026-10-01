@@ -24,10 +24,10 @@ const INSTRUCTIONS = [
 function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
   const blocked = phoneRequired && !phoneLinked
   return (
-    <div className="flex flex-col h-screen bg-[var(--color-paper)] text-[var(--color-ink)]">
-      <header className="shrink-0 flex items-center justify-between px-6 py-3 bg-[var(--color-surface)] border-b border-[var(--color-line)]">
-        <PrismLogo size={28} subtitle={null} />
-        <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+    <div className="flex flex-col h-screen bg-[var(--prism-canvas)] text-[var(--prism-ink)]">
+      <header className="shrink-0 flex items-center justify-between px-6 py-3 bg-[var(--prism-surface)] border-b border-[var(--prism-border)]">
+        <PrismLogo size={28} />
+        <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)]">
           Assessment · about 30 minutes
         </span>
       </header>
@@ -39,11 +39,11 @@ function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
           className="w-full max-w-lg mx-auto flex flex-col gap-8"
         >
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-accent)]/10 mb-4">
-              <ShieldCheck size={22} className="text-[var(--color-accent)]" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--prism-signal)]/10 mb-4">
+              <ShieldCheck size={22} className="text-[var(--prism-signal)]" />
             </div>
-            <h1 className="font-serif text-3xl text-[var(--color-ink)] mb-2">Before you begin</h1>
-            <p className="font-sans text-sm text-[var(--color-ink-muted)]">30-minute assessment · 5 skill dimensions · Verified result</p>
+            <h1 className="font-serif text-3xl text-[var(--prism-ink)] mb-2">Before you begin</h1>
+            <p className="font-sans text-sm text-[var(--prism-ink-muted)]">30-minute assessment · 5 skill dimensions · Verifiable result</p>
           </div>
 
           <ul className="flex flex-col gap-3">
@@ -53,12 +53,12 @@ function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.08 + i * 0.06 }}
-                className="flex gap-3.5 items-start p-4 rounded-[var(--radius-md)] bg-[var(--color-surface)] border border-[var(--color-line)]"
+                className="flex gap-3.5 items-start p-4 rounded-[var(--radius-md)] bg-[var(--prism-surface)] border border-[var(--prism-border)]"
               >
-                <span className="shrink-0 mt-0.5 w-8 h-8 rounded-full bg-[var(--color-paper)] border border-[var(--color-line)] flex items-center justify-center">
-                  <item.Icon size={15} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
+                <span className="shrink-0 mt-0.5 w-8 h-8 rounded-full bg-[var(--prism-canvas)] border border-[var(--prism-border)] flex items-center justify-center">
+                  <item.Icon size={15} className="text-[var(--prism-ink-muted)]" aria-hidden="true" />
                 </span>
-                <span className="font-sans text-sm text-[var(--color-ink)] leading-relaxed">{item.text}</span>
+                <span className="font-sans text-sm text-[var(--prism-ink)] leading-relaxed">{item.text}</span>
               </motion.li>
             ))}
           </ul>
@@ -67,8 +67,8 @@ function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
             <div
               className={`flex items-center gap-3 p-4 rounded-[var(--radius-md)] border font-sans text-sm ${
                 phoneLinked
-                  ? 'bg-[var(--color-success-surface)] border-[var(--color-success)]/30 text-[var(--color-success)]'
-                  : 'bg-[var(--color-warn-surface)] border-[var(--color-reliability-moderate)]/30 text-[var(--color-reliability-moderate)]'
+                  ? 'bg-[var(--status-positive-soft)] border-[var(--status-positive-ink)]/30 text-[var(--status-positive-ink)]'
+                  : 'bg-[var(--status-partial-soft)] border-[var(--status-partial-ink)]/30 text-[var(--status-partial-ink)]'
               }`}
             >
               <Smartphone size={18} className="shrink-0" />
@@ -86,12 +86,12 @@ function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
             transition={{ delay: 0.5 }}
             onClick={onBegin}
             disabled={blocked}
-            className="w-full py-4 rounded-[var(--radius-md)] bg-[var(--color-ink)] font-sans font-semibold text-sm text-[var(--color-paper)] tracking-wide hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full py-4 rounded-[var(--radius-md)] bg-[var(--prism-ink)] font-sans font-semibold text-sm text-[var(--prism-canvas)] tracking-wide hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {blocked ? 'Waiting for phone camera…' : 'Begin assessment'}
           </motion.button>
 
-          <p className="text-center font-sans text-xs text-[var(--color-ink-muted)]">
+          <p className="text-center font-sans text-xs text-[var(--prism-ink-muted)]">
             By beginning you confirm this is your own unaided work.
           </p>
         </motion.div>
@@ -121,8 +121,8 @@ function SpeakerBadge({ name, speaking }) {
       aria-hidden="true"
       className={`w-7 h-7 rounded-full flex items-center justify-center font-mono text-[11px] shrink-0 border transition-colors ${
         speaking
-          ? 'bg-[var(--color-accent-bright)]/15 border-[var(--color-accent-bright)] text-[var(--color-accent-bright)]'
-          : 'bg-[var(--color-room-surface)] border-[var(--color-room-line)] text-[var(--color-ink-muted)]'
+          ? 'bg-[var(--brand-green)]/15 border-[var(--brand-green)] text-[var(--brand-green)]'
+          : 'bg-[var(--brand-navy)] border-[var(--border-on-dark)] text-[var(--prism-ink-muted)]'
       }`}
     >
       {initialsOf(name)}
@@ -138,22 +138,22 @@ function ScriptTurn({ speaker, role, content, you = false, animate = false }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       className={`group flex flex-col gap-1.5 pl-4 border-l-2 ${
-        you ? 'border-[var(--color-accent-bright)]' : 'border-[var(--color-room-line)]'
+        you ? 'border-[var(--brand-green)]' : 'border-[var(--border-on-dark)]'
       }`}
     >
       <div className="flex items-baseline gap-2 flex-wrap">
         <span
           className={`font-mono text-[11px] tracking-[0.08em] uppercase ${
-            you ? 'text-[var(--color-accent-bright)]' : 'text-[var(--color-ink)]'
+            you ? 'text-[var(--brand-green)]' : 'text-[var(--prism-ink)]'
           }`}
         >
           {speaker}
         </span>
         {role && (
-          <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">{role}</span>
+          <span className="font-mono text-[10px] text-[var(--prism-ink-muted)]">{role}</span>
         )}
       </div>
-      <p className="font-sans text-[15px] leading-[1.7] text-[var(--color-ink)] max-w-prose whitespace-pre-wrap">
+      <p className="font-sans text-[15px] leading-[1.7] text-[var(--prism-ink)] max-w-prose whitespace-pre-wrap">
         {content}
       </p>
     </motion.div>
@@ -164,18 +164,18 @@ function ScriptTurn({ speaker, role, content, you = false, animate = false }) {
 // nothing conveys by motion alone — LAW 4).
 function RespondingNote({ name }) {
   return (
-    <div className="flex items-center gap-2 pl-4 border-l-2 border-[var(--color-room-line)]" role="status">
+    <div className="flex items-center gap-2 pl-4 border-l-2 border-[var(--border-on-dark)]" role="status">
       <span className="inline-flex gap-1" aria-hidden="true">
         {[0, 1, 2].map((i) => (
           <motion.span
             key={i}
-            className="w-1 h-1 rounded-full bg-[var(--color-ink-muted)]"
+            className="w-1 h-1 rounded-full bg-[var(--prism-ink-muted)]"
             animate={{ opacity: [0.3, 1, 0.3] }}
             transition={{ duration: 1, delay: i * 0.2, repeat: Infinity }}
           />
         ))}
       </span>
-      <span className="font-mono text-[11px] text-[var(--color-ink-muted)] italic">
+      <span className="font-mono text-[11px] text-[var(--prism-ink-muted)] italic">
         {name ? `${name} is responding…` : 'The panel is responding…'}
       </span>
     </div>
@@ -226,7 +226,7 @@ function VoiceBars() {
   return (
     <span className="inline-flex items-end gap-[2px] h-3" aria-hidden="true">
       {[0, 1, 2, 3].map((i) => (
-        <span key={i} className="prism-voicebar w-[2.5px] rounded-full bg-[var(--color-accent-bright)]" style={{ animationDelay: `${i * 120}ms` }} />
+        <span key={i} className="prism-voicebar w-[2.5px] rounded-full bg-[var(--brand-green)]" style={{ animationDelay: `${i * 120}ms` }} />
       ))}
     </span>
   )
@@ -239,14 +239,14 @@ function PersonaCard({ name, role, state }) {
     <div
       className={`flex items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2 min-w-0 transition-colors ${
         speaking
-          ? 'bg-[var(--color-room-surface)] border-[var(--color-accent-bright)]'
-          : 'bg-[var(--color-room-surface)] border-[var(--color-room-line)]'
+          ? 'bg-[var(--brand-navy)] border-[var(--brand-green)]'
+          : 'bg-[var(--brand-navy)] border-[var(--border-on-dark)]'
       }`}
     >
       <SpeakerBadge name={name} speaking={speaking} />
       <div className="min-w-0">
-        <p className="font-sans text-xs font-semibold text-[var(--color-ink)] truncate">{name}</p>
-        <p className="font-mono text-[10px] text-[var(--color-ink-muted)] truncate flex items-center gap-1.5">
+        <p className="font-sans text-xs font-semibold text-[var(--prism-ink)] truncate">{name}</p>
+        <p className="font-mono text-[10px] text-[var(--prism-ink-muted)] truncate flex items-center gap-1.5">
           {speaking ? (
             <>
               <VoiceBars />
@@ -254,7 +254,7 @@ function PersonaCard({ name, role, state }) {
             </>
           ) : listening ? (
             <>
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent-bright)]" aria-hidden="true" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-green)]" aria-hidden="true" />
               listening
             </>
           ) : (
@@ -274,16 +274,16 @@ function CandidateTurn({ content, character, userName }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="flex flex-col gap-1.5 pl-4 border-l-2 border-[var(--color-accent-bright)]"
+      className="flex flex-col gap-1.5 pl-4 border-l-2 border-[var(--brand-green)]"
     >
       <div className="flex items-center gap-2">
         {character && <CharacterAvatar id={character.id} size={20} />}
-        <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-accent-bright)]">
+        <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--brand-green)]">
           {userName || 'You'}
         </span>
-        <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">you</span>
+        <span className="font-mono text-[10px] text-[var(--prism-ink-muted)]">you</span>
       </div>
-      <p className="font-sans text-[15px] leading-[1.7] text-[var(--color-ink)] max-w-prose whitespace-pre-wrap">{content}</p>
+      <p className="font-sans text-[15px] leading-[1.7] text-[var(--prism-ink)] max-w-prose whitespace-pre-wrap">{content}</p>
     </motion.div>
   )
 }
@@ -1233,20 +1233,20 @@ export default function Assessment() {
   }
 
   return (
-    <div className="room-dark flex flex-col h-screen bg-[var(--color-room)] text-[var(--color-ink)] font-sans">
+    <div className="room-dark flex flex-col h-screen bg-[var(--brand-navy-deep)] text-[var(--prism-ink)] font-sans">
       <style>{`
         .prism-voicebar{height:3px;animation:prismVoice 900ms ease-in-out infinite}
         @keyframes prismVoice{0%,100%{height:3px}50%{height:12px}}
-        .room-dark ::selection{background:var(--color-accent-bright);color:var(--color-room)}
-        .room-dark textarea::placeholder{color:var(--color-ink-muted);opacity:0.8}
+        .room-dark ::selection{background:var(--brand-green);color:var(--brand-navy-deep)}
+        .room-dark textarea::placeholder{color:var(--prism-ink-muted);opacity:0.8}
       `}</style>
 
       {/* Top bar: identity · stage · calm time · submit */}
-      <header className="shrink-0 border-b border-[var(--color-room-line)] bg-[var(--color-room-surface)]">
+      <header className="shrink-0 border-b border-[var(--border-on-dark)] bg-[var(--brand-navy)]">
         <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5">
           <div className="flex items-center gap-3 min-w-0">
-            <PrismLogo size={24} subtitle={null} wordmarkColor="var(--color-room-ink)" />
-            <span className="hidden sm:inline font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+            <PrismLogo size={24} tone="reverse" />
+            <span className="hidden sm:inline font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)]">
               {stage.label}
             </span>
           </div>
@@ -1254,7 +1254,7 @@ export default function Assessment() {
           <div className="flex items-center gap-3 sm:gap-4">
             <span
               className={`font-mono text-[11px] tabular-nums ${
-                timePhase === 'open' ? 'text-[var(--color-ink-muted)]' : 'text-[var(--color-reliability-moderate)]'
+                timePhase === 'open' ? 'text-[var(--prism-ink-muted)]' : 'text-[var(--status-partial-ink)]'
               }`}
               role="timer"
               aria-label={`${formatTime(elapsed)} elapsed of about thirty minutes`}
@@ -1264,7 +1264,7 @@ export default function Assessment() {
             <button
               onClick={() => handleSubmit(false)}
               disabled={submitting || exchangeCount < 3}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] font-sans font-semibold text-xs border border-[var(--color-room-line)] bg-[var(--color-room)] text-[var(--color-ink)] enabled:hover:border-[var(--color-accent-bright)] enabled:hover:text-[var(--color-accent-bright)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-sm)] font-sans font-semibold text-xs border border-[var(--border-on-dark)] bg-[var(--brand-navy-deep)] text-[var(--prism-ink)] enabled:hover:border-[var(--brand-green)] enabled:hover:text-[var(--brand-green)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               title={exchangeCount < 3 ? 'Please engage more before submitting' : 'End assessment and get your score'}
             >
               <CheckCircle size={14} />
@@ -1274,15 +1274,15 @@ export default function Assessment() {
         </div>
 
         {/* Thin session progress with phase markers — information, not alarm */}
-        <div className="relative h-[3px] bg-[var(--color-room-line)]" aria-hidden="true">
+        <div className="relative h-[3px] bg-[var(--border-on-dark)]" aria-hidden="true">
           <div
-            className="absolute inset-y-0 left-0 bg-[var(--color-accent-bright)] transition-[width] duration-1000 ease-linear"
+            className="absolute inset-y-0 left-0 bg-[var(--brand-green)] transition-[width] duration-1000 ease-linear"
             style={{ width: `${progress * 100}%` }}
           />
           {ASSESSMENT_FLOW.filter((s) => s.atSecond > 60).map((s) => (
             <span
               key={s.id}
-              className="absolute top-0 bottom-0 w-px bg-[var(--color-room)]"
+              className="absolute top-0 bottom-0 w-px bg-[var(--brand-navy-deep)]"
               style={{ left: `${(s.atSecond / DURATION_SECONDS) * 100}%` }}
             />
           ))}
@@ -1302,11 +1302,11 @@ export default function Assessment() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="shrink-0 overflow-hidden bg-[var(--color-room-surface)] border-b border-[var(--color-room-line)]"
+            className="shrink-0 overflow-hidden bg-[var(--brand-navy)] border-b border-[var(--border-on-dark)]"
           >
             <div className="flex items-center gap-2 px-4 sm:px-6 py-1.5">
-              <Timer size={12} className="text-[var(--color-reliability-moderate)] shrink-0" />
-              <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">
+              <Timer size={12} className="text-[var(--status-partial-ink)] shrink-0" />
+              <p className="font-mono text-[11px] text-[var(--prism-ink-muted)]">
                 {timePhase === 'final'
                   ? 'Final minutes — wrap up and press Submit & Get Score when you are ready.'
                   : 'Closing phase — start bringing your thinking together.'}
@@ -1318,7 +1318,7 @@ export default function Assessment() {
 
       {/* PERSONA STAGE — who is in the room, and who has the floor */}
       {!initialising && !error && personas.length > 0 && (
-        <div className="shrink-0 border-b border-[var(--color-room-line)] bg-[var(--color-room)]">
+        <div className="shrink-0 border-b border-[var(--border-on-dark)] bg-[var(--brand-navy-deep)]">
           <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-2.5 flex gap-2 overflow-x-auto">
             {personas.map((p) => (
               <PersonaCard
@@ -1348,16 +1348,16 @@ export default function Assessment() {
         <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-6 flex flex-col gap-7 min-h-full">
           {initialising ? (
             <div className="flex flex-col items-center justify-center flex-1 gap-4" role="status">
-              <div className="w-8 h-8 border-2 border-[var(--color-accent-bright)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-              <p className="font-mono text-xs text-[var(--color-ink-muted)]">Setting up your scenario…</p>
+              <div className="w-8 h-8 border-2 border-[var(--brand-green)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              <p className="font-mono text-xs text-[var(--prism-ink-muted)]">Setting up your scenario…</p>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center">
-              <AlertTriangle size={28} className="text-[var(--color-danger)]" />
-              <p className="font-sans text-sm text-[var(--color-ink-muted)] max-w-sm">{error}</p>
+              <AlertTriangle size={28} className="text-[var(--status-blocked-ink)]" />
+              <p className="font-sans text-sm text-[var(--prism-ink-muted)] max-w-sm">{error}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="font-mono text-xs text-[var(--color-accent-bright)] underline underline-offset-4 cursor-pointer"
+                className="font-mono text-xs text-[var(--brand-green)] underline underline-offset-4 cursor-pointer"
               >
                 Reload page
               </button>
@@ -1390,7 +1390,7 @@ export default function Assessment() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               onClick={jumpToNow}
-              className="sticky bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3.5 py-2 rounded-[var(--radius-full)] bg-[var(--color-room-surface)] border border-[var(--color-room-line)] font-mono text-[11px] text-[var(--color-ink)] shadow-lg hover:border-[var(--color-accent-bright)] transition-colors cursor-pointer"
+              className="sticky bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3.5 py-2 rounded-[var(--radius-full)] bg-[var(--brand-navy)] border border-[var(--border-on-dark)] font-mono text-[11px] text-[var(--prism-ink)] shadow-lg hover:border-[var(--brand-green)] transition-colors cursor-pointer"
             >
               <ChevronDown size={13} aria-hidden="true" />
               Jump to now
@@ -1406,15 +1406,15 @@ export default function Assessment() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="shrink-0 overflow-hidden bg-[var(--color-room-surface)] border-t border-[var(--color-room-line)]"
+            className="shrink-0 overflow-hidden bg-[var(--brand-navy)] border-t border-[var(--border-on-dark)]"
           >
             <div className="max-w-3xl mx-auto w-full flex items-start gap-2 px-4 sm:px-6 py-2">
-              <AlertTriangle size={13} className="text-[var(--color-reliability-moderate)] shrink-0 mt-0.5" aria-hidden="true" />
-              <p className="flex-1 font-sans text-xs text-[var(--color-ink)]" role="status">{notice}</p>
+              <AlertTriangle size={13} className="text-[var(--status-partial-ink)] shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="flex-1 font-sans text-xs text-[var(--prism-ink)]" role="status">{notice}</p>
               <button
                 onClick={() => setNotice(null)}
                 aria-label="Dismiss notice"
-                className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] cursor-pointer"
+                className="text-[var(--prism-ink-muted)] hover:text-[var(--prism-ink)] cursor-pointer"
               >
                 <X size={13} />
               </button>
@@ -1424,7 +1424,7 @@ export default function Assessment() {
       </AnimatePresence>
 
       {/* CANDIDATE CONSOLE — the mic state machine + full typing parity */}
-      <div className="shrink-0 bg-[var(--color-room-surface)] border-t border-[var(--color-room-line)] px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+      <div className="shrink-0 bg-[var(--brand-navy)] border-t border-[var(--border-on-dark)] px-4 sm:px-6 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
         {/* ASR review strip — visible commit window, explicit send-now */}
         <AnimatePresence>
           {reviewDeadline && (
@@ -1432,17 +1432,17 @@ export default function Assessment() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 6 }}
-              className="max-w-3xl mx-auto mb-2.5 flex items-center gap-2.5 px-3.5 py-2 rounded-[var(--radius-md)] border border-[var(--color-accent-bright)]/50 bg-[var(--color-room)]"
+              className="max-w-3xl mx-auto mb-2.5 flex items-center gap-2.5 px-3.5 py-2 rounded-[var(--radius-md)] border border-[var(--brand-green)]/50 bg-[var(--brand-navy-deep)]"
             >
-              <span className="font-mono text-[11px] text-[var(--color-accent-bright)] tabular-nums shrink-0" aria-hidden="true">
+              <span className="font-mono text-[11px] text-[var(--brand-green)] tabular-nums shrink-0" aria-hidden="true">
                 {reviewLeft}s
               </span>
-              <p className="flex-1 font-sans text-xs text-[var(--color-ink)]">
+              <p className="flex-1 font-sans text-xs text-[var(--prism-ink)]">
                 Check your transcribed answer below — fix anything the transcription missed. It sends automatically.
               </p>
               <button
                 onClick={sendMessage}
-                className="font-mono text-[11px] text-[var(--color-accent-bright)] underline underline-offset-4 shrink-0 cursor-pointer"
+                className="font-mono text-[11px] text-[var(--brand-green)] underline underline-offset-4 shrink-0 cursor-pointer"
               >
                 Send now
               </button>
@@ -1466,7 +1466,7 @@ export default function Assessment() {
                   : 'Speak with the mic, or type here — both count the same'
             }
             rows={2}
-            className="flex-1 resize-none bg-[var(--color-room)] border border-[var(--color-room-line)] rounded-[var(--radius-md)] px-4 py-3 font-sans text-sm text-[var(--color-ink)] focus:outline-none focus:border-[var(--color-accent-bright)]/70 transition-colors disabled:opacity-50"
+            className="flex-1 resize-none bg-[var(--brand-navy-deep)] border border-[var(--border-on-dark)] rounded-[var(--radius-md)] px-4 py-3 font-sans text-sm text-[var(--prism-ink)] focus:outline-none focus:border-[var(--brand-green)]/70 transition-colors disabled:opacity-50"
             aria-label="Your response"
           />
 
@@ -1478,8 +1478,8 @@ export default function Assessment() {
             title={ttsEnabled ? 'Narration on' : 'Narration off'}
             className={`flex items-center justify-center w-11 h-11 rounded-[var(--radius-md)] border transition-colors disabled:opacity-40 cursor-pointer shrink-0 ${
               ttsEnabled
-                ? 'bg-[var(--color-room)] border-[var(--color-room-line)] text-[var(--color-ink)]'
-                : 'bg-[var(--color-room)] border-[var(--color-room-line)] text-[var(--color-ink-muted)]'
+                ? 'bg-[var(--brand-navy-deep)] border-[var(--border-on-dark)] text-[var(--prism-ink)]'
+                : 'bg-[var(--brand-navy-deep)] border-[var(--border-on-dark)] text-[var(--prism-ink-muted)]'
             }`}
           >
             {ttsEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
@@ -1494,8 +1494,8 @@ export default function Assessment() {
             title={recording ? 'End your turn' : 'Speak your answer'}
             className={`relative flex items-center justify-center gap-2 h-11 rounded-[var(--radius-md)] border transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 ${
               recording
-                ? 'px-3.5 bg-[var(--color-room)] border-[var(--color-accent-bright)] text-[var(--color-accent-bright)]'
-                : 'w-11 bg-[var(--color-accent-bright)]/10 border-[var(--color-accent-bright)]/60 text-[var(--color-accent-bright)] hover:bg-[var(--color-accent-bright)]/20'
+                ? 'px-3.5 bg-[var(--brand-navy-deep)] border-[var(--brand-green)] text-[var(--brand-green)]'
+                : 'w-11 bg-[var(--brand-green)]/10 border-[var(--brand-green)]/60 text-[var(--brand-green)] hover:bg-[var(--brand-green)]/20'
             }`}
           >
             {transcribing ? (
@@ -1521,8 +1521,8 @@ export default function Assessment() {
               title={listening ? 'Stop dictation' : 'Dictate into the box'}
               className={`relative flex items-center justify-center w-11 h-11 rounded-[var(--radius-md)] border transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 ${
                 listening
-                  ? 'bg-[var(--color-room)] border-[var(--color-accent-bright)] text-[var(--color-accent-bright)]'
-                  : 'bg-[var(--color-room)] border-[var(--color-room-line)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                  ? 'bg-[var(--brand-navy-deep)] border-[var(--brand-green)] text-[var(--brand-green)]'
+                  : 'bg-[var(--brand-navy-deep)] border-[var(--border-on-dark)] text-[var(--prism-ink-muted)] hover:text-[var(--prism-ink)]'
               }`}
             >
               {listening ? <Mic size={16} /> : <MicOff size={16} />}
@@ -1533,14 +1533,14 @@ export default function Assessment() {
             onClick={sendMessage}
             disabled={!input.trim() || loading || submitting || initialising || recording || transcribing}
             aria-label="Send your answer"
-            className="flex items-center justify-center w-11 h-11 rounded-[var(--radius-md)] bg-[var(--color-ink)] text-[var(--color-room)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 hover:opacity-90 transition-opacity"
+            className="flex items-center justify-center w-11 h-11 rounded-[var(--radius-md)] bg-[var(--prism-ink)] text-[var(--brand-navy-deep)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 hover:opacity-90 transition-opacity"
           >
             <Send size={16} />
           </button>
         </div>
 
         {/* Mic state, announced — one line, always true */}
-        <p className="max-w-3xl mx-auto font-mono text-[10px] text-[var(--color-ink-muted)] mt-2 px-1" aria-live="polite">
+        <p className="max-w-3xl mx-auto font-mono text-[10px] text-[var(--prism-ink-muted)] mt-2 px-1" aria-live="polite">
           {micStatus}
         </p>
       </div>
@@ -1559,12 +1559,12 @@ export default function Assessment() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[105] bg-[var(--color-room)]/95 backdrop-blur-sm flex items-center justify-center px-6"
+            className="fixed inset-0 z-[105] bg-[var(--brand-navy-deep)]/95 backdrop-blur-sm flex items-center justify-center px-6"
           >
             <div className="text-center max-w-sm" role="status">
-              <div className="w-10 h-10 mx-auto mb-5 border-2 border-[var(--color-accent-bright)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-              <h2 className="font-serif text-2xl text-[var(--color-ink)] mb-2">Scoring your conversation</h2>
-              <p className="font-sans text-sm text-[var(--color-ink-muted)] leading-relaxed">
+              <div className="w-10 h-10 mx-auto mb-5 border-2 border-[var(--brand-green)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              <h2 className="font-serif text-2xl text-[var(--prism-ink)] mb-2">Scoring your conversation</h2>
+              <p className="font-sans text-sm text-[var(--prism-ink-muted)] leading-relaxed">
                 An independent panel of AI judges is reading your full transcript.
                 This usually takes under a minute — please keep this window open.
               </p>
@@ -1580,28 +1580,28 @@ export default function Assessment() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-[var(--color-room)]/90 backdrop-blur-sm flex items-center justify-center"
+            className="fixed inset-0 z-[100] bg-[var(--brand-navy-deep)]/90 backdrop-blur-sm flex items-center justify-center"
           >
             <motion.div
               initial={{ scale: 0.95, y: 12 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 12 }}
-              className="bg-[var(--color-room-surface)] border border-[var(--color-room-line)] rounded-[var(--radius-lg)] p-7 max-w-sm w-full mx-4 text-center shadow-2xl"
+              className="bg-[var(--brand-navy)] border border-[var(--border-on-dark)] rounded-[var(--radius-lg)] p-7 max-w-sm w-full mx-4 text-center shadow-2xl"
             >
-              <div className="w-11 h-11 rounded-full bg-[var(--color-reliability-moderate)]/15 flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle size={22} className="text-[var(--color-reliability-moderate)]" aria-hidden="true" />
+              <div className="w-11 h-11 rounded-full bg-[var(--status-partial-ink)]/15 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle size={22} className="text-[var(--status-partial-ink)]" aria-hidden="true" />
               </div>
-              <h2 className="font-serif text-xl text-[var(--color-ink)] mb-2">Integrity event recorded</h2>
-              <p className="font-sans text-sm text-[var(--color-ink-muted)] mb-1 leading-relaxed">
+              <h2 className="font-serif text-xl text-[var(--prism-ink)] mb-2">Integrity event recorded</h2>
+              <p className="font-sans text-sm text-[var(--prism-ink-muted)] mb-1 leading-relaxed">
                 Leaving this tab or attempting a screenshot is recorded with your session and may be
                 reviewed by a person.
               </p>
-              <p className="font-mono text-[11px] text-[var(--color-ink-muted)] mb-6">
+              <p className="font-mono text-[11px] text-[var(--prism-ink-muted)] mb-6">
                 Recorded events this session: {tabViolations}
               </p>
               <button
                 onClick={() => setShowTabWarning(false)}
-                className="w-full py-3 rounded-[var(--radius-md)] bg-[var(--color-room-ink)] font-sans font-semibold text-sm text-[var(--color-room)] hover:opacity-90 transition-opacity cursor-pointer"
+                className="w-full py-3 rounded-[var(--radius-md)] bg-[var(--brand-soft)] font-sans font-semibold text-sm text-[var(--brand-navy-deep)] hover:opacity-90 transition-opacity cursor-pointer"
               >
                 Return to the conversation
               </button>
@@ -1619,9 +1619,9 @@ export default function Assessment() {
             exit={{ opacity: 0, y: -16 }}
             className="fixed top-4 left-1/2 -translate-x-1/2 z-[95]"
           >
-            <div className="flex items-center gap-2 rounded-[var(--radius-full)] bg-[var(--color-room-surface)] border border-[var(--color-reliability-moderate)] px-4 py-2 shadow-lg">
-              <ScanFace size={14} className="text-[var(--color-reliability-moderate)] shrink-0" aria-hidden="true" />
-              <span className="font-sans text-xs font-medium text-[var(--color-ink)]" role="status">{faceWarning}</span>
+            <div className="flex items-center gap-2 rounded-[var(--radius-full)] bg-[var(--brand-navy)] border border-[var(--status-partial-ink)] px-4 py-2 shadow-lg">
+              <ScanFace size={14} className="text-[var(--status-partial-ink)] shrink-0" aria-hidden="true" />
+              <span className="font-sans text-xs font-medium text-[var(--prism-ink)]" role="status">{faceWarning}</span>
             </div>
           </motion.div>
         )}
@@ -1635,24 +1635,24 @@ export default function Assessment() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90] bg-[var(--color-room)]/95 backdrop-blur-sm flex items-center justify-center"
+            className="fixed inset-0 z-[90] bg-[var(--brand-navy-deep)]/95 backdrop-blur-sm flex items-center justify-center"
           >
             <motion.div
               initial={{ scale: 0.95, y: 12 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 12 }}
-              className="bg-[var(--color-room-surface)] border border-[var(--color-room-line)] rounded-[var(--radius-lg)] p-7 max-w-sm w-full mx-4 text-center shadow-2xl"
+              className="bg-[var(--brand-navy)] border border-[var(--border-on-dark)] rounded-[var(--radius-lg)] p-7 max-w-sm w-full mx-4 text-center shadow-2xl"
             >
-              <div className="w-11 h-11 rounded-full bg-[var(--color-info)]/15 flex items-center justify-center mx-auto mb-4">
-                <Smartphone size={22} className="text-[var(--color-info)]" aria-hidden="true" />
+              <div className="w-11 h-11 rounded-full bg-[var(--status-info-ink)]/15 flex items-center justify-center mx-auto mb-4">
+                <Smartphone size={22} className="text-[var(--status-info-ink)]" aria-hidden="true" />
               </div>
-              <h2 className="font-serif text-xl text-[var(--color-ink)] mb-2">Phone camera disconnected</h2>
-              <p className="font-sans text-sm text-[var(--color-ink-muted)] mb-4 leading-relaxed">
+              <h2 className="font-serif text-xl text-[var(--prism-ink)] mb-2">Phone camera disconnected</h2>
+              <p className="font-sans text-sm text-[var(--prism-ink-muted)] mb-4 leading-relaxed">
                 Your second camera went offline. Re-open the proctor page on your phone (or scan the
                 QR again) and keep that screen on. The test will resume automatically once it
                 reconnects.
               </p>
-              <div className="inline-flex items-center gap-2 font-mono text-xs text-[var(--color-ink)]" role="status">
+              <div className="inline-flex items-center gap-2 font-mono text-xs text-[var(--prism-ink)]" role="status">
                 <Loader2 size={14} className="animate-spin" aria-hidden="true" />
                 Waiting for your phone…
               </div>
@@ -1672,19 +1672,19 @@ export default function Assessment() {
             <img
               ref={phoneImgRef}
               alt="Phone proctor camera"
-              className={`w-40 h-28 rounded-[var(--radius-md)] object-cover shadow-2xl bg-[var(--color-room)] border ${
-                phoneLinked ? 'border-[var(--color-room-line)]' : 'border-[var(--color-danger)]/60'
+              className={`w-40 h-28 rounded-[var(--radius-md)] object-cover shadow-2xl bg-[var(--brand-navy-deep)] border ${
+                phoneLinked ? 'border-[var(--border-on-dark)]' : 'border-[var(--status-blocked-ink)]/60'
               } ${phoneLinked ? 'block' : 'opacity-30'}`}
             />
             {phoneLinked ? (
-              <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-[var(--color-room)]/70 rounded-[var(--radius-full)] px-2 py-0.5">
-                <Smartphone size={10} className="text-[var(--color-room-ink)]" aria-hidden="true" />
-                <span className="font-mono text-[9px] text-[var(--color-room-ink)] tracking-wide">PHONE</span>
+              <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-[var(--brand-navy-deep)]/70 rounded-[var(--radius-full)] px-2 py-0.5">
+                <Smartphone size={10} className="text-[var(--brand-soft)]" aria-hidden="true" />
+                <span className="font-mono text-[9px] text-[var(--brand-soft)] tracking-wide">PHONE</span>
               </span>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--color-room)]/85 rounded-[var(--radius-md)]">
-                <Smartphone size={16} className="text-[var(--color-danger)]" aria-hidden="true" />
-                <span className="font-mono text-[10px] text-[var(--color-danger)]">Phone offline</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--brand-navy-deep)]/85 rounded-[var(--radius-md)]">
+                <Smartphone size={16} className="text-[var(--status-blocked-ink)]" aria-hidden="true" />
+                <span className="font-mono text-[10px] text-[var(--status-blocked-ink)]">Phone offline</span>
               </div>
             )}
           </div>
@@ -1695,28 +1695,28 @@ export default function Assessment() {
             autoPlay
             muted
             playsInline
-            className={`w-40 h-28 rounded-[var(--radius-md)] object-cover shadow-2xl bg-[var(--color-room)] border ${
-              mediaAllowed === true ? 'border-[var(--color-room-line)]' : 'border-[var(--color-danger)]/60'
+            className={`w-40 h-28 rounded-[var(--radius-md)] object-cover shadow-2xl bg-[var(--brand-navy-deep)] border ${
+              mediaAllowed === true ? 'border-[var(--border-on-dark)]' : 'border-[var(--status-blocked-ink)]/60'
             }`}
           />
           {/* Live indicator */}
           {mediaAllowed === true && (
-            <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-[var(--color-room)]/70 rounded-[var(--radius-full)] px-2 py-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-danger)] animate-pulse" aria-hidden="true" />
-              <span className="font-mono text-[9px] text-[var(--color-room-ink)] tracking-wide">REC</span>
+            <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-[var(--brand-navy-deep)]/70 rounded-[var(--radius-full)] px-2 py-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-blocked-ink)] animate-pulse" aria-hidden="true" />
+              <span className="font-mono text-[9px] text-[var(--brand-soft)] tracking-wide">REC</span>
             </span>
           )}
           {mediaAllowed === false && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--color-room)]/85 rounded-[var(--radius-md)] px-2 text-center">
-              <VideoOff size={18} className="text-[var(--color-danger)]" aria-hidden="true" />
-              <span className="font-mono text-[10px] text-[var(--color-danger)]">Camera blocked</span>
-              <span className="font-sans text-[9px] leading-tight text-[var(--color-ink-muted)]">Click the camera icon in your address bar to allow, then reload.</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[var(--brand-navy-deep)]/85 rounded-[var(--radius-md)] px-2 text-center">
+              <VideoOff size={18} className="text-[var(--status-blocked-ink)]" aria-hidden="true" />
+              <span className="font-mono text-[10px] text-[var(--status-blocked-ink)]">Camera blocked</span>
+              <span className="font-sans text-[9px] leading-tight text-[var(--prism-ink-muted)]">Click the camera icon in your address bar to allow, then reload.</span>
             </div>
           )}
           {mediaAllowed === null && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-[var(--color-room)]/70 rounded-[var(--radius-md)] px-2 text-center">
-              <div className="w-5 h-5 border-2 border-[var(--color-room-ink)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-              <span className="font-sans text-[9px] leading-tight text-[var(--color-ink-muted)]">Click “Allow” in the browser pop-up — camera &amp; mic are used only for exam integrity.</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-[var(--brand-navy-deep)]/70 rounded-[var(--radius-md)] px-2 text-center">
+              <div className="w-5 h-5 border-2 border-[var(--brand-soft)] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              <span className="font-sans text-[9px] leading-tight text-[var(--prism-ink-muted)]">Click “Allow” in the browser pop-up — camera &amp; mic are used only for exam integrity.</span>
             </div>
           )}
         </div>
@@ -1725,47 +1725,47 @@ export default function Assessment() {
         <div className="flex flex-col items-end gap-1">
           <button
             onClick={() => setSelfViewOpen((v) => !v)}
-            className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1 hover:text-[var(--color-ink)] transition-colors cursor-pointer"
+            className="font-mono text-[10px] text-[var(--prism-ink-muted)] bg-[var(--brand-navy)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--border-on-dark)] flex items-center gap-1 hover:text-[var(--prism-ink)] transition-colors cursor-pointer"
             aria-pressed={!selfViewOpen}
           >
             {selfViewOpen ? <EyeOff size={10} aria-hidden="true" /> : <Eye size={10} aria-hidden="true" />}
             {selfViewOpen ? 'Hide preview' : 'Show preview'}
           </button>
-          <span className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1">
-            {mediaAllowed === true ? <Video size={10} aria-hidden="true" /> : <VideoOff size={10} className="text-[var(--color-danger)]" aria-hidden="true" />}
+          <span className="font-mono text-[10px] text-[var(--prism-ink-muted)] bg-[var(--brand-navy)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--border-on-dark)] flex items-center gap-1">
+            {mediaAllowed === true ? <Video size={10} aria-hidden="true" /> : <VideoOff size={10} className="text-[var(--status-blocked-ink)]" aria-hidden="true" />}
             {mediaAllowed === true ? 'Camera recording' : mediaAllowed === false ? 'Camera blocked — allow in address bar' : 'Camera starting — click Allow'}
           </span>
-          <span className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1">
+          <span className="font-mono text-[10px] text-[var(--prism-ink-muted)] bg-[var(--brand-navy)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--border-on-dark)] flex items-center gap-1">
             {mediaAllowed === true ? (
               <>
-                <Mic size={10} className="text-[var(--color-success)]" aria-hidden="true" />
+                <Mic size={10} className="text-[var(--status-positive-ink)]" aria-hidden="true" />
                 Mic on
               </>
             ) : (
               <>
-                <MicOff size={10} className="text-[var(--color-danger)]" aria-hidden="true" />
+                <MicOff size={10} className="text-[var(--status-blocked-ink)]" aria-hidden="true" />
                 Mic off
               </>
             )}
           </span>
           {!fsActive && (
-            <span className="font-mono text-[10px] text-[var(--color-reliability-moderate)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)] flex items-center gap-1">
+            <span className="font-mono text-[10px] text-[var(--status-partial-ink)] bg-[var(--brand-navy)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--border-on-dark)] flex items-center gap-1">
               <AlertTriangle size={10} aria-hidden="true" />
               Not fullscreen
             </span>
           )}
-          <span className="font-mono text-[10px] text-[var(--color-ink-muted)] bg-[var(--color-room-surface)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-room-line)]">
+          <span className="font-mono text-[10px] text-[var(--prism-ink-muted)] bg-[var(--brand-navy)] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--border-on-dark)]">
             {standalone ? 'App window' : 'Browser tab'}{fsActive ? (keysLocked ? ' · keys held' : '') : ''}
           </span>
           {/* Live face-proctoring status */}
           {mediaAllowed === true && faceStatus !== 'idle' && (
             <span
-              className={`font-mono text-[10px] px-2 py-0.5 rounded-[var(--radius-full)] border flex items-center gap-1 bg-[var(--color-room-surface)] ${
+              className={`font-mono text-[10px] px-2 py-0.5 rounded-[var(--radius-full)] border flex items-center gap-1 bg-[var(--brand-navy)] ${
                 faceStatus === 'ok'
-                  ? 'text-[var(--color-success)] border-[var(--color-room-line)]'
+                  ? 'text-[var(--status-positive-ink)] border-[var(--border-on-dark)]'
                   : faceStatus === 'loading' || faceStatus === 'unavailable'
-                    ? 'text-[var(--color-ink-muted)] border-[var(--color-room-line)]'
-                    : 'text-[var(--color-danger)] border-[var(--color-danger)]/50'
+                    ? 'text-[var(--prism-ink-muted)] border-[var(--border-on-dark)]'
+                    : 'text-[var(--status-blocked-ink)] border-[var(--status-blocked-ink)]/50'
               }`}
             >
               <ScanFace size={10} aria-hidden="true" />

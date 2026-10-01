@@ -1,88 +1,61 @@
-import { motion } from 'framer-motion'
-import SectionLabel from './ui/SectionLabel.jsx'
-import PricingCard from './ui/PricingCard.jsx'
-import { stagger, fadeUp } from '../hooks/motionVariants.js'
 import { SCORE_VALIDITY_MONTHS } from '../../server/lib/sharedConstants.js'
+import PricingCard from './ui/PricingCard.jsx'
 
-const individualFeatures = [
-  'One 30-minute AI assessment',
-  'Verified Prism Score',
-  'Full 5-dimension skill map report',
-  'Shareable score link',
+// Two ways in. The only price shown is the one already in the product
+// (Payment.jsx and the admin margin model); campus pricing is agreed per
+// institution and shown as "Custom".
+const personalFeatures = [
+  'One 30-minute assessment in realistic workplace situations',
+  'Capability evidence tied to the moments that earned it',
+  'Development insight: where to focus next',
+  'A shareable report that you control',
   `Valid for ${SCORE_VALIDITY_MONTHS} months`,
 ]
 
-const institutionalFeatures = [
-  'Entire cohort access (up to 500 students)',
-  'Placement team dashboard',
-  'Cohort-level skill analytics',
-  'Employer-facing cohort reports',
-  'Priority support',
+const campusFeatures = [
+  'Cohort capability intelligence',
+  'Assessment programs for your cohorts',
+  'Development interventions linked to capability needs',
+  'Growth tracking across comparable reassessments',
+  'Placement-readiness insights',
 ]
 
 export default function Pricing({ onGetAssessed, onContactSales }) {
   return (
-    <section id="pricing" className="py-24 bg-white">
-      <div className="max-w-7xl mx-auto px-6">
-        {/* Header */}
-        <motion.div
-          className="mb-14 text-center"
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-80px' }}
-        >
-          <motion.div variants={fadeUp}>
-            <SectionLabel text="Pricing" />
-          </motion.div>
-          <motion.h2
-            variants={fadeUp}
-            className="font-serif text-4xl md:text-5xl text-[var(--color-ink)] leading-tight mt-1"
-          >
+    <section id="pricing" aria-labelledby="pricing-title" className="bg-prism-surface py-20 md:py-24">
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="mb-12 text-center">
+          <p className="mb-3 font-mono text-xs uppercase tracking-widest text-prism-ink-subtle">Pricing</p>
+          <h2 id="pricing-title" className="text-3xl font-bold leading-tight tracking-tight text-prism-ink md:text-4xl">
             Simple, transparent pricing.
-          </motion.h2>
-        </motion.div>
+          </h2>
+        </div>
 
-        {/* Cards */}
-        <motion.div
-          className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto"
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-80px' }}
-        >
+        <div className="mx-auto grid max-w-3xl grid-cols-1 gap-6 md:grid-cols-2">
           <PricingCard
-            plan="Individual"
-            price="₹499"
+            plan="Personal"
+            price={'\u20B9499'}
             period="per assessment"
-            subtitle="For students booking directly"
-            features={individualFeatures}
-            ctaLabel="Get Assessed"
+            subtitle="For students and professionals booking directly"
+            features={personalFeatures}
+            ctaLabel="Take the assessment"
             ctaAction={onGetAssessed}
-            featured={false}
           />
           <PricingCard
-            plan="Institutional"
+            plan="Campus"
             price="Custom"
             period="per year"
             subtitle="For colleges and universities"
-            badge="Most popular"
-            features={institutionalFeatures}
+            features={campusFeatures}
             ctaLabel="Talk to us"
             ctaAction={onContactSales}
-            featured={true}
+            featured
           />
-        </motion.div>
+        </div>
 
-        <motion.p
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="text-center font-sans text-xs text-[var(--color-ink-muted)] mt-6"
-        >
-          For larger cohorts, custom pricing available.
-        </motion.p>
+        <p className="mt-6 text-center text-xs text-prism-ink-muted">
+          Campus pricing is agreed with your institution. Students keep control of what they share beyond the assessments their institution sponsors.
+        </p>
       </div>
     </section>
   )

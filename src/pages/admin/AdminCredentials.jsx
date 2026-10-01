@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { KeyRound } from 'lucide-react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, SearchBox, DataTable, Pill, btn, btnDanger, field, when, mono } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, SearchBox, DataTable, Pill, btn, btnDanger, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/credentials — credential console (Phase 4) ────────────────────────
 // Signed contents have NO edit control anywhere: revoke and reissue
@@ -51,21 +51,21 @@ export default function AdminCredentials() {
 
   const issue = () =>
     run(async () => {
-      const sessionId = window.prompt('Session id with a completed report to certify:')
+      const sessionId = await askText('Session id with a completed report to certify:')
       if (!sessionId) return null
       return adminFetch(`/api/admin/credentials/session/${sessionId.trim()}/issue`, { method: 'POST', body: {} })
     })
 
   const revoke = (credentialId) =>
     run(async () => {
-      const reason = window.prompt('Reason for REVOCATION (10+ characters — recorded on the credential and both audit trails):')
+      const reason = await askText('Reason for REVOCATION (10+ characters — recorded on the credential and both audit trails):')
       if (!reason) return null
       return adminFetch(`/api/admin/credentials/${credentialId}/revoke`, { method: 'POST', body: { reason } })
     }, 'Credential revoked. Public status endpoints reflect it immediately.')
 
   const reissue = (credentialId) =>
     run(async () => {
-      const reason = window.prompt('Reason for REISSUE (10+ characters — creates a superseding credential; the old one stays in the chain):')
+      const reason = await askText('Reason for REISSUE (10+ characters — creates a superseding credential; the old one stays in the chain):')
       if (!reason) return null
       return adminFetch(`/api/admin/credentials/${credentialId}/reissue`, { method: 'POST', body: { reason } })
     })
@@ -89,18 +89,18 @@ export default function AdminCredentials() {
 
       {/* Signing key panel — public parts only. */}
       {signingKey && (
-        <div className="mb-4 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 flex items-start gap-3">
-          <KeyRound size={16} className="text-[var(--color-accent)] mt-0.5" aria-hidden="true" />
+        <div className="mb-4 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4 flex items-start gap-3">
+          <KeyRound size={16} className="text-[var(--prism-signal)] mt-0.5" aria-hidden="true" />
           <div className="min-w-0">
-            <p className="font-sans text-sm text-[var(--color-ink)]">
+            <p className="font-sans text-sm text-[var(--prism-ink)]">
               Signing key {signingKey.configured
                 ? <><span className="font-mono text-[12px]">{signingKey.keyId}</span> · {signingKey.algorithm} · <Pill tone={signingKey.glassBox ? 'ok' : 'warn'}>{signingKey.glassBox ? 'glass-box on' : 'glass-box off'}</Pill></>
                 : <Pill tone="danger">not configured</Pill>}
             </p>
             {signingKey.lastIssue && (
-              <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">last issue {when(signingKey.lastIssue.issued_at)}</p>
+              <p className="font-mono text-[11px] text-[var(--prism-ink-muted)]">last issue {when(signingKey.lastIssue.issued_at)}</p>
             )}
-            <p className="mt-1 font-mono text-[10px] text-[var(--color-ink-muted)]">{signingKey.note}</p>
+            <p className="mt-1 font-mono text-[10px] text-[var(--prism-ink-muted)]">{signingKey.note}</p>
           </div>
         </div>
       )}
@@ -141,41 +141,41 @@ export default function AdminCredentials() {
       />
 
       {detail && (
-        <section className="mt-4 mb-10 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+        <section className="mt-4 mb-10 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">
               {detail.credential.credentialId}
             </h2>
             <button type="button" className={btn} onClick={() => setDetail(null)}>Close</button>
           </div>
           <div className="mt-2 grid gap-4 md:grid-cols-2">
             <div>
-              <p className="font-sans text-sm text-[var(--color-ink)]">
+              <p className="font-sans text-sm text-[var(--prism-ink)]">
                 Integrity: {detail.integrity.verified
                   ? <Pill tone="ok">hash + signature verified</Pill>
                   : <Pill tone="danger">verification failed</Pill>}
               </p>
-              <p className="mt-1 font-mono text-[11px] text-[var(--color-ink-muted)] break-all">bundle hash {detail.credential.bundleHash}</p>
+              <p className="mt-1 font-mono text-[11px] text-[var(--prism-ink-muted)] break-all">bundle hash {detail.credential.bundleHash}</p>
               {detail.credential.revokedReason && (
-                <p className="mt-1 font-sans text-[13px] text-[var(--color-danger)]">revoked: “{detail.credential.revokedReason}”</p>
+                <p className="mt-1 font-sans text-[13px] text-[var(--status-blocked-ink)]">revoked: “{detail.credential.revokedReason}”</p>
               )}
-              <p className="mt-2 font-mono text-[11px] text-[var(--color-ink-muted)]">
+              <p className="mt-2 font-mono text-[11px] text-[var(--prism-ink-muted)]">
                 public verification: <span className="select-all">{detail.publicVerifyPath}</span>
               </p>
-              <h3 className="mt-3 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Chain</h3>
+              <h3 className="mt-3 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Chain</h3>
               {detail.chain.map((c) => (
-                <p key={c.credential_id} className="font-mono text-[11px] text-[var(--color-ink)]">
+                <p key={c.credential_id} className="font-mono text-[11px] text-[var(--prism-ink)]">
                   {mono(c.credential_id, 13)}… <Pill tone={STATUS_TONE[c.status]}>{c.status}</Pill> {when(c.issued_at)}
                 </p>
               ))}
             </div>
             <div>
-              <h3 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Recent public verifications</h3>
+              <h3 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Recent public verifications</h3>
               {detail.verifications.length === 0 ? (
-                <p className="font-sans text-[13px] text-[var(--color-ink-muted)]">None recorded.</p>
+                <p className="font-sans text-[13px] text-[var(--prism-ink-muted)]">None recorded.</p>
               ) : (
                 detail.verifications.map((v, i) => (
-                  <p key={i} className="font-mono text-[11px] text-[var(--color-ink)]">
+                  <p key={i} className="font-mono text-[11px] text-[var(--prism-ink)]">
                     {v.refererHost || 'direct'} · {v.uaFamily || '?'} · {v.disclosure} · {when(v.at)}
                   </p>
                 ))

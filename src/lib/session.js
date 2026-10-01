@@ -3,6 +3,11 @@
 
 const USER_KEY = 'prism_user'
 const TOKEN_KEY = 'prism_token'
+export const SESSION_EVENT = 'prism-session-change'
+
+function notify() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_EVENT))
+}
 
 export function getUser() {
   try {
@@ -20,6 +25,7 @@ export function getToken() {
 // Replace the stored token (e.g. after a password change re-issues one).
 export function setToken(token) {
   if (token) localStorage.setItem(TOKEN_KEY, token)
+  notify()
 }
 
 function persist(token, user) {
@@ -31,12 +37,14 @@ function persist(token, user) {
   }
   localStorage.setItem(TOKEN_KEY, token)
   localStorage.setItem(USER_KEY, JSON.stringify(safe))
+  notify()
   return safe
 }
 
 export function clearUser() {
   localStorage.removeItem(USER_KEY)
   localStorage.removeItem(TOKEN_KEY)
+  notify()
 }
 
 // Synchronous check used by route guards. A valid session has both a token and

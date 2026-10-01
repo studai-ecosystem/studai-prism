@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, when, mono } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, when, mono, askText } from './ui.jsx'
 
 // ── /admin/replays — practice replays (Phase 4) ──────────────────────────────
 // Practice-only ledger: structurally unable to touch certified scores. Erasure
@@ -25,7 +25,7 @@ export default function AdminReplays() {
 
   const flag = async (replay) => {
     setError(''); setNotice('')
-    const reason = window.prompt('Reason for flagging this replay for abuse review (10+ characters):')
+    const reason = await askText('Reason for flagging this replay for abuse review (10+ characters):')
     if (!reason) return
     try {
       await adminFetch(`/api/admin/replays/${replay.replay_id}/flag`, { method: 'POST', body: { reason } })
@@ -36,7 +36,7 @@ export default function AdminReplays() {
 
   const exportReplays = async () => {
     setError(''); setNotice('')
-    const purpose = window.prompt('Purpose for this research export (goes on the export ledger):')
+    const purpose = await askText('Purpose for this research export (goes on the export ledger):')
     if (!purpose) return
     try {
       const r = await adminFetch(`/api/admin/replays/export?limit=200&purpose=${encodeURIComponent(purpose)}`)
@@ -91,9 +91,9 @@ export default function AdminReplays() {
       />
 
       {detail && (
-        <section className="mt-4 mb-10 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+        <section className="mt-4 mb-10 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">
               Replay {detail.replay.replay_id}
             </h2>
             <button type="button" className={btn} onClick={() => setDetail(null)}>Close</button>
@@ -101,17 +101,17 @@ export default function AdminReplays() {
           <div className="mt-2 space-y-2 max-h-80 overflow-y-auto">
             {(detail.replay.turns || []).map((turn, i) => (
               <div key={i} className="font-sans text-[13px]">
-                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">
                   {turn.speaker || 'unknown'}
                 </span>
-                <p className="text-[var(--color-ink)] whitespace-pre-wrap">{String(turn.text || '')}</p>
+                <p className="text-[var(--prism-ink)] whitespace-pre-wrap">{String(turn.text || '')}</p>
               </div>
             ))}
           </div>
           {detail.incidents.length > 0 && (
-            <div className="mt-3 border-t border-[var(--color-line)] pt-2">
+            <div className="mt-3 border-t border-[var(--prism-border)] pt-2">
               {detail.incidents.map((i) => (
-                <p key={i.incident_id} className="font-sans text-[13px] text-[var(--color-danger)]">
+                <p key={i.incident_id} className="font-sans text-[13px] text-[var(--status-blocked-ink)]">
                   incident {mono(i.incident_id, 8)} · {i.severity} · {i.status} · {when(i.created_at)}
                 </p>
               ))}

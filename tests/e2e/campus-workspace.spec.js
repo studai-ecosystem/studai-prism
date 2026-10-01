@@ -1,0 +1,190 @@
+// Prism Campus C5.13 — Assessment Workspace V3 journeys (spec §12, §43
+// Journey E) on the campus harness server (flags on in-process only, K2; the
+// AI is the isolated audit mock). Synthetic users only.
+//  - personal start: briefing → system check → consent → idempotent start →
+//    V3 player; an answer and a reply; axe.
+//  - Journey E: the API drops mid-session → the answer is marked "Not sent",
+//    no reply is invented, a reconnect banner appears → the connection comes
+//    back → the SAME answer is delivered exactly once and saved work remains.
+//  - refresh resume: the conversation is read back from the server.
+//  - Pixel 7: large-screen notice for work materials, then the tabs.
+import { test, expect, devices } from '@playwright/test'
+import { CAMPUS_BASE_URL, api, signInSynthetic, expectNoSeriousAxe, expectNoHorizontalOverflow } from './campusHelpers.js'
+import { ASSESSMENT_CONSENT_ITEMS } from '../../src/lib/copy/assessmentConsent.js'
+import { seedSponsoredAssignment, listConsumptions } from '../fixtures/campusSeed.mjs'
+
+const DB = process.env.PRISM_E2E_DATABASE_URL
+
+async function startPersonalV3(page, label) {
+  const student = await signInSynthetic(page, CAMPUS_BASE_URL, label)
+  const dev = await api(page, '/api/payment/dev-session', { method: 'POST', token: student.token })
+  expect(dev.status).toBe(200)
+  await page.goto(`${CAMPUS_BASE_URL}/app/assessments`)
+  const card = page.getByTestId('assignment-card').first()
+  await card.getByRole('link', { name: /Open briefing/ }).click()
+  await page.getByRole('link', { name: 'Continue to system check' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'System check' })).toBeVisible()
+  // Wait for the device check to render its results: they appear above the
+  // consent items and move them, and a click during that shift can miss.
+  await expect(page.getByText('Prism can be reached.')).toBeVisible()
+  const begin = page.getByRole('button', { name: 'Begin assessment' })
+  await expect(begin).toBeDisabled()
+  for (const item of ASSESSMENT_CONSENT_ITEMS) await page.getByLabel(item.label).check()
+  await expect(begin).toBeEnabled()
+  await begin.click()
+  await expect(page).toHaveURL(new RegExp(`/app/assessment/${dev.body.sessionId}$`))
+  return { student, sessionId: dev.body.sessionId }
+}
+
+const contractOf = async (page, token, sessionId) => {
+  const r = await api(page, `/api/v1/assessment-sessions/${sessionId}`, { token })
+  expect(r.status).toBe(200)
+  return r.body.data
+}
+
+// The segmented control is a visually hidden radio inside its label: tap the
+// label, as a person would.
+const showWorkspace = (page) => page.locator('fieldset label').filter({ hasText: /^Workspace$/ }).click()
+
+test.describe('@critical @campus assessment workspace V3 — personal start and Journey E', () => {
+  test('start → answer → connection drop (no invented reply) → reconnect → resume after refresh', async ({ page }) => {
+    const { student, sessionId } = await startPersonalV3(page, 'workspace-desktop')
+    const contract = await contractOf(page, student.token, sessionId)
+    expect(contract.status).toBe('IN_PROGRESS')
+    expect(JSON.stringify(contract)).not.toMatch(/"(rubric|systemPrompt|persona|probingTree)"/)
+
+    await expect(page.getByRole('heading', { level: 1, name: contract.scenario.title })).toBeVisible()
+    await expect(page.getByText('Personal assessment')).toBeVisible()
+    const feed = page.getByTestId('conversation')
+    const participants = feed.locator('[data-role="participant"]')
+    await expect(participants.first()).toBeVisible()
+    await expectNoSeriousAxe(page)
+
+    // First answer: the reply comes from the server.
+    const before = await participants.count()
+    await page.getByLabel('Your answer').fill('Synthetic answer one: I would start by checking the data.')
+    await page.getByRole('button', { name: 'Send' }).click()
+    await expect(feed.locator('[data-role="candidate"]')).toHaveCount(1)
+    await expect.poll(() => participants.count(), { timeout: 30_000 }).toBeGreaterThan(before)
+    const afterFirst = await participants.count()
+
+    // Journey E: the API drops. The answer is kept, marked "Not sent", and
+    // nothing is generated on the client.
+    await page.route('**/api/v1/assessment-sessions/**', (route) => route.abort('internetdisconnected'))
+    const second = 'Synthetic answer two: I would confirm the plan with the team.'
+    await page.getByLabel('Your answer').fill(second)
+    await page.getByRole('button', { name: 'Send' }).click()
+    await expect(page.getByText(/Not sent\./)).toBeVisible()
+    await expect(page.getByTestId('reconnect-banner')).toBeVisible()
+    await expect(page.getByText('Offline — your work will save when you reconnect').or(page.getByText('Not saved yet — retry'))).toBeVisible()
+    expect(await participants.count()).toBe(afterFirst)
+    await expectNoSeriousAxe(page)
+
+    // Reconnect: the pending answer is delivered with its original event id.
+    await page.unroute('**/api/v1/assessment-sessions/**')
+    await expect(page.getByTestId('reconnect-banner')).toBeHidden({ timeout: 30_000 })
+    await expect.poll(() => participants.count(), { timeout: 30_000 }).toBeGreaterThan(afterFirst)
+    await expect(page.getByText(/Not sent\./)).toBeHidden()
+    const server = await contractOf(page, student.token, sessionId)
+    expect(server.messages.filter((m) => m.isUser && m.content === second)).toHaveLength(1)
+    expect(server.progress.exchanges).toBe(2)
+
+    // Refresh resume: everything comes back from the server.
+    await page.reload()
+    await expect(feed.locator('[data-role="candidate"]')).toHaveCount(2)
+    await expect(feed.getByText(second)).toBeVisible()
+    await expectNoSeriousAxe(page)
+
+    // Starting again from the briefing resumes the same session.
+    await page.goto(`${CAMPUS_BASE_URL}/app/assessments`)
+    await expect(page.getByTestId('assignment-card').first()).toContainText('In progress')
+
+    // S9: a V3 session is closed on the legacy session routes — anonymous
+    // erasure and a legacy restart/answer get 404, even with the owner's token,
+    // and the session is intact.
+    expect((await api(page, `/api/assessment/data/${sessionId}`, { method: 'DELETE' })).status).toBe(404)
+    expect((await api(page, '/api/assessment/start', { method: 'POST', token: student.token, body: { sessionId } })).status).toBe(404)
+    expect((await api(page, '/api/assessment/message', { method: 'POST', token: student.token, body: { sessionId, text: 'Synthetic legacy answer' } })).status).toBe(404)
+    expect((await contractOf(page, student.token, sessionId)).progress.exchanges).toBe(2)
+  })
+})
+
+test.describe('@critical @campus assessment workspace V3 — Pixel 7', () => {
+  const { defaultBrowserType: _browser, ...pixel7 } = devices['Pixel 7']
+  test.use(pixel7)
+
+  test('mobile: a conversation-only personal session needs no notice and no tabs', async ({ page }) => {
+    const { student, sessionId } = await startPersonalV3(page, 'workspace-mobile')
+    const contract = await contractOf(page, student.token, sessionId)
+    expect(contract.artifacts).toHaveLength(0)
+    expect(contract.device.requiresLargeScreen).toBe(false)
+    await expect(page.getByLabel('Your answer')).toBeVisible()
+    await expect(page.getByText('This assessment works best on a larger screen')).toHaveCount(0)
+    await expect(page.getByRole('radio', { name: 'Workspace' })).toHaveCount(0)
+    await expectNoHorizontalOverflow(page)
+    await expectNoSeriousAxe(page)
+  })
+
+  test('mobile, sponsored: seat reserved on start, large-screen notice, tabs, work saved on the server and resumed', async ({ page, browser }) => {
+    test.skip(!DB, 'needs the throwaway campus store (PRISM_E2E_DATABASE_URL); CI and the gate runner provide it')
+    const adminContext = await browser.newContext()
+    const admin = await signInSynthetic(await adminContext.newPage(), CAMPUS_BASE_URL, 'workspace-owner')
+    await adminContext.close()
+    const student = await signInSynthetic(page, CAMPUS_BASE_URL, 'workspace-sponsored')
+    expect((await api(page, '/api/v1/me/assessments', { token: student.token })).status).toBe(200)
+    const fx = await seedSponsoredAssignment({ databaseUrl: DB, ownerUserId: admin.user.id, studentUserId: student.user.id, workMaterials: true, seat: true })
+    const base = `${CAMPUS_BASE_URL}/app/campus/${fx.organizationId}/assignments/${fx.assignmentId}`
+
+    await page.goto(`${base}/briefing`)
+    await page.getByLabel(`I understand what ${fx.organizationName} can and cannot see`).check()
+    await page.getByRole('button', { name: 'Confirm' }).click()
+    await expect(page.getByText('You confirmed you have read this.')).toBeVisible()
+    await page.goto(`${base}/system-check`)
+    for (const item of ASSESSMENT_CONSENT_ITEMS) await page.getByLabel(item.label).check()
+    await page.getByRole('button', { name: 'Begin assessment' }).click()
+    await expect(page).toHaveURL(/\/app\/assessment\/[0-9a-f-]{36}\?ws=/)
+    const sessionId = new URL(page.url()).pathname.split('/').pop()
+    const ws = new URL(page.url()).searchParams.get('ws')
+
+    const seats = await listConsumptions({ databaseUrl: DB, entitlementId: fx.entitlementId })
+    expect(seats.map((c) => c.event)).toEqual(['RESERVED'])
+    expect(seats[0].sessionId).toBe(sessionId)
+
+    const contractRes = await api(page, `/api/v1/assessment-sessions/${sessionId}`, { token: student.token, headers: { 'X-Prism-Workspace': ws } })
+    expect(contractRes.status).toBe(200)
+    const contract = contractRes.body.data
+    expect(contract.scope).toBe('SPONSORED')
+    expect(contract.artifacts.length).toBeGreaterThan(0)
+    expect(contract.device.requiresLargeScreen).toBe(true)
+
+    await expect(page.getByText(`Sponsored by ${fx.organizationName}`)).toBeVisible()
+    await expect(page.getByText('This assessment works best on a larger screen')).toBeVisible()
+    await expectNoSeriousAxe(page)
+    await page.getByRole('button', { name: 'Continue on this device' }).click()
+    await expect(page.getByRole('radio', { name: 'Conversation' })).toBeChecked()
+    await showWorkspace(page)
+    await expect(page.getByRole('radio', { name: 'Workspace' })).toBeChecked()
+    await expect(page.getByRole('tablist', { name: 'Work materials' })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await expectNoSeriousAxe(page)
+
+    // Save a work material, then prove it is on the server and survives a reload.
+    const first = contract.artifacts.find((a) => a.type === 'BUDGET_MODELER')
+    expect(first, 'the pinned bank form includes an editable planning tool').toBeTruthy()
+    await page.getByRole('tab', { name: first.title }).click()
+    await page.getByLabel('Your reasoning').fill('Synthetic reasoning for the plan.')
+    await page.getByRole('button', { name: 'Save plan' }).click()
+    await expect.poll(async () => {
+      const r = await api(page, `/api/v1/assessment-sessions/${sessionId}`, { token: student.token, headers: { 'X-Prism-Workspace': ws } })
+      return r.body.data.artifacts.find((a) => a.artifactId === first.artifactId)?.version || 0
+    }, { timeout: 30_000 }).toBeGreaterThan(0)
+    await page.reload()
+    await expect(page.getByText('This assessment works best on a larger screen')).toBeVisible()
+    await page.getByRole('button', { name: 'Continue on this device' }).click()
+    await showWorkspace(page)
+    await expect(page.getByRole('tablist', { name: 'Work materials' })).toBeVisible()
+    await expect(page.getByText('All work saved')).toBeVisible()
+    await page.getByRole('tab', { name: first.title }).click()
+    await expect(page.getByLabel('Your reasoning')).toHaveValue('Synthetic reasoning for the plan.')
+  })
+})

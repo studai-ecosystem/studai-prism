@@ -30,6 +30,7 @@ logger.info('v1_store_backend', { backend: usePg ? 'postgres' : 'json' })
 
 export const createEntitlement = impl.createEntitlement
 export const getEntitlement = impl.getEntitlement
+export const listEntitlementsByUser = impl.listEntitlementsByUser
 export const createSession = impl.createSession
 export const getSession = impl.getSession
 export const getRecentScenarioIdsByUser = impl.getRecentScenarioIdsByUser

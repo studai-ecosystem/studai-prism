@@ -15,21 +15,21 @@ export default function StoryThread() {
   const tickIn = useTransform(scrollYProgress, [0.62, 0.7], [0, 1])
 
   return (
-    <section ref={ref} className="relative bg-[var(--color-paper)] py-24 sm:py-36 overflow-hidden" aria-label="The evidence thread">
+    <section ref={ref} className="relative bg-[var(--prism-canvas)] py-24 sm:py-36 overflow-hidden" aria-label="The evidence thread">
       <div className="max-w-5xl mx-auto px-6">
         <div className="max-w-2xl mb-16">
-          <p className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)] mb-3">The thread</p>
-          <h2 className="font-serif text-3xl sm:text-5xl text-[var(--color-ink)] leading-tight">
+          <p className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)] mb-3">The thread</p>
+          <h2 className="font-serif text-3xl sm:text-5xl text-[var(--prism-ink)] leading-tight">
             Every number stays tied to the moment that earned it.
           </h2>
         </div>
 
         <div className="relative">
           {/* The claim */}
-          <div className="inline-flex items-baseline gap-3 bg-[var(--color-surface)] border border-[var(--color-line)] rounded-[var(--radius-md)] px-5 py-3.5">
-            <span className="font-sans text-sm font-semibold text-[var(--color-ink)]">Critical thinking</span>
-            <span className="font-mono text-2xl tabular-nums text-[var(--color-ink)]">74</span>
-            <span className="font-mono text-[10px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">sample</span>
+          <div className="inline-flex items-baseline gap-3 bg-[var(--prism-surface)] border border-[var(--prism-border)] rounded-[var(--radius-md)] px-5 py-3.5">
+            <span className="font-sans text-sm font-semibold text-[var(--prism-ink)]">Critical thinking</span>
+            <span className="font-mono text-2xl tabular-nums text-[var(--prism-ink)]">74</span>
+            <span className="font-mono text-[10px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)]">sample</span>
           </div>
 
           {/* The thread — an SVG line that draws with scroll */}
@@ -38,7 +38,7 @@ export default function StoryThread() {
               <motion.path
                 d="M 2 0 L 2 62 Q 2 72 12 72 L 55 72 Q 65 72 65 82 L 65 100"
                 fill="none"
-                stroke="var(--color-accent)"
+                stroke="var(--prism-signal)"
                 strokeWidth="1.2"
                 vectorEffect="non-scaling-stroke"
                 style={reduced ? { pathLength: 1 } : { pathLength: draw }}
@@ -49,18 +49,18 @@ export default function StoryThread() {
           {/* The source */}
           <motion.div
             style={reduced ? undefined : { opacity: quoteIn }}
-            className="ml-8 sm:ml-32 max-w-xl bg-[var(--color-surface)] border border-[var(--color-line)] rounded-[var(--radius-md)] p-6"
+            className="ml-8 sm:ml-32 max-w-xl bg-[var(--prism-surface)] border border-[var(--prism-border)] rounded-[var(--radius-md)] p-6"
           >
-            <p className="font-mono text-[10px] tracking-[0.08em] uppercase text-[var(--color-accent)] mb-2">
+            <p className="font-mono text-[10px] tracking-[0.08em] uppercase text-[var(--prism-signal)] mb-2">
               The moment · exchange 4 · sample
             </p>
-            <p className="font-sans text-lg text-[var(--color-ink)] leading-relaxed">
+            <p className="font-sans text-lg text-[var(--prism-ink)] leading-relaxed">
               “Before we choose, what did the last cohort actually do at this step —
               do we have that number, or are we guessing?”
             </p>
             <motion.p
               style={reduced ? undefined : { opacity: tickIn }}
-              className="mt-4 font-mono text-[11px] text-[var(--color-ink-muted)]"
+              className="mt-4 font-mono text-[11px] text-[var(--prism-ink-muted)]"
             >
               ✓ quoted on the report · ✓ readable by anyone you share it with
             </motion.p>

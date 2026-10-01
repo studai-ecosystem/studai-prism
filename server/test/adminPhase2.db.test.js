@@ -127,7 +127,8 @@ test('Phase 2 admin plane end-to-end', { skip }, async (t) => {
   const detail = await call('GET', `/api/admin/users/${cand.id}`, superAdmin)
   assert.equal(detail.status, 200)
   assert.equal(detail.json.sessions.length, 1)
-  assert.equal(detail.json.reports[0].overall, 63)
+  assert.equal(detail.json.reports[0].overall, undefined, 'charter §6: operational report rows never carry the composite')
+  assert.equal(detail.json.reports[0].reportReady, true)
   assert.ok(detail.json.perSession[sid].consent)
 
   const badPatch = await call('PATCH', `/api/admin/users/${cand.id}`, superAdmin, { email: 'evil@x.com' })
@@ -150,7 +151,8 @@ test('Phase 2 admin plane end-to-end', { skip }, async (t) => {
   // ── Sessions: list overlay + review hold + invalidate ─────────────────────
   const sessList = await call('GET', `/api/admin/sessions?userId=${cand.id}`, opsAdmin)
   assert.equal(sessList.status, 200)
-  assert.equal(sessList.json.rows[0].overall, 63)
+  assert.equal(sessList.json.rows[0].overall, undefined, 'charter §6: session list never carries the composite')
+  assert.equal(sessList.json.rows[0].reportReady, true)
 
   const hold = await call('POST', `/api/admin/sessions/${sid}/review`, opsAdmin, { action: 'hold', reason: 'needs a second look' })
   assert.equal(hold.status, 200)
@@ -160,12 +162,21 @@ test('Phase 2 admin plane end-to-end', { skip }, async (t) => {
   assert.equal(sessDetail.json.summary.consentVersion, 'p2-test')
   assert.equal(sessDetail.json.integrity.events.length, 1)
 
-  // Score-affecting decisions land in the assessment audit_log too.
-  const trailHold = await query(
-    `SELECT COUNT(*) FROM audit_log WHERE event_type = 'session_review_hold' AND session_id = $1::uuid`,
-    [sid],
-  )
-  assert.equal(Number(trailHold.rows[0].count), 1, 'review hold recorded in the decision trail')
+  // Score-affecting decisions land in the assessment audit_log too. auditLog()
+  // is fire-and-forget by design, so poll briefly (same as adminPhase3) — on a
+  // real multi-connection Postgres the insert may commit after this tick (K53).
+  const trailCount = async (eventType, sessionId) => {
+    const read = async () => Number((await query(
+      'SELECT COUNT(*) FROM audit_log WHERE event_type = $1 AND session_id = $2::uuid',
+      [eventType, sessionId],
+    )).rows[0].count)
+    for (let i = 0; i < 20; i++) {
+      if ((await read()) >= 1) break
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    return read()
+  }
+  assert.equal(await trailCount('session_review_hold', sid), 1, 'review hold recorded in the decision trail')
 
   const inval = await call('POST', `/api/admin/sessions/${sid}/invalidate`, opsAdmin, { reason: 'confirmed impersonation during review' })
   assert.equal(inval.status, 200)
@@ -217,11 +228,7 @@ test('Phase 2 admin plane end-to-end', { skip }, async (t) => {
   assert.ok(!('previousOverall' in (reportDetail.json.report.correction || {})), 'no composite lineage on the ops surface')
   assert.ok(!('overall' in (reportDetail.json.report.scores || {})), 'ops detail carries no composite')
 
-  const trailSup = await query(
-    `SELECT COUNT(*) FROM audit_log WHERE event_type = 'report_superseded' AND session_id = $1::uuid`,
-    [sid],
-  )
-  assert.equal(Number(trailSup.rows[0].count), 1, 'supersession recorded in the decision trail')
+  assert.equal(await trailCount('report_superseded', sid), 1, 'supersession recorded in the decision trail')
 
   // Auditor is structurally read-only on this plane.
   const auditorMutation = await call('POST', `/api/admin/reports/${sid}/hold`, auditor, { reason: 'x' })

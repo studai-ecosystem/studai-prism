@@ -12,11 +12,11 @@ import {
 // JS memory (adminApi module) and persistence is the HttpOnly refresh cookie.
 
 const field =
-  'w-full rounded-[6px] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 ' +
-  'font-sans text-sm text-[var(--color-ink)] outline-none focus:border-[var(--color-accent)]'
-const label = 'block font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)] mb-1.5'
+  'w-full rounded-[6px] border border-[var(--prism-border)] bg-[var(--prism-surface)] px-3 py-2 ' +
+  'font-sans text-sm text-[var(--prism-ink)] outline-none focus:border-[var(--prism-signal)]'
+const label = 'block font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)] mb-1.5'
 const button =
-  'w-full rounded-[6px] bg-[var(--color-ink)] text-[var(--color-paper)] px-4 py-2.5 font-sans text-sm ' +
+  'w-full rounded-[6px] bg-[var(--prism-ink)] text-[var(--prism-canvas)] px-4 py-2.5 font-sans text-sm ' +
   'hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-2'
 
 export default function AdminLogin() {
@@ -83,19 +83,19 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-paper)] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[var(--prism-canvas)] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 mb-6">
-          <ShieldCheck size={20} className="text-[var(--color-accent)]" aria-hidden="true" />
+          <ShieldCheck size={20} className="text-[var(--prism-signal)]" aria-hidden="true" />
           <div>
-            <h1 className="font-display text-lg text-[var(--color-ink)]">Prism administration</h1>
-            <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">
+            <h1 className="font-display text-lg text-[var(--prism-ink)]">Prism administration</h1>
+            <p className="font-mono text-[11px] text-[var(--prism-ink-muted)]">
               Authorised operators only. Every action is audited.
             </p>
           </div>
         </div>
 
-        <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
+        <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-5">
           {step === 'credentials' && (
             <form onSubmit={submitCredentials}>
               <label className={label} htmlFor="admin-email">Email</label>
@@ -116,18 +116,18 @@ export default function AdminLogin() {
           {step === 'mfa-setup' && enrolment && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Smartphone size={15} className="text-[var(--color-accent)]" aria-hidden="true" />
-                <h2 className="font-sans text-sm text-[var(--color-ink)]">Set up your authenticator</h2>
+                <Smartphone size={15} className="text-[var(--prism-signal)]" aria-hidden="true" />
+                <h2 className="font-sans text-sm text-[var(--prism-ink)]">Set up your authenticator</h2>
               </div>
-              <p className="font-sans text-[13px] leading-relaxed text-[var(--color-ink-muted)]">
+              <p className="font-sans text-[13px] leading-relaxed text-[var(--prism-ink-muted)]">
                 Multi-factor authentication is mandatory. Add this account to an authenticator app
                 (enter the key manually or paste the URI), then confirm with a 6-digit code.
               </p>
-              <div className="mt-3 rounded-[6px] border border-[var(--color-line)] bg-[var(--color-paper)] p-3">
-                <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Secret key (shown once)</p>
-                <p className="font-mono text-sm break-all text-[var(--color-ink)] select-all">{enrolment.secret}</p>
-                <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">otpauth URI</p>
-                <p className="font-mono text-[11px] break-all text-[var(--color-ink-muted)] select-all">{enrolment.otpauthUri}</p>
+              <div className="mt-3 rounded-[6px] border border-[var(--prism-border)] bg-[var(--prism-canvas)] p-3">
+                <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Secret key (shown once)</p>
+                <p className="font-mono text-sm break-all text-[var(--prism-ink)] select-all">{enrolment.secret}</p>
+                <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">otpauth URI</p>
+                <p className="font-mono text-[11px] break-all text-[var(--prism-ink-muted)] select-all">{enrolment.otpauthUri}</p>
               </div>
               <form onSubmit={submitCode} className="mt-4">
                 <label className={label} htmlFor="mfa-code">6-digit code</label>
@@ -145,8 +145,8 @@ export default function AdminLogin() {
           {step === 'mfa-code' && (
             <form onSubmit={submitCode}>
               <div className="flex items-center gap-2 mb-3">
-                <Smartphone size={15} className="text-[var(--color-accent)]" aria-hidden="true" />
-                <h2 className="font-sans text-sm text-[var(--color-ink)]">Two-factor code</h2>
+                <Smartphone size={15} className="text-[var(--prism-signal)]" aria-hidden="true" />
+                <h2 className="font-sans text-sm text-[var(--prism-ink)]">Two-factor code</h2>
               </div>
               <label className={label} htmlFor="mfa-code2">6-digit code from your authenticator</label>
               <input id="mfa-code2" inputMode="numeric" pattern="\d{6}" maxLength={6} required autoFocus
@@ -162,10 +162,10 @@ export default function AdminLogin() {
           {step === 'change-password' && (
             <form onSubmit={submitPasswordChange}>
               <div className="flex items-center gap-2 mb-3">
-                <Lock size={15} className="text-[var(--color-accent)]" aria-hidden="true" />
-                <h2 className="font-sans text-sm text-[var(--color-ink)]">Choose your own password</h2>
+                <Lock size={15} className="text-[var(--prism-signal)]" aria-hidden="true" />
+                <h2 className="font-sans text-sm text-[var(--prism-ink)]">Choose your own password</h2>
               </div>
-              <p className="font-sans text-[13px] leading-relaxed text-[var(--color-ink-muted)] mb-3">
+              <p className="font-sans text-[13px] leading-relaxed text-[var(--prism-ink-muted)] mb-3">
                 You signed in with a temporary password ({currentAdmin()?.email}). Set a new one
                 (12+ characters) to continue.
               </p>
@@ -186,13 +186,13 @@ export default function AdminLogin() {
           )}
 
           {error && (
-            <p role="alert" className="mt-4 rounded-[6px] border border-[var(--color-danger)] bg-[var(--color-danger-surface)] px-3 py-2 font-sans text-[13px] text-[var(--color-danger)]">
+            <p role="alert" className="mt-4 rounded-[6px] border border-[var(--status-blocked-ink)] bg-[var(--status-blocked-soft)] px-3 py-2 font-sans text-[13px] text-[var(--status-blocked-ink)]">
               {error}
             </p>
           )}
         </div>
 
-        <p className="mt-4 font-mono text-[11px] leading-relaxed text-[var(--color-ink-muted)]">
+        <p className="mt-4 font-mono text-[11px] leading-relaxed text-[var(--prism-ink-muted)]">
           Sessions expire after 12 hours. Repeated failures lock the account.
           The legacy read-only cockpit remains at /admin/legacy-ops.
         </p>

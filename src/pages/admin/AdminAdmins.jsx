@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, UserPlus, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react'
 import { adminFetch, adminHasPermission, currentAdmin } from '../../lib/adminApi.js'
+import { askText } from './ui.jsx'
 
 // ── /admin/admins — administrator management (Phase 1) ───────────────────────
 // List, invite, role grant/revoke, account state, dual-approval queue. Actions
@@ -8,19 +9,19 @@ import { adminFetch, adminHasPermission, currentAdmin } from '../../lib/adminApi
 // (the UI is never the security boundary).
 
 const field =
-  'w-full rounded-[6px] border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 ' +
-  'font-sans text-sm text-[var(--color-ink)] outline-none focus:border-[var(--color-accent)]'
-const label = 'block font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)] mb-1'
+  'w-full rounded-[6px] border border-[var(--prism-border)] bg-[var(--prism-surface)] px-3 py-2 ' +
+  'font-sans text-sm text-[var(--prism-ink)] outline-none focus:border-[var(--prism-signal)]'
+const label = 'block font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)] mb-1'
 const btn =
-  'inline-flex items-center gap-1.5 rounded-[6px] border border-[var(--color-line)] px-3 py-1.5 ' +
-  'font-sans text-[13px] text-[var(--color-ink)] hover:border-[var(--color-accent)] disabled:opacity-50'
+  'inline-flex items-center gap-1.5 rounded-[6px] border border-[var(--prism-border)] px-3 py-1.5 ' +
+  'font-sans text-[13px] text-[var(--prism-ink)] hover:border-[var(--prism-signal)] disabled:opacity-50'
 
 const STATE_STYLE = {
-  active: 'text-[var(--color-success)] border-[var(--color-success)]',
-  invited: 'text-[var(--color-info)] border-[var(--color-info)]',
-  suspended: 'text-[var(--color-reliability-moderate)] border-[var(--color-reliability-moderate)]',
-  locked: 'text-[var(--color-danger)] border-[var(--color-danger)]',
-  deactivated: 'text-[var(--color-ink-muted)] border-[var(--color-line)]',
+  active: 'text-[var(--status-positive-ink)] border-[var(--status-positive-ink)]',
+  invited: 'text-[var(--status-info-ink)] border-[var(--status-info-ink)]',
+  suspended: 'text-[var(--status-partial-ink)] border-[var(--status-partial-ink)]',
+  locked: 'text-[var(--status-blocked-ink)] border-[var(--status-blocked-ink)]',
+  deactivated: 'text-[var(--prism-ink-muted)] border-[var(--prism-border)]',
 }
 
 export default function AdminAdmins() {
@@ -80,7 +81,7 @@ export default function AdminAdmins() {
   }
 
   const changeState = async (admin, state) => {
-    const reason = window.prompt(`Reason for setting ${admin.email} to ${state}? (recorded in the audit trail)`)
+    const reason = await askText(`Reason for setting ${admin.email} to ${state}? (recorded in the audit trail)`)
     if (!reason) return
     setError('')
     try {
@@ -92,7 +93,7 @@ export default function AdminAdmins() {
   }
 
   const decide = async (approval, decision) => {
-    const reason = window.prompt(`Reason to mark this request ${decision}?`)
+    const reason = await askText(`Reason to mark this request ${decision}?`)
     if (!reason) return
     setError('')
     try {
@@ -107,7 +108,7 @@ export default function AdminAdmins() {
 
   if (!admins && !error) {
     return (
-      <div className="p-8 flex items-center gap-2 font-sans text-sm text-[var(--color-ink-muted)]">
+      <div className="p-8 flex items-center gap-2 font-sans text-sm text-[var(--prism-ink-muted)]">
         <Loader2 size={15} className="animate-spin" aria-hidden="true" /> Loading administrators…
       </div>
     )
@@ -117,8 +118,8 @@ export default function AdminAdmins() {
     <div className="p-6 max-w-5xl">
       <div className="flex items-center justify-between gap-3 mb-5">
         <div>
-          <h1 className="font-display text-xl text-[var(--color-ink)]">Administrators</h1>
-          <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">
+          <h1 className="font-display text-xl text-[var(--prism-ink)]">Administrators</h1>
+          <p className="font-mono text-[11px] text-[var(--prism-ink-muted)]">
             Role grants are enforced server-side. Elevation to super administrator requires dual approval.
           </p>
         </div>
@@ -130,18 +131,18 @@ export default function AdminAdmins() {
       </div>
 
       {error && (
-        <p role="alert" className="mb-4 rounded-[6px] border border-[var(--color-danger)] bg-[var(--color-danger-surface)] px-3 py-2 font-sans text-[13px] text-[var(--color-danger)]">
+        <p role="alert" className="mb-4 rounded-[6px] border border-[var(--status-blocked-ink)] bg-[var(--status-blocked-soft)] px-3 py-2 font-sans text-[13px] text-[var(--status-blocked-ink)]">
           {error}
         </p>
       )}
       {notice && (
-        <p className="mb-4 rounded-[6px] border border-[var(--color-success)] bg-[var(--color-success-surface)] px-3 py-2 font-sans text-[13px] text-[var(--color-ink)]">
+        <p className="mb-4 rounded-[6px] border border-[var(--status-positive-ink)] bg-[var(--status-positive-soft)] px-3 py-2 font-sans text-[13px] text-[var(--prism-ink)]">
           {notice}
         </p>
       )}
 
       {showInvite && canManage && (
-        <form onSubmit={submitInvite} className="mb-6 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 grid gap-3 md:grid-cols-2">
+        <form onSubmit={submitInvite} className="mb-6 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4 grid gap-3 md:grid-cols-2">
           <div>
             <label className={label} htmlFor="inv-email">Email</label>
             <input id="inv-email" type="email" required className={field}
@@ -176,38 +177,38 @@ export default function AdminAdmins() {
         </form>
       )}
 
-      <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] overflow-x-auto">
+      <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-[var(--color-line)]">
+            <tr className="border-b border-[var(--prism-border)]">
               {['Administrator', 'Roles', 'State', 'Last sign-in', canManage ? 'Actions' : null].filter(Boolean).map((h) => (
-                <th key={h} className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{h}</th>
+                <th key={h} className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {(admins || []).map((a) => (
-              <tr key={a.admin_id} className="border-b border-[var(--color-line)] last:border-0 align-top">
+              <tr key={a.admin_id} className="border-b border-[var(--prism-border)] last:border-0 align-top">
                 <td className="px-4 py-2.5">
-                  <p className="font-sans text-[13px] text-[var(--color-ink)]">{a.name || '—'}</p>
-                  <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">{a.email}</p>
+                  <p className="font-sans text-[13px] text-[var(--prism-ink)]">{a.name || '—'}</p>
+                  <p className="font-mono text-[11px] text-[var(--prism-ink-muted)]">{a.email}</p>
                 </td>
-                <td className="px-4 py-2.5 font-mono text-[11px] text-[var(--color-ink)]">
+                <td className="px-4 py-2.5 font-mono text-[11px] text-[var(--prism-ink)]">
                   {(a.roles || []).join(', ') || '—'}
-                  {a.is_break_glass && <span className="ml-1 text-[var(--color-danger)]">(break-glass)</span>}
+                  {a.is_break_glass && <span className="ml-1 text-[var(--status-blocked-ink)]">(break-glass)</span>}
                 </td>
                 <td className="px-4 py-2.5">
                   <span className={`inline-block rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] ${STATE_STYLE[a.state] || STATE_STYLE.deactivated}`}>
                     {a.state}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 font-mono text-[11px] text-[var(--color-ink-muted)] whitespace-nowrap">
+                <td className="px-4 py-2.5 font-mono text-[11px] text-[var(--prism-ink-muted)] whitespace-nowrap">
                   {a.last_login_at ? new Date(a.last_login_at).toLocaleString() : 'never'}
                 </td>
                 {canManage && (
                   <td className="px-4 py-2.5">
                     {a.admin_id === me?.id ? (
-                      <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">you — self-service only</span>
+                      <span className="font-mono text-[11px] text-[var(--prism-ink-muted)]">you — self-service only</span>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
                         {a.state !== 'active' && a.state !== 'invited' && (
@@ -231,21 +232,21 @@ export default function AdminAdmins() {
 
       {/* ── Approvals queue ─────────────────────────────────────────────── */}
       <section className="mt-8 mb-10">
-        <h2 className="font-display text-base text-[var(--color-ink)] mb-2">Approval requests</h2>
-        <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)]">
+        <h2 className="font-display text-base text-[var(--prism-ink)] mb-2">Approval requests</h2>
+        <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)]">
           {approvals.length === 0 ? (
-            <p className="p-4 font-sans text-sm text-[var(--color-ink-muted)]">No approval requests.</p>
+            <p className="p-4 font-sans text-sm text-[var(--prism-ink-muted)]">No approval requests.</p>
           ) : (
             approvals.map((ap) => (
-              <div key={ap.approval_id} className="p-4 border-b border-[var(--color-line)] last:border-0 flex items-start justify-between gap-3 flex-wrap">
+              <div key={ap.approval_id} className="p-4 border-b border-[var(--prism-border)] last:border-0 flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <p className="font-mono text-[12px] text-[var(--color-ink)]">{ap.action}
-                    {ap.entity_id && <span className="text-[var(--color-ink-muted)]"> · {String(ap.entity_id).slice(0, 8)}</span>}
+                  <p className="font-mono text-[12px] text-[var(--prism-ink)]">{ap.action}
+                    {ap.entity_id && <span className="text-[var(--prism-ink-muted)]"> · {String(ap.entity_id).slice(0, 8)}</span>}
                   </p>
-                  <p className="font-sans text-[13px] text-[var(--color-ink-muted)]">
+                  <p className="font-sans text-[13px] text-[var(--prism-ink-muted)]">
                     “{ap.requested_reason}” — {ap.requested_by_email}, {new Date(ap.created_at).toLocaleString()}
                   </p>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] mt-1 text-[var(--color-ink-muted)]">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] mt-1 text-[var(--prism-ink-muted)]">
                     {ap.status}{ap.decided_by_email ? ` by ${ap.decided_by_email}` : ''}
                   </p>
                 </div>
@@ -260,7 +261,7 @@ export default function AdminAdmins() {
                   </div>
                 )}
                 {ap.status === 'pending' && ap.requested_by === me?.id && (
-                  <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">awaiting a different super administrator</p>
+                  <p className="font-mono text-[11px] text-[var(--prism-ink-muted)]">awaiting a different super administrator</p>
                 )}
               </div>
             ))

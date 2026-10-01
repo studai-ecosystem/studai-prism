@@ -15,6 +15,7 @@
 import { useEffect, useState, createContext, useContext } from 'react'
 import { ShieldCheck, AlertTriangle, HelpCircle, Hourglass } from 'lucide-react'
 import { EvidenceThread } from './EvidenceThread.jsx'
+import { fetchEvidenceClaims } from '../../api/evidence.js'
 
 // ── LAW 1: useClaims ─────────────────────────────────────────────────────────
 const ClaimsContext = createContext(null)
@@ -23,8 +24,7 @@ export function ClaimsProvider({ children }) {
   const [claims, setClaims] = useState(null)
   useEffect(() => {
     let cancelled = false
-    fetch('/api/evidence/claims')
-      .then((r) => (r.ok ? r.json() : null))
+    fetchEvidenceClaims()
       .then((c) => { if (!cancelled) setClaims(c) })
       .catch(() => {})
     return () => { cancelled = true }
@@ -53,22 +53,22 @@ const RELIABILITY = {
     label: 'High AI panel consistency',
     tooltip: 'The AI evaluation panel agreed closely on your performance.',
     Icon: ShieldCheck,
-    color: 'var(--color-reliability-high)',
-    surface: 'var(--color-success-surface)',
+    color: 'var(--status-positive-ink)',
+    surface: 'var(--status-positive-soft)',
   },
   moderate: {
     label: 'Moderate AI panel consistency',
     tooltip: 'The AI panel mostly agreed; small differences remain.',
     Icon: HelpCircle,
-    color: 'var(--color-reliability-moderate)',
-    surface: 'var(--color-warn-surface)',
+    color: 'var(--status-partial-ink)',
+    surface: 'var(--status-partial-soft)',
   },
   low: {
     label: 'Low AI panel agreement — eligible for human review',
     tooltip: 'This result is eligible for human review at no cost to you.',
     Icon: AlertTriangle,
-    color: 'var(--color-reliability-low)',
-    surface: 'var(--color-danger-surface)',
+    color: 'var(--status-blocked-ink)',
+    surface: 'var(--status-blocked-soft)',
   },
 }
 
@@ -105,11 +105,11 @@ export function ConfidenceBand({ ci, max = 100 }) {
   if (high < low) return null
   return (
     <div style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-sm)' }}>
-      <div aria-hidden="true" style={{ position: 'relative', height: 6, background: 'var(--color-line)', borderRadius: 'var(--radius-full)' }}>
+      <div aria-hidden="true" style={{ position: 'relative', height: 6, background: 'var(--prism-border)', borderRadius: 'var(--radius-full)' }}>
         <div style={{ position: 'absolute', left: `${(low / max) * 100}%`, width: `${((high - low) / max) * 100}%`, top: 0, bottom: 0, background: 'var(--thread-color)', borderRadius: 'var(--radius-full)' }} />
       </div>
-      <p style={{ marginTop: 'var(--space-2)', color: 'var(--color-ink-muted)' }}>
-        <span style={{ color: 'var(--color-ink)', fontVariantNumeric: 'tabular-nums' }}>{low}–{high}</span>
+      <p style={{ marginTop: 'var(--space-2)', color: 'var(--prism-ink-muted)' }}>
+        <span style={{ color: 'var(--prism-ink)', fontVariantNumeric: 'tabular-nums' }}>{low}–{high}</span>
         {' '}AI panel variation interval{ci.provisional ? ' · provisional until the first calibration study' : ' · 90% coverage target'}
       </p>
     </div>
@@ -138,14 +138,14 @@ export function EvidenceQuote({ score, dimensionLabel, quote, turnRef }) {
 export function PendingStat({ label, missing, arrives }) {
   return (
     <div style={{
-      border: '1px dashed var(--color-line)', borderRadius: 'var(--radius-md)',
+      border: '1px dashed var(--prism-border)', borderRadius: 'var(--radius-md)',
       padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start',
-      background: 'var(--color-paper)',
+      background: 'var(--prism-canvas)',
     }}>
-      <Hourglass size={16} style={{ color: 'var(--color-ink-muted)', flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
+      <Hourglass size={16} style={{ color: 'var(--prism-ink-muted)', flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
       <div style={{ fontFamily: 'var(--font-body)' }}>
-        <p style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--color-ink)' }}>{label}: pending</p>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', maxWidth: '48ch' }}>
+        <p style={{ fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--prism-ink)' }}>{label}: pending</p>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--prism-ink-muted)', maxWidth: '48ch' }}>
           {missing}{arrives ? ` ${arrives}` : ''}
         </p>
       </div>

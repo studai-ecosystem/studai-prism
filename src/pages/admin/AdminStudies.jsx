@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, field, when, mono } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, DataTable, Pill, btn, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/studies — Study Runner administration (Phase 3) ───────────────────
 // Preregistrations are editable ONLY before activation. Arm assignments are
@@ -57,16 +57,16 @@ export default function AdminStudies() {
 
   const transition = (study, status) =>
     run(async () => {
-      const reason = window.prompt(`Reason for moving '${study.study_key}' to ${status} (audited):`)
+      const reason = await askText(`Reason for moving '${study.study_key}' to ${status} (audited):`)
       if (!reason) return null
       return adminFetch(`/api/admin/studies/${study.study_key}/status`, { method: 'POST', body: { status, reason } })
     }, `Study moved to ${status}.`)
 
   const editStudy = (study) =>
     run(async () => {
-      const title = window.prompt('New title (editable only while preregistered):', study.title)
+      const title = await askText('New title (editable only while preregistered):', study.title)
       if (title === null) return null
-      const reason = window.prompt('Reason for the amendment (audited):')
+      const reason = await askText('Reason for the amendment (audited):')
       if (!reason) return null
       return adminFetch(`/api/admin/studies/${study.study_key}`, { method: 'PATCH', body: { title, reason } })
     }, 'Preregistration amended.')
@@ -106,12 +106,12 @@ export default function AdminStudies() {
       <Notice>{notice}</Notice>
 
       {showCreate && canManage && (
-        <form onSubmit={create} className="mb-4 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 grid gap-3 md:grid-cols-2">
+        <form onSubmit={create} className="mb-4 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4 grid gap-3 md:grid-cols-2">
           {[
             ['studyKey', 'Study key (a-z, 0-9, _)'], ['title', 'Title'], ['hypothesis', 'Hypothesis'],
             ['preregisteredMetric', 'Preregistered metric'], ['protocolDoc', 'Protocol document path'],
           ].map(([k, label]) => (
-            <label key={k} className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+            <label key={k} className="font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
               {label}
               <input required className={`${field} w-full mt-1`} value={draft[k]}
                 onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} />
@@ -119,7 +119,7 @@ export default function AdminStudies() {
           ))}
           <div className="md:col-span-2">
             <button type="submit" className={btn}>Preregister</button>
-            <span className="ml-3 font-mono text-[10px] text-[var(--color-ink-muted)]">
+            <span className="ml-3 font-mono text-[10px] text-[var(--prism-ink-muted)]">
               Every field is a scientific commitment — hypothesis and metric lock at activation.
             </span>
           </div>
@@ -166,21 +166,21 @@ export default function AdminStudies() {
       />
 
       {results && (
-        <section className="mt-4 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+        <section className="mt-4 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">
               Results — {results.studyKey}
             </h2>
             <button type="button" className={btn} onClick={() => setResults(null)}>Close</button>
           </div>
-          <p className="mt-1 font-mono text-[10px] text-[var(--color-ink-muted)]">{results.note}</p>
+          <p className="mt-1 font-mono text-[10px] text-[var(--prism-ink-muted)]">{results.note}</p>
           {results.rows.length === 0 ? (
-            <p className="mt-2 font-sans text-sm text-[var(--color-ink-muted)]">No results yet — honest pending.</p>
+            <p className="mt-2 font-sans text-sm text-[var(--prism-ink-muted)]">No results yet — honest pending.</p>
           ) : (
             results.rows.map((r) => (
-              <div key={r.result_id} className="mt-2 border-b border-[var(--color-line)] last:border-0 pb-2 font-sans text-[13px]">
-                <span className="font-mono text-[12px] text-[var(--color-ink)]">{r.metric_name}</span>
-                <span className="text-[var(--color-ink-muted)]"> · n={r.n} · {r.analysis_version} · {when(r.computed_at)}</span>
+              <div key={r.result_id} className="mt-2 border-b border-[var(--prism-border)] last:border-0 pb-2 font-sans text-[13px]">
+                <span className="font-mono text-[12px] text-[var(--prism-ink)]">{r.metric_name}</span>
+                <span className="text-[var(--prism-ink-muted)]"> · n={r.n} · {r.analysis_version} · {when(r.computed_at)}</span>
                 {r.superseded_by && <Pill tone="warn">superseded</Pill>}
               </div>
             ))
@@ -190,7 +190,7 @@ export default function AdminStudies() {
 
       {/* ── External ratings ────────────────────────────────────────────── */}
       <div className="mt-8 flex items-center justify-between">
-        <h2 className="font-display text-base text-[var(--color-ink)]">External ratings (transferability anchors)</h2>
+        <h2 className="font-display text-base text-[var(--prism-ink)]">External ratings (transferability anchors)</h2>
         {canManage && (
           <button type="button" className={btn} onClick={() => setShowRating((v) => !v)}>
             {showRating ? 'Cancel' : 'Add rating'}
@@ -199,26 +199,26 @@ export default function AdminStudies() {
       </div>
 
       {showRating && canManage && (
-        <form onSubmit={submitRating} className="mt-3 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 grid gap-3 md:grid-cols-3">
+        <form onSubmit={submitRating} className="mt-3 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4 grid gap-3 md:grid-cols-3">
           {[
             ['sessionId', 'Prism session id', true], ['sourceOrg', 'Source organisation', true],
             ['exerciseType', 'Exercise type', true], ['raterRole', 'Rater role', false],
             ['score', 'Score 0–100', true], ['supersedes', 'Supersedes rating id (correction only)', false],
           ].map(([k, label, req]) => (
-            <label key={k} className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+            <label key={k} className="font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
               {label}
               <input required={req} className={`${field} w-full mt-1`} value={rating[k]}
                 onChange={(e) => setRating({ ...rating, [k]: e.target.value })} />
             </label>
           ))}
-          <label className="md:col-span-3 font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+          <label className="md:col-span-3 font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
             Notes
             <input className={`${field} w-full mt-1`} value={rating.notes}
               onChange={(e) => setRating({ ...rating, notes: e.target.value })} />
           </label>
           <div className="md:col-span-3">
             <button type="submit" className={btn}>Record rating</button>
-            <span className="ml-3 font-mono text-[10px] text-[var(--color-ink-muted)]">
+            <span className="ml-3 font-mono text-[10px] text-[var(--prism-ink-muted)]">
               Append-only: corrections supersede — existing ratings are never edited.
             </span>
           </div>

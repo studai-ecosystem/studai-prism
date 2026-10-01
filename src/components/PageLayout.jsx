@@ -16,8 +16,8 @@ export default function PageLayout({ children }) {
 
   return (
     <main
-      className="bg-[var(--color-paper)] min-h-screen overflow-x-hidden"
-      style={{ fontFamily: "'DM Sans', sans-serif" }}
+      className="bg-prism-canvas min-h-screen overflow-x-hidden"
+      style={{ fontFamily: 'var(--font-body)' }}
     >
       <Nav onGetAssessed={handleGetAssessed} />
       {/* Offset for the fixed 4rem-tall header */}
@@ -27,16 +27,16 @@ export default function PageLayout({ children }) {
   )
 }
 
-// Reusable page heading with the gold divider used across all pages.
+// Reusable page heading with the green divider used across all pages.
 export function PageHeading({ title, subtitle }) {
   return (
     <header className="text-center max-w-3xl mx-auto">
-      <h1 className="text-4xl md:text-5xl font-bold text-[var(--color-ink)] tracking-tight">
+      <h1 className="text-4xl md:text-5xl font-bold text-prism-ink tracking-tight">
         {title}
       </h1>
-      <div className="w-16 h-1 bg-gold mx-auto mt-4" />
+      <div className="w-16 h-1 bg-brand-green mx-auto mt-4" />
       {subtitle && (
-        <p className="mt-6 text-lg text-[var(--color-ink-muted)] leading-relaxed">{subtitle}</p>
+        <p className="mt-6 text-lg text-prism-ink-muted leading-relaxed">{subtitle}</p>
       )}
     </header>
   )

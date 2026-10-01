@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { FileText, BarChart3, ClipboardCheck, Newspaper, Building2, Users, Globe, Briefcase, Megaphone, X } from 'lucide-react'
 import PrismLogo from './ui/PrismLogo.jsx'
 import { isAuthenticated, clearUser } from '../lib/session.js'
 
@@ -11,18 +12,18 @@ const navLinks = [
 ]
 
 const researchLinks = [
-  { icon: '📄', label: 'The Science Behind Prism', desc: 'How we measure 5 skill dimensions', to: '/research/science' },
-  { icon: '📊', label: 'Scoring Methodology',      desc: 'How scores are produced — validation in progress', to: '/research/validity' },
-  { icon: '🧠', label: 'AI Evaluation',            desc: 'How our AI evaluation panel scores your responses', to: '/research/ai-evaluation' },
-  { icon: '📰', label: 'Blog',                     desc: 'Insights on skills, hiring and AI', to: '/research/blog' },
+  { icon: FileText, label: 'The Science Behind Prism', desc: 'How we measure 5 skill dimensions', to: '/research/science' },
+  { icon: BarChart3, label: 'Scoring Methodology',      desc: 'How scores are produced — validation in progress', to: '/research/validity' },
+  { icon: ClipboardCheck, label: 'AI Evaluation',            desc: 'How our AI evaluation panel scores your responses', to: '/research/ai-evaluation' },
+  { icon: Newspaper, label: 'Blog',                     desc: 'Insights on skills, hiring and AI', to: '/research/blog' },
 ]
 
 const aboutLinks = [
-  { icon: '🏢', label: 'About StudAI One', desc: 'Who we are and why we built Prism', to: '/about' },
-  { icon: '👥', label: 'Our Team',         desc: 'The people behind the product', href: '#team' },
-  { icon: '🌏', label: 'Our Mission',      desc: "Building the skills layer for India's workforce", to: '/about/mission' },
-  { icon: '💼', label: 'Careers',          desc: 'Join the StudAI One team', to: '/about/careers' },
-  { icon: '📢', label: 'Press',            desc: 'News and media coverage', href: '#press' },
+  { icon: Building2, label: 'About StudAI One', desc: 'Who we are and why we built Prism', to: '/about' },
+  { icon: Users, label: 'Our Team',         desc: 'The people behind the product', href: '#team' },
+  { icon: Globe, label: 'Our Mission',      desc: "Building the skills layer for India's workforce", to: '/about/mission' },
+  { icon: Briefcase, label: 'Careers',          desc: 'Join the StudAI One team', to: '/about/careers' },
+  { icon: Megaphone, label: 'Press',            desc: 'News and media coverage', href: '#press' },
 ]
 
 const dropdowns = {
@@ -33,6 +34,13 @@ const dropdowns = {
 export default function Nav({ onGetAssessed, activeHref }) {
   const [openDropdown, setOpenDropdown] = useState(null) // null, 'research', or 'about'
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Escape closes the open menu, like every other dismissible layer.
+  useEffect(() => {
+    if (!mobileOpen) return undefined
+    const onKey = (e) => { if (e.key === 'Escape') setMobileOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [mobileOpen])
   const [mobileAccordion, setMobileAccordion] = useState(null)
   const navRef = useRef(null)
   const navigate = useNavigate()
@@ -106,28 +114,29 @@ export default function Nav({ onGetAssessed, activeHref }) {
           bottom: -4px;
           height: 1px;
           width: 0;
-          background: var(--color-accent);
+          background: var(--prism-signal);
           transition: width 200ms ease;
         }
         .prism-navlink:hover::after { width: 100%; }
         .prism-navlink.is-active::after { width: 100%; }
         .prism-overlay {
           transform: translateX(100%);
-          transition: transform 300ms ease;
+          visibility: hidden;
+          transition: transform 300ms ease, visibility 0s linear 300ms;
         }
-        .prism-overlay.is-open { transform: translateX(0); }
-        .prism-drop-item:hover { box-shadow: inset 3px 0 0 var(--color-accent); background: var(--color-paper); }
+        .prism-overlay.is-open { transform: translateX(0); visibility: visible; transition-delay: 0s; }
+        .prism-drop-item:hover { box-shadow: inset 3px 0 0 var(--prism-signal); background: var(--prism-canvas); }
       `}</style>
 
       <header
         ref={navRef}
-        className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-[var(--color-paper)]/90 border-b border-[var(--color-line)]"
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
+        className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-[var(--prism-canvas)]/90 border-b border-[var(--prism-border)]"
+        style={{ fontFamily: 'var(--font-body)' }}
       >
         <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
           <Link to="/" aria-label="Prism home">
-            <PrismLogo size={34} wordmarkColor="var(--color-ink)" subtitleColor="var(--color-ink-muted)" />
+            <PrismLogo size={34} />
           </Link>
 
           {/* Desktop links */}
@@ -137,7 +146,7 @@ export default function Nav({ onGetAssessed, activeHref }) {
                 <a
                   href={link.href}
                   onClick={(e) => handleSectionNav(e, link.href)}
-                  className={`prism-navlink relative text-[14px] text-[var(--color-ink)] no-underline ${activeHref === link.href ? 'is-active' : ''}`}
+                  className={`prism-navlink relative text-[14px] text-[var(--prism-ink)] no-underline ${activeHref === link.href ? 'is-active' : ''}`}
                 >
                   {link.label}
                 </a>
@@ -160,7 +169,7 @@ export default function Nav({ onGetAssessed, activeHref }) {
                     onClick={() => setOpenDropdown(isOpen ? null : key)}
                     aria-haspopup="true"
                     aria-expanded={isOpen}
-                    className={`prism-navlink relative text-[14px] text-[var(--color-ink)] bg-transparent cursor-pointer ${isOpen ? 'is-active' : ''}`}
+                    className={`prism-navlink relative text-[14px] text-[var(--prism-ink)] bg-transparent cursor-pointer ${isOpen ? 'is-active' : ''}`}
                   >
                     {label}
                   </button>
@@ -168,16 +177,16 @@ export default function Nav({ onGetAssessed, activeHref }) {
                   {isOpen && (
                     <div className="absolute left-0 top-full pt-3 w-[220px]">
                     <div
-                      className="prism-dropdown-anim w-full bg-white rounded-lg overflow-hidden border-l-[3px] border-[var(--color-accent)]"
-                      style={{ boxShadow: '0 12px 32px rgba(10,13,20,0.12)' }}
+                      className="prism-dropdown-anim w-full bg-prism-surface rounded-lg overflow-hidden border-l-[3px] border-[var(--prism-signal)]"
+                      style={{ boxShadow: '0 12px 32px rgba(8,22,51,0.12)' }}
                     >
                       {dropdowns[key].map((item) => {
                         const inner = (
                           <>
-                            <span className="text-base leading-5">{item.icon}</span>
+                            <span className="text-base leading-5 text-[var(--prism-ink-muted)]"><item.icon size={18} aria-hidden="true" /></span>
                             <span className="flex flex-col">
-                              <span className="text-[13px] font-semibold text-[var(--color-ink)] leading-tight">{item.label}</span>
-                              <span className="text-[11px] text-[var(--color-ink-muted)] leading-snug mt-0.5">{item.desc}</span>
+                              <span className="text-[13px] font-semibold text-[var(--prism-ink)] leading-tight">{item.label}</span>
+                              <span className="text-[11px] text-[var(--prism-ink-muted)] leading-snug mt-0.5">{item.desc}</span>
                             </span>
                           </>
                         )
@@ -216,13 +225,13 @@ export default function Nav({ onGetAssessed, activeHref }) {
               <>
                 <Link
                   to="/profile"
-                  className="text-[14px] font-medium text-[var(--color-ink)] no-underline hover:text-[var(--color-accent)] transition"
+                  className="text-[14px] font-medium text-[var(--prism-ink)] no-underline hover:text-[var(--prism-signal)] transition"
                 >
                   My Profile
                 </Link>
                 <button
                   onClick={handleSignOut}
-                  className="text-[14px] font-medium text-[var(--color-ink-muted)] bg-transparent cursor-pointer hover:text-[var(--color-ink)] transition"
+                  className="text-[14px] font-medium text-[var(--prism-ink-muted)] bg-transparent cursor-pointer hover:text-[var(--prism-ink)] transition"
                 >
                   Sign out
                 </button>
@@ -230,7 +239,7 @@ export default function Nav({ onGetAssessed, activeHref }) {
             )}
             <button
               onClick={onGetAssessed}
-              className="px-5 py-2 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-[var(--color-accent)] cursor-pointer hover:brightness-105 transition"
+              className="px-5 py-2 rounded-lg font-bold text-sm text-brand-navy bg-brand-green cursor-pointer hover:brightness-95 transition"
             >
               Get Assessed
             </button>
@@ -243,27 +252,27 @@ export default function Nav({ onGetAssessed, activeHref }) {
             aria-expanded={mobileOpen}
             className="md:hidden flex flex-col justify-center gap-[5px] w-10 h-10 items-center"
           >
-            <span className="block w-6 h-[2px] bg-[var(--color-ink)]" />
-            <span className="block w-6 h-[2px] bg-[var(--color-ink)]" />
-            <span className="block w-6 h-[2px] bg-[var(--color-ink)]" />
+            <span className="block w-6 h-[2px] bg-[var(--prism-ink)]" />
+            <span className="block w-6 h-[2px] bg-[var(--prism-ink)]" />
+            <span className="block w-6 h-[2px] bg-[var(--prism-ink)]" />
           </button>
         </nav>
       </header>
 
       {/* Mobile full-screen overlay */}
       <div
-        className={`prism-overlay md:hidden fixed inset-0 z-[60] bg-[var(--color-paper)] ${mobileOpen ? 'is-open' : ''}`}
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
+        className={`prism-overlay md:hidden fixed inset-0 z-[60] bg-[var(--prism-canvas)] ${mobileOpen ? 'is-open' : ''}`}
+        style={{ fontFamily: 'var(--font-body)' }}
         aria-hidden={!mobileOpen}
       >
-        <div className="flex items-center justify-between px-6 h-16 border-b border-[var(--color-line)]">
-          <PrismLogo size={34} wordmarkColor="var(--color-ink)" subtitleColor="var(--color-ink-muted)" />
+        <div className="flex items-center justify-between px-6 h-16 border-b border-[var(--prism-border)]">
+          <PrismLogo size={34} />
           <button
             onClick={closeMobile}
             aria-label="Close menu"
-            className="w-10 h-10 flex items-center justify-center text-[var(--color-ink)] text-2xl leading-none"
+            className="w-10 h-10 flex items-center justify-center text-[var(--prism-ink)]"
           >
-            ✕
+            <X size={22} aria-hidden="true" />
           </button>
         </div>
 
@@ -273,7 +282,7 @@ export default function Nav({ onGetAssessed, activeHref }) {
               key={link.href}
               href={link.href}
               onClick={(e) => { handleSectionNav(e, link.href); closeMobile() }}
-              className={`py-3 text-[20px] text-[var(--color-ink)] no-underline border-b border-[var(--color-line)] ${activeHref === link.href ? 'border-b-2 border-[var(--color-accent)]' : ''}`}
+              className={`py-3 text-[20px] text-[var(--prism-ink)] no-underline border-b border-[var(--prism-border)] ${activeHref === link.href ? 'border-b-2 border-[var(--prism-signal)]' : ''}`}
             >
               {link.label}
             </a>
@@ -284,12 +293,12 @@ export default function Nav({ onGetAssessed, activeHref }) {
             const label = key.charAt(0).toUpperCase() + key.slice(1)
             const isOpen = mobileAccordion === key
             return (
-              <div key={key} className="border-b border-[var(--color-line)]">
+              <div key={key} className="border-b border-[var(--prism-border)]">
                 <button
                   type="button"
                   onClick={() => setMobileAccordion(isOpen ? null : key)}
                   aria-expanded={isOpen}
-                  className="w-full flex items-center justify-between py-3 text-[20px] text-[var(--color-ink)] bg-transparent"
+                  className="w-full flex items-center justify-between py-3 text-[20px] text-[var(--prism-ink)] bg-transparent"
                 >
                   {label}
                   <span
@@ -304,10 +313,10 @@ export default function Nav({ onGetAssessed, activeHref }) {
                     {dropdowns[key].map((item) => {
                       const inner = (
                         <>
-                          <span className="text-base leading-6">{item.icon}</span>
+                          <span className="text-base leading-6 text-[var(--prism-ink-muted)]"><item.icon size={20} aria-hidden="true" /></span>
                           <span className="flex flex-col">
-                            <span className="text-[15px] font-semibold text-[var(--color-ink)] leading-tight">{item.label}</span>
-                            <span className="text-[12px] text-[var(--color-ink-muted)] leading-snug mt-0.5">{item.desc}</span>
+                            <span className="text-[15px] font-semibold text-[var(--prism-ink)] leading-tight">{item.label}</span>
+                            <span className="text-[12px] text-[var(--prism-ink-muted)] leading-snug mt-0.5">{item.desc}</span>
                           </span>
                         </>
                       )
@@ -340,7 +349,7 @@ export default function Nav({ onGetAssessed, activeHref }) {
 
           <button
             onClick={() => { closeMobile(); onGetAssessed && onGetAssessed() }}
-            className="mt-6 w-full py-3 rounded-lg font-bold text-base text-[var(--color-ink)] bg-[var(--color-accent)]"
+            className="mt-6 w-full py-3 rounded-lg font-bold text-base text-brand-navy bg-brand-green"
           >
             Get Assessed
           </button>
@@ -350,13 +359,13 @@ export default function Nav({ onGetAssessed, activeHref }) {
               <Link
                 to="/profile"
                 onClick={closeMobile}
-                className="mt-3 w-full py-3 rounded-lg font-semibold text-base text-center text-[var(--color-ink)] border border-[var(--color-line)] no-underline"
+                className="mt-3 w-full py-3 rounded-lg font-semibold text-base text-center text-[var(--prism-ink)] border border-[var(--prism-border)] no-underline"
               >
                 My Profile
               </Link>
               <button
                 onClick={handleSignOut}
-                className="mt-2 w-full py-3 rounded-lg font-semibold text-base text-[var(--color-ink-muted)] bg-transparent border border-[var(--color-line)]"
+                className="mt-2 w-full py-3 rounded-lg font-semibold text-base text-[var(--prism-ink-muted)] bg-transparent border border-[var(--prism-border)]"
               >
                 Sign out
               </button>

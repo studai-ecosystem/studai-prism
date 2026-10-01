@@ -28,7 +28,7 @@ export const SPOKEN_QUESTION_TYPES = {
 }
 
 export const ASSESSMENT_FLOW = [
-  { id: 'scenario',  atSecond: 0,       label: 'Scenario Briefing', overlay: 'scenario_card' }, // ✅ shown up front
+  { id: 'scenario',  atSecond: 0,       label: 'Scenario Briefing', overlay: 'scenario_card' }, // shown up front
   { id: 'intro',     atSecond: 1,       label: 'Conversation',      overlay: null },
   { id: 'timed',     atSecond: 10 * 60, label: 'Timed Question',    overlay: null },             // ⏳ next
   { id: 'decision',  atSecond: 13 * 60, label: 'Decision Moment',   overlay: null },             // ⏳ next

@@ -44,26 +44,34 @@ router.get('/:id/neighborhood', async (req, res) => {
   }
 })
 
-// POST /api/job-families/explore — Evaluate role affinity based on candidate RIASEC & work preferences
+// POST /api/job-families/explore — explain roles from SELF-REPORTED interests
+// and DEMONSTRATED capability evidence (spec §18). Nothing is assumed: no
+// interests supplied → no interest reasons; no percentages or scores.
 router.post('/explore', async (req, res) => {
   try {
-    const { default: roleAffinityEngine } = await import('../lib/roleAffinityEngine.js')
-    const { candidateInterests = { E: 0.5, A: 0.3, I: 0.2 }, capabilityProfile = {} } = req.body || {}
+    const { default: roleAffinityEngine, sanitizeInterests } = await import('../lib/roleAffinityEngine.js')
+    const body = req.body || {}
+    if (body.candidateInterests !== undefined && body.candidateInterests !== null && !sanitizeInterests(body.candidateInterests)) {
+      return res.status(422).json({ error: 'Interest ratings must be numbers between 0 and 1.', code: 'VALIDATION_FAILED' })
+    }
     const families = await occupationalGraph.getAllJobFamilies()
     const fullBlueprints = await Promise.all(
       families.map(f => occupationalGraph.getJobFamilyBlueprint(f.job_family_id))
     )
+    // Capability evidence only comes from the server's own ledger, never
+    // from the request body (a client cannot assert its own capabilities).
     const results = roleAffinityEngine.evaluateAffinity({
-      candidateInterests,
-      capabilityProfile,
+      candidateInterests: body.candidateInterests ?? null,
+      capabilityProfile: {},
       blueprints: fullBlueprints.filter(Boolean)
     })
     res.json({
       success: true,
+      basis: sanitizeInterests(body.candidateInterests) ? 'SELF_REPORTED_INTERESTS' : 'NONE',
       recommendations: results
     })
   } catch (err) {
-    res.status(500).json({ error: 'Failed to compute role affinity', detail: err.message })
+    res.status(500).json({ error: 'Failed to compute role exploration' })
   }
 })
 

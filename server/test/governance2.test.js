@@ -1,6 +1,7 @@
 // Charter MASTER-2026-08-04 Phase 3 part 2 — governance suite
 // (§13 accommodations, §15 fairness-research framework, §16 retention).
 
+import '../test-support/isolatedDataDir.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'

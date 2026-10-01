@@ -1,0 +1,64 @@
+/* Prism Campus app-level styles. Colour values live ONLY in
+   src/design/tokens.css (--prism-* palette + .theme-assessment dark scope);
+   this file wires them into the app frame, focus and motion rules. */
+
+.prism-app {
+  background-color: var(--prism-canvas);
+  color: var(--prism-ink);
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+.prism-app :focus-visible,
+.prism-portal :focus-visible {
+  outline: 2px solid var(--prism-focus);
+  outline-offset: 2px;
+}
+
+/* Overlays render in a portal outside .prism-app; keep the app type + colour. */
+.prism-portal {
+  color: var(--prism-ink);
+  font-family: var(--font-body);
+}
+
+.sr-only-focusable:not(:focus):not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-app *,
+  .prism-app *::before,
+  .prism-app *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.prism-reduced-motion *,
+.prism-reduced-motion *::before,
+.prism-reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Account preference "Larger text" (C4.11): scales rem-based type app-wide. */
+html.prism-large-text {
+  font-size: 112.5%;
+}
+
+/* A heading that receives focus after navigation (tabindex=-1) is a screen-reader
+   landmark, not a control: no ring around it. Interactive elements keep theirs. */
+.prism-app h1[tabindex='-1']:focus-visible,
+.prism-app h2[tabindex='-1']:focus-visible {
+  outline: none;
+}

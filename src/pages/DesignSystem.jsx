@@ -12,6 +12,9 @@ import tokens, { color, font, typeScale, space, radius, elevation, motion } from
 import '../design/tokens.css'
 import { EvidenceThread, EvidenceTick, evidenceThreadStyles } from '../components/ui/EvidenceThread.jsx'
 import { ReliabilityLabel, ConfidenceBand, PendingStat } from '../components/ui/measurement.jsx'
+import CampusShowcase from '../features/designSystem/CampusShowcase.jsx'
+import ProductShowcase from '../features/designSystem/ProductShowcase.jsx'
+import PrismLogo from '../components/ui/PrismLogo.jsx'
 
 const TYPE_TESTS = [
   { lang: 'Latin', text: 'Measurement you can see inside — every score carries its evidence.' },
@@ -22,19 +25,29 @@ const TYPE_TESTS = [
 function TokenSwatch({ name, value }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-      <span style={{ width: 44, height: 44, borderRadius: 'var(--radius-sm)', background: value, border: '1px solid var(--color-line)' }} />
+      <span style={{ width: 44, height: 44, borderRadius: 'var(--radius-sm)', background: value, border: '1px solid var(--prism-border)' }} />
       <span style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-sm)' }}>
         {name}
-        <span style={{ color: 'var(--color-ink-muted)', marginLeft: 8 }}>{value}</span>
+        <span style={{ color: 'var(--prism-ink-muted)', marginLeft: 8 }}>{value}</span>
       </span>
     </div>
   )
 }
 
+
+// Flatten the nested colour tokens into [name, value] swatches (arrays become name[i]).
+function swatches(obj, prefix = '') {
+  return Object.entries(obj).flatMap(([k, v]) => {
+    const name = prefix ? `${prefix}.${k}` : k
+    if (typeof v === 'string') return [[name, v]]
+    if (Array.isArray(v)) return v.map((x, i) => [`${name}[${i}]`, x])
+    return swatches(v, name)
+  })
+}
 function Section({ title, children }) {
   return (
     <section style={{ marginBottom: 'var(--space-16)' }}>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', marginBottom: 'var(--space-6)', borderBottom: '1px solid var(--color-line)', paddingBottom: 'var(--space-3)' }}>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', marginBottom: 'var(--space-6)', borderBottom: '1px solid var(--prism-border)', paddingBottom: 'var(--space-3)' }}>
         {title}
       </h2>
       {children}
@@ -62,21 +75,21 @@ export default function DesignSystem() {
 
   if (!unlocked) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-paper)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-body)' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--prism-canvas)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-body)' }}>
         <style>{evidenceThreadStyles}</style>
-        <div style={{ width: 340, padding: 'var(--space-8)', background: 'var(--color-surface)', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-md)' }}>
+        <div style={{ width: 340, padding: 'var(--space-8)', background: 'var(--prism-surface)', border: '1px solid var(--prism-border)', borderRadius: 'var(--radius-md)' }}>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', marginBottom: 'var(--space-4)' }}>Design system</h1>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', marginBottom: 'var(--space-4)' }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--prism-ink-muted)', marginBottom: 'var(--space-4)' }}>
             Internal style guide. Enter the admin token to continue.
           </p>
           <input
             type="password" value={token} onChange={(e) => setToken(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && tryUnlock()}
             aria-label="Admin token"
-            style={{ width: '100%', padding: 'var(--space-3)', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-utility)', marginBottom: 'var(--space-3)' }}
+            style={{ width: '100%', padding: 'var(--space-3)', border: '1px solid var(--prism-border)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-utility)', marginBottom: 'var(--space-3)' }}
           />
-          {error && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{error}</p>}
-          <button onClick={tryUnlock} style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--color-ink)', color: 'var(--color-paper)', border: 0, borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-body)', cursor: 'pointer' }}>
+          {error && <p role="alert" style={{ color: 'var(--status-blocked-ink)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>{error}</p>}
+          <button onClick={tryUnlock} style={{ width: '100%', padding: 'var(--space-3)', background: 'var(--prism-ink)', color: 'var(--prism-canvas)', border: 0, borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-body)', cursor: 'pointer' }}>
             Unlock the style guide
           </button>
         </div>
@@ -85,59 +98,81 @@ export default function DesignSystem() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-paper)', color: 'var(--color-ink)', fontFamily: 'var(--font-body)', lineHeight: 'var(--leading-base)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--prism-canvas)', color: 'var(--prism-ink)', fontFamily: 'var(--font-body)', lineHeight: 'var(--leading-base)' }}>
       <style>{evidenceThreadStyles}</style>
       <div style={{ maxWidth: 880, margin: '0 auto', padding: 'var(--space-12) var(--space-6)' }}>
         <header style={{ marginBottom: 'var(--space-16)' }}>
-          <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
-            Prism design system · Part A
+          <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--prism-signal)' }}>
+            StudAI Prism design system
           </p>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-3xl)', lineHeight: 'var(--leading-tight)', margin: 'var(--space-2) 0' }}>
-            Instrument, not oracle.
+            Evidence you can understand. Growth you can act on.
           </h1>
-          <p style={{ maxWidth: '58ch', color: 'var(--color-ink-muted)' }}>
-            Prism looks like a precision measuring device that shows its workings. The accent means
-            measurement — it appears only where a number meets its evidence. Uncertainty is rendered
-            honestly; pending states are designed as carefully as filled ones.
+          <p style={{ maxWidth: '58ch', color: 'var(--prism-ink-muted)' }}>
+            Prism shows its workings: every conclusion links to its evidence, uncertainty is rendered honestly, and pending states are designed as carefully as filled ones.
           </p>
         </header>
 
-        <Section title="Palette">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 'var(--space-4)' }}>
-            {Object.entries(color).map(([name, value]) => <TokenSwatch key={name} name={name} value={value} />)}
+        <Section title="Brand">
+          <div style={{ display: 'grid', gap: 'var(--space-6)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-8)', alignItems: 'center' }}>
+              <PrismLogo variant="full" />
+              <PrismLogo variant="lockup" />
+              <PrismLogo variant="icon" size={64} />
+            </div>
+            <div style={{ background: 'var(--brand-navy)', padding: 'var(--space-6)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-8)', alignItems: 'center' }}>
+              <PrismLogo variant="full" tone="reverse" />
+              <PrismLogo variant="lockup" tone="reverse" />
+              <PrismLogo variant="icon" tone="reverse" size={64} />
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-8)', alignItems: 'center' }}>
+              <PrismLogo variant="lockup" tone="black" />
+              <span style={{ background: 'var(--brand-navy)', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', display: 'inline-flex' }}><PrismLogo variant="lockup" tone="white" /></span>
+            </div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--prism-ink-muted)', maxWidth: '64ch' }}>
+              Official artwork only (public/brand). Full lockup 240 px wide or more, lockup 160 px, icon 24 px; reversed
+              files on navy; clear space of one third of the icon width; no recolouring, effects or redrawing. The tagline
+              appears in the full lockup, not under every navigation logo.
+            </p>
           </div>
-          <p style={{ marginTop: 'var(--space-6)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', maxWidth: '64ch' }}>
-            Usage rules: <strong>accent is reserved for measurement moments</strong> (evidence threads,
-            AI panel variation intervals, live speaking state). Status colors never appear without their icon
-            and label — status is never conveyed by color alone.
+        </Section>
+
+        <Section title="Palette">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-4)' }}>
+            {swatches(color).map(([name, value]) => <TokenSwatch key={name} name={name} value={value} />)}
+          </div>
+          <p style={{ marginTop: 'var(--space-6)', fontSize: 'var(--text-sm)', color: 'var(--prism-ink-muted)', maxWidth: '64ch' }}>
+            Usage rules: <strong>brand green is a fill, mark or rule colour</strong>; green text on light surfaces uses
+            green-ink, and navy text sits on green fills (white on green fails contrast). Status colours never appear
+            without their icon and label: status is never conveyed by colour alone.
           </p>
         </Section>
 
         <Section title="Type — three faces, three scripts">
           <div style={{ display: 'grid', gap: 'var(--space-8)' }}>
             <div>
-              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Display — Fraunces</p>
+              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--prism-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Display — Inter (bold, tight tracking)</p>
               <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-2xl)', lineHeight: 'var(--leading-tight)' }}>
                 Measurement you can see inside.
               </p>
             </div>
             <div>
-              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Body — Noto Sans (+ Devanagari + Tamil companions)</p>
+              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--prism-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Body — Inter (+ Noto Sans Devanagari and Tamil companions)</p>
               {TYPE_TESTS.map((t) => (
                 <p key={t.lang} style={{ marginTop: 'var(--space-2)' }}>
-                  <span style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-accent)', marginRight: 'var(--space-3)' }}>{t.lang}</span>
+                  <span style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--prism-signal)', marginRight: 'var(--space-3)' }}>{t.lang}</span>
                   {t.text}
                 </p>
               ))}
             </div>
             <div>
-              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Utility — IBM Plex Mono (tabular numerals)</p>
+              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--prism-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Utility — IBM Plex Mono (tabular numerals)</p>
               <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-lg)', fontVariantNumeric: 'tabular-nums' }}>
                 72 · 68–76 · 28:41 · κ pending · n=0
               </p>
             </div>
             <div>
-              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Scale — 8 steps</p>
+              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--prism-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Scale — 8 steps</p>
               {Object.entries(typeScale).map(([step, size]) => (
                 <p key={step} style={{ fontSize: size, lineHeight: 'var(--leading-tight)', margin: 'var(--space-1) 0' }}>
                   {step} · {size}
@@ -168,7 +203,7 @@ export default function DesignSystem() {
               source={<>No agreement statistic is claimed until the preregistered human–LLM study reports. This pending state is the claim.</>}
             />
           </div>
-          <p style={{ marginTop: 'var(--space-8)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', maxWidth: '64ch' }}>
+          <p style={{ marginTop: 'var(--space-8)', fontSize: 'var(--text-sm)', color: 'var(--prism-ink-muted)', maxWidth: '64ch' }}>
             Rules: the thread always runs claim → source; a claim with no available source gets the
             honest pending state, never a bare number; the thread’s color is the accent, and the
             accent means measurement. Inline variant: <EvidenceTick>calibration stamp v1 · pending</EvidenceTick>
@@ -179,22 +214,22 @@ export default function DesignSystem() {
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end', marginBottom: 'var(--space-8)' }}>
             {Object.entries(space).filter(([k]) => k !== '0').map(([step, value]) => (
               <div key={step} style={{ textAlign: 'center' }}>
-                <div style={{ width: value, height: value, background: 'var(--color-accent)', opacity: 0.25, borderRadius: 'var(--radius-hair)' }} />
+                <div style={{ width: value, height: value, background: 'var(--prism-signal)', opacity: 0.25, borderRadius: 'var(--radius-hair)' }} />
                 <span style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)' }}>{step}</span>
               </div>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
             {Object.entries(radius).map(([name, value]) => (
-              <div key={name} style={{ width: 72, height: 48, border: '1.5px solid var(--color-ink)', borderRadius: value, display: 'grid', placeItems: 'center', fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)' }}>{name}</div>
+              <div key={name} style={{ width: 72, height: 48, border: '1.5px solid var(--prism-ink)', borderRadius: value, display: 'grid', placeItems: 'center', fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)' }}>{name}</div>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
             {Object.entries(elevation).map(([name, value]) => (
-              <div key={name} style={{ width: 120, height: 72, background: 'var(--color-surface)', borderRadius: 'var(--radius-md)', boxShadow: value, display: 'grid', placeItems: 'center', fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', border: name === 'flat' ? '1px solid var(--color-line)' : 'none' }}>{name}</div>
+              <div key={name} style={{ width: 120, height: 72, background: 'var(--prism-surface)', borderRadius: 'var(--radius-md)', boxShadow: value, display: 'grid', placeItems: 'center', fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', border: name === 'flat' ? '1px solid var(--prism-border)' : 'none' }}>{name}</div>
             ))}
           </div>
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', maxWidth: '64ch' }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--prism-ink-muted)', maxWidth: '64ch' }}>
             Motion: {motion.durationFast} hover · {motion.durationBase} state · {motion.durationSlow} page.
             Under <span style={{ fontFamily: 'var(--font-utility)' }}>prefers-reduced-motion</span> every duration collapses globally
             (tokens.css); nothing conveys meaning by motion alone.
@@ -218,7 +253,7 @@ export default function DesignSystem() {
                 arrives="The score is final; the comparison is what's pending."
               />
             </div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', maxWidth: '64ch' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--prism-ink-muted)', maxWidth: '64ch' }}>
               ConfidenceBand renders a band ONLY from an API-shaped CI — there is no prop to invent a
               number (CI-tested). ReliabilityLabel refuses unknown levels. PendingStat is the honest
               empty state, designed as carefully as the filled one.
@@ -227,8 +262,8 @@ export default function DesignSystem() {
         </Section>
 
         <Section title="The room, dark">
-          <div className="room-dark" style={{ background: 'var(--color-paper)', color: 'var(--color-ink)', padding: 'var(--space-8)', borderRadius: 'var(--radius-lg)' }}>
-            <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--color-accent-bright)', marginBottom: 'var(--space-3)' }}>
+          <div className="room-dark" style={{ background: 'var(--prism-canvas)', color: 'var(--prism-ink)', padding: 'var(--space-8)', borderRadius: 'var(--radius-lg)' }}>
+            <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--brand-green)', marginBottom: 'var(--space-3)' }}>
               Assessment room · dark-capable
             </p>
             <p style={{ maxWidth: '56ch' }}>
@@ -238,7 +273,15 @@ export default function DesignSystem() {
           </div>
         </Section>
 
-        <footer style={{ borderTop: '1px solid var(--color-line)', paddingTop: 'var(--space-6)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)' }}>
+        <Section title="Prism Campus primitives (spec §8.1) and page states (§40)">
+          <CampusShowcase />
+        </Section>
+
+        <Section title="Capability, evidence, mission, state and chart components">
+          <ProductShowcase />
+        </Section>
+
+        <footer style={{ borderTop: '1px solid var(--prism-border)', paddingTop: 'var(--space-6)', fontSize: 'var(--text-sm)', color: 'var(--prism-ink-muted)' }}>
           Gate: human screenshot review of this route signs off Part A. Tokens live in
           <span style={{ fontFamily: 'var(--font-utility)' }}> src/design/tokens.js</span> — raw hex in rebuilt page code fails CI.
           Voice canon: <span style={{ fontFamily: 'var(--font-utility)' }}>docs/design/VOICE.md</span>.

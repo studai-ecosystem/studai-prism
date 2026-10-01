@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import {
-  useAdminList, PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pager,
-  Pill, btn, field, when, mono,
-} from './ui.jsx'
+import { useAdminList, PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pager,
+  Pill, btn, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/records — consents, verifications, integrity events (Phase 2) ─────
 // One component, three modes (routes /admin/consents, /admin/verifications,
@@ -30,7 +28,7 @@ function Consents() {
         columns={[
           {
             key: 'sessionId', label: 'Session', className: 'font-mono text-[12px]',
-            render: (c) => <Link className="text-[var(--color-accent)] underline" to={`/admin/sessions/${c.sessionId}`}>{mono(c.sessionId, 13)}…</Link>,
+            render: (c) => <Link className="text-[var(--prism-signal)] underline" to={`/admin/sessions/${c.sessionId}`}>{mono(c.sessionId, 13)}…</Link>,
           },
           { key: 'scopes', label: 'Scopes', render: (c) => (c.scopes || []).join(', ') || '—' },
           { key: 'consentVersion', label: 'Version', className: 'font-mono text-[11px]' },
@@ -88,7 +86,7 @@ function Verifications() {
         columns={[
           {
             key: 'sessionId', label: 'Session', className: 'font-mono text-[12px]',
-            render: (v) => <Link className="text-[var(--color-accent)] underline" to={`/admin/sessions/${v.sessionId}`}>{mono(v.sessionId, 13)}…</Link>,
+            render: (v) => <Link className="text-[var(--prism-signal)] underline" to={`/admin/sessions/${v.sessionId}`}>{mono(v.sessionId, 13)}…</Link>,
           },
           { key: 'status', label: 'Status', render: (v) => <Pill tone={v.status === 'verified' ? 'ok' : 'warn'}>{v.status || '—'}</Pill> },
           { key: 'nameMatch', label: 'Name match', render: (v) => (v.nameMatch ? 'yes' : 'no') },
@@ -119,7 +117,7 @@ function Integrity() {
 
   const review = async (e, decision) => {
     setActionError(''); setNotice('')
-    const note = window.prompt(`Note for marking this ${e.type} as ${decision} (audited):`)
+    const note = await askText(`Note for marking this ${e.type} as ${decision} (audited):`)
     if (note === null) return
     try {
       await adminFetch('/api/admin/records/events/review', {
@@ -160,14 +158,14 @@ function Integrity() {
         columns={[
           {
             key: 'sessionId', label: 'Session', className: 'font-mono text-[12px]',
-            render: (e) => <Link className="text-[var(--color-accent)] underline" to={`/admin/sessions/${e.sessionId}`}>{mono(e.sessionId, 13)}…</Link>,
+            render: (e) => <Link className="text-[var(--prism-signal)] underline" to={`/admin/sessions/${e.sessionId}`}>{mono(e.sessionId, 13)}…</Link>,
           },
           { key: 'type', label: 'Event', className: 'font-mono text-[12px]' },
           { key: 'at', label: 'When', render: (e) => when(e.at), className: 'whitespace-nowrap font-mono text-[11px]' },
           {
             key: 'review', label: 'Reviewer decision',
             render: (e) => (e.review
-              ? <span className="font-sans text-[13px]"><Pill tone={e.review.decision === 'false_positive' ? 'ok' : e.review.decision === 'escalated' ? 'danger' : 'warn'}>{e.review.decision}</Pill> <span className="text-[var(--color-ink-muted)]">{e.review.reviewer}</span></span>
+              ? <span className="font-sans text-[13px]"><Pill tone={e.review.decision === 'false_positive' ? 'ok' : e.review.decision === 'escalated' ? 'danger' : 'warn'}>{e.review.decision}</Pill> <span className="text-[var(--prism-ink-muted)]">{e.review.reviewer}</span></span>
               : <Pill tone="muted">unreviewed</Pill>),
           },
           {

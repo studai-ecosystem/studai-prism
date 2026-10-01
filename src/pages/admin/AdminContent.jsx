@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, btnDanger, field, when, actWithReason } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, btnDanger, field, when, actWithReason, askText, askConfirm } from './ui.jsx'
 
 // ── /admin/content — CMS (Phase 5): blog, careers, applications ──────────────
 
@@ -20,8 +20,8 @@ export default function AdminContent() {
         {['Blog', 'Careers', 'Applications'].map((t) => (
           <button key={t} type="button" onClick={() => setTab(t)}
             className={`rounded-[6px] px-3 py-1.5 font-sans text-[13px] border ${
-              tab === t ? 'border-[var(--color-accent)] text-[var(--color-ink)] bg-[var(--color-surface)]'
-                        : 'border-[var(--color-line)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'}`}>
+              tab === t ? 'border-[var(--prism-signal)] text-[var(--prism-ink)] bg-[var(--prism-surface)]'
+                        : 'border-[var(--prism-border)] text-[var(--prism-ink-muted)] hover:text-[var(--prism-ink)]'}`}>
             {t}
           </button>
         ))}
@@ -65,9 +65,9 @@ function BlogTab() {
 
   const createDraft = () =>
     run(async () => {
-      const slug = window.prompt('Slug (a-z, 0-9, hyphens):')
+      const slug = await askText('Slug (a-z, 0-9, hyphens):')
       if (!slug) return null
-      const title = window.prompt('Title:')
+      const title = await askText('Title:')
       if (!title) return null
       return adminFetch('/api/admin/content/posts', { method: 'POST', body: { slug: slug.trim(), title: title.trim() } })
     }, 'Draft created.')
@@ -76,10 +76,10 @@ function BlogTab() {
     run(async () => {
       let scheduledFor
       if (status === 'scheduled') {
-        scheduledFor = window.prompt('Publish at (ISO datetime, e.g. 2026-08-01T09:00:00Z):')
+        scheduledFor = await askText('Publish at (ISO datetime, e.g. 2026-08-01T09:00:00Z):')
         if (!scheduledFor) return null
       }
-      const reason = window.prompt(`Reason for ${status} (audited):`)
+      const reason = await askText(`Reason for ${status} (audited):`)
       if (reason === null) return null
       return adminFetch(`/api/admin/content/posts/${post.postId}/status`, {
         method: 'POST', body: { status, scheduledFor, reason },
@@ -88,7 +88,7 @@ function BlogTab() {
 
   const saveBody = () =>
     run(async () => {
-      const changeNote = window.prompt('Change note (goes in the version history):')
+      const changeNote = await askText('Change note (goes in the version history):')
       if (changeNote === null) return null
       return adminFetch(`/api/admin/content/posts/${detail.post.postId}`, {
         method: 'PATCH',
@@ -103,7 +103,7 @@ function BlogTab() {
     <>
       <ErrorNotice error={error} />
       <Notice>{notice}</Notice>
-      {data?.servingFrom && <p className="mb-3 font-mono text-[11px] text-[var(--color-ink-muted)]">Public serving: {data.servingFrom}</p>}
+      {data?.servingFrom && <p className="mb-3 font-mono text-[11px] text-[var(--prism-ink-muted)]">Public serving: {data.servingFrom}</p>}
       <Toolbar onRefresh={load}>
         {canWrite && <button type="button" className={btn} onClick={createDraft}>New draft</button>}
       </Toolbar>
@@ -135,7 +135,7 @@ function BlogTab() {
                 {canWrite && p.status === 'draft' && !p.publishedAt && (
                   <button type="button" className={btnDanger}
                     onClick={() => run(async () => {
-                      if (!window.confirm('Hard-delete this never-published draft? This is the only hard delete in the CMS.')) return null
+                      if (!await askConfirm('Hard-delete this never-published draft? This is the only hard delete in the CMS.')) return null
                       return adminFetch(`/api/admin/content/posts/${p.postId}`, { method: 'DELETE' })
                     }, 'Draft deleted.')}>
                     Delete draft
@@ -149,9 +149,9 @@ function BlogTab() {
         empty="No posts."
       />
       {detail && (
-        <section className="mt-4 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+        <section className="mt-4 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="font-display text-base text-[var(--color-ink)]">{detail.post.slug} · v{detail.post.version}</h2>
+            <h2 className="font-display text-base text-[var(--prism-ink)]">{detail.post.slug} · v{detail.post.version}</h2>
             <span className="flex gap-1.5">
               {canWrite && <button type="button" className={btn} onClick={saveBody}>Save (new version)</button>}
               <button type="button" className={btn} onClick={() => setDetail(null)}>Close</button>
@@ -159,7 +159,7 @@ function BlogTab() {
           </div>
           <div className="grid gap-2 md:grid-cols-2 mb-2">
             {['title', 'dateLabel', 'summary', 'author'].map((k) => (
-              <label key={k} className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)]">
+              <label key={k} className="font-mono text-[10px] uppercase text-[var(--prism-ink-muted)]">
                 {k}
                 <input className={`${field} w-full mt-1`} value={detail.post[k] || ''}
                   disabled={!canWrite}
@@ -167,16 +167,16 @@ function BlogTab() {
               </label>
             ))}
           </div>
-          <label className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)]">
+          <label className="font-mono text-[10px] uppercase text-[var(--prism-ink-muted)]">
             Body (markdown)
             <textarea rows={10} className={`${field} w-full mt-1 font-mono text-[12px]`} value={detail.post.body || ''}
               disabled={!canWrite}
               onChange={(e) => setDetail({ ...detail, post: { ...detail.post, body: e.target.value } })} />
           </label>
-          <h3 className="mt-3 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Version history</h3>
+          <h3 className="mt-3 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Version history</h3>
           {detail.versions.map((v) => (
-            <p key={v.version_id} className="font-sans text-[13px] text-[var(--color-ink)] py-0.5">
-              v{v.version} — “{v.change_note}” <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">{v.changed_by || 'import'} · {when(v.created_at)}</span>
+            <p key={v.version_id} className="font-sans text-[13px] text-[var(--prism-ink)] py-0.5">
+              v{v.version} — “{v.change_note}” <span className="font-mono text-[10px] text-[var(--prism-ink-muted)]">{v.changed_by || 'import'} · {when(v.created_at)}</span>
             </p>
           ))}
         </section>
@@ -216,9 +216,9 @@ function CareersTab() {
         {canWrite && (
           <button type="button" className={btn}
             onClick={() => run(async () => {
-              const slug = window.prompt('Role slug (a-z, 0-9, hyphens):')
+              const slug = await askText('Role slug (a-z, 0-9, hyphens):')
               if (!slug) return null
-              const title = window.prompt('Role title:')
+              const title = await askText('Role title:')
               if (!title) return null
               return adminFetch('/api/admin/content/jobs-list', { method: 'POST', body: { slug: slug.trim(), title: title.trim() } })
             }, 'Role created as draft.')}>
@@ -287,7 +287,7 @@ function ApplicationsTab() {
     } catch (err) { setError(err.message) }
   }
 
-  if (!canManage) return <p className="font-sans text-sm text-[var(--color-ink-muted)]">Your role does not include application processing.</p>
+  if (!canManage) return <p className="font-sans text-sm text-[var(--prism-ink-muted)]">Your role does not include application processing.</p>
 
   return (
     <>
@@ -317,7 +317,7 @@ function ApplicationsTab() {
                 </select>
                 <button type="button" className={btnDanger}
                   onClick={() => run(async () => {
-                    const reason = window.prompt('Retention reason for deleting this application (it carries applicant PII):')
+                    const reason = await askText('Retention reason for deleting this application (it carries applicant PII):')
                     if (!reason) return null
                     return adminFetch(`/api/admin/content/applications/${a.application_id}`, { method: 'DELETE', body: { reason } })
                   }, 'Application deleted per retention policy.')}>

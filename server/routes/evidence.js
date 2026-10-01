@@ -13,6 +13,7 @@ import { isGlassBoxEnabled } from '../lib/credentials.js'
 import { isLangEnabled } from '../lib/lang.js'
 import { isVelocityEnabled } from '../lib/velocity.js'
 import { isReplayEnabled } from '../lib/replay.js'
+import { CAMPUS_CLAIMS } from '../domain/claims/campusClaims.js'
 
 const router = Router()
 
@@ -22,7 +23,7 @@ const router = Router()
 // A stat the registry can't back is null — and the UI's useClaims() hook
 // renders its designed pending state. No hardcoded numbers in JSX, ever.
 let _claimsCache = { at: 0, body: null }
-router.get('/claims', async (_req, res) => {
+router.get('/claims', async (req, res) => {
   try {
     if (Date.now() - _claimsCache.at < 60_000 && _claimsCache.body) return res.json(_claimsCache.body)
     let stats = { assessedRealSessions: null, kappaAiHuman: null, testRetestR: null, evasionRate: null, transferR: null, difLanguages: null }
@@ -57,6 +58,9 @@ router.get('/claims', async (_req, res) => {
         replay: isReplayEnabled(),
       },
       note: 'Null means pending. The UI renders designed pending states, never a substitute number.',
+      // Campus V1 scientific and privacy claims: all PENDING until a human
+      // records the evidence (docs/campus/CAMPUS_CLAIMS_REGISTER.md).
+      campusClaims: CAMPUS_CLAIMS.map(({ id, statement, status, humanAction }) => ({ id, statement, status, humanAction })),
     }
     _claimsCache = { at: Date.now(), body }
     res.json(body)

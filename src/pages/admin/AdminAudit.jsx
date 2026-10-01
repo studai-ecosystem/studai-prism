@@ -41,9 +41,9 @@ function EntityTimeline({ entity, onClose }) {
   }, [entity])
 
   return (
-    <div className="rounded-[10px] border border-[var(--color-accent)] bg-[var(--color-surface)] p-4 mb-5">
+    <div className="rounded-[10px] border border-[var(--prism-signal)] bg-[var(--prism-surface)] p-4 mb-5">
       <div className="flex items-start justify-between gap-3">
-        <p className="font-mono text-[12px] text-[var(--color-ink)]">
+        <p className="font-mono text-[12px] text-[var(--prism-ink)]">
           Timeline — {entity.type} · {mono(entity.id, 16)}
         </p>
         <button type="button" className={btn} onClick={onClose}>Close</button>
@@ -51,27 +51,27 @@ function EntityTimeline({ entity, onClose }) {
       <ErrorNotice error={error} />
       {data && (
         <>
-          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mt-3 mb-1">Administrator actions</p>
-          {(data.adminEvents || []).length === 0 && <p className="font-sans text-[13px] text-[var(--color-ink-muted)]">None.</p>}
+          <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mt-3 mb-1">Administrator actions</p>
+          {(data.adminEvents || []).length === 0 && <p className="font-sans text-[13px] text-[var(--prism-ink-muted)]">None.</p>}
           {(data.adminEvents || []).map((e) => (
-            <div key={e.event_id} className="border-b border-[var(--color-line)] last:border-0 py-1.5">
-              <p className="font-sans text-[13px] text-[var(--color-ink)]">
+            <div key={e.event_id} className="border-b border-[var(--prism-border)] last:border-0 py-1.5">
+              <p className="font-sans text-[13px] text-[var(--prism-ink)]">
                 <span className="font-mono text-[11px]">{when(e.created_at)}</span> · {e.admin_email} · <strong>{e.action}</strong>
               </p>
-              {e.reason && <p className="font-sans text-[12px] text-[var(--color-ink-muted)]">{e.reason}</p>}
+              {e.reason && <p className="font-sans text-[12px] text-[var(--prism-ink-muted)]">{e.reason}</p>}
             </div>
           ))}
           {(data.decisionTrail || []).length > 0 && (
             <>
-              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mt-4 mb-1">
+              <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mt-4 mb-1">
                 Assessment decision trail (system)
               </p>
               {data.decisionTrail.map((e, i) => (
-                <div key={i} className="border-b border-[var(--color-line)] last:border-0 py-1.5">
-                  <p className="font-sans text-[13px] text-[var(--color-ink)]">
+                <div key={i} className="border-b border-[var(--prism-border)] last:border-0 py-1.5">
+                  <p className="font-sans text-[13px] text-[var(--prism-ink)]">
                     <span className="font-mono text-[11px]">{when(e.created_at)}</span> · <strong>{e.event_type}</strong>
                   </p>
-                  <pre className="font-mono text-[10px] text-[var(--color-ink-muted)] whitespace-pre-wrap">{JSON.stringify(e.payload)}</pre>
+                  <pre className="font-mono text-[10px] text-[var(--prism-ink-muted)] whitespace-pre-wrap">{JSON.stringify(e.payload)}</pre>
                 </div>
               ))}
             </>
@@ -97,26 +97,26 @@ function SecurityTab() {
       <ErrorNotice error={error} />
       <Toolbar onRefresh={load} />
       <div className="flex gap-3 flex-wrap mb-5">
-        <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3">
-          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Locked admin accounts</p>
-          <p className="font-display text-xl text-[var(--color-ink)] tabular-nums">{data?.lockedAdminAccounts ?? '—'}</p>
+        <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] px-4 py-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Locked admin accounts</p>
+          <p className="font-display text-xl text-[var(--prism-ink)] tabular-nums">{data?.lockedAdminAccounts ?? '—'}</p>
         </div>
-        <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3">
-          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Open incidents</p>
-          <p className="font-display text-xl text-[var(--color-ink)] tabular-nums">{data?.openIncidents ?? '—'}</p>
+        <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] px-4 py-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Open incidents</p>
+          <p className="font-display text-xl text-[var(--prism-ink)] tabular-nums">{data?.openIncidents ?? '—'}</p>
         </div>
-        <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-3 min-w-[260px]">
-          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-1">Security events — last 7 days</p>
-          {(data?.last7Days || []).length === 0 && <p className="font-sans text-[13px] text-[var(--color-ink-muted)]">None.</p>}
+        <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] px-4 py-3 min-w-[260px]">
+          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-1">Security events — last 7 days</p>
+          {(data?.last7Days || []).length === 0 && <p className="font-sans text-[13px] text-[var(--prism-ink-muted)]">None.</p>}
           {(data?.last7Days || []).map((a) => (
-            <p key={a.action} className="font-mono text-[11px] text-[var(--color-ink)] tabular-nums">
+            <p key={a.action} className="font-mono text-[11px] text-[var(--prism-ink)] tabular-nums">
               {a.n} × {a.action}
             </p>
           ))}
         </div>
       </div>
 
-      <h2 className="font-display text-base text-[var(--color-ink)] mb-2">Recent security events</h2>
+      <h2 className="font-display text-base text-[var(--prism-ink)] mb-2">Recent security events</h2>
       <DataTable
         columns={[
           { key: 'created_at', label: 'When', render: (r) => when(r.created_at), className: 'font-mono whitespace-nowrap' },
@@ -131,7 +131,7 @@ function SecurityTab() {
         busy={!data}
       />
 
-      <h2 className="mt-6 font-display text-base text-[var(--color-ink)] mb-2">Incidents</h2>
+      <h2 className="mt-6 font-display text-base text-[var(--prism-ink)] mb-2">Incidents</h2>
       <DataTable
         columns={[
           { key: 'created_at', label: 'Opened', render: (r) => when(r.created_at), className: 'font-mono whitespace-nowrap' },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, btnDanger, field, when, mono } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, btnDanger, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/calibrations — calibration-run lifecycle (Phase 3) ────────────────
 // Freeze and Apply are SEPARATE dual-approved actions; Apply has live scoring
@@ -29,7 +29,7 @@ export default function AdminCalibrations() {
 
   const act = async (run, action, promptText) => {
     setError(''); setNotice('')
-    const reason = window.prompt(promptText)
+    const reason = await askText(promptText)
     if (!reason) return
     try {
       const r = await adminFetch(`/api/admin/calibrations/${run.run_id}/${action}`, { method: 'POST', body: { reason } })
@@ -110,19 +110,19 @@ export default function AdminCalibrations() {
       />
 
       {detail && (
-        <section className="mt-4 mb-10 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+        <section className="mt-4 mb-10 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">
               Run {detail.run_id} · {detail.run_type}
             </h2>
             <button type="button" className={btn} onClick={() => setDetail(null)}>Close</button>
           </div>
-          <p className="mt-2 font-mono text-[11px] text-[var(--color-ink-muted)]">inputs summary</p>
-          <pre className="mt-1 max-h-40 overflow-auto rounded-[6px] bg-[var(--color-paper)] p-3 font-mono text-[11px] text-[var(--color-ink)]">
+          <p className="mt-2 font-mono text-[11px] text-[var(--prism-ink-muted)]">inputs summary</p>
+          <pre className="mt-1 max-h-40 overflow-auto rounded-[6px] bg-[var(--prism-canvas)] p-3 font-mono text-[11px] text-[var(--prism-ink)]">
             {JSON.stringify(detail.inputs_summary, null, 2)}
           </pre>
-          <p className="mt-2 font-mono text-[11px] text-[var(--color-ink-muted)]">outputs</p>
-          <pre className="mt-1 max-h-72 overflow-auto rounded-[6px] bg-[var(--color-paper)] p-3 font-mono text-[11px] text-[var(--color-ink)]">
+          <p className="mt-2 font-mono text-[11px] text-[var(--prism-ink-muted)]">outputs</p>
+          <pre className="mt-1 max-h-72 overflow-auto rounded-[6px] bg-[var(--prism-canvas)] p-3 font-mono text-[11px] text-[var(--prism-ink)]">
             {JSON.stringify(detail.outputs, null, 2)}
           </pre>
         </section>

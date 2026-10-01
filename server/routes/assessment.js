@@ -648,8 +648,15 @@ router.post('/start', async (req, res) => {
   }
 
   const seenScenarioIds = await getRecentScenarioIdsByUser(authUser?.id)
+  // An explicitly requested scenario must exist in the governed bank — an
+  // unknown id is an error, never a silent substitute (spec §34.3, C2.05).
   const requestedScenarioId = req.body.scenarioId || (req.body.jobFamilyId === 'STUDAI-JF-MKT-L1' ? 'prism-sim-mkt-l1' : null)
-  const scenario = requestedScenarioId ? (findScenario(requestedScenarioId) || pickScenario(tier, seenScenarioIds)) : pickScenario(tier, seenScenarioIds)
+  const requestedScenario = requestedScenarioId ? findScenario(requestedScenarioId) : null
+  if (requestedScenarioId && !requestedScenario) {
+    auditLog('scenario_not_found', sessionId, { requestedScenarioId: String(requestedScenarioId).slice(0, 64) })
+    return res.status(422).json({ error: 'This assessment is not available.', code: 'SCENARIO_NOT_FOUND' })
+  }
+  const scenario = requestedScenario || pickScenario(tier, seenScenarioIds)
 
   // Charter §13: an APPROVED accommodation activates the alternate
   // administration for this session (text-only / no-camera / reduced
@@ -763,6 +770,12 @@ router.post('/start', async (req, res) => {
   }
 })
 
+// Artifact → capability attribution comes only from the governed bank: the
+// marketing bank's probing turn 3 asks for the budget modeler under
+// CAP-MKT-BUDGET-JUDGMENT. Artifacts without a governed attribution record
+// no evidence (their state is still saved to the session).
+const ARTIFACT_CAPABILITY = Object.freeze({ 'ART-BUDGET-03': 'CAP-MKT-BUDGET-JUDGMENT' })
+
 function findScenario(id) {
   const existing = SCENARIOS.find((s) => s.id === id)
   if (existing) return existing
@@ -810,20 +823,6 @@ async function loadSession(sessionId) {
     }
     await sessions.set(sessionId, revived)
     return { ...revived, _persisted: persisted }
-  }
-  if (!persisted && sessionId && sessionId.startsWith('test-mkt-session-')) {
-    const defaultScenario = getScenarioByAssessmentId('prism-sim-mkt-l1')
-    const revived = {
-      scenario: findScenario('prism-sim-mkt-l1') || defaultScenario,
-      exchangeCount: 0,
-      history: [],
-      evidence: emptyEvidence(),
-      artifacts: JSON.parse(JSON.stringify(defaultScenario.interactiveArtifacts || [])),
-      candidateName: 'Candidate',
-      characterId: null,
-    }
-    await sessions.set(sessionId, revived)
-    return revived
   }
   return null
 }
@@ -1837,14 +1836,28 @@ router.get('/report/:sessionId', async (req, res) => {
 })
 
 // ── GET /api/assessment/report/:sessionId/v2 ─────────────────────────────────
-// Serves the 12-section PRISM Next Student Report V2 with evidence citations,
-// observable rubric levels, career exploration tiers, and 30/60/90 development plan.
+// On-demand, fail-closed capability report (status + reasons per capability,
+// claim-backed conclusions only). Issued reports are never re-rendered here.
+// Every sufficiency decision shown on a candidate surface is audited (C2.15).
+function auditSufficiencyDecisions(surface, sessionId, report) {
+  auditLog('evidence.status.decided', sessionId, {
+    surface,
+    ruleVersion: report.method?.sufficiencyRules,
+    capabilities: Object.fromEntries(
+      [...report.section3_layer1TransferableCapabilities, ...report.section4_layer2RoleCapabilities]
+        .map((c) => [c.id, { status: c.status, reasons: c.statusReasons }]),
+    ),
+  })
+}
+
 router.get('/report/:sessionId/v2', async (req, res) => {
   try {
     const report = await getReport(req.params.sessionId)
     const session = (await getSession(req.params.sessionId)) || (await loadSession(req.params.sessionId))
+    if (!report && !session) return res.status(404).json({ error: 'Report not found', code: 'NOT_FOUND' })
 
     const v2Report = await buildStudentReportV2(req.params.sessionId, session, report || {})
+    auditSufficiencyDecisions('report_v2', req.params.sessionId, v2Report)
     res.json(v2Report)
   } catch (err) {
     logger.captureException(err, { msg: 'report_v2_generation_failed', sessionId: req.params.sessionId })
@@ -1853,13 +1866,15 @@ router.get('/report/:sessionId/v2', async (req, res) => {
 })
 
 // ── GET /api/assessment/report/:sessionId/employee ───────────────────────────
-// Serves the PRISM Next Employee Mobility & Growth Report.
+// Workplace view of the same fail-closed report (no readiness figures).
 router.get('/report/:sessionId/employee', async (req, res) => {
   try {
     const report = await getReport(req.params.sessionId)
     const session = (await getSession(req.params.sessionId)) || (await loadSession(req.params.sessionId))
+    if (!report && !session) return res.status(404).json({ error: 'Report not found', code: 'NOT_FOUND' })
 
     const employeeReport = await buildEmployeeReportV2(req.params.sessionId, session, report || {})
+    auditSufficiencyDecisions('report_employee', req.params.sessionId, employeeReport)
     res.json(employeeReport)
   } catch (err) {
     logger.captureException(err, { msg: 'report_employee_generation_failed', sessionId: req.params.sessionId })
@@ -1874,13 +1889,12 @@ router.get('/artifacts/:sessionId', async (req, res) => {
     const session = await loadSession(req.params.sessionId)
     if (!session) {
       const persisted = await getSession(req.params.sessionId)
-      if (!persisted) {
-        const defaultScenario = getScenarioByAssessmentId('prism-sim-mkt-l1')
-        return res.json({ artifacts: defaultScenario.interactiveArtifacts, scenarioTitle: defaultScenario.title })
-      }
+      // Unknown sessions get no scenario content at all (C2.05).
+      if (!persisted) return res.status(404).json({ error: 'Session not found', code: 'SESSION_NOT_FOUND' })
       const scenario = findScenario(persisted.scenarioId)
+      if (!scenario && !persisted.artifacts) return res.status(422).json({ error: 'This assessment is not available.', code: 'SCENARIO_NOT_FOUND' })
       const artifacts = persisted.artifacts || scenario?.interactiveArtifacts || []
-      return res.json({ artifacts, scenarioTitle: scenario?.title })
+      return res.json({ artifacts, scenarioTitle: scenario?.title ?? null })
     }
     const artifacts = session.artifacts || session.scenario?.interactiveArtifacts || []
     res.json({ artifacts, scenarioTitle: session.scenario?.title })
@@ -1902,30 +1916,34 @@ router.post('/artifacts/:sessionId', async (req, res) => {
       session.artifacts = JSON.parse(JSON.stringify(session.scenario?.interactiveArtifacts || []))
     }
     const target = session.artifacts.find((a) => a.artifactId === artifactId)
-    if (target) {
-      if (updates) {
-        target.data = { ...target.data, ...updates }
-        target.lastModified = new Date().toISOString()
-      }
-    }
+    // Never acknowledge a save that did not happen (C2.14).
+    if (!target) return res.status(404).json({ error: 'This work material is not part of the session.', code: 'ARTIFACT_NOT_FOUND' })
 
     const authUser = getAuthUser(req)
-    const candidateId = session.candidateId || authUser?.id || 'anon'
-    const capId = artifactId === 'ART-BUDGET-03' ? 'CAP-MKT-BUDGET-JUDGMENT' : 'CAP-MKT-UNIT-ECONOMICS'
+    const capId = ARTIFACT_CAPABILITY[artifactId] || null
 
-    await evidenceGraph.recordEvidenceUnit({
-      sessionId: req.params.sessionId,
-      candidateId,
-      capabilityId: capId,
-      sourceType: 'WORK_ARTIFACT',
-      sourceId: artifactId || 'unknown_artifact',
-      context: `Candidate modified work artifact ${artifactId}`,
-      observedBehavior: `Candidate adjusted values: ${JSON.stringify(updates || {})}. Rationale notes: ${notes || 'None provided'}`,
-      rubricLevel: updates?.allocations?.retentionSpend >= 50000 ? 4 : 3,
-      confidence: 0.90,
-      weight: 1.25,
-    })
+    // Fail closed (spec §33.1): an artifact edit is an observed ACTION with
+    // provenance, not a judged behaviour. No rubric level is assigned here;
+    // judging happens only through the governed scoring pipeline. The evidence
+    // write happens BEFORE the session changes, so a failed write leaves the
+    // session untouched (K38).
+    if (capId) {
+      const unit = await evidenceGraph.recordEvidenceUnit({
+        session_id: req.params.sessionId,
+        capability_id: capId,
+        blueprint_id: session.scenario?.blueprintId ?? null,
+        source_type: 'WORK_ARTIFACT',
+        source_artifact_id: artifactId,
+        candidate_action: { artifactId, updates: updates || {}, notes: typeof notes === 'string' ? notes.slice(0, 2000) : null },
+        provenance: { source: 'ARTIFACT_EDIT', recordedAt: new Date().toISOString(), requestId: req.requestId || null, actor: authUser ? 'candidate' : 'anonymous' },
+      })
+      auditLog('evidence.status.decided', req.params.sessionId, { capabilityId: capId, evidenceId: unit.evidence_id, status: unit.evidence_status, reasons: unit.status_reasons, source: 'WORK_ARTIFACT' })
+    }
 
+    if (updates && typeof updates === 'object') {
+      target.data = { ...target.data, ...updates }
+      target.lastModified = new Date().toISOString()
+    }
     await updateSession(req.params.sessionId, { artifacts: session.artifacts })
     await sessions.set(req.params.sessionId, session)
 

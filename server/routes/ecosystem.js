@@ -5,7 +5,8 @@ import { getPool } from '../db/pool.js'
 
 const router = Router()
 
-// Aligned roles based on candidate's demonstrated competencies
+// Example roles in the StudAI Hire ecosystem. These are NOT matched to the
+// candidate: no capability is "verified" here and no fit is claimed (C2.04).
 const CURATED_HIRE_ROLES = [
   {
     job_ref: 'hire_job_bizops_01',
@@ -19,7 +20,7 @@ const CURATED_HIRE_ROLES = [
     location: 'Bengaluru, India (Hybrid)',
     work_mode: 'hybrid',
     salary_range: { min: 650000, max: 900000, currency: 'INR', period: 'yearly' },
-    alignment_reason: 'Matches verified Problem Solving and Communication strengths.',
+    alignment_reason: 'This role emphasises problem solving and communication.',
     target_constructs: ['problem_solving', 'communication'],
     application_url: 'https://hire.studai.one/jobs/operations-associate',
   },
@@ -35,7 +36,7 @@ const CURATED_HIRE_ROLES = [
     location: 'Mumbai, India (Hybrid)',
     work_mode: 'hybrid',
     salary_range: { min: 750000, max: 1100000, currency: 'INR', period: 'yearly' },
-    alignment_reason: 'Prioritizes candidates with verified Critical Thinking and AI Fluency.',
+    alignment_reason: 'This role emphasises critical thinking and AI fluency.',
     target_constructs: ['critical_thinking', 'ai_fluency'],
     application_url: 'https://hire.studai.one/jobs/bizops-analyst',
   },
@@ -51,7 +52,7 @@ const CURATED_HIRE_ROLES = [
     location: 'Remote, India',
     work_mode: 'remote',
     salary_range: { min: 600000, max: 850000, currency: 'INR', period: 'yearly' },
-    alignment_reason: 'Values adaptive collaboration and structured stakeholder navigation.',
+    alignment_reason: 'This role emphasises collaboration and structured stakeholder work.',
     target_constructs: ['collaboration', 'critical_thinking'],
     application_url: 'https://hire.studai.one/jobs/product-ops-specialist',
   },
@@ -67,7 +68,7 @@ function mintEcosystemJwt(payload, secret) {
 
 /**
  * GET /api/ecosystem/aligned-jobs
- * Return active job opportunities that value the candidate's verified competencies.
+ * Return example roles in the StudAI Hire ecosystem (not matched to the candidate).
  */
 router.get('/aligned-jobs', async (req, res) => {
   try {

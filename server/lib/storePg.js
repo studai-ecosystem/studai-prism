@@ -51,6 +51,15 @@ export async function getEntitlement(sessionId) {
 }
 
 // ── Sessions ─────────────────────────────────────────────────────────────────
+// Prism Campus (C3.07): read-only list for the legacy entitlement adapter.
+export async function listEntitlementsByUser(userId) {
+  if (!userId) return []
+  const r = await query('SELECT session_id FROM v1_payments WHERE user_id = $1 ORDER BY created_at ASC', [userId])
+  const out = []
+  for (const row of r?.rows || []) out.push(await getEntitlement(row.session_id))
+  return out.filter(Boolean)
+}
+
 function rowToSession(row) {
   if (!row) return null
   return {
