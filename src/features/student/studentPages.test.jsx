@@ -244,6 +244,8 @@ describe('Capabilities (§13) and Evidence (§15)', () => {
       expect(within(detail).getByText('Developing (provisional)')).toBeInTheDocument()
       expect(within(detail).getByText(/I would first separate the complaint data/)).toBeInTheDocument()
       expect(within(detail).getByText(/Prism Workplace Simulation, /)).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Evidence over time' })).toBeInTheDocument()
+      expect(screen.getByTestId('evidence-timeline')).toHaveTextContent('Developing (provisional)')
       expect(screen.getByText('No practice mission is linked to this capability yet.')).toBeInTheDocument()
       expect(screen.getByText('No reassessment is scheduled for you.')).toBeInTheDocument()
       expect(screen.getByText('Change over time is shown only between assessments approved as comparable.')).toBeInTheDocument()

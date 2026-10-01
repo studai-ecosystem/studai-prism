@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: autopilot
-active_phase: F
+active_phase: G
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -134,16 +134,16 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase F - Report V3 and the Evidence UI system
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 1b32c4e (build, vitest 260, server 620/596/0, static audit, playwright chromium + mobile-chromium 286)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] F.01 Evidence components: EvidenceCard, EvidenceThread, EvidenceSource, EvidenceStatus, EvidenceQuote, EvidenceCoverage, EvidenceTimeline, EvidenceDetailDrawer
-- [ ] F.02 Report V3 as Summary, Evidence, Development and Methodology tabs with hero, capability cards, strengths, priorities, highlights, missions, growth, methodology
-- [ ] F.03 Evidence UI reused on capability pages and growth views
-- [ ] F.04 Methodology and psychometric detail in drawers and expandables
-- [ ] F.05 Share and credential controls, shared report page, employee view where it exists
-- [ ] F.06 Tests (honest states, every conclusion has evidence or is marked) and gates, commit
+- [x] F.01 Evidence components: EvidenceCard, EvidenceThread, EvidenceSource, EvidenceStatus, EvidenceQuote, EvidenceCoverage, EvidenceTimeline, EvidenceDetailDrawer - evidence: src/components/evidence/ (8 new files). EvidenceThread draws the chain action, observed behaviour, capability, described behaviour at the level and leaves out any step with no value; EvidenceQuote renders nothing without a verified quote; EvidenceStatus keeps practice dashed and without sufficiency; EvidenceTracePanel is now a thin wrapper over EvidenceCard so existing imports and the data-kind contract hold. The legacy ui/EvidenceThread (claim to source line used by legacy pages) stays until phase L. Tests: components/evidence/evidenceSystem.test.jsx (10)
+- [x] F.02 Report V3 as Summary, Evidence, Development and Methodology tabs with hero, capability cards, strengths, priorities, highlights, missions, growth, methodology - evidence: ReportView.jsx: hero gains a "Level names are provisional" badge from the methodology status; Summary opens with "At a glance" (coverage in words and markers, strengths only for DEMONSTRATED or STRONG, focus list, up to two evidence highlights for described capabilities, growth line that never promises change); missions stay the honest "not available yet" on the Development tab; Evidence tab uses EvidenceCard. Tests: reports.test.jsx (3 new)
+- [x] F.03 Evidence UI reused on capability pages and growth views - evidence: CapabilityDetailPage "Evidence over time" (EvidenceTimeline from the capability history, no level for an assessment without enough evidence); CapabilitiesPage EvidenceCoverage; ObservedBehaviorCard uses EvidenceQuote; GrowthPage compared-assessment lines use EvidenceSource. Tests: studentPages.test.jsx detail test, growth.test.jsx unchanged and green
+- [x] F.04 Methodology and psychometric detail in drawers and expandables - evidence: EvidenceDetailDrawer (how an item was reviewed, claim status, source) opened from each evidence card; Methodology tab keeps report version, evidence rules version and assessment form inside a closed "Technical details" disclosure. No SEM, interval or percentile is shown anywhere because none is supplied. Test: reports.test.jsx
+- [x] F.05 Share and credential controls, shared report page, employee view where it exists - evidence: share dialog, active shares with revoke, PDF download and the public shared page unchanged and green; summary-only shares show no highlights, priorities or owner links (new test). Credential verification (Verify.jsx) and the legacy employee report (EmployeeReportV2) are phase K and L surfaces and were not touched
+- [x] F.06 Tests (honest states, every conclusion has evidence or is marked) and gates, commit - evidence: vitest 260, server 620/596/0, static audit, playwright 286; screenshots audit-results/ui/phase-f (report summary and capability timeline at 1440, 1024, 768 and 390, evidence tab at 1440 and 390, details drawer, methodology with the disclosure open; no horizontal overflow, no console errors). The report was rendered from a synthetic contract in a throwaway script that is not committed
 
 ## Phase G - Development missions and growth
 

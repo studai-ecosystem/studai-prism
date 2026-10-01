@@ -6,6 +6,7 @@ import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { LinkButton } from '../../../components/ui/Button.jsx'
 import { Callout } from '../../../components/ui/Notice.jsx'
 import { CapabilityCard } from '../../../components/capability/CapabilityCard.jsx'
+import { EvidenceCoverage } from '../../../components/evidence/EvidenceCoverage.jsx'
 import { EmptyState } from '../../../components/states/index.js'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useStudentCapabilities } from '../../student/hooks.js'
@@ -41,6 +42,7 @@ export default function CapabilitiesPage() {
           headingLevel={2}
         />
       )}
+      {assessedCount > 0 && <EvidenceCoverage items={items} />}
       <ul className="grid gap-4 lg:grid-cols-2">
         {items.map((cap) => <li key={cap.id}><CapabilityCard cap={cap} to={`/app/capabilities/${encodeURIComponent(cap.id)}`} /></li>)}
       </ul>

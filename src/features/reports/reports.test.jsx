@@ -97,6 +97,33 @@ describe('Student Report V3 page', () => {
     expect(screen.getByText(/There is no single overall score/)).toBeInTheDocument()
   })
 
+  it('the summary opens with an honest at-a-glance: coverage in words, no invented strengths, evidence highlights only for described capabilities', async () => {
+    renderReport({ '/api/v1/assessment-sessions/sess-report-0001/report': ownerBody() })
+    const glance = await screen.findByTestId('report-glance')
+    expect(within(glance).getByTestId('evidence-coverage')).toHaveTextContent('1 of 2 capabilities have enough evidence to describe.')
+    expect(within(glance).getByText(/No capability is described as demonstrated yet/)).toBeInTheDocument()
+    expect(screen.queryByTestId('report-strengths')).not.toBeInTheDocument()
+    expect(within(glance).getByTestId('report-highlights')).toHaveTextContent('Synthetic Reasoning: Checked the source of the complaints.')
+    expect(within(glance).getByText('Synthetic Reasoning')).toBeInTheDocument()
+    expect(within(glance).getByText('Change over time is shown only between assessments approved as comparable.')).toBeInTheDocument()
+    expect(screen.getByText('Level names are provisional')).toBeInTheDocument()
+    await userEvent.click(within(glance).getByRole('button', { name: 'See all evidence' }))
+    expect(screen.getByRole('tab', { name: 'Evidence' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('an evidence item opens its details with how it was reviewed; methodology keeps technical detail behind a disclosure', async () => {
+    renderReport({ '/api/v1/assessment-sessions/sess-report-0001/report': ownerBody() })
+    await userEvent.click(await screen.findByRole('tab', { name: 'Evidence' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Details for Synthetic Reasoning' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Synthetic Reasoning' })
+    expect(within(dialog).getByText('Reviewed by AI, not yet by a person')).toBeInTheDocument()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Methodology' }))
+    const details = screen.getByText('Technical details').closest('details')
+    expect(details).not.toHaveAttribute('open')
+    expect(within(details).getByText('sufficiency-rules.v1-provisional')).toBeInTheDocument()
+  })
+
   it('not ready and under review are named states; another person\'s report is not available', async () => {
     const a = renderReport({ '/api/v1/assessment-sessions/sess-report-0001/report': () => jsonResponse(409, { error: { code: 'REPORT_NOT_READY', message: 'x', requestId: 'r' } }) })
     expect(await screen.findByText('Your report is not ready yet')).toBeInTheDocument()
@@ -150,6 +177,15 @@ describe('shared report page', () => {
     mockFetch({ '/api/v1/shared/': handler, '/api/v1/me': () => jsonResponse(401, { error: { code: 'UNAUTHENTICATED', message: 'x', requestId: 'r' } }) })
     return renderApp(<Routes><Route path="/shared/:token" element={<SharedReportPage />} /></Routes>, { route: '/shared/synthetic-token-abcdefghijklmnopqrstuvwxyz' })
   }
+
+  it('a summary share has no highlights, priorities or owner-only links in its at-a-glance', async () => {
+    renderShared(() => jsonResponse(200, { data: { report: reportFixture({ disclosure: 'SUMMARY' }), version: { number: 1, createdAt: null }, audience: 'SHARE_LINK', share: { expiresAt: '2026-11-01T10:00:00.000Z', disclosureLevel: 'SUMMARY' } } }))
+    const glance = await screen.findByTestId('report-glance')
+    expect(within(glance).getByTestId('evidence-coverage')).toBeInTheDocument()
+    expect(screen.queryByTestId('report-highlights')).not.toBeInTheDocument()
+    expect(within(glance).queryByText('Where to focus')).not.toBeInTheDocument()
+    expect(within(glance).queryByRole('link', { name: 'Open growth' })).not.toBeInTheDocument()
+  })
 
   it('a summary share shows only the summary and methodology, never quotes', async () => {
     renderShared(() => jsonResponse(200, { data: { report: reportFixture({ disclosure: 'SUMMARY' }), version: { number: 1, createdAt: null }, audience: 'SHARE_LINK', share: { expiresAt: '2026-11-01T10:00:00.000Z', disclosureLevel: 'SUMMARY' } } }))

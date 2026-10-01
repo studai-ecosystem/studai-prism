@@ -13,13 +13,14 @@ import { queryStateView, formatDate, formatDateTime } from '../../student/QueryS
 import { GROWTH_REASON_COPY, GROWTH_COPY } from '../../../lib/copy/student.js'
 import { GrowthDeltaCard } from '../components/GrowthDeltaCard.jsx'
 import { GrowthTimeline } from '../components/GrowthTimeline.jsx'
+import { EvidenceSource } from '../../../components/evidence/EvidenceSource.jsx'
 
 function SessionLine({ label, s }) {
   return (
     <div>
       <dt className="text-prism-ink-muted">{label}</dt>
       <dd className="mt-1 font-medium text-prism-ink">
-        {s.title || 'Assessment'} · {formatDate(s.completedAt) || 'Date not recorded'}
+        <EvidenceSource title={s.title} date={s.completedAt} emptyDate="Date not recorded" />
         {s.form && <span className="block text-xs font-normal text-prism-ink-subtle">Form version {s.form.version}</span>}
       </dd>
     </div>

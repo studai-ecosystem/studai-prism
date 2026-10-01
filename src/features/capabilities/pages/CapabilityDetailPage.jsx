@@ -10,6 +10,7 @@ import { LinkButton } from '../../../components/ui/Button.jsx'
 import { EvidenceSufficiencyBadge } from '../../../components/evidence/EvidenceSufficiencyBadge.jsx'
 import { CapabilityLevelBadge } from '../../../components/capability/CapabilityLevelBadge.jsx'
 import { ObservedBehaviorCard } from '../../../components/evidence/ObservedBehaviorCard.jsx'
+import { EvidenceTimeline } from '../../../components/evidence/EvidenceTimeline.jsx'
 import { EmptyState } from '../../../components/states/index.js'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useStudentCapabilities, useDevelopmentPlan, useGrowth } from '../../student/hooks.js'
@@ -106,6 +107,14 @@ export default function CapabilityDetailPage() {
           </Link>
         )}
       </Card>
+
+      {cap.history.length > 0 && (
+        <Card className="space-y-3">
+          <Section id="cap-timeline" title="Evidence over time">
+            <EvidenceTimeline entries={cap.history.map((h) => ({ id: h.sessionId, title: h.assessmentTitle, date: h.completedAt, level: h.level, status: h.status }))} />
+          </Section>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="space-y-2">
