@@ -95,7 +95,7 @@ export const Checkbox = forwardRef(function Checkbox({ id: idProp, label, descri
         type="checkbox"
         aria-invalid={error ? true : undefined}
         aria-describedby={[description ? `${id}-desc` : null, error ? `${id}-error` : null].filter(Boolean).join(' ') || undefined}
-        className="mt-0.5 h-4 w-4 rounded border-prism-border-strong accent-[var(--prism-accent)]"
+        className="h-6 w-6 shrink-0 rounded border-prism-border-strong accent-[var(--prism-accent)]"
         {...rest}
       />
       <div>
@@ -125,7 +125,7 @@ export function RadioGroup({ label, name: nameProp, options, value, onChange, er
               checked={value === o.value}
               onChange={() => onChange(o.value)}
               disabled={o.disabled}
-              className="mt-0.5 h-4 w-4 accent-[var(--prism-accent)]"
+              className="h-6 w-6 shrink-0 accent-[var(--prism-accent)]"
             />
             <label htmlFor={id} className="text-sm text-prism-ink">
               {o.label}

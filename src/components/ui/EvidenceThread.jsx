@@ -45,11 +45,11 @@ export function EvidenceTick({ children }) {
 export const evidenceThreadStyles = `
 .evidence-thread {
   display: grid;
-  grid-template-columns: max-content var(--space-6) 1fr;
+  grid-template-columns: minmax(0, max-content) var(--space-6) minmax(0, 1fr);
   align-items: start;
   gap: var(--space-2);
 }
-.evidence-thread__claim { font-family: var(--font-utility); }
+.evidence-thread__claim { font-family: var(--font-utility); overflow-wrap: anywhere; }
 .evidence-thread__line {
   display: flex;
   flex-direction: column;
@@ -100,6 +100,10 @@ export const evidenceThreadStyles = `
   height: var(--thread-tick);
   border-left: var(--thread-stroke) solid var(--thread-color);
   border-bottom: var(--thread-stroke) solid var(--thread-color);
+}
+@media (max-width: 520px) {
+  .evidence-thread { grid-template-columns: minmax(0, 1fr); }
+  .evidence-thread__line { display: none; }
 }
 @media print {
   .evidence-thread__rail, .evidence-thread__tick, .evidence-tick__mark {

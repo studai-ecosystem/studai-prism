@@ -5,6 +5,6 @@ for (const path of ['/', '/register', '/login', '/invite/synthetic-token', '/res
   test(`accessibility baseline ${path}`, async ({ page }) => {
     await page.goto(path)
     const results = await new AxeBuilder({ page }).analyze()
-    expect(results.violations.filter((item) => item.impact === 'critical')).toEqual([])
+    expect(results.violations.filter((item) => (item.impact === 'critical' || item.impact === 'serious'))).toEqual([])
   })
 }

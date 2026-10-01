@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: off
-active_phase: L
+active_phase: M
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -210,16 +210,16 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase L - Responsive, accessibility and polish
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 1c42249 (build, vitest 308, server 620/596/0/24, static audit, playwright chromium + mobile-chromium 306 passed and 6 skipped: the new matrix spec runs on the chromium project only)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] L.01 Width matrix 1440, 1280, 1024, 768, 430, 390, 360 on every route family with no horizontal overflow
-- [ ] L.02 Axe across all routes; keyboard-only walkthroughs; focus traps; status announcements; contrast audit; touch targets; zoom and reflow
-- [ ] L.03 Reduced-motion audit; remove constant or decorative motion
-- [ ] L.04 Performance: bundle sizes, lazy routes and charts, logo and font loading
-- [ ] L.05 Complete /design-system: all logo variants, colours, type, spacing, radii, elevation, components, evidence and capability components, charts, states, light, dark, mobile, Tamil, Devanagari, long text, focus
-- [ ] L.06 Gates and commit
+- [x] L.01 Width matrix 1440, 1280, 1024, 768, 430, 390, 360 on every route family with no horizontal overflow - evidence: tests/e2e/ui-matrix.spec.js sweeps 13 public routes and 9 personal app routes at all seven widths plus a 320 px reflow check and a larger-text check at 390; the campus administration and student routes keep their own sweep (campus-a11y-sweep.spec.js). Before: no overflow on those 22 routes. Found by the visual check instead: /design-system overflowed at 390 (the evidence thread squeezed its source column off screen, and a long unbroken token escaped a card). After: EvidenceThread stacks under 520 px and its columns can shrink, Card and Panel wrap unbroken text; design-system has no overflow at 1440, 1024, 768 and 390
+- [x] L.02 Axe across all routes, keyboard walkthroughs, focus traps, announcements, contrast, touch targets, zoom and reflow - evidence: axe now runs WCAG 2.0 to 2.2 A and AA (including target size) and fails on serious as well as critical (accessibility.spec.js was critical only and now covers 12 routes). Before: 10 of 13 public routes had serious findings (color-contrast on the Get Assessed button, the hero sample and the landing conversation sample; aria-hidden-focus on the closed mobile menu on 10 routes; scrollable-region-focusable on 2 regions); 1 landing button and 3 Explore inputs were under 24 px. After: 0 findings on all 22 routes, 0 undersized controls. Root causes fixed, no rule relaxed: call-to-action now navy text on the brand green fill (it was navy on dark green), the closed mobile menu is visibility hidden so nothing in it can take focus, Escape closes it, scrollable tables and rails are named focusable regions, checkboxes and radios are 24 px, the hero and landing samples no longer fade text in and out (contrast is measured at rest). Keyboard walkthrough of all 9 personal app routes (skip link first, visible focus) and the settings dialog (focus trapped, Escape closes, focus returns) pass
+- [x] L.03 Reduced-motion audit - evidence: with reduced motion requested, none of the 22 routes keeps an infinite animation running (spec test); the tokens already collapse every duration. Removed decorative motion: the hero scroll cue bounce (phase J), hero sample opacity fades, the conversation sample dimming on the landing story. Remaining motion is state only (loading spinners, skeleton pulse, the assessment voice bar while recording) and is covered by the global collapse
+- [x] L.04 Performance - evidence: routes are lazy, charts load behind Suspense, the PDF libraries and the face model are dynamic chunks, fonts are non-blocking with preconnect, logos are SVG with fixed dimensions and one or two load per page. Bundle before and after this phase is unchanged: entry 376.64 kB (112.70 gzip) to 376.78 kB (112.81), charts 374.16 kB, landing 53.55 kB; the 638.61 kB face model chunk loads only in proctored assessment. No dependency added. Further splitting of the entry chunk is left to phase M if the numbers justify it
+- [x] L.05 Complete /design-system - evidence: pages/DesignSystem.jsx gains "Capability, evidence, mission, state and chart components" (features/designSystem/ProductShowcase.jsx): level and sufficiency badges, capability cards, formal and practice evidence, observed behaviour, mission and practice labels, insufficient, expired and partial states, a chart frame with its table equivalent, empty and too-few states, sponsored and consent surfaces, each also in dark, a 390 px column, Tamil, Devanagari, long text with an unbroken token, and keyboard focus. Logo variants, palette, type, space, radius, elevation, evidence thread, primitives and states were already there. Tests: phaseL.test.jsx (5)
+- [x] L.06 Gates and commit - evidence: ui-matrix.spec.js (6 tests) green; screenshots audit-results/ui/phase-l (design-system at 1440, 1024, 768, 390: no overflow, 0 console errors, 14 sections, 7 capability cards); mobile menu measured open (visible, 8 controls) and closed by Escape (hidden). The admin console and the assessment player were not swept for width because they need an admin session and a live AI model; they are listed for human visual approval
 
 ## Phase M - Testing, cleanup and production validation
 

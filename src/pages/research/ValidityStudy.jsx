@@ -89,7 +89,7 @@ export default function ValidityStudy() {
         Each dimension is scored 0&ndash;100 and weighted for internal research and calibration exactly as
         below. During the pilot, reports are profile-first &mdash; the weighted composite is not shown on new reports.
       </DocP>
-      <div className="overflow-x-auto rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface">
+      <div role="region" aria-label="Scoring weights by dimension" tabIndex={0} className="overflow-x-auto rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Dimensions, the signal the AI panel looks for and each weight</caption>
           <thead>

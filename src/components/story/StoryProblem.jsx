@@ -19,9 +19,8 @@ export default function StoryProblem() {
   const reduced = useReducedMotion()
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] })
 
-  const resumeOpacity = useTransform(scrollYProgress, [0.15, 0.45], [1, 0.28])
+  const resumeOpacity = useTransform(scrollYProgress, [0.15, 0.45], [1, 0.7])
   const strike = useTransform(scrollYProgress, [0.18, 0.42], ['0%', '100%'])
-  const convoOpacity = useTransform(scrollYProgress, [0.25, 0.5], [0.15, 1])
   const convoY = useTransform(scrollYProgress, [0.25, 0.5], [24, 0])
 
   return (
@@ -61,7 +60,7 @@ export default function StoryProblem() {
 
           {/* The behaviour with provenance */}
           <motion.div
-            style={reduced ? undefined : { opacity: convoOpacity, y: convoY }}
+            style={reduced ? undefined : { y: convoY }}
             className="bg-[var(--color-surface)] border border-[var(--color-line)] rounded-[var(--radius-lg)] p-7"
           >
             <p className="font-mono text-[10px] tracking-[0.08em] uppercase text-[var(--color-accent)] mb-5">

@@ -34,6 +34,13 @@ const dropdowns = {
 export default function Nav({ onGetAssessed, activeHref }) {
   const [openDropdown, setOpenDropdown] = useState(null) // null, 'research', or 'about'
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Escape closes the open menu, like every other dismissible layer.
+  useEffect(() => {
+    if (!mobileOpen) return undefined
+    const onKey = (e) => { if (e.key === 'Escape') setMobileOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [mobileOpen])
   const [mobileAccordion, setMobileAccordion] = useState(null)
   const navRef = useRef(null)
   const navigate = useNavigate()
@@ -114,9 +121,10 @@ export default function Nav({ onGetAssessed, activeHref }) {
         .prism-navlink.is-active::after { width: 100%; }
         .prism-overlay {
           transform: translateX(100%);
-          transition: transform 300ms ease;
+          visibility: hidden;
+          transition: transform 300ms ease, visibility 0s linear 300ms;
         }
-        .prism-overlay.is-open { transform: translateX(0); }
+        .prism-overlay.is-open { transform: translateX(0); visibility: visible; transition-delay: 0s; }
         .prism-drop-item:hover { box-shadow: inset 3px 0 0 var(--color-accent); background: var(--color-paper); }
       `}</style>
 
@@ -231,7 +239,7 @@ export default function Nav({ onGetAssessed, activeHref }) {
             )}
             <button
               onClick={onGetAssessed}
-              className="px-5 py-2 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-[var(--color-accent)] cursor-pointer hover:brightness-105 transition"
+              className="px-5 py-2 rounded-lg font-bold text-sm text-brand-navy bg-brand-green cursor-pointer hover:brightness-95 transition"
             >
               Get Assessed
             </button>
@@ -341,7 +349,7 @@ export default function Nav({ onGetAssessed, activeHref }) {
 
           <button
             onClick={() => { closeMobile(); onGetAssessed && onGetAssessed() }}
-            className="mt-6 w-full py-3 rounded-lg font-bold text-base text-[var(--color-ink)] bg-[var(--color-accent)]"
+            className="mt-6 w-full py-3 rounded-lg font-bold text-base text-brand-navy bg-brand-green"
           >
             Get Assessed
           </button>

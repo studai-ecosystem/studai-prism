@@ -13,6 +13,7 @@ import '../design/tokens.css'
 import { EvidenceThread, EvidenceTick, evidenceThreadStyles } from '../components/ui/EvidenceThread.jsx'
 import { ReliabilityLabel, ConfidenceBand, PendingStat } from '../components/ui/measurement.jsx'
 import CampusShowcase from '../features/designSystem/CampusShowcase.jsx'
+import ProductShowcase from '../features/designSystem/ProductShowcase.jsx'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
 
 const TYPE_TESTS = [
@@ -274,6 +275,10 @@ export default function DesignSystem() {
 
         <Section title="Prism Campus primitives (spec §8.1) and page states (§40)">
           <CampusShowcase />
+        </Section>
+
+        <Section title="Capability, evidence, mission, state and chart components">
+          <ProductShowcase />
         </Section>
 
         <footer style={{ borderTop: '1px solid var(--color-line)', paddingTop: 'var(--space-6)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)' }}>

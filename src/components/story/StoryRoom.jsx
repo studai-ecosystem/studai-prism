@@ -66,7 +66,7 @@ export default function StoryRoom() {
           </div>
 
           {/* Persona rail */}
-          <div className="flex gap-2 px-5 py-3 border-b border-[var(--color-room-line)] overflow-x-auto">
+          <div role="region" aria-label="Conversation participants" tabIndex={0} className="flex gap-2 px-5 py-3 border-b border-[var(--color-room-line)] overflow-x-auto">
             {[{ n: 'Meera', r: 'Community Librarian' }, { n: 'Arun', r: 'Volunteer Lead' }, { n: 'Sara', r: 'Parent Representative' }].map((p) => (
               <div key={p.n} className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-room-line)] bg-[var(--color-room-surface)] px-3 py-1.5 shrink-0">
                 <span className="w-6 h-6 rounded-full bg-[var(--color-room)] border border-[var(--color-room-line)] flex items-center justify-center font-mono text-[10px] text-[var(--color-ink-muted)]" aria-hidden="true">{p.n[0]}</span>

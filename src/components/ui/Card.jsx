@@ -2,7 +2,7 @@ import { cx } from '../../lib/cx.js'
 
 export function Card({ as: Tag = 'section', className, children, ...rest }) {
   return (
-    <Tag className={cx('rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface p-5', className)} {...rest}>
+    <Tag className={cx('min-w-0 rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface p-5 [overflow-wrap:anywhere]', className)} {...rest}>
       {children}
     </Tag>
   )
@@ -11,7 +11,7 @@ export function Card({ as: Tag = 'section', className, children, ...rest }) {
 export function Panel({ title, description, actions, headingLevel = 2, className, children, ...rest }) {
   const H = `h${headingLevel}`
   return (
-    <section className={cx('rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface', className)} {...rest}>
+    <section className={cx('min-w-0 rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface [overflow-wrap:anywhere]', className)} {...rest}>
       {(title || actions) && (
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-prism-border px-5 py-4">
           <div className="min-w-0">

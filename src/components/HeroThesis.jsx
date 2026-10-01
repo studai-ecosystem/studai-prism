@@ -14,7 +14,7 @@ import { Button, LinkButton } from './ui/Button.jsx'
 // The sample builds itself once (label, claim and thread, then the ticks).
 // Reduced motion renders everything at once.
 const cardStagger = { hidden: {}, show: { transition: { staggerChildren: 0.18, delayChildren: 0.2 } } }
-const pieceIn = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
+const pieceIn = { hidden: { y: 8 }, show: { y: 0, transition: { duration: 0.4 } } }
 
 export default function HeroThesis({ onGetAssessed, onSeeHow }) {
   const claims = useClaims()
@@ -52,7 +52,7 @@ export default function HeroThesis({ onGetAssessed, onSeeHow }) {
             <button
               type="button"
               onClick={onSeeHow}
-              className="mt-4 text-sm text-brand-green-ink underline underline-offset-4 hover:text-prism-ink"
+              className="mt-4 inline-flex min-h-6 items-center text-sm text-brand-green-ink underline underline-offset-4 hover:text-prism-ink"
             >
               See exactly how scoring works
             </button>
