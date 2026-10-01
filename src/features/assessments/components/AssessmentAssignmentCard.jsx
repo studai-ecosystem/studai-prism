@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Clock, ShieldCheck } from 'lucide-react'
 import { Card } from '../../../components/ui/Card.jsx'
 import { Badge, StatusChip } from '../../../components/ui/Badge.jsx'
@@ -5,11 +6,14 @@ import { LinkButton } from '../../../components/ui/Button.jsx'
 import { AssessmentStatusTimeline } from './AssessmentStatusTimeline.jsx'
 import { ASSESSMENT_STATUS_COPY, CTA_COPY, INTEGRITY_COPY, SCOPE_LABEL } from '../../../lib/copy/student.js'
 import { formatDate } from '../../student/QueryState.jsx'
+import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
+import { assignmentBase } from '../pages/BriefingPage.jsx'
 
 // One assessment in the list (spec §10): title, scope (personal or sponsored,
 // always visible), sponsor, duration, due date, integrity mode, status, CTA.
 export function AssessmentAssignmentCard({ assignment, headingLevel = 3 }) {
   const H = `h${headingLevel}`
+  const { active } = useWorkspace()
   const status = ASSESSMENT_STATUS_COPY[assignment.status] || ASSESSMENT_STATUS_COPY.NOT_STARTED
   const scope = assignment.scope === 'SPONSORED' ? SCOPE_LABEL.SPONSORED(assignment.sponsor?.name) : SCOPE_LABEL.PERSONAL
   const due = formatDate(assignment.dueAt)
@@ -20,7 +24,9 @@ export function AssessmentAssignmentCard({ assignment, headingLevel = 3 }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <Badge tone={assignment.scope === 'SPONSORED' ? 'accent' : 'neutral'}>{scope}</Badge>
-          <H className="text-base font-semibold text-prism-ink">{assignment.title}</H>
+          <H className="text-base font-semibold text-prism-ink">
+            <Link to={assignmentBase(active, assignment.id)} className="hover:underline">{assignment.title}</Link>
+          </H>
         </div>
         <StatusChip tone={status.tone} label={status.label} />
       </div>

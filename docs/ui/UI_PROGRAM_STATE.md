@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: autopilot
-active_phase: D
+active_phase: E
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -94,16 +94,16 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase D - Personal home, assessments list and capabilities
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 8d62e16 (build, vitest 241, server 620/596/0, static audit, playwright chromium + mobile-chromium 286)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] D.01 Home answers where am I, what do we know, what next: workspace, snapshot, next assessment, strengths, priority, recommended mission, valid growth only, recent evidence, primary action
-- [ ] D.02 Assessments list and detail with Active, Upcoming, Completed and scope labels
-- [ ] D.03 Capabilities list and detail: definition, demonstrated level, evidence sufficiency, latest observations, growth direction, development actions, reassessment eligibility
-- [ ] D.04 CapabilityCard and related primitives with Insufficient evidence as a first-class state
-- [ ] D.05 Loading, empty, partial, error, unauthorized and offline states on every page
-- [ ] D.06 Tests and gates, visual QA at 4 widths, commit
+- [x] D.01 Home answers where am I, what do we know, what next: workspace, snapshot, next assessment, strengths, priority, recommended mission, valid growth only, recent evidence, primary action - evidence: HomePage.jsx: primary action, "Strengths so far" (only DEMONSTRATED or STRONG levels, provisional stays labelled, honest empty line), "Where to focus next" (server focus list, max 3, plus a recommended Practice mission only when the plan marks missions available), capability snapshot linking to the detail route, growth line that says "See your growth" only when the API marks it comparable; recent evidence is a link to Evidence (inline evidence items arrive with the phase F evidence components). Tests: studentPages.test.jsx (2 new Home tests)
+- [x] D.02 Assessments list and detail with Active, Upcoming, Completed and scope labels - evidence: AssessmentDetailPage.jsx (scope, status, progress timeline, what it looks at, what it does not measure, one next step, under-review notice) at /app/assessments/:id and /app/campus/:org/assignments/:id; card titles link to it; list tabs and scope labels unchanged. Tests: studentPages.test.jsx (2 new)
+- [x] D.03 Capabilities list and detail: definition, demonstrated level, evidence sufficiency, latest observations, growth direction, development actions, reassessment eligibility - evidence: CapabilityDetailPage.jsx at /app/capabilities/:capabilityId (observations, evidence source, earlier observations, growth direction that never shows change without a comparable pair, linked practice missions from the plan, reassessment line from the growth data); list page H1 now "Capabilities" to match the nav. Tests: studentPages.test.jsx (3 new detail tests)
+- [x] D.04 CapabilityCard and related primitives with Insufficient evidence as a first-class state - evidence: components/capability/CapabilityCard.jsx (no level shown without evidence, reasons listed, data-described flag); campus-student e2e selector moved to capability-card
+- [x] D.05 Loading, empty, partial, error, unauthorized and offline states on every page - evidence: new pages use queryStateView and keep the H1 through loading, error and not-available; Home treats plan and growth as optional so their failure never blocks it; existing h1-sweep test now covers Capabilities; unknown capability and unknown assignment have explicit tests
+- [x] D.06 Tests and gates, visual QA at 4 widths, commit - evidence: studentPages.test.jsx 40 tests; screenshots audit-results/ui/phase-d (home, capabilities, capability detail at 1440, 1024, 768, 390: no horizontal overflow, no console errors; assessment detail not captured because the local demo user has no assignments, covered by unit tests); playwright needed PRISM_E2E_DATABASE_URL pointing at a throwaway database (prism_e2e) for the campus project
 
 ## Phase E - Assessment funnel, simulation workspace and artifacts
 

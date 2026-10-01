@@ -91,6 +91,8 @@ const SystemCheckPage = lazy(() => import('../features/assessments/pages/SystemC
 const AssessmentPlayerPage = lazy(() => import('../features/assessments/pages/AssessmentPlayerPage.jsx'))
 const ExplorePage = lazy(() => import('../features/exploration/pages/ExplorePage.jsx'))
 const CapabilitiesPage = lazy(() => import('../features/capabilities/pages/CapabilitiesPage.jsx'))
+const CapabilityDetailPage = lazy(() => import('../features/capabilities/pages/CapabilityDetailPage.jsx'))
+const AssessmentDetailPage = lazy(() => import('../features/assessments/pages/AssessmentDetailPage.jsx'))
 const EvidencePage = lazy(() => import('../features/evidence/pages/EvidencePage.jsx'))
 const DevelopmentPage = lazy(() => import('../features/development/pages/DevelopmentPage.jsx'))
 const GrowthPage = lazy(() => import('../features/growth/pages/GrowthPage.jsx'))
@@ -229,9 +231,11 @@ export default function AppRouter() {
           <Route element={studentShell}>
             <Route path="/app/home" element={<HomePage />} />
             <Route path="/app/assessments" element={<AssessmentsPage />} />
+            <Route path="/app/assessments/:assignmentId" element={<AssessmentDetailPage />} />
             <Route path="/app/assessments/:assignmentId/briefing" element={<BriefingPage />} />
             <Route path="/app/assessments/:assignmentId/system-check" element={<SystemCheckPage />} />
             <Route path="/app/capabilities" element={<CapabilitiesPage />} />
+            <Route path="/app/capabilities/:capabilityId" element={<CapabilityDetailPage />} />
             <Route path="/app/evidence" element={<EvidencePage />} />
             <Route path="/app/development" element={<DevelopmentPage />} />
             <Route path="/app/growth" element={<GrowthPage />} />
@@ -261,6 +265,7 @@ export default function AppRouter() {
             <Route index element={<Navigate to="home" replace />} />
             <Route path="home" element={<HomePage />} />
             <Route path="assignments" element={<AssessmentsPage />} />
+            <Route path="assignments/:assignmentId" element={<AssessmentDetailPage />} />
             <Route path="assignments/:assignmentId/briefing" element={<BriefingPage />} />
             <Route path="assignments/:assignmentId/system-check" element={<SystemCheckPage />} />
             <Route path="development" element={<DevelopmentPage />} />

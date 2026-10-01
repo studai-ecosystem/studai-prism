@@ -12,6 +12,8 @@ import AssessmentsPage from '../assessments/pages/AssessmentsPage.jsx'
 import BriefingPage from '../assessments/pages/BriefingPage.jsx'
 import SystemCheckPage from '../assessments/pages/SystemCheckPage.jsx'
 import CapabilitiesPage from '../capabilities/pages/CapabilitiesPage.jsx'
+import CapabilityDetailPage from '../capabilities/pages/CapabilityDetailPage.jsx'
+import AssessmentDetailPage from '../assessments/pages/AssessmentDetailPage.jsx'
 import EvidencePage from '../evidence/pages/EvidencePage.jsx'
 import GrowthPage from '../growth/pages/GrowthPage.jsx'
 import DevelopmentPage from '../development/pages/DevelopmentPage.jsx'
@@ -75,6 +77,24 @@ describe('Student Home (§9)', () => {
     expect(await screen.findByText('1. Develop Reasoning & Decision Quality')).toBeInTheDocument()
     expect(screen.getByText('Developing (provisional)')).toBeInTheDocument()
   })
+  it('with no demonstrated level, strengths say so; no mission is invented', async () => {
+    render(<HomePage />)
+    expect(await screen.findByText(/Nothing is shown as demonstrated yet/)).toBeInTheDocument()
+    expect(screen.queryByTestId('home-strengths')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('home-mission')).not.toBeInTheDocument()
+  })
+  it('a demonstrated capability is a strength; an available mission is recommended as practice', async () => {
+    const base = home()
+    base.data.capabilitySnapshot[0] = { ...base.data.capabilitySnapshot[0], status: 'SUFFICIENT', level: { band: 'DEMONSTRATED', label: 'Demonstrated' } }
+    const plan = { data: { status: 'FOCUS_FROM_EVIDENCE', priorities: [], missions: [{ id: 'm-1', title: 'Separate cause from symptom', targetCapabilityName: 'Reasoning & Decision Quality', estimatedMinutes: 15, intervention: null, latestAttempt: null }], completedMissions: [], missionsAvailable: true, upcomingReassessment: null, practiceEvidence: [] } }
+    render(<HomePage />, { routes: { '/api/v1/me/home': base, '/api/v1/me/development-plan': plan } })
+    const strengths = await screen.findByTestId('home-strengths')
+    expect(within(strengths).getByText('Reasoning & Decision Quality')).toBeInTheDocument()
+    expect(await screen.findByTestId('home-mission')).toHaveTextContent('Separate cause from symptom')
+    expect(screen.getByTestId('home-mission')).toHaveTextContent('Practice never changes your formal results')
+    expect(screen.getAllByRole('link', { name: /See details/ })[0]).toHaveAttribute('href', '/app/capabilities/CAP-L1-REASONING')
+    noPercent()
+  })
 })
 
 describe('Assessments list (§10)', () => {
@@ -87,6 +107,7 @@ describe('Assessments list (§10)', () => {
     render(<AssessmentsPage />, { routes: { '/api/v1/me/assessments': data } })
     const cards = await screen.findAllByTestId('assignment-card')
     expect(within(cards[0]).getByText('Personal assessment')).toBeInTheDocument()
+    expect(within(cards[0]).getByRole('link', { name: 'Prism Workplace Simulation' })).toHaveAttribute('href', '/app/assessments/pa_00000000000000000000000000000001')
     expect(within(cards[1]).getByText('Sponsored by Synthetic University')).toBeInTheDocument()
     expect(within(cards[1]).getByText(/^Due /)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('tab', { name: 'Upcoming (0)' }))
@@ -99,6 +120,25 @@ describe('Assessments list (§10)', () => {
   })
 })
 
+describe('Assessment detail (§10)', () => {
+  const path = '/app/assessments/:assignmentId'
+  it('shows scope, status, what it looks at, what it does not measure and the next step', async () => {
+    render(<AssessmentDetailPage />, { path, route: '/app/assessments/a-1', routes: { '/api/v1/assessment-assignments/': briefing() } })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Prism Workplace Simulation' })).toBeInTheDocument()
+    expect(screen.getByText('Personal assessment')).toBeInTheDocument()
+    expect(screen.getByText('Not started')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'What it does not measure' })).toBeInTheDocument()
+    expect(screen.getByText('Your personality type')).toBeInTheDocument()
+    expect(screen.getByText('Reasoning & Decision Quality')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Open briefing/ })).toHaveAttribute('href', '/app/assessments/pa_00000000000000000000000000000001/briefing')
+    noPercent()
+  })
+  it('an unknown assignment keeps the heading and says it is not available', async () => {
+    render(<AssessmentDetailPage />, { path, route: '/app/assessments/nope' })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Assessment' })).toBeInTheDocument()
+    expect(await screen.findByText('This page is not available')).toBeInTheDocument()
+  })
+})
 describe('Briefing (§11)', () => {
   const path = '/app/assessments/:assignmentId/briefing'
   const route = '/app/assessments/a-1/briefing'
@@ -181,16 +221,45 @@ describe('System check (§11 item 9)', () => {
 })
 
 describe('Capabilities (§13) and Evidence (§15)', () => {
-  it('described capabilities show level, sufficiency and observations; others explain why not', async () => {
+  it('the list shows a card per capability with its level and sufficiency; insufficient ones say why', async () => {
     render(<CapabilitiesPage />, { routes: { '/api/v1/me/capabilities': describedCapabilities() } })
-    const cards = await screen.findAllByTestId('capability-detail')
+    const cards = await screen.findAllByTestId('capability-card')
     expect(cards).toHaveLength(5)
     expect(within(cards[0]).getByText('Developing (provisional)')).toBeInTheDocument()
     expect(within(cards[0]).getByText('Development priority')).toBeInTheDocument()
-    expect(within(cards[0]).getByText('“I would first separate the complaint data”')).toBeInTheDocument()
+    expect(within(cards[0]).getByRole('link', { name: /View capability/ })).toHaveAttribute('href', '/app/capabilities/CAP-L1-REASONING')
     expect(within(cards[1]).getAllByText('Insufficient evidence').length).toBeGreaterThan(0)
     expect(within(cards[1]).getAllByText('No evidence was recorded for this capability.').length).toBeGreaterThan(0)
+    expect(cards[1]).toHaveAttribute('data-described', 'false')
+    expect(screen.queryByText(/I would first separate/)).not.toBeInTheDocument()
     noPercent()
+  })
+  describe('capability detail', () => {
+    const path = '/app/capabilities/:capabilityId'
+    const caps = { '/api/v1/me/capabilities': describedCapabilities() }
+    it('a described capability shows observations, sources and honest growth, practice and reassessment states', async () => {
+      render(<CapabilityDetailPage />, { path, route: '/app/capabilities/CAP-L1-REASONING', routes: caps })
+      expect(await screen.findByRole('heading', { level: 1, name: 'Reasoning & Decision Quality' })).toBeInTheDocument()
+      const detail = await screen.findByTestId('capability-detail')
+      expect(within(detail).getByText('Developing (provisional)')).toBeInTheDocument()
+      expect(within(detail).getByText(/I would first separate the complaint data/)).toBeInTheDocument()
+      expect(within(detail).getByText(/Prism Workplace Simulation, /)).toBeInTheDocument()
+      expect(screen.getByText('No practice mission is linked to this capability yet.')).toBeInTheDocument()
+      expect(screen.getByText('No reassessment is scheduled for you.')).toBeInTheDocument()
+      expect(screen.getByText('Change over time is shown only between assessments approved as comparable.')).toBeInTheDocument()
+      noPercent()
+    })
+    it('a capability without enough evidence is a first-class state with its reasons', async () => {
+      render(<CapabilityDetailPage />, { path, route: '/app/capabilities/CAP-L1-COMMUNICATION', routes: caps })
+      expect(await screen.findByRole('heading', { name: 'Why there is no level yet' })).toBeInTheDocument()
+      expect(screen.getAllByText('Insufficient evidence').length).toBeGreaterThan(0)
+      expect(screen.queryByRole('link', { name: /See the evidence/ })).not.toBeInTheDocument()
+    })
+    it('an unknown capability says so and keeps a way back', async () => {
+      render(<CapabilityDetailPage />, { path, route: '/app/capabilities/CAP-NOPE', routes: caps })
+      expect(await screen.findByText('This capability is not available')).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Back to capabilities' })).toHaveAttribute('href', '/app/capabilities')
+    })
   })
   it('no completed assessment → the empty state with the start flow', async () => {
     render(<CapabilitiesPage />)
@@ -259,7 +328,7 @@ describe('Development, Growth, Sharing, Settings', () => {
 describe('Every student page keeps its h1 through loading, error and unauthorized states', () => {
   const PAGES = [
     ['Assessments', <AssessmentsPage key="a" />, '/api/v1/me/assessments'],
-    ['My Capabilities', <CapabilitiesPage key="c" />, '/api/v1/me/capabilities'],
+    ['Capabilities', <CapabilitiesPage key="c" />, '/api/v1/me/capabilities'],
     ['Evidence', <EvidencePage key="e" />, '/api/v1/me/evidence'],
     ['Development', <DevelopmentPage key="d" />, '/api/v1/me/development-plan'],
     ['Growth', <GrowthPage key="g" />, '/api/v1/me/growth'],

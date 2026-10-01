@@ -56,8 +56,8 @@ async function personalJourney(page, { mobile = false } = {}) {
   // Capabilities: nothing completed → honest empty state, every capability insufficient.
   await page.goto(`${CAMPUS_BASE_URL}/app/capabilities`)
   await expect(page.getByText('You do not have a formal capability profile yet.')).toBeVisible()
-  await expect(page.getByTestId('capability-detail')).toHaveCount(5)
-  await expect(page.getByTestId('capability-detail').first()).toContainText('Insufficient evidence')
+  await expect(page.getByTestId('capability-card')).toHaveCount(5)
+  await expect(page.getByTestId('capability-card').first()).toContainText('Insufficient evidence')
   await check()
 
   // Evidence: filters in the URL are honoured (and junk is ignored).
