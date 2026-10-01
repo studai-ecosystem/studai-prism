@@ -1,108 +1,77 @@
-import { useId } from 'react'
+import { cx } from '../../lib/cx.js'
 
-// PRISM brand logo — a hand-built, scalable SVG (no image asset). Renders the
-// gold ribbon mark and, optionally, the navy serif "PRISM"
-// wordmark + "by StudAI One" subtitle. Used across the app's headers, footer
-// and report so the brand stays consistent everywhere.
+// StudAI Prism brand logo: the OFFICIAL brand-pack artwork only (public/brand,
+// copied unchanged from StudAI_Prism_Brand_Pack/09_Vector). Never redraw,
+// recolour, stretch, or add effects to it.
 //
-// Props:
-//   size           — height of the mark in px (default 32)
-//   showWordmark   — show the PRISM wordmark beside the mark (default true)
-//   wordmark       — wordmark text (default 'PRISM')
-//   subtitle       — subtitle text, or null/'' to hide (default 'by StudAI One')
-//   wordmarkColor  — wordmark colour (default navy #1A2A6C)
-//   subtitleColor  — subtitle colour (default #64687A)
-//   gap            — px gap between mark and wordmark (default 10)
-//   className      — extra classes on the wrapper
+//   variant  'lockup'  icon + wordmark: product UI, navigation, documents (default)
+//            'full'    icon + wordmark + tagline: marketing, auth, reports
+//            'icon'    the three-facet mark: favicon, collapsed sidebar, mobile
+//   tone     'color' on light surfaces, 'reverse' on navy or dark surfaces,
+//            'black' / 'white' one-colour production use only
+//   size     height in px (legacy prop). Width is derived from the artwork
+//            ratio and raised to the brand minimum, so the logo is never
+//            rendered below its minimum size.
+//   width    set the width instead of the height
+//
+// Brand minimums (digital): full lockup 240 px wide, lockup 160 px, icon 24 px.
 
-export function PrismMark({ size = 32, className = '', title = 'Prism' }) {
-  const uid = useId().replace(/[:]/g, '')
-  const gold = `pl-gold-${uid}`
-  const goldDark = `pl-goldDark-${uid}`
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 64 64"
-      className={className}
-      role="img"
-      aria-label={title}
-    >
-      <defs>
-        <linearGradient id={gold} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#F6DD8B" />
-          <stop offset="45%" stopColor="#E3B84E" />
-          <stop offset="100%" stopColor="#B8860B" />
-        </linearGradient>
-        <linearGradient id={goldDark} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#D9A93C" />
-          <stop offset="100%" stopColor="#9A6E0A" />
-        </linearGradient>
-      </defs>
+const ARTWORK = {
+  lockup: { ratio: 1329 / 350, min: 160, src: { color: 'logo-lockup-color', reverse: 'logo-lockup-reverse', black: 'logo-lockup-black', white: 'logo-lockup-white' } },
+  full: { ratio: 1329 / 350, min: 240, src: { color: 'logo-full-color', reverse: 'logo-full-reverse' } },
+  icon: { ratio: 370 / 342, min: 24, src: { color: 'logo-icon-color', reverse: 'logo-icon-reverse', black: 'logo-icon-black', white: 'logo-icon-white' } },
+}
 
-      {/* Back document — gold, offset behind */}
-      <rect x="26" y="7" width="29" height="40" rx="4" fill={`url(#${gold})`} />
-      <g stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.55">
-        <line x1="33" y1="17" x2="48" y2="17" />
-        <line x1="33" y1="23" x2="48" y2="23" />
-        <line x1="33" y1="29" x2="48" y2="29" />
-        <line x1="33" y1="35" x2="44" y2="35" />
-      </g>
+export function logoDimensions({ variant = 'lockup', size = 32, width } = {}) {
+  const art = ARTWORK[variant] || ARTWORK.lockup
+  const wanted = width ?? size * art.ratio
+  const w = Math.max(Math.round(wanted), art.min)
+  return { width: w, height: Math.round(w / art.ratio) }
+}
 
-      {/* Front document — white with a gold frame */}
-      <rect x="11" y="13" width="29" height="40" rx="4" fill="#FFFFFF" stroke={`url(#${gold})`} strokeWidth="2.4" />
-      <g stroke={`url(#${gold})`} strokeWidth="2" strokeLinecap="round">
-        <line x1="17" y1="23" x2="34" y2="23" />
-        <line x1="17" y1="29" x2="34" y2="29" />
-        <line x1="17" y1="35" x2="30" y2="35" />
-      </g>
-
-      {/* Ribbon tails */}
-      <path d="M16 49 L11 63 L17 59 L20 64 L23 51 Z" fill={`url(#${goldDark})`} />
-      <path d="M30 49 L35 63 L29 59 L26 64 L23 51 Z" fill={`url(#${goldDark})`} />
-
-      {/* Seal — 8-point rosette badge */}
-      <g transform="translate(23 47)">
-        <rect x="-9" y="-9" width="18" height="18" rx="3" fill={`url(#${gold})`} />
-        <rect x="-9" y="-9" width="18" height="18" rx="3" fill={`url(#${gold})`} transform="rotate(45)" />
-        <circle r="8.5" fill={`url(#${gold})`} />
-        <circle r="6.2" fill="none" stroke="#fff" strokeWidth="1.1" opacity="0.7" />
-      </g>
-    </svg>
-  )
+export function logoSource({ variant = 'lockup', tone = 'color' } = {}) {
+  const art = ARTWORK[variant] || ARTWORK.lockup
+  // A tone without official artwork for this variant falls back to the nearest official one.
+  const name = art.src[tone] || (tone === 'white' ? art.src.reverse : art.src.color)
+  return `/brand/${name}.svg`
 }
 
 export default function PrismLogo({
+  variant,
+  tone = 'color',
   size = 32,
+  width,
   showWordmark = true,
-  wordmark = 'PRISM',
-  subtitle = 'by StudAI One',
-  wordmarkColor = '#1A2A6C',
-  subtitleColor = '#64687A',
-  gap = 10,
+  decorative = false,
   className = '',
 }) {
+  const kind = showWordmark === false ? 'icon' : (variant || 'lockup')
+  const dim = logoDimensions({ variant: kind, size, width })
   return (
-    <span className={`inline-flex items-center ${className}`} style={{ gap }}>
-      <PrismMark size={size} title={wordmark} />
-      {showWordmark && (
-        <span className="flex flex-col leading-none">
-          <span
-            className="font-serif font-bold tracking-tight"
-            style={{ color: wordmarkColor, fontSize: Math.round(size * 0.6), lineHeight: 1 }}
-          >
-            {wordmark}
-          </span>
-          {subtitle && (
-            <span
-              className="font-sans tracking-wider"
-              style={{ color: subtitleColor, fontSize: Math.max(9, Math.round(size * 0.3)), marginTop: 2 }}
-            >
-              {subtitle}
-            </span>
-          )}
-        </span>
-      )}
-    </span>
+    <img
+      src={logoSource({ variant: kind, tone })}
+      width={dim.width}
+      height={dim.height}
+      alt={decorative ? '' : 'StudAI Prism'}
+      decoding="async"
+      draggable={false}
+      className={cx('inline-block max-w-full select-none', className)}
+      style={{ height: 'auto', aspectRatio: `${dim.width} / ${dim.height}` }}
+    />
+  )
+}
+
+// Icon-only mark (kept for existing imports).
+export function PrismMark({ size = 32, tone = 'color', className = '', title = 'StudAI Prism' }) {
+  return (
+    <img
+      src={logoSource({ variant: 'icon', tone })}
+      width={size}
+      height={Math.round(size * (342 / 370))}
+      alt={title}
+      decoding="async"
+      draggable={false}
+      className={className}
+    />
   )
 }

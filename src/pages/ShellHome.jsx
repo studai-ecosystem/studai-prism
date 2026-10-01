@@ -43,7 +43,7 @@ export default function ShellHome() {
   return (
     <div className="room-dark min-h-screen bg-[var(--color-paper)] text-[var(--color-ink)] flex flex-col">
       <header className="shrink-0 flex items-center justify-between px-6 py-4">
-        <PrismLogo size={28} subtitle={null} wordmarkColor="var(--color-ink)" />
+        <PrismLogo size={28} />
         <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
           Assessment app
         </span>

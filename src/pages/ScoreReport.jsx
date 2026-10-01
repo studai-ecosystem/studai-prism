@@ -7,6 +7,7 @@ import {
   ShieldCheck, Briefcase, Share2, Scale, Trash2,
 } from 'lucide-react'
 import { getUser, getToken } from '../lib/session.js'
+import PrismLogo from '../components/ui/PrismLogo.jsx'
 import {
   DIMENSION_WEIGHTS, DIMENSION_LABELS, DIMENSION_PUBLIC_DEFINITIONS, SCORE_VALIDITY_MONTHS,
   REASSESSMENT_DAYS, PILOT_NOTICE, NOT_SOLE_BASIS_POLICY, INSUFFICIENT_EVIDENCE_LABEL,
@@ -17,9 +18,9 @@ import {
 // accent belongs to measurement moments; concrete rgb() literals because the
 // radar/rings render inside the html2canvas PDF capture, which cannot resolve
 // var() inside SVG attributes) ────────────────────────────────────────────
-const ACCENT = 'rgb(14,124,123)'
-const ACCENT_SOFT = 'rgba(14,124,123,0.10)'
-const ACCENT_SOFTER = 'rgba(14,124,123,0.12)'
+const ACCENT = 'rgb(2,122,85)'
+const ACCENT_SOFT = 'rgba(2,122,85,0.10)'
+const ACCENT_SOFTER = 'rgba(2,122,85,0.12)'
 const DIMENSIONS = [
   {
     key: 'communication',
@@ -119,14 +120,14 @@ function Radar({ dims }) {
         <polygon
           key={v}
           points={polyStr(Array.from({ length: N }, (_, i) => pt(R * v / 100, i)))}
-          fill="none" stroke="rgb(217,217,210)" strokeWidth="1"
+          fill="none" stroke="rgb(221,227,238)" strokeWidth="1"
         />
       ))}
       {dims.map((_, i) => {
         const [x, y] = pt(R, i)
-        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgb(217,217,210)" strokeWidth="1" />
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgb(221,227,238)" strokeWidth="1" />
       })}
-      <polygon points={polyStr(scorePts)} fill="rgba(14,124,123,0.14)" stroke="rgb(14,124,123)" strokeWidth="2" />
+      <polygon points={polyStr(scorePts)} fill="rgba(2,122,85,0.14)" stroke="rgb(2,122,85)" strokeWidth="2" />
       {dims.map((d, i) => {
         const [x, y] = pt(R * d.score / 100, i)
         return <circle key={i} cx={x} cy={y} r="5" fill={d.color} stroke="white" strokeWidth="2" />
@@ -142,7 +143,7 @@ function Radar({ dims }) {
           <g key={i}>
             <text
               x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
-              fontSize="11" fontWeight="600" fill="rgb(22,24,29)"
+              fontSize="11" fontWeight="600" fill="rgb(14,37,91)"
               fontFamily="'Noto Sans',sans-serif"
             >
               {split ? (
@@ -453,11 +454,11 @@ export default function ScoreReport() {
       await fetch(`/api/assessment/data/${sessionId}`, { method: 'DELETE' })
       localStorage.removeItem('prismUserName')
       localStorage.removeItem('prismCharacter')
-      alert('Your data has been permanently deleted.')
-      navigate('/')
+      setNotice({ kind: 'ok', text: 'Your data has been permanently deleted.' })
+      setTimeout(() => navigate('/'), 2500)
     } catch {
       setErasing(false)
-      alert('Sorry, we could not delete your data right now. Please try again.')
+      setNotice({ kind: 'error', text: 'We could not delete your data right now. Please try again.' })
     }
   }
 
@@ -469,7 +470,7 @@ export default function ScoreReport() {
       pdf.save(filename)
     } catch (err) {
       console.error('PDF download failed', err)
-      alert('Sorry, the PDF could not be generated. Please try again.')
+      setNotice({ kind: 'error', text: 'The PDF could not be generated. Please try again.' })
     } finally {
       setDownloading(false)
     }
@@ -497,7 +498,7 @@ export default function ScoreReport() {
 
     const captureOpts = {
       scale: 2,
-      backgroundColor: 'rgb(250,250,247)',
+      backgroundColor: 'rgb(246,248,251)',
       useCORS: true,
       // html2canvas renders text higher within its line-box than the browser
       // does, so very tight line-heights cause the name to overlap the meta
@@ -555,7 +556,7 @@ export default function ScoreReport() {
           slice.width = canvas.width
           slice.height = Math.min(sliceHeightPx, canvas.height - offset)
           const ctx = slice.getContext('2d')
-          ctx.fillStyle = 'rgb(250,250,247)'
+          ctx.fillStyle = 'rgb(246,248,251)'
           ctx.fillRect(0, 0, slice.width, slice.height)
           ctx.drawImage(canvas, 0, offset, canvas.width, slice.height, 0, 0, canvas.width, slice.height)
           pieces.push(slice)
@@ -623,12 +624,12 @@ export default function ScoreReport() {
     <div className="prism-report">
       <style>{`
 .prism-report{
-  --pr:var(--color-accent);--prh:var(--color-accent);--prs:rgba(14,124,123,0.08);--prm:rgba(14,124,123,0.16);--prt:var(--color-accent);
+  --pr:var(--color-accent);--prh:var(--color-accent);--prs:rgba(2,122,85,0.08);--prm:rgba(2,122,85,0.16);--prt:var(--color-accent);
   --bg:var(--color-paper);--s0:var(--color-surface);--s1:var(--color-paper);--s2:var(--color-line);
-  --bd:var(--color-line);--bd2:rgba(22,24,29,0.24);--bd3:rgba(22,24,29,0.36);
+  --bd:var(--color-line);--bd2:rgba(14,37,91,0.24);--bd3:rgba(14,37,91,0.36);
   --t1:var(--color-ink);--t2:var(--color-ink);--t3:var(--color-ink-muted);--t4:var(--color-ink-muted);
-  --ok:var(--color-success);--oks:rgba(26,127,55,0.09);--okb:rgba(26,127,55,0.22);
-  --am:var(--color-reliability-moderate);--ams:rgba(154,103,0,0.09);--amb:rgba(154,103,0,0.22);
+  --ok:var(--color-success);--oks:rgba(2,122,85,0.09);--okb:rgba(2,122,85,0.22);
+  --am:var(--color-reliability-moderate);--ams:rgba(146,64,14,0.09);--amb:rgba(146,64,14,0.22);
   --sc1:var(--color-accent);--sc2:var(--color-accent);--sc3:var(--color-accent);--sc4:var(--color-accent);--sc5:var(--color-accent);
   --f:var(--font-body);
   --fd:var(--font-display);
@@ -656,7 +657,7 @@ export default function ScoreReport() {
 .hbtn-g:hover{background:var(--s2)}
 .pr-main{max-width:900px;margin:0 auto;padding:40px 24px 80px}
 .cert-card{background:var(--s0);border:1px solid var(--bd);border-radius:20px;overflow:hidden;margin-bottom:20px;position:relative}
-.cert-top{background:linear-gradient(135deg, rgb(18,69,71) 0%, rgb(14,124,123) 58%, rgb(59,184,182) 135%);padding:40px 44px;position:relative;overflow:hidden}
+.cert-top{background:linear-gradient(135deg, rgb(8,22,51) 0%, rgb(2,122,85) 58%, rgb(39,64,138) 135%);padding:40px 44px;position:relative;overflow:hidden}
 .cert-pattern{position:absolute;inset:0;opacity:0.06}
 .cert-overline{display:flex;align-items:center;gap:8px;margin-bottom:20px}
 .cert-overline-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:100px;padding:5px 14px 5px 8px}
@@ -769,25 +770,19 @@ export default function ScoreReport() {
 
       <div className="pr-top-strip" />
 
-      <header className="pr-header no-print">
-        <div className="pr-header-logo">
-          <div className="pr-logo-mark">
-            <svg viewBox="0 0 24 24">
-              <rect x="9" y="2.5" width="11" height="15" rx="2" fill="white" opacity="0.55" />
-              <rect x="4" y="5" width="11" height="15" rx="2" fill="white" />
-              <g stroke="rgb(14,124,123)" strokeWidth="1" strokeLinecap="round">
-                <line x1="6.5" y1="9" x2="12.5" y2="9" />
-                <line x1="6.5" y1="11.5" x2="12.5" y2="11.5" />
-                <line x1="6.5" y1="14" x2="10.5" y2="14" />
-              </g>
-              <circle cx="9" cy="18" r="3.2" fill="white" stroke="rgb(14,124,123)" strokeWidth="0.9" />
-            </svg>
-          </div>
-          <div>
-            <div className="pr-logo-name">StudAI Prism</div>
-            <div className="pr-logo-sub">Verified Assessment</div>
-          </div>
+      {notice && (
+        <div
+          role={notice.kind === 'error' ? 'alert' : 'status'}
+          className="no-print"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 16px', fontSize: 14, fontWeight: 600, background: notice.kind === 'error' ? 'var(--color-danger-surface)' : 'var(--color-success-surface)', color: notice.kind === 'error' ? 'var(--color-danger)' : 'var(--color-success)' }}
+        >
+          <span>{notice.text}</span>
+          <button type="button" onClick={() => setNotice(null)} style={{ background: 'transparent', border: 0, color: 'inherit', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Dismiss</button>
         </div>
+      )}
+
+      <header className="pr-header no-print">
+        <div className="pr-header-logo"><PrismLogo size={36} /></div>
         <div className="pr-header-right">
           <button className="hbtn hbtn-g" onClick={handleDownloadPdf} disabled={downloading}>
             <Download size={15} />{downloading ? 'Preparing…' : 'Download PDF'}
@@ -1249,8 +1244,8 @@ export default function ScoreReport() {
             marginTop: 28,
             padding: '28px 24px',
             borderRadius: 16,
-            background: 'linear-gradient(135deg, rgba(14,124,123,0.06) 0%, rgba(255,255,255,1) 100%)',
-            border: '2px solid rgba(14,124,123,0.22)',
+            background: 'linear-gradient(135deg, rgba(2,122,85,0.06) 0%, rgba(255,255,255,1) 100%)',
+            border: '2px solid rgba(2,122,85,0.22)',
             boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
           }}
         >
@@ -1259,7 +1254,7 @@ export default function ScoreReport() {
               <span
                 style={{
                   width: 36, height: 36, borderRadius: 10,
-                  background: 'rgb(14,124,123)', color: 'white',
+                  background: 'rgb(2,122,85)', color: 'white',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: 700, fontSize: 16,
                 }}
@@ -1270,7 +1265,7 @@ export default function ScoreReport() {
                 <span
                   style={{
                     fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-                    letterSpacing: '0.06em', color: 'rgb(14,124,123)',
+                    letterSpacing: '0.06em', color: 'rgb(2,122,85)',
                   }}
                 >
                   StudAI One Talent Ecosystem
@@ -1305,7 +1300,7 @@ export default function ScoreReport() {
               >
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'rgb(14,124,123)' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'rgb(2,122,85)' }}>
                       {job.company?.name || 'Enterprise Partner'}
                     </span>
                     <span style={{ fontSize: 11, color: 'var(--color-ink-muted)' }}>
@@ -1328,7 +1323,7 @@ export default function ScoreReport() {
                     disabled={handoverLoading}
                     style={{
                       border: 'none', background: 'transparent',
-                      color: 'rgb(14,124,123)', fontWeight: 600, fontSize: 12,
+                      color: 'rgb(2,122,85)', fontWeight: 600, fontSize: 12,
                       cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
                       padding: 0,
                     }}
@@ -1341,7 +1336,7 @@ export default function ScoreReport() {
           </div>
 
           {/* Dual Primary Ecosystem CTAs */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, paddingTop: 16, borderTop: '1px solid rgba(14,124,123,0.15)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, paddingTop: 16, borderTop: '1px solid rgba(2,122,85,0.15)' }}>
             <button
               onClick={() => handleEcosystemHandover('hire')}
               disabled={handoverLoading}
@@ -1349,7 +1344,7 @@ export default function ScoreReport() {
                 flex: '1 1 240px',
                 padding: '12px 20px',
                 borderRadius: 10,
-                background: 'rgb(14,124,123)',
+                background: 'rgb(2,122,85)',
                 color: 'white',
                 border: 'none',
                 fontWeight: 600,
@@ -1359,7 +1354,7 @@ export default function ScoreReport() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                boxShadow: '0 2px 6px rgba(14,124,123,0.25)',
+                boxShadow: '0 2px 6px rgba(2,122,85,0.25)',
               }}
             >
               <Briefcase size={16} />
@@ -1374,8 +1369,8 @@ export default function ScoreReport() {
                 padding: '12px 20px',
                 borderRadius: 10,
                 background: 'white',
-                color: 'rgb(14,124,123)',
-                border: '1.5px solid rgb(14,124,123)',
+                color: 'rgb(2,122,85)',
+                border: '1.5px solid rgb(2,122,85)',
                 fontWeight: 600,
                 fontSize: 14,
                 cursor: 'pointer',
@@ -1398,7 +1393,7 @@ export default function ScoreReport() {
             className="no-print"
             onClick={() => !emailSending && setEmailOpen(false)}
             style={{
-              position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(10,13,20,0.55)',
+              position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(8,22,51,0.55)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
             }}
           >
@@ -1411,7 +1406,7 @@ export default function ScoreReport() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                 <span style={{
-                  width: 40, height: 40, borderRadius: 10, background: 'rgba(184,144,47,0.12)',
+                  width: 40, height: 40, borderRadius: 10, background: 'rgba(146,64,14,0.12)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)',
                 }}>
                   <Mail size={20} />

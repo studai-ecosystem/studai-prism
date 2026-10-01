@@ -13,6 +13,7 @@ import '../design/tokens.css'
 import { EvidenceThread, EvidenceTick, evidenceThreadStyles } from '../components/ui/EvidenceThread.jsx'
 import { ReliabilityLabel, ConfidenceBand, PendingStat } from '../components/ui/measurement.jsx'
 import CampusShowcase from '../features/designSystem/CampusShowcase.jsx'
+import PrismLogo from '../components/ui/PrismLogo.jsx'
 
 const TYPE_TESTS = [
   { lang: 'Latin', text: 'Measurement you can see inside — every score carries its evidence.' },
@@ -32,6 +33,16 @@ function TokenSwatch({ name, value }) {
   )
 }
 
+
+// Flatten the nested colour tokens into [name, value] swatches (arrays become name[i]).
+function swatches(obj, prefix = '') {
+  return Object.entries(obj).flatMap(([k, v]) => {
+    const name = prefix ? `${prefix}.${k}` : k
+    if (typeof v === 'string') return [[name, v]]
+    if (Array.isArray(v)) return v.map((x, i) => [`${name}[${i}]`, x])
+    return swatches(v, name)
+  })
+}
 function Section({ title, children }) {
   return (
     <section style={{ marginBottom: 'var(--space-16)' }}>
@@ -91,39 +102,61 @@ export default function DesignSystem() {
       <div style={{ maxWidth: 880, margin: '0 auto', padding: 'var(--space-12) var(--space-6)' }}>
         <header style={{ marginBottom: 'var(--space-16)' }}>
           <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
-            Prism design system · Part A
+            StudAI Prism design system
           </p>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-3xl)', lineHeight: 'var(--leading-tight)', margin: 'var(--space-2) 0' }}>
-            Instrument, not oracle.
+            Evidence you can understand. Growth you can act on.
           </h1>
           <p style={{ maxWidth: '58ch', color: 'var(--color-ink-muted)' }}>
-            Prism looks like a precision measuring device that shows its workings. The accent means
-            measurement — it appears only where a number meets its evidence. Uncertainty is rendered
-            honestly; pending states are designed as carefully as filled ones.
+            Prism shows its workings: every conclusion links to its evidence, uncertainty is rendered honestly, and pending states are designed as carefully as filled ones.
           </p>
         </header>
 
+        <Section title="Brand">
+          <div style={{ display: 'grid', gap: 'var(--space-6)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-8)', alignItems: 'center' }}>
+              <PrismLogo variant="full" />
+              <PrismLogo variant="lockup" />
+              <PrismLogo variant="icon" size={64} />
+            </div>
+            <div style={{ background: 'var(--brand-navy)', padding: 'var(--space-6)', borderRadius: 'var(--radius-md)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-8)', alignItems: 'center' }}>
+              <PrismLogo variant="full" tone="reverse" />
+              <PrismLogo variant="lockup" tone="reverse" />
+              <PrismLogo variant="icon" tone="reverse" size={64} />
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-8)', alignItems: 'center' }}>
+              <PrismLogo variant="lockup" tone="black" />
+              <span style={{ background: 'var(--brand-navy)', padding: 'var(--space-4)', borderRadius: 'var(--radius-sm)', display: 'inline-flex' }}><PrismLogo variant="lockup" tone="white" /></span>
+            </div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', maxWidth: '64ch' }}>
+              Official artwork only (public/brand). Full lockup 240 px wide or more, lockup 160 px, icon 24 px; reversed
+              files on navy; clear space of one third of the icon width; no recolouring, effects or redrawing. The tagline
+              appears in the full lockup, not under every navigation logo.
+            </p>
+          </div>
+        </Section>
+
         <Section title="Palette">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 'var(--space-4)' }}>
-            {Object.entries(color).map(([name, value]) => <TokenSwatch key={name} name={name} value={value} />)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-4)' }}>
+            {swatches(color).map(([name, value]) => <TokenSwatch key={name} name={name} value={value} />)}
           </div>
           <p style={{ marginTop: 'var(--space-6)', fontSize: 'var(--text-sm)', color: 'var(--color-ink-muted)', maxWidth: '64ch' }}>
-            Usage rules: <strong>accent is reserved for measurement moments</strong> (evidence threads,
-            AI panel variation intervals, live speaking state). Status colors never appear without their icon
-            and label — status is never conveyed by color alone.
+            Usage rules: <strong>brand green is a fill, mark or rule colour</strong>; green text on light surfaces uses
+            green-ink, and navy text sits on green fills (white on green fails contrast). Status colours never appear
+            without their icon and label: status is never conveyed by colour alone.
           </p>
         </Section>
 
         <Section title="Type — three faces, three scripts">
           <div style={{ display: 'grid', gap: 'var(--space-8)' }}>
             <div>
-              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Display — Fraunces</p>
+              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Display — Inter (bold, tight tracking)</p>
               <p style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-2xl)', lineHeight: 'var(--leading-tight)' }}>
                 Measurement you can see inside.
               </p>
             </div>
             <div>
-              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Body — Noto Sans (+ Devanagari + Tamil companions)</p>
+              <p style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-ink-muted)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)' }}>Body — Inter (+ Noto Sans Devanagari and Tamil companions)</p>
               {TYPE_TESTS.map((t) => (
                 <p key={t.lang} style={{ marginTop: 'var(--space-2)' }}>
                   <span style={{ fontFamily: 'var(--font-utility)', fontSize: 'var(--text-xs)', color: 'var(--color-accent)', marginRight: 'var(--space-3)' }}>{t.lang}</span>

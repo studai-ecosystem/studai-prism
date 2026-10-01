@@ -26,7 +26,7 @@ function InstructionsScreen({ onBegin, phoneRequired, phoneLinked }) {
   return (
     <div className="flex flex-col h-screen bg-[var(--color-paper)] text-[var(--color-ink)]">
       <header className="shrink-0 flex items-center justify-between px-6 py-3 bg-[var(--color-surface)] border-b border-[var(--color-line)]">
-        <PrismLogo size={28} subtitle={null} />
+        <PrismLogo size={28} />
         <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
           Assessment · about 30 minutes
         </span>
@@ -1245,7 +1245,7 @@ export default function Assessment() {
       <header className="shrink-0 border-b border-[var(--color-room-line)] bg-[var(--color-room-surface)]">
         <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-2.5">
           <div className="flex items-center gap-3 min-w-0">
-            <PrismLogo size={24} subtitle={null} wordmarkColor="var(--color-room-ink)" />
+            <PrismLogo size={24} tone="reverse" />
             <span className="hidden sm:inline font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
               {stage.label}
             </span>

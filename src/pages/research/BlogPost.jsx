@@ -35,7 +35,7 @@ export default function BlogPost() {
       <article className="py-20 px-6 max-w-3xl mx-auto">
         <Link
           to="/research/blog"
-          className="text-gold font-semibold no-underline hover:underline"
+          className="text-brand-green-ink font-semibold no-underline hover:underline"
         >
           ← All insights
         </Link>

@@ -91,9 +91,9 @@ export default function ScienceBehindPrism() {
           {dimensions.map((d) => (
             <div
               key={d.num}
-              className="bg-white rounded-2xl shadow-sm p-6 flex flex-col border-t-2 border-transparent hover:border-gold transition-colors"
+              className="bg-white rounded-2xl shadow-sm p-6 flex flex-col border-t-2 border-transparent hover:border-brand-green transition-colors"
             >
-              <span className="text-3xl font-bold text-gold mb-3">{d.num}</span>
+              <span className="text-3xl font-bold text-brand-green-ink mb-3">{d.num}</span>
               <h3 className="text-xl font-bold text-[var(--color-ink)] mb-3">{d.name}</h3>
               <p className="text-[var(--color-ink-muted)] leading-relaxed mb-4">{d.measures}</p>
               <p className="text-[var(--color-ink-muted)] italic leading-relaxed mt-auto">
@@ -115,7 +115,7 @@ export default function ScienceBehindPrism() {
               key={s.num}
               className="bg-white rounded-2xl shadow-sm p-8 flex flex-col items-center text-center"
             >
-              <div className="w-12 h-12 rounded-full bg-gold text-[var(--color-ink)] font-bold text-xl flex items-center justify-center mb-5">
+              <div className="w-12 h-12 rounded-full bg-brand-green text-[var(--color-ink)] font-bold text-xl flex items-center justify-center mb-5">
                 {s.num}
               </div>
               <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">{s.text}</p>
@@ -126,7 +126,7 @@ export default function ScienceBehindPrism() {
 
       {/* Section 4 — Quote block */}
       <section className="py-20 px-6 max-w-6xl mx-auto">
-        <blockquote className="bg-white rounded-2xl shadow-sm p-10 md:p-14 max-w-3xl mx-auto border-l-4 border-gold">
+        <blockquote className="bg-white rounded-2xl shadow-sm p-10 md:p-14 max-w-3xl mx-auto border-l-4 border-brand-green">
           <p className="text-2xl md:text-3xl font-serif text-[var(--color-ink)] leading-snug">
             “The best predictor of job performance is not where you studied. It
             is how you think. Prism measures that.”

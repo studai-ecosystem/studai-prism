@@ -17,7 +17,7 @@ export default function PageLayout({ children }) {
   return (
     <main
       className="bg-[var(--color-paper)] min-h-screen overflow-x-hidden"
-      style={{ fontFamily: "'DM Sans', sans-serif" }}
+      style={{ fontFamily: 'var(--font-body)' }}
     >
       <Nav onGetAssessed={handleGetAssessed} />
       {/* Offset for the fixed 4rem-tall header */}
@@ -34,7 +34,7 @@ export function PageHeading({ title, subtitle }) {
       <h1 className="text-4xl md:text-5xl font-bold text-[var(--color-ink)] tracking-tight">
         {title}
       </h1>
-      <div className="w-16 h-1 bg-gold mx-auto mt-4" />
+      <div className="w-16 h-1 bg-brand-green mx-auto mt-4" />
       {subtitle && (
         <p className="mt-6 text-lg text-[var(--color-ink-muted)] leading-relaxed">{subtitle}</p>
       )}

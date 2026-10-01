@@ -8,7 +8,7 @@ export default function PricingCard({ plan, price, period, subtitle, badge, feat
       variants={fadeUp}
       className={`relative flex flex-col gap-6 p-8 rounded-2xl border transition-all duration-300 ${
         featured
-          ? 'bg-[var(--color-ink)] border-[var(--color-accent)]/50 shadow-[0_0_40px_rgba(201,168,76,0.08)]'
+          ? 'bg-[var(--color-ink)] border-[var(--color-accent)]/50 shadow-[0_0_40px_rgba(3,182,122,0.08)]'
           : 'bg-[var(--color-ink)] border-[var(--color-line)]'
       }`}
       whileHover={{ y: -4 }}
@@ -42,7 +42,7 @@ export default function PricingCard({ plan, price, period, subtitle, badge, feat
         className={`w-full py-3 rounded-lg font-sans font-semibold text-sm transition-all duration-200 ${
           featured
             ? 'border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10'
-            : 'shimmer-btn text-[var(--color-ink)] glow-pulse'
+            : 'bg-brand-green text-brand-navy hover:brightness-95'
         }`}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}

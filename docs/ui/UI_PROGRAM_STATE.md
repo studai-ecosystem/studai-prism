@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: off
-active_phase: B
+active_phase: C
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -24,9 +24,12 @@ UI-STATE:END -->
 
 | Id | Decision |
 | --- | --- |
-| U1 | The brand pack defines no typeface; the primary UI face is chosen in phase B and recorded here. |
+| U1 | RESOLVED in phase B: Inter for display and body (matches the geometric grotesque of the wordmark), Noto Sans Devanagari and Tamil as script companions, IBM Plex Mono for IDs. The pack itself defines no typeface; this is a design decision, change it here if the owner has a brand font. |
 | U2 | Derived (non-brand-issued) colours and their measured contrast are in docs/ui/UI_AUDIT.md section 5: green-ink #027A55 for green text, navy text on green fills, chart ordinal ramp #7189BD #3F5C9E #27408A #0E255B, chart green series = green-ink. |
 | U3 | Phase A found no slate, indigo, purple or cyan classes left; the real fragmentation is two token systems (legacy teal/cream/Fraunces and campus indigo/Noto Sans). Phase B swaps both token files to one brand system rather than hunting classes. |
+| U5 | Phase B kept --color-* and --prism-* as compatibility aliases onto the new brand tokens, so 182 files re-skin without edits; later phases migrate components to the semantic token classes as they are redesigned and the aliases are removed in phase M. |
+| U6 | The legacy report header text 'Verified Assessment' was removed with its hand-built logo mark (the official lockup carries the name); report body content is untouched. |
+| U7 | Dingbat check marks (U+2713 style) remain in story, research, report and flow text for their own phases; Nav, Briefing and shared components are glyph-free. |
 | U4 | The landing sample score (Critical thinking 74) and dimension weight percentages conflict with the no-fabricated-data law; replaced in phase J with an illustrative, number-free evidence thread. |
 
 ## Risks and open questions
@@ -35,6 +38,9 @@ UI-STATE:END -->
 - Product copy "by StudAI One" is a naming decision for the owner; leave unchanged unless told.
 - Local-run caveat: server/.env carries a local-campus block (campus flags on, DATABASE_URL to prism_local) for the demo; Playwright's flags-off server loads it and 6 @critical tests fail unless the block is removed for the run (git-ignored; remove or comment it before every e2e run).
 - A pending, unstaged deletion of studai-prism/.github/copilot-instructions.md and untracked brand-pack files, data/ are unrelated to the UI commits; leave them out of phase commits.
+- Tooling lesson (phase B): never name a PowerShell helper Rd (alias for Remove-Item); a helper called Rd deleted 70 source files once and they were restored from git. Use Read-Prism and Write-Prism and check git ls-files -d after bulk edits.
+- Firefox and WebKit were not run in phase B (fonts load from the CDN and render differently); the full four-project run is part of phase M.
+- StoryDimensions.jsx:64 still logs 5 console errors on the landing page (Framer Motion r animation); fixed with the landing redesign in phase J.
 - Tauri desktop icons need the `tauri icon` tool; outside this programme unless requested.
 
 ## Phase A - Repository audit, UI inventory and route map
@@ -55,20 +61,20 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase B - Brand tokens, typography, logo integration and design primitives
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 66d545b (build, vitest 226, server 620/596/0/24, static audit, playwright chromium + mobile-chromium 286)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] B.01 Copy official SVG lockups, icon, favicons, app icons and social card to public/brand; rebuild manifest.webmanifest (PNG any and maskable) and index.html (theme-color, icons, title, fonts)
-- [ ] B.02 Rewrite src/design/tokens.js and tokens.css in lockstep: color.brand/surface/text/border/status/data, evidence-status tokens, type, spacing, radius, elevation, motion, breakpoints, layout widths, sidebar widths, header heights, content widths, focus rings, chart tokens; light and scoped dark semantics
-- [ ] B.03 Typography: one primary sans with Latin, Devanagari and Tamil support, tabular numerals, role scale (Display to Code/ID); remove the other font families and inline font-family styles
-- [ ] B.04 Brand logo component on the official assets: full, compact, icon, reversed, mono; minimum sizes; replaces PrismLogo and removes it from the hex allowlist
-- [ ] B.05 Tailwind config on tokens; remove gold, cream and other legacy colour names after migrating their usages; delete dead legacy CSS (shimmer, glow, hero grid) when unused
-- [ ] B.06 Primitives on tokens: Button, IconButton, Input, Textarea, Select, Checkbox, Radio, Switch, Tabs, SegmentedControl, Badge, StatusBadge, Card, Panel, Metric, Dialog, Drawer, Tooltip, Popover, Dropdown, Toast
-- [ ] B.07 Standard PageSkeleton, CardSkeleton, TableSkeleton, InlineSpinner, FullScreenLoading, EmptyState, ErrorState; replace every alert()
-- [ ] B.08 Icon rules applied: lucide only, no emoji UI, aria-label on icon buttons
-- [ ] B.09 Initial /design-system route sections for logo, colours, type, primitives (completed in phase L)
-- [ ] B.10 Gates, visual QA, commit
+- [x] B.01 Copy official SVG lockups, icon, favicons, app icons and social card to public/brand; rebuild manifest.webmanifest (PNG any and maskable) and index.html (theme-color, icons, title, fonts) - evidence: public/brand (17 official files copied unchanged: SVG lockups, icon, mono, favicons, app and maskable icons, social card), public/favicon.ico, manifest.webmanifest (PNG any + maskable, navy theme), index.html (favicons, theme-color #0E255B, one font request, brand title); old gold icons removed; maskable content inside the safe zone (108-404 of 512)
+- [x] B.02 Rewrite src/design/tokens.js and tokens.css in lockstep: color.brand/surface/text/border/status/data, evidence-status tokens, type, spacing, radius, elevation, motion, breakpoints, layout widths, sidebar widths, header heights, content widths, focus rings, chart tokens; light and scoped dark semantics - evidence: src/design/tokens.js and tokens.css rewritten in lockstep (32 hex, 0 missing): brand, surface, text, border, status, evidence, data (ordinal ramp + series), dark, type roles, layout, focus, motion, breakpoints; compatibility aliases keep --color-* and --prism-* pages on-brand without per-file edits; designSystem.test 9/9
+- [x] B.03 Typography: one primary sans with Latin, Devanagari and Tamil support, tabular numerals, role scale (Display to Code/ID); remove the other font families and inline font-family styles - evidence: Inter (display and body) with Noto Sans Devanagari and Tamil companions and IBM Plex Mono (decision U1); Fraunces, DM Sans, Bricolage, Instrument Serif and JetBrains Mono removed; roles in tokens.js typeRoles and --font-role-*; .font-serif now maps to bold tight-tracked Inter; browser check: body font Inter on 18 of 18 captures
+- [x] B.04 Brand logo component on the official assets: full, compact, icon, reversed, mono; minimum sizes; replaces PrismLogo and removes it from the hex allowlist - evidence: src/components/ui/PrismLogo.jsx on the official artwork (lockup, full, icon; color, reverse, black, white), brand minimum sizes enforced in one place, legacy props ignored so the 16 call sites work; reversed logo on the dark room; ScoreReport hand-built mark replaced; src/components/ui/PrismLogo.jsx removed from the hex allow-list
+- [x] B.05 Tailwind config on tokens; remove gold, cream and other legacy colour names after migrating their usages; delete dead legacy CSS (shimmer, glow, hero grid) when unused - evidence: tailwind.config.js on brand and prism tokens (gold, cream and legacy aliases removed); 11 gold files migrated (text-brand-green-ink, bg-brand-green with navy text, border-brand-green); index.css legacy vars, shimmer, glow, hero-grid, noise removed; 63 rgb() colour literals re-pointed (ScoreReport keeps literals on purpose for html2canvas); 0 gold, shimmer or old-teal references left
+- [x] B.06 Primitives on tokens: Button, IconButton, Input, Textarea, Select, Checkbox, Radio, Switch, Tabs, SegmentedControl, Badge, StatusBadge, Card, Panel, Metric, Dialog, Drawer, Tooltip, Popover, Dropdown, Toast - evidence: audited: components/ui primitives already read --prism-* tokens, so they follow the brand through the token layer (verified by the 286-test browser run with axe sweeps); StatusChip and Badge cover status; no new Metric or Panel primitive added because no repetition justifies one yet
+- [x] B.07 Standard PageSkeleton, CardSkeleton, TableSkeleton, InlineSpinner, FullScreenLoading, EmptyState, ErrorState; replace every alert() - evidence: src/components/ui/Spinner.jsx (InlineSpinner, FullScreenLoading, "Preparing your workspace") and Skeleton.jsx (PageSkeleton, CardSkeleton, TableSkeleton); ScoreReport alert() x3 replaced by an inline status banner; 0 alert() calls left in src
+- [x] B.08 Icon rules applied: lucide only, no emoji UI, aria-label on icon buttons - evidence: Nav dropdown emoji (9) replaced by lucide icons, close glyphs and the dice emoji in Nav and Briefing replaced by lucide X, Check and Dices; close buttons already carried aria-label. Remaining typographic check-mark glyphs in story, research, report and flow copy are scheduled with their pages (J, K, F, E); the full icon-button aria-label audit runs in phase L
+- [x] B.09 Initial /design-system route sections for logo, colours, type, primitives (completed in phase L) - evidence: src/pages/DesignSystem.jsx: Brand section (all logo variants on light, navy, monochrome), nested-token palette, Inter type labels, new principle text; primitives via CampusShowcase; renders with 0 console errors
+- [x] B.10 Gates, visual QA, commit - evidence: build PASS; vitest 226/226; server 620 tests, 596 pass, 0 fail, 24 skipped; static audit PASS; playwright chromium + mobile-chromium 286 passed (5.7 min) with the local-campus block removed from server/.env for the run; visual QA of landing, login, app home, design system at 1440 and app home, landing at 390 (audit-results/ui/phase-b, git-ignored); commit on ui/prism-brand-transformation
 
 ## Phase C - Unified shell, navigation and workspace context
 

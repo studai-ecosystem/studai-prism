@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ShieldCheck, MonitorX, Clock, Copy, Eye, Camera, Check, MonitorDown } from 'lucide-react'
+import { ShieldCheck, MonitorX, Clock, Copy, Eye, Camera, Check, MonitorDown, Dices, X } from 'lucide-react'
 import { CHARACTERS, CharacterAvatar } from '../lib/characters.jsx'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
 import { getToken, confirmAge } from '../lib/session.js'
@@ -305,7 +305,7 @@ export default function Briefing() {
                 borderRadius: '0.5rem',
                 fontSize: '16px',
                 color: 'var(--color-ink)',
-                boxShadow: nameFocused ? '0 0 0 3px rgba(201,168,76,0.25)' : 'none',
+                boxShadow: nameFocused ? '0 0 0 3px rgba(3,182,122,0.25)' : 'none',
                 transition: 'all 200ms ease',
                 outline: 'none',
               }}
@@ -330,7 +330,7 @@ export default function Briefing() {
               .prism-card-shake{animation:prismShake .3s ease 2}
               .prism-panel{animation:prismPanelIn .3s cubic-bezier(0.34,1.56,0.64,1) forwards}
               .prism-card{transition:transform 250ms ease,box-shadow 200ms ease,filter 200ms ease}
-              .prism-card:not(.is-selected):hover{filter:brightness(1.1);box-shadow:0 0 0 2px rgba(201,168,76,0.5)}
+              .prism-card:not(.is-selected):hover{filter:brightness(1.1);box-shadow:0 0 0 2px rgba(3,182,122,0.5)}
               .prism-surprise:hover{background:var(--color-info) !important;color:white !important}
             `}</style>
 
@@ -366,7 +366,7 @@ export default function Briefing() {
                   className="prism-surprise rounded-full px-4 py-2 font-sans text-[13px] font-semibold transition-all duration-200"
                   style={{ background: 'transparent', color: 'var(--color-info)', border: '1px solid var(--color-info)' }}
                 >
-                  🎲 Surprise me
+                  <Dices size={14} aria-hidden="true" className="inline-block -mt-0.5 mr-1" />Surprise me
                 </button>
               </div>
 
@@ -391,7 +391,7 @@ export default function Briefing() {
                           minHeight: 200,
                           transform: isSelected ? 'scale(1.05)' : 'scale(1)',
                           ...(isSelected
-                            ? { boxShadow: '0 0 0 3px var(--color-accent), 0 0 0 7px rgba(201,168,76,0.30)' }
+                            ? { boxShadow: '0 0 0 3px var(--color-accent), 0 0 0 7px rgba(3,182,122,0.30)' }
                             : {}),
                         }}
                       >
@@ -448,9 +448,9 @@ export default function Briefing() {
                   type="button"
                   onClick={() => setSelectedCharacter(null)}
                   aria-label="Close"
-                  className="absolute top-3 right-3 text-[var(--color-ink-muted)] text-lg leading-none"
+                  className="absolute top-3 right-3 text-[var(--color-ink-muted)]"
                 >
-                  ✕
+                  <X size={18} aria-hidden="true" />
                 </button>
                 <div className="flex justify-center">
                   <CharacterAvatar id={selectedCharacter.id} size={120} />
@@ -461,7 +461,7 @@ export default function Briefing() {
                 <div className="flex justify-center">
                   <span
                     className="rounded-full px-3 py-1 font-sans text-[12px] font-semibold"
-                    style={{ background: 'rgba(201,168,76,0.15)', color: 'var(--color-accent)' }}
+                    style={{ background: 'rgba(3,182,122,0.15)', color: 'var(--color-accent)' }}
                   >
                     {selectedCharacter.personality}
                   </span>
@@ -470,7 +470,7 @@ export default function Briefing() {
                   {selectedCharacter.description}
                 </p>
                 <p className="text-center font-sans text-[12px] font-semibold" style={{ color: 'var(--color-success)' }}>
-                  This is you ✓
+                  This is you <Check size={13} aria-hidden="true" className="inline-block -mt-0.5" />
                 </p>
                 <div className="h-px w-full" style={{ background: 'var(--color-line)' }} />
                 <button

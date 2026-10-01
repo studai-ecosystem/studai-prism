@@ -9,7 +9,7 @@ export function PublicLayout({ children }) {
     <div className="prism-app flex min-h-screen flex-col">
       <SkipLink />
       <header className="flex h-14 items-center border-b border-prism-border bg-prism-surface px-4 md:px-8">
-        <Link to="/" aria-label="Prism home"><PrismLogo size={24} subtitle={null} wordmarkColor="var(--prism-ink)" /></Link>
+        <Link to="/" aria-label="Prism home"><PrismLogo size={24} /></Link>
       </header>
       <main id="main" tabIndex={-1} className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 focus:outline-none md:px-8">
         {children || <Outlet />}

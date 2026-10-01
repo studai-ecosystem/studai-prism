@@ -56,7 +56,7 @@ export default function ValidityStudy() {
 
       {/* Section 1 — Validation status (honest) */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-gold">
+        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-brand-green">
           <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">
             Where validation stands today
           </h2>
@@ -126,7 +126,7 @@ export default function ValidityStudy() {
                   <td className="py-4 px-6 text-[var(--color-ink-muted)] align-top">
                     {row.signal}
                   </td>
-                  <td className="py-4 px-6 font-bold text-gold text-right align-top">
+                  <td className="py-4 px-6 font-bold text-brand-green-ink text-right align-top">
                     {row.weight}
                   </td>
                 </tr>

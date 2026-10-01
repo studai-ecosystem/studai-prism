@@ -51,7 +51,7 @@ export default function Blog() {
               <Link
                 key={post.slug}
                 to={`/research/blog/${post.slug}`}
-                className="group bg-white rounded-2xl shadow-sm p-6 flex flex-col no-underline border-t-2 border-transparent hover:border-gold transition-colors"
+                className="group bg-white rounded-2xl shadow-sm p-6 flex flex-col no-underline border-t-2 border-transparent hover:border-brand-green transition-colors"
               >
                 <p className="text-xs font-semibold tracking-[0.15em] text-[var(--color-ink-muted)] uppercase mb-3">
                   {post.date}
@@ -60,7 +60,7 @@ export default function Blog() {
                   {post.title}
                 </h3>
                 <p className="text-[var(--color-ink-muted)] leading-relaxed mb-6">{post.desc}</p>
-                <span className="mt-auto text-gold font-semibold group-hover:translate-x-1 transition-transform">
+                <span className="mt-auto text-brand-green-ink font-semibold group-hover:translate-x-1 transition-transform">
                   Read more →
                 </span>
               </Link>

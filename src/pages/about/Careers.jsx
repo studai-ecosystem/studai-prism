@@ -52,7 +52,7 @@ function ApplyForm({ job, onClose }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-gold hover:brightness-105 transition"
+              className="px-5 py-2 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-brand-green hover:brightness-105 transition"
             >
               Done
             </button>
@@ -66,7 +66,7 @@ function ApplyForm({ job, onClose }) {
                 required
                 value={form.name}
                 onChange={update('name')}
-                className="w-full border border-[var(--color-line)] rounded-lg px-3 py-2 focus:outline-none focus:border-gold"
+                className="w-full border border-[var(--color-line)] rounded-lg px-3 py-2 focus:outline-none focus:border-brand-navy"
               />
             </div>
             <div>
@@ -76,7 +76,7 @@ function ApplyForm({ job, onClose }) {
                 required
                 value={form.email}
                 onChange={update('email')}
-                className="w-full border border-[var(--color-line)] rounded-lg px-3 py-2 focus:outline-none focus:border-gold"
+                className="w-full border border-[var(--color-line)] rounded-lg px-3 py-2 focus:outline-none focus:border-brand-navy"
               />
             </div>
             <div>
@@ -88,7 +88,7 @@ function ApplyForm({ job, onClose }) {
                 value={form.resumeUrl}
                 onChange={update('resumeUrl')}
                 placeholder="https://"
-                className="w-full border border-[var(--color-line)] rounded-lg px-3 py-2 focus:outline-none focus:border-gold"
+                className="w-full border border-[var(--color-line)] rounded-lg px-3 py-2 focus:outline-none focus:border-brand-navy"
               />
             </div>
             <div>
@@ -99,7 +99,7 @@ function ApplyForm({ job, onClose }) {
                 rows={3}
                 value={form.message}
                 onChange={update('message')}
-                className="w-full border border-[var(--color-line)] rounded-lg px-3 py-2 focus:outline-none focus:border-gold resize-none"
+                className="w-full border border-[var(--color-line)] rounded-lg px-3 py-2 focus:outline-none focus:border-brand-navy resize-none"
               />
             </div>
 
@@ -108,7 +108,7 @@ function ApplyForm({ job, onClose }) {
             <button
               type="submit"
               disabled={status === 'submitting'}
-              className="w-full px-5 py-2.5 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-gold hover:brightness-105 transition disabled:opacity-60"
+              className="w-full px-5 py-2.5 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-brand-green hover:brightness-105 transition disabled:opacity-60"
             >
               {status === 'submitting' ? 'Submitting…' : 'Submit application'}
             </button>
@@ -169,7 +169,7 @@ export default function Careers() {
             {roles.map((role) => (
               <div
                 key={role.id}
-                className="bg-white rounded-2xl shadow-sm p-6 border-l-4 border-gold flex flex-col"
+                className="bg-white rounded-2xl shadow-sm p-6 border-l-4 border-brand-green flex flex-col"
               >
                 <h3 className="text-xl font-bold text-[var(--color-ink)] mb-2">{role.title}</h3>
                 <p className="text-[var(--color-ink-muted)] mb-3">
@@ -181,7 +181,7 @@ export default function Careers() {
                 <button
                   type="button"
                   onClick={() => setActiveJob(role)}
-                  className="mt-auto inline-block self-start px-5 py-2 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-gold hover:brightness-105 transition"
+                  className="mt-auto inline-block self-start px-5 py-2 rounded-lg font-bold text-sm text-[var(--color-ink)] bg-brand-green hover:brightness-105 transition"
                 >
                   Apply →
                 </button>
@@ -197,7 +197,7 @@ export default function Careers() {
           Don't see your role? Write to us at{' '}
           <a
             href="mailto:careers@studai.one"
-            className="text-gold font-semibold hover:underline"
+            className="text-brand-green-ink font-semibold hover:underline"
           >
             careers@studai.one
           </a>

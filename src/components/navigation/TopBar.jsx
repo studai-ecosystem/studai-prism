@@ -29,7 +29,7 @@ export function TopBar({ onOpenNav, navLabel = 'Open navigation' }) {
         </IconButton>
       )}
       <Link to="/app" className="shrink-0" aria-label="Prism home">
-        <PrismLogo size={24} subtitle={null} wordmarkColor="var(--prism-ink)" />
+        <PrismLogo size={24} />
       </Link>
       <div className="ml-2 flex min-w-0 items-center gap-2">
         {campusEnabled && <WorkspaceSwitcher />}

@@ -42,7 +42,7 @@ export default function AboutStudAI() {
 
       {/* Section 2 — Why we built Prism */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-gold">
+        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-brand-green">
           <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">
             Why we built Prism
           </h2>
@@ -63,7 +63,7 @@ export default function AboutStudAI() {
               key={s.label}
               className="bg-white rounded-2xl shadow-sm p-8 text-center"
             >
-              <p className="text-4xl font-bold text-gold mb-2">{s.value}</p>
+              <p className="text-4xl font-bold text-brand-green-ink mb-2">{s.value}</p>
               <p className="text-[var(--color-ink-muted)]">{s.label}</p>
             </div>
           ))}

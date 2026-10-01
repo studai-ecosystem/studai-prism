@@ -5,7 +5,7 @@
 .prism-app {
   background-color: var(--prism-canvas);
   color: var(--prism-ink);
-  font-family: 'Noto Sans', system-ui, sans-serif;
+  font-family: var(--font-body);
   min-height: 100vh;
 }
 
@@ -18,7 +18,7 @@
 /* Overlays render in a portal outside .prism-app; keep the app type + colour. */
 .prism-portal {
   color: var(--prism-ink);
-  font-family: 'Noto Sans', system-ui, sans-serif;
+  font-family: var(--font-body);
 }
 
 .sr-only-focusable:not(:focus):not(:focus-within) {

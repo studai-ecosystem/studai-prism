@@ -23,4 +23,37 @@ export function Skeleton({ variant = 'block', label = 'Loading', lines = 3, clas
   )
 }
 
+// Standard skeleton shapes for pages, cards and tables.
+export function PageSkeleton({ label = 'Loading' }) {
+  return <Skeleton variant="page" label={label} />
+}
+
+export function CardSkeleton({ label = 'Loading', className }) {
+  return (
+    <div role="status" aria-live="polite" className={cx('rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface p-4', className)}>
+      <span className="sr-only">{label}{'\u2026'}</span>
+      <div aria-hidden="true" className="space-y-3">
+        <Bar className="h-5 w-1/3" />
+        <Bar className="h-4 w-full" />
+        <Bar className="h-4 w-2/3" />
+      </div>
+    </div>
+  )
+}
+
+export function TableSkeleton({ rows = 5, columns = 4, label = 'Loading' }) {
+  return (
+    <div role="status" aria-live="polite" className="rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface">
+      <span className="sr-only">{label}{'\u2026'}</span>
+      <div aria-hidden="true" className="divide-y divide-[var(--prism-border)]">
+        {Array.from({ length: rows }, (_, r) => (
+          <div key={r} className="grid gap-4 p-3" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+            {Array.from({ length: columns }, (_, c) => <Bar key={c} className="h-4" />)}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default Skeleton

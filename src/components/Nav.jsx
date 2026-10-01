@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { FileText, BarChart3, ClipboardCheck, Newspaper, Building2, Users, Globe, Briefcase, Megaphone, X } from 'lucide-react'
 import PrismLogo from './ui/PrismLogo.jsx'
 import { isAuthenticated, clearUser } from '../lib/session.js'
 
@@ -11,18 +12,18 @@ const navLinks = [
 ]
 
 const researchLinks = [
-  { icon: '📄', label: 'The Science Behind Prism', desc: 'How we measure 5 skill dimensions', to: '/research/science' },
-  { icon: '📊', label: 'Scoring Methodology',      desc: 'How scores are produced — validation in progress', to: '/research/validity' },
-  { icon: '🧠', label: 'AI Evaluation',            desc: 'How our AI evaluation panel scores your responses', to: '/research/ai-evaluation' },
-  { icon: '📰', label: 'Blog',                     desc: 'Insights on skills, hiring and AI', to: '/research/blog' },
+  { icon: FileText, label: 'The Science Behind Prism', desc: 'How we measure 5 skill dimensions', to: '/research/science' },
+  { icon: BarChart3, label: 'Scoring Methodology',      desc: 'How scores are produced — validation in progress', to: '/research/validity' },
+  { icon: ClipboardCheck, label: 'AI Evaluation',            desc: 'How our AI evaluation panel scores your responses', to: '/research/ai-evaluation' },
+  { icon: Newspaper, label: 'Blog',                     desc: 'Insights on skills, hiring and AI', to: '/research/blog' },
 ]
 
 const aboutLinks = [
-  { icon: '🏢', label: 'About StudAI One', desc: 'Who we are and why we built Prism', to: '/about' },
-  { icon: '👥', label: 'Our Team',         desc: 'The people behind the product', href: '#team' },
-  { icon: '🌏', label: 'Our Mission',      desc: "Building the skills layer for India's workforce", to: '/about/mission' },
-  { icon: '💼', label: 'Careers',          desc: 'Join the StudAI One team', to: '/about/careers' },
-  { icon: '📢', label: 'Press',            desc: 'News and media coverage', href: '#press' },
+  { icon: Building2, label: 'About StudAI One', desc: 'Who we are and why we built Prism', to: '/about' },
+  { icon: Users, label: 'Our Team',         desc: 'The people behind the product', href: '#team' },
+  { icon: Globe, label: 'Our Mission',      desc: "Building the skills layer for India's workforce", to: '/about/mission' },
+  { icon: Briefcase, label: 'Careers',          desc: 'Join the StudAI One team', to: '/about/careers' },
+  { icon: Megaphone, label: 'Press',            desc: 'News and media coverage', href: '#press' },
 ]
 
 const dropdowns = {
@@ -122,12 +123,12 @@ export default function Nav({ onGetAssessed, activeHref }) {
       <header
         ref={navRef}
         className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-[var(--color-paper)]/90 border-b border-[var(--color-line)]"
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
+        style={{ fontFamily: 'var(--font-body)' }}
       >
         <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
           <Link to="/" aria-label="Prism home">
-            <PrismLogo size={34} wordmarkColor="var(--color-ink)" subtitleColor="var(--color-ink-muted)" />
+            <PrismLogo size={34} />
           </Link>
 
           {/* Desktop links */}
@@ -169,12 +170,12 @@ export default function Nav({ onGetAssessed, activeHref }) {
                     <div className="absolute left-0 top-full pt-3 w-[220px]">
                     <div
                       className="prism-dropdown-anim w-full bg-white rounded-lg overflow-hidden border-l-[3px] border-[var(--color-accent)]"
-                      style={{ boxShadow: '0 12px 32px rgba(10,13,20,0.12)' }}
+                      style={{ boxShadow: '0 12px 32px rgba(8,22,51,0.12)' }}
                     >
                       {dropdowns[key].map((item) => {
                         const inner = (
                           <>
-                            <span className="text-base leading-5">{item.icon}</span>
+                            <span className="text-base leading-5 text-[var(--color-ink-muted)]"><item.icon size={18} aria-hidden="true" /></span>
                             <span className="flex flex-col">
                               <span className="text-[13px] font-semibold text-[var(--color-ink)] leading-tight">{item.label}</span>
                               <span className="text-[11px] text-[var(--color-ink-muted)] leading-snug mt-0.5">{item.desc}</span>
@@ -253,17 +254,17 @@ export default function Nav({ onGetAssessed, activeHref }) {
       {/* Mobile full-screen overlay */}
       <div
         className={`prism-overlay md:hidden fixed inset-0 z-[60] bg-[var(--color-paper)] ${mobileOpen ? 'is-open' : ''}`}
-        style={{ fontFamily: "'DM Sans', sans-serif" }}
+        style={{ fontFamily: 'var(--font-body)' }}
         aria-hidden={!mobileOpen}
       >
         <div className="flex items-center justify-between px-6 h-16 border-b border-[var(--color-line)]">
-          <PrismLogo size={34} wordmarkColor="var(--color-ink)" subtitleColor="var(--color-ink-muted)" />
+          <PrismLogo size={34} />
           <button
             onClick={closeMobile}
             aria-label="Close menu"
-            className="w-10 h-10 flex items-center justify-center text-[var(--color-ink)] text-2xl leading-none"
+            className="w-10 h-10 flex items-center justify-center text-[var(--color-ink)]"
           >
-            ✕
+            <X size={22} aria-hidden="true" />
           </button>
         </div>
 
@@ -304,7 +305,7 @@ export default function Nav({ onGetAssessed, activeHref }) {
                     {dropdowns[key].map((item) => {
                       const inner = (
                         <>
-                          <span className="text-base leading-6">{item.icon}</span>
+                          <span className="text-base leading-6 text-[var(--color-ink-muted)]"><item.icon size={20} aria-hidden="true" /></span>
                           <span className="flex flex-col">
                             <span className="text-[15px] font-semibold text-[var(--color-ink)] leading-tight">{item.label}</span>
                             <span className="text-[12px] text-[var(--color-ink-muted)] leading-snug mt-0.5">{item.desc}</span>

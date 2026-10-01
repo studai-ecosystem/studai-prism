@@ -19,11 +19,11 @@ const SRC = join(__dirname, '..', '..', 'src')
 const TOKEN_SOURCES = ['design/tokens.js', 'design/tokens.css']
 
 // The rebuild is COMPLETE: every page and component renders from tokens.
-// The two remaining entries are content assets, not UI code — the character
-// avatar illustrations and the brand logo mark, whose colors are artwork.
+// The one remaining entry is a content asset, not UI code: the character
+// avatar illustrations, whose colours are artwork. The brand logo is now the
+// official image asset (no hex in code), so it left this list.
 // RATCHET: shrink-only (an addition fails the test below).
 const LEGACY_ALLOWLIST = [
-  'components/ui/PrismLogo.jsx',
   'lib/characters.jsx',
 ]
 
@@ -70,9 +70,9 @@ test('PART A: tokens.js and tokens.css declare the same palette (lockstep)', asy
   }
 })
 
-test('PART A: multilingual type pair is actually loaded (PRISM_LANG-ready)', async () => {
+test('PART A: brand type (Inter) plus Devanagari and Tamil companions is actually loaded (PRISM_LANG-ready)', async () => {
   const html = await readFile(join(SRC, '..', 'index.html'), 'utf-8')
-  for (const family of ['Fraunces', 'Noto+Sans', 'Noto+Sans+Devanagari', 'Noto+Sans+Tamil', 'IBM+Plex+Mono']) {
+  for (const family of ['Inter', 'Noto+Sans+Devanagari', 'Noto+Sans+Tamil', 'IBM+Plex+Mono']) {
     assert.ok(html.includes(family), `index.html must load ${family}`)
   }
   const tokens = await readFile(join(SRC, 'design', 'tokens.js'), 'utf-8')

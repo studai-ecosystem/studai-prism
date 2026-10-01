@@ -66,7 +66,7 @@ export default function AIEvaluation() {
           {analyses.map((a) => (
             <div
               key={a.title}
-              className="bg-white rounded-2xl shadow-sm p-6 border-t-2 border-transparent hover:border-gold transition-colors"
+              className="bg-white rounded-2xl shadow-sm p-6 border-t-2 border-transparent hover:border-brand-green transition-colors"
             >
               <h3 className="text-xl font-bold text-[var(--color-ink)] mb-3">
                 {a.title}
@@ -86,7 +86,7 @@ export default function AIEvaluation() {
           <ul className="flex flex-col gap-4">
             {doesNot.map((item) => (
               <li key={item} className="flex items-start gap-3">
-                <span className="text-gold font-bold text-xl leading-6 flex-shrink-0">
+                <span className="text-brand-green-ink font-bold text-xl leading-6 flex-shrink-0">
                   ✓
                 </span>
                 <span className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
@@ -100,7 +100,7 @@ export default function AIEvaluation() {
 
       {/* Section 4 — Privacy */}
       <section className="py-12 pb-20 px-6 max-w-6xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-gold">
+        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-brand-green">
           <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">Privacy</h2>
           <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
             Your assessment conversation is processed to generate your score

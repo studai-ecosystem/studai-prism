@@ -40,7 +40,7 @@ export default function Mission() {
 
       {/* Vision statement */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <div className="bg-[var(--color-paper)] rounded-2xl shadow-sm p-10 md:p-14 max-w-3xl mx-auto border-l-4 border-gold">
+        <div className="bg-[var(--color-paper)] rounded-2xl shadow-sm p-10 md:p-14 max-w-3xl mx-auto border-l-4 border-brand-green">
           <p className="text-2xl md:text-3xl font-serif text-[var(--color-ink)] leading-snug">
             “A world where every capable person has a verified, verifiable
             proof of what they can do — regardless of where they studied or who
@@ -58,9 +58,9 @@ export default function Mission() {
           {pillars.map((p, i) => (
             <div
               key={p.name}
-              className="bg-white rounded-2xl shadow-sm p-8 border-t-2 border-transparent hover:border-gold transition-colors"
+              className="bg-white rounded-2xl shadow-sm p-8 border-t-2 border-transparent hover:border-brand-green transition-colors"
             >
-              <span className="text-3xl font-bold text-gold">
+              <span className="text-3xl font-bold text-brand-green-ink">
                 {String(i + 1).padStart(2, '0')}
               </span>
               <h3 className="text-xl font-bold text-[var(--color-ink)] mt-3 mb-3">
