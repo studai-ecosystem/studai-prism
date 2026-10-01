@@ -27,12 +27,15 @@ for (const width of WIDTHS) {
       await quick.getByRole('link', { name: 'Assess' }).click()
       await expect(page.getByRole('heading', { level: 1, name: 'Assessments' })).toBeVisible()
       if (await isDesktop()) {
-        await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'My Capabilities' }).click()
+        await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Capabilities' }).click()
       } else {
+        await quick.getByRole('link', { name: 'Capabilities' }).click()
+        // Everything not in the quick bar opens from More.
         await page.getByRole('button', { name: 'More' }).click()
         const drawer = page.getByRole('dialog', { name: 'More' })
         await expect(drawer).toBeVisible()
-        await drawer.getByRole('link', { name: 'My Capabilities' }).click()
+        await expect(drawer.getByRole('link', { name: 'Explore' })).toBeVisible()
+        await page.keyboard.press('Escape')
       }
       await expect(page.getByText('You do not have a formal capability profile yet.')).toBeVisible()
     } else {

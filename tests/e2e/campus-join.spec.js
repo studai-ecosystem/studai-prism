@@ -43,7 +43,7 @@ test.describe('@critical @campus Journey B — join a college without exposing p
     // Only sponsored sections exist in the campus workspace.
     const nav = page.getByRole('navigation', { name: 'Primary' })
     await expect(nav.getByRole('link', { name: 'Capabilities' })).toHaveCount(0)
-    await expect(nav.getByRole('link', { name: 'Sharing' })).toHaveCount(0)
+    await expect(nav.getByRole('link', { name: 'Shared reports' })).toHaveCount(0)
     await expectNoSeriousAxe(page)
 
     // One identity, two workspaces.

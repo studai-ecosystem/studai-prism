@@ -15,9 +15,9 @@ export function PageHeader({ id = 'page-title', title, description, context, bre
         {breadcrumbs && <Breadcrumbs items={breadcrumbs} />}
         <div className="flex flex-wrap items-center gap-2">
           <h1 id={id} tabIndex={-1} className="text-2xl font-semibold text-prism-ink focus:outline-none">{title}</h1>
-          {context && (
-            <Badge tone={context.type === 'PERSONAL' ? 'neutral' : 'accent'}>
-              {context.type === 'PERSONAL' ? 'Personal' : context.organizationName || context.name}
+          {context && context.type !== 'PERSONAL' && (
+            <Badge tone="accent">
+              {context.organizationName || context.name}
             </Badge>
           )}
         </div>

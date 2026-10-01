@@ -127,7 +127,7 @@ describe('AppRouter — mixed and all-on flag combinations never loop and keep l
     mockFetch({ ...studentRoutes(), '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true, PRISM_ROLE_EXPLORATION_V2: true } }), '/api/': pendingApi })
     renderApp(app, { route: '/app/home' })
     const nav = await screen.findByRole('navigation', { name: 'Primary' })
-    await userEvent.click(within(nav).getByRole('link', { name: 'Explore Roles' }))
+    await userEvent.click(within(nav).getByRole('link', { name: 'Explore' }))
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Explore Roles' })).toHaveFocus())
     expect(document.title).toBe('Explore Roles · Prism')
   })
@@ -171,7 +171,7 @@ describe('AppRouter — PRISM_APP_SHELL_V3 on', () => {
     renderApp(app, { route: '/app/home' })
     const nav = await screen.findByRole('navigation', { name: 'Primary' })
     expect(within(nav).getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
-    await userEvent.click(within(nav).getByRole('link', { name: 'My Capabilities' }))
+    await userEvent.click(within(nav).getByRole('link', { name: 'Capabilities' }))
     expect(await screen.findByText('You do not have a formal capability profile yet.')).toBeInTheDocument()
   })
   it('every §6.2 section renders a page with an h1', async () => {

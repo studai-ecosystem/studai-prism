@@ -2,24 +2,17 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, Menu } from 'lucide-react'
 import PrismLogo from '../ui/PrismLogo.jsx'
 import { Avatar } from '../ui/Avatar.jsx'
-import { Badge } from '../ui/Badge.jsx'
 import { DropdownMenu } from '../ui/DropdownMenu.jsx'
 import { IconButton } from '../ui/Button.jsx'
 import { useAuth } from '../../app/providers/AuthProvider.jsx'
-import { useWorkspace } from '../../app/providers/WorkspaceProvider.jsx'
-import { useFlag } from '../../app/providers/FeatureFlagProvider.jsx'
-import { WorkspaceSwitcher } from '../../features/workspaces/components/WorkspaceSwitcher.jsx'
-import { workspaceLabel } from '../../features/workspaces/workspacePaths.js'
-import { PrivacyScopeBadge } from '../campus/PrivacyScopeBadge.jsx'
+import { WorkspaceContext } from '../../features/workspaces/components/WorkspaceContext.jsx'
 
-// Top bar (spec §7.1): workspace selector, context badge, profile menu.
-// Notifications arrive with Phase 7 (no placeholder control until then).
+// Top bar: brand, the single workspace-context control, account menu. The
+// icon mark shows on small screens, the no-tagline lockup from sm up (the
+// tagline lockup is for marketing, not navigation).
 export function TopBar({ onOpenNav, navLabel = 'Open navigation' }) {
   const { user, signOut } = useAuth()
-  const { active } = useWorkspace()
-  const { enabled: campusEnabled } = useFlag('PRISM_CAMPUS_ENABLED')
   const navigate = useNavigate()
-  const personal = active.type === 'PERSONAL'
 
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-prism-border bg-prism-surface px-3 md:px-5">
@@ -29,14 +22,11 @@ export function TopBar({ onOpenNav, navLabel = 'Open navigation' }) {
         </IconButton>
       )}
       <Link to="/app" className="shrink-0" aria-label="Prism home">
-        <PrismLogo size={24} />
+        <PrismLogo variant="icon" width={32} decorative className="sm:hidden" />
+        <PrismLogo variant="lockup" size={24} decorative className="hidden sm:inline-block" />
       </Link>
-      <div className="ml-2 flex min-w-0 items-center gap-2">
-        {campusEnabled && <WorkspaceSwitcher />}
-        <Badge tone={personal ? 'neutral' : 'accent'} className="hidden sm:inline-flex" aria-label={`Current context: ${workspaceLabel(active)}`}>
-          {workspaceLabel(active)}
-        </Badge>
-        <span className="hidden lg:inline-flex"><PrivacyScopeBadge workspace={active} /></span>
+      <div className="ml-1 min-w-0 md:ml-3">
+        <WorkspaceContext />
       </div>
       <div className="ml-auto shrink-0">
         <DropdownMenu

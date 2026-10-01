@@ -55,3 +55,10 @@
 html.prism-large-text {
   font-size: 112.5%;
 }
+
+/* A heading that receives focus after navigation (tabindex=-1) is a screen-reader
+   landmark, not a control: no ring around it. Interactive elements keep theirs. */
+.prism-app h1[tabindex='-1']:focus-visible,
+.prism-app h2[tabindex='-1']:focus-visible {
+  outline: none;
+}

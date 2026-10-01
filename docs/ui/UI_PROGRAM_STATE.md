@@ -4,8 +4,8 @@ Live checklist for `.github/skills/prism-ui/references/master-spec.md`. Keep the
 Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, autopilot.
 
 <!-- UI-STATE:BEGIN
-run_mode: off
-active_phase: C
+run_mode: autopilot
+active_phase: D
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -30,6 +30,7 @@ UI-STATE:END -->
 | U5 | Phase B kept --color-* and --prism-* as compatibility aliases onto the new brand tokens, so 182 files re-skin without edits; later phases migrate components to the semantic token classes as they are redesigned and the aliases are removed in phase M. |
 | U6 | The legacy report header text 'Verified Assessment' was removed with its hand-built logo mark (the official lockup carries the name); report body content is untouched. |
 | U7 | Dingbat check marks (U+2713 style) remain in story, research, report and flow text for their own phases; Nav, Briefing and shared components are glyph-free. |
+| U8 | Phase C: the personal nav groups Evidence and Shared reports under a labelled group; Profile remains in the account menu (a /profile page exists outside the shell until phase K). |
 | U4 | The landing sample score (Critical thinking 74) and dimension weight percentages conflict with the no-fabricated-data law; replaced in phase J with an illustrative, number-free evidence thread. |
 
 ## Risks and open questions
@@ -78,18 +79,18 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase C - Unified shell, navigation and workspace context
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ a51b221 (build, vitest 234, server 620/596/0/24, static audit, playwright chromium + mobile-chromium 286)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] C.01 AppShell (Sidebar, Topbar, ContextHeader, Breadcrumb, MainContent, ContextActions) shared by personal, campus and internal surfaces
-- [ ] C.02 Workspace switcher: Personal and sponsored campus, active context, privacy boundary text, never implies institutional ownership
-- [ ] C.03 Personal navigation: Home, Assessments, Capabilities, Development, Growth, Explore, Profile; secondary Shared reports, Credentials, Settings, Privacy
-- [ ] C.04 Campus navigation by permission: Overview, Students, Cohorts, Assessments, Capabilities, Development, Interventions, Growth, Reports, Settings
-- [ ] C.05 Responsive navigation: persistent sidebar, compact tablet, drawer or bottom nav on mobile, collapsed icon-only sidebar
-- [ ] C.06 Route hierarchy and redirects for legacy public URLs; standalone pages folded into the shell where the matrix says MERGE
-- [ ] C.07 Brand presence rules in shell, auth and reports; no tagline under nav logos
-- [ ] C.08 Tests (guards, nav by role, switcher keyboard) and gates, commit
+- [x] C.01 AppShell (Sidebar, Topbar, ContextHeader, Breadcrumb, MainContent, ContextActions) shared by personal, campus and internal surfaces - evidence: src/layouts/AppShell.jsx (collapsible sidebar from the layout tokens, content width token, skip link, route focus) with SideNav, TopBar and the new WorkspaceContext; shared by personal, campus and sponsored views. ContextHeader, breadcrumbs and page actions stay page-level (PageHeader and Breadcrumbs) rather than shell slots
+- [x] C.02 Workspace switcher: Personal and sponsored campus, active context, privacy boundary text, never implies institutional ownership - evidence: src/features/workspaces/components/WorkspaceContext.jsx and WorkspaceSwitcher.jsx: one control that names the workspace and who can see it (Personal, Private to you / Visible to <org>), options explain the boundary ("Private to you. Your institution never sees it."); replaces three redundant indicators; PageHeader shows its badge only outside the personal workspace; scope wording in workspacePaths.scopeText
+- [x] C.03 Personal navigation: Home, Assessments, Capabilities, Development, Growth, Explore, Profile; secondary Shared reports, Credentials, Settings, Privacy - evidence: src/components/navigation/navConfig.js: Home, Assessments, Capabilities, Development, Growth, Explore, then a labelled Evidence and sharing group (Evidence, Shared reports), footer Help and Settings; Profile stays in the account menu until phase K merges it into Settings; Credentials and Privacy have no personal route yet and were not invented
+- [x] C.04 Campus navigation by permission: Overview, Students, Cohorts, Assessments, Capabilities, Development, Interventions, Growth, Reports, Settings - evidence: campus nav grouped into People, Assess and develop, Insight, Administration (permissions unchanged); alias routes /campus/:org/interventions, /growth and /capabilities redirect to development, reassessments and analytics; the Capabilities, Interventions and Growth labels move with the campus page redesign in phase I
+- [x] C.05 Responsive navigation: persistent sidebar, compact tablet, drawer or bottom nav on mobile, collapsed icon-only sidebar - evidence: persistent sidebar from 768 px, collapsible to icons (remembered in localStorage, aria-expanded, titles and accessible names kept), mobile bottom bar Home, Assess, Capabilities, Develop, More, drawer for the rest; icon mark below sm, lockup from sm; checked at 1440, 1024, 768, 390 with 0 overflow
+- [x] C.06 Route hierarchy and redirects for legacy public URLs; standalone pages folded into the shell where the matrix says MERGE - evidence: AppRouter.jsx: /app/missions/:missionId alias to the development mission URL; campus aliases above; every existing URL unchanged. Folding of the legacy funnel pages (Briefing, Profile, report, mission) into the shell is scheduled with their phases (E, F, G, K) where the matrix says MERGE
+- [x] C.07 Brand presence rules in shell, auth and reports; no tagline under nav logos - evidence: TopBar: no-tagline lockup (160 px minimum enforced) and icon mark, decorative images inside a labelled Prism home link; no tagline in navigation
+- [x] C.08 Tests (guards, nav by role, switcher keyboard) and gates, commit - evidence: src/layouts/shellNavigation.test.jsx (8 new tests: IA, groups, collapse and persistence, single context control, mission alias); selector updates in layouts and router tests and campus-shell and campus-join specs; build PASS; vitest 234/234; server 620/596/0/24; static audit PASS; playwright chromium + mobile-chromium 286 passed (6.1 min); visual QA at 1440, collapsed, 1024, 768, 390 and the More drawer (audit-results/ui/phase-c)
 
 ## Phase D - Personal home, assessments list and capabilities
 

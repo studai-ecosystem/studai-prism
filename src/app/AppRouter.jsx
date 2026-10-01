@@ -241,6 +241,8 @@ export default function AppRouter() {
           <Route path="/app/assessment/:sessionId" element={<V3Route flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell legacyPath="/workspace/:sessionId" page={<AuthGuard><AssessmentPlayerPage /></AuthGuard>} />} />
           <Route path="/app/reports/:sessionId" element={<V3Route flag="PRISM_STUDENT_REPORT_V3" requiresShell legacyPath="/report/:sessionId/v2" page={inShell(<StudentReportPage />)} />} />
           <Route path="/app/development/missions/:missionId" element={<V3Route flag="PRISM_DEVELOPMENT_V2" requiresShell legacyPath="/missions/:missionId" page={inShell(<MissionPlayerPage />)} />} />
+          {/* Short mission URL: an alias; the development path stays canonical. */}
+          <Route path="/app/missions/:missionId" element={<ShellGate><ParamRedirect to="/app/development/missions/:missionId" /></ShellGate>} />
           <Route path="/app/explore" element={<V3Route flag="PRISM_ROLE_EXPLORATION_V2" requiresShell legacyPath="/explore" page={inShell(<ExplorePage />)} />} />
           <Route path="/app/*" element={<ShellGate><Navigate to="/app/home" replace /></ShellGate>} />
 
@@ -294,6 +296,10 @@ export default function AppRouter() {
             <Route path="reassessments" element={<FlagRoute flag="PRISM_GROWTH_ENABLED" onError="error" on={<CampusReassessmentsPage />} off={<CampusNotYetAvailablePage title="Reassessments" />} />} />
             <Route path="analytics" element={<FlagRoute flag="PRISM_CAMPUS_ANALYTICS" onError="error" on={<CampusAnalyticsPage />} off={<CampusNotYetAvailablePage title="Analytics" />} />} />
             <Route path="reports" element={<FlagRoute flag="PRISM_CAMPUS_ANALYTICS" onError="error" on={<CampusReportsPage />} off={<CampusNotYetAvailablePage title="Reports" />} />} />
+            {/* Wording aliases for the target IA: Interventions, Growth, Capabilities. */}
+            <Route path="interventions" element={<ParamRedirect to="/campus/:organizationId/development" />} />
+            <Route path="growth" element={<ParamRedirect to="/campus/:organizationId/reassessments" />} />
+            <Route path="capabilities" element={<ParamRedirect to="/campus/:organizationId/analytics" />} />
             <Route path="integrations" element={<CampusIntegrationsPage />} />
             <Route path="billing" element={<CampusBillingPage />} />
             <Route path="*" element={<ParamRedirect to="/campus/:organizationId/overview" />} />

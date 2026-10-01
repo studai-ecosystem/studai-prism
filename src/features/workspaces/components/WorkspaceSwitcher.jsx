@@ -5,7 +5,7 @@ import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useToast } from '../../../components/ui/Toast.jsx'
 import { useDismiss } from '../../../hooks/useFocusTrap.js'
 import { cx } from '../../../lib/cx.js'
-import { homePathFor, workspaceLabel } from '../workspacePaths.js'
+import { homePathFor, scopeText, workspaceLabel } from '../workspacePaths.js'
 
 // Workspace selector (spec §7.2). Listbox pattern: arrow keys move, Enter
 // selects, Esc closes. Switching drops the previous workspace's cached data
@@ -56,12 +56,15 @@ export function WorkspaceSwitcher() {
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-labelledby={`${listId}-label ${listId}-value`}
+        aria-labelledby={`${listId}-label ${listId}-value ${listId}-scope`}
         onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); openList() } }}
-        className="inline-flex max-w-[7rem] items-center gap-2 rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-surface px-3 py-1.5 text-sm font-medium text-prism-ink hover:bg-prism-subtle sm:max-w-[14rem]"
+        className="inline-flex max-w-[9rem] items-center gap-2 rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-surface px-3 py-1 text-left text-sm font-medium text-prism-ink hover:bg-prism-subtle sm:max-w-[18rem]"
       >
-        <span id={`${listId}-value`} className="truncate">{workspaceLabel(active)}</span>
+        <span className="min-w-0 leading-tight">
+          <span id={`${listId}-value`} className="block truncate">{workspaceLabel(active)}</span>
+          <span id={`${listId}-scope`} className="hidden truncate text-[11px] font-normal text-prism-ink-subtle sm:block">{scopeText(active)}</span>
+        </span>
         <ChevronsUpDown size={14} aria-hidden="true" className="shrink-0 text-prism-ink-subtle" />
       </button>
       {open && (
@@ -88,7 +91,7 @@ export function WorkspaceSwitcher() {
               >
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{workspaceLabel(w)}</span>
-                  <span className="block text-xs text-prism-ink-subtle">{w.type === 'PERSONAL' ? 'Only you can see this' : w.type === 'CAMPUS_ADMIN' ? 'Institution administration' : 'Sponsored by your institution'}</span>
+                  <span className="block text-xs text-prism-ink-subtle">{w.type === 'PERSONAL' ? 'Private to you. Your institution never sees it.' : w.type === 'CAMPUS_ADMIN' ? 'Institution administration' : `Sponsored by ${w.organizationName || w.name}. Your own results stay private.`}</span>
                 </span>
                 {selected && <Check size={16} aria-hidden="true" className="shrink-0 text-prism-accent" />}
               </li>
