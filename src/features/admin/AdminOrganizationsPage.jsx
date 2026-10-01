@@ -26,37 +26,37 @@ function NewContract({ orgId, onCreated, onError }) {
     } catch (err) { onError(err.message) }
   }
   return (
-    <form onSubmit={submit} className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 space-y-3" aria-label="New draft contract">
-      <p className="font-sans text-sm font-semibold text-[var(--color-ink)]">New draft contract</p>
+    <form onSubmit={submit} className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4 space-y-3" aria-label="New draft contract">
+      <p className="font-sans text-sm font-semibold text-[var(--prism-ink)]">New draft contract</p>
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-        <label className="font-sans text-xs text-[var(--color-ink-muted)] md:col-span-2">Name
+        <label className="font-sans text-xs text-[var(--prism-ink-muted)] md:col-span-2">Name
           <input className={`${field} w-full`} value={form.name} onChange={set('name')} maxLength={160} required />
         </label>
-        <label className="font-sans text-xs text-[var(--color-ink-muted)]">Term start
+        <label className="font-sans text-xs text-[var(--prism-ink-muted)]">Term start
           <input type="date" className={`${field} w-full`} value={form.termStart} onChange={set('termStart')} required />
         </label>
-        <label className="font-sans text-xs text-[var(--color-ink-muted)]">Term end
+        <label className="font-sans text-xs text-[var(--prism-ink-muted)]">Term end
           <input type="date" className={`${field} w-full`} value={form.termEnd} onChange={set('termEnd')} required />
         </label>
-        <label className="font-sans text-xs text-[var(--color-ink-muted)]">Included seats
+        <label className="font-sans text-xs text-[var(--prism-ink-muted)]">Included seats
           <input type="number" min={1} step={1} className={`${field} w-full`} value={form.includedSeats} onChange={set('includedSeats')} required />
         </label>
       </div>
-      <label className="block font-sans text-xs text-[var(--color-ink-muted)]">Billable event
+      <label className="block font-sans text-xs text-[var(--prism-ink-muted)]">Billable event
         <select className={`${field} block`} value={form.billableEvent} onChange={set('billableEvent')}>
           {Object.entries(EVENTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
       </label>
       <fieldset className="flex flex-wrap gap-4">
-        <legend className="font-sans text-xs text-[var(--color-ink-muted)] mb-1">Included components (no amounts — finance sets prices)</legend>
+        <legend className="font-sans text-xs text-[var(--prism-ink-muted)] mb-1">Included components (no amounts — finance sets prices)</legend>
         {Object.entries(COMPONENTS).map(([k, v]) => (
-          <label key={k} className="inline-flex items-center gap-1.5 font-sans text-[13px] text-[var(--color-ink)]">
+          <label key={k} className="inline-flex items-center gap-1.5 font-sans text-[13px] text-[var(--prism-ink)]">
             <input type="checkbox" checked={Boolean(form.components[k])} onChange={(e) => setForm({ ...form, components: { ...form.components, [k]: e.target.checked } })} />
             {v}
           </label>
         ))}
       </fieldset>
-      <label className="block font-sans text-xs text-[var(--color-ink-muted)]">Reason (audited, at least 10 characters)
+      <label className="block font-sans text-xs text-[var(--prism-ink-muted)]">Reason (audited, at least 10 characters)
         <input className={`${field} w-full`} value={form.reason} onChange={set('reason')} maxLength={500} required />
       </label>
       <button type="submit" className={btn}>Create draft</button>
@@ -83,7 +83,7 @@ function Detail({ orgId, onBack }) {
       load()
     } catch (err) { setError(err.message) }
   }
-  if (!data) return <div className="p-6"><ErrorNotice error={error} />{!error && <p className="font-sans text-sm text-[var(--color-ink-muted)]">Loading…</p>}</div>
+  if (!data) return <div className="p-6"><ErrorNotice error={error} />{!error && <p className="font-sans text-sm text-[var(--prism-ink-muted)]">Loading…</p>}</div>
   const roles = Object.entries(data.memberships.byRole)
   return (
     <div className="p-6 max-w-6xl space-y-5">
@@ -94,7 +94,7 @@ function Detail({ orgId, onBack }) {
       <Notice>{notice}</Notice>
 
       <section aria-labelledby="org-members">
-        <h2 id="org-members" className="font-sans text-sm font-semibold text-[var(--color-ink)] mb-2">Memberships ({data.memberships.total})</h2>
+        <h2 id="org-members" className="font-sans text-sm font-semibold text-[var(--prism-ink)] mb-2">Memberships ({data.memberships.total})</h2>
         <DataTable
           rowKey={([role]) => role}
           rows={roles}
@@ -107,7 +107,7 @@ function Detail({ orgId, onBack }) {
       </section>
 
       <section aria-labelledby="org-seats">
-        <h2 id="org-seats" className="font-sans text-sm font-semibold text-[var(--color-ink)] mb-2">Sponsored seat pools</h2>
+        <h2 id="org-seats" className="font-sans text-sm font-semibold text-[var(--prism-ink)] mb-2">Sponsored seat pools</h2>
         <DataTable
           rowKey={(e) => e.id}
           rows={data.entitlements}
@@ -124,7 +124,7 @@ function Detail({ orgId, onBack }) {
       </section>
 
       <section aria-labelledby="org-contracts" className="space-y-3">
-        <h2 id="org-contracts" className="font-sans text-sm font-semibold text-[var(--color-ink)]">Contracts</h2>
+        <h2 id="org-contracts" className="font-sans text-sm font-semibold text-[var(--prism-ink)]">Contracts</h2>
         <DataTable
           rowKey={(c) => c.id}
           rows={data.contracts}
@@ -148,7 +148,7 @@ function Detail({ orgId, onBack }) {
           ]}
         />
         {canManage && <NewContract orgId={orgId} onCreated={(m) => { setNotice(m); load() }} onError={setError} />}
-        <p className="font-sans text-xs text-[var(--color-ink-muted)]">Prices are not entered in the console. Finance records approved prices outside the application (HA-C006).</p>
+        <p className="font-sans text-xs text-[var(--prism-ink-muted)]">Prices are not entered in the console. Finance records approved prices outside the application (HA-C006).</p>
       </section>
     </div>
   )

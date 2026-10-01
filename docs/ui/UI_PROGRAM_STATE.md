@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: off
-active_phase: M
+active_phase: none
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -223,14 +223,13 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase M - Testing, cleanup and production validation
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 0412e67 (build, vitest 308, server 623/599/0/24 incl. the three new ratchets, static audit, playwright all four projects 602 passed, 4 flaky that passed on retry (firefox: campus analytics, marketing reference simulation, PRISM-E2E-28; webkit: campus development V2), 18 skipped = the chromium-only width matrix on the other three projects, 0 failed)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] M.01 Repository search for gold, amber, indigo, purple, slate-950, emerald, raw hex, PRISM NEXT, Verified Prism Score, emoji UI, old logo, legacy gradients; each occurrence evaluated and resolved or justified
-- [ ] M.02 Dead CSS, duplicate components, obsolete helpers and unused imports removed
-- [ ] M.03 Full suites: build, unit, server, static audit, complete Playwright on all projects
-- [ ] M.04 Visual QA of every major route at 1440, 1024, 768, 390 reviewed
-- [ ] M.05 Final delivery report (what changed, architecture, shared components, routes, responsive, accessibility, removed legacy, tests, blockers, files changed, routes needing human approval, confirmation that scoring was not altered, completion statement)
-- [ ] M.06 Commit, set Status COMPLETE and run_mode off
-
+- [x] M.01 Repository search - evidence: gold (one comment, reworded), amber (6 stock palette status classes in the phone link, room scan and identity pages, moved to the status tokens together with red and green and 29 plain white fills), indigo, purple, slate, emerald, PRISM NEXT, Verified Prism Score and the other banned phrases (none left), gradients (the certificate header gradient and a tinted panel replaced by solid brand tokens; the only gradients left are the character avatar illustrations in lib/characters.jsx and their use in the briefing), raw hex (only the token files, the grandfathered avatar artwork file, and the theme-colour meta in index.html), old logo and placeholder (none; official artwork only), emoji (one comment emoji removed; the check mark in "valid credential" and "Strengths identified" is a text marker beside its label and stays). The legacy --color-* aliases are removed: 1,714 references in 60 files moved to --prism-*, --brand-* and --status-* (a new --prism-signal token carries green text: green-ink on light, brand green on dark; .room-dark is now expressed in the same tokens); a before and after screenshot comparison of 36 pages (public and personal app routes at 1440 and 390) found no difference above 0.2 percent. --prism-* stays: it is the application token layer that Tailwind and every primitive use. Ratchets added to server/test/designSystem.test.js: no --color-* anywhere, no stock Tailwind palette colours, no gradients outside the avatar artwork
+- [x] M.02 Dead code - evidence: removed three unreferenced files (components/ui/Spinner.jsx, features/shared/NotYetAvailablePage.jsx, hooks/useScrollDirection.js) and nine unused imports; legacy screens were kept where a route or a test still reaches them (ScoreReport, Assessment, Briefing, Payment and the admin pages), and the superseded Profile.jsx went in phase K. Not done: unused exports inside files that are used, because no linter is configured in the repository
+- [x] M.03 Full suites - evidence: see Gates. The width and axe matrix (22 routes), the keyboard walkthroughs and the larger-text and reduced-motion checks pass on chromium; the shared journeys pass on firefox, webkit and the mobile project
+- [x] M.04 Visual QA at 1440, 1024, 768, 390 - evidence: screenshots under audit-results/ui for every phase (campus, student, report, explore, marketing, auth, legal, research, settings, design-system); this phase re-checked 18 routes at 1440 and 390 against the pre-migration baseline (no difference). Routes still needing human visual approval are listed in the final report
+- [x] M.05 Final delivery report - evidence: delivered in the closing message of this run (what changed, architecture, shared components, routes, responsive and accessibility work, removed legacy, tests, blockers and backend gaps, files changed, routes needing human approval, confirmation that scoring and scientific behaviour were not altered)
+- [x] M.06 Commit, Status COMPLETE, run_mode off - evidence: this commit

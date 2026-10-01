@@ -92,17 +92,17 @@ export default function AdminTeamfit() {
       <Notice>{notice}</Notice>
 
       {data?.simulationPlane && (
-        <p className="mb-3 font-mono text-[11px] text-[var(--color-ink-muted)]">{data.simulationPlane}</p>
+        <p className="mb-3 font-mono text-[11px] text-[var(--prism-ink-muted)]">{data.simulationPlane}</p>
       )}
 
       {showCreate && canManage && (
-        <form onSubmit={create} className="mb-4 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <label className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+        <form onSubmit={create} className="mb-4 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+          <label className="font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
             Team name
             <input required className={`${field} w-full mt-1`} value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           </label>
-          <label className="block mt-3 font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+          <label className="block mt-3 font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
             Member session ids (2+, whitespace/comma separated — each must carry the consent scope)
             <textarea required rows={3} className={`${field} w-full mt-1 font-mono text-[12px]`} value={draft.members}
               onChange={(e) => setDraft({ ...draft, members: e.target.value })} />
@@ -136,17 +136,17 @@ export default function AdminTeamfit() {
       />
 
       {teamDetail && (
-        <section className="mt-4 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+        <section className="mt-4 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-base text-[var(--color-ink)]">{teamDetail.team.name}</h2>
+            <h2 className="font-display text-base text-[var(--prism-ink)]">{teamDetail.team.name}</h2>
             <button type="button" className={btn} onClick={() => setTeamDetail(null)}>Close</button>
           </div>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
             <div>
-              <h3 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-1">Members (consent evidence)</h3>
+              <h3 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-1">Members (consent evidence)</h3>
               {teamDetail.members.map((m) => (
-                <p key={m.member_session_id} className="font-mono text-[11px] text-[var(--color-ink)] flex items-center gap-2 py-0.5">
-                  {mono(m.member_session_id, 13)}… <span className="text-[var(--color-ink-muted)]">consent verified {when(m.consent_verified_at)}</span>
+                <p key={m.member_session_id} className="font-mono text-[11px] text-[var(--prism-ink)] flex items-center gap-2 py-0.5">
+                  {mono(m.member_session_id, 13)}… <span className="text-[var(--prism-ink-muted)]">consent verified {when(m.consent_verified_at)}</span>
                   {canManage && !teamDetail.team.archived_at && (
                     <button type="button" className={`${btn} ml-auto`} onClick={() => removeMember(teamDetail.team.team_id, m.member_session_id)}>Remove</button>
                   )}
@@ -166,13 +166,13 @@ export default function AdminTeamfit() {
               )}
             </div>
             <div>
-              <h3 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-1">Simulations</h3>
+              <h3 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-1">Simulations</h3>
               {teamDetail.simulations.length === 0 ? (
-                <p className="font-sans text-[13px] text-[var(--color-ink-muted)]">None recorded.</p>
+                <p className="font-sans text-[13px] text-[var(--prism-ink-muted)]">None recorded.</p>
               ) : (
                 teamDetail.simulations.map((s) => (
                   <button key={s.teamfit_id} type="button" onClick={() => openSim(s.teamfit_id)}
-                    className="block w-full text-left font-mono text-[11px] text-[var(--color-accent)] underline py-0.5">
+                    className="block w-full text-left font-mono text-[11px] text-[var(--prism-signal)] underline py-0.5">
                     {mono(s.teamfit_id, 13)}… · {s.turn_count} turns · {s.has_observations ? 'observed' : 'no observations'} · {when(s.created_at)}
                   </button>
                 ))
@@ -183,9 +183,9 @@ export default function AdminTeamfit() {
       )}
 
       {simDetail && (
-        <section className="mt-4 mb-10 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+        <section className="mt-4 mb-10 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">
               Simulation {simDetail.session.teamfit_id} · {simDetail.session.team_name}
             </h2>
             <button type="button" className={btn} onClick={() => setSimDetail(null)}>Close</button>
@@ -194,24 +194,24 @@ export default function AdminTeamfit() {
             <div className="max-h-72 overflow-y-auto space-y-2">
               {(simDetail.session.turns || []).map((turn, i) => (
                 <div key={i} className="font-sans text-[13px]">
-                  <span className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)]">{turn.speaker || turn.name || '?'}</span>
-                  <p className="text-[var(--color-ink)] whitespace-pre-wrap">{String(turn.text || turn.content || '')}</p>
+                  <span className="font-mono text-[10px] uppercase text-[var(--prism-ink-muted)]">{turn.speaker || turn.name || '?'}</span>
+                  <p className="text-[var(--prism-ink)] whitespace-pre-wrap">{String(turn.text || turn.content || '')}</p>
                 </div>
               ))}
             </div>
             <div>
-              <h3 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-1">Qualitative observations</h3>
+              <h3 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-1">Qualitative observations</h3>
               {simDetail.session.observations?.observations?.length ? (
                 simDetail.session.observations.observations.map((o, i) => (
                   <div key={i} className="mb-2 font-sans text-[13px]">
-                    <p className="text-[var(--color-ink)]">{o.theme || o.observation || JSON.stringify(o)}</p>
-                    {o.evidence && <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">“{o.evidence}”</p>}
+                    <p className="text-[var(--prism-ink)]">{o.theme || o.observation || JSON.stringify(o)}</p>
+                    {o.evidence && <p className="font-mono text-[11px] text-[var(--prism-ink-muted)]">“{o.evidence}”</p>}
                   </div>
                 ))
               ) : (
-                <p className="font-sans text-[13px] text-[var(--color-ink-muted)]">No observations recorded.</p>
+                <p className="font-sans text-[13px] text-[var(--prism-ink-muted)]">No observations recorded.</p>
               )}
-              <p className="mt-2 font-mono text-[10px] text-[var(--color-ink-muted)]">{simDetail.note}</p>
+              <p className="mt-2 font-mono text-[10px] text-[var(--prism-ink-muted)]">{simDetail.note}</p>
             </div>
           </div>
         </section>

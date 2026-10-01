@@ -25,14 +25,14 @@ export default function StoryCredential() {
   const standing = claims?.standingClaim || 'cryptographically verifiable evidence chain'
 
   return (
-    <section ref={ref} className="relative bg-[var(--color-paper)] py-24 sm:py-32" aria-label="The verifiable credential">
+    <section ref={ref} className="relative bg-[var(--prism-canvas)] py-24 sm:py-32" aria-label="The verifiable credential">
       <div className="max-w-6xl mx-auto px-6">
         <div className="max-w-2xl mb-12">
-          <p className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)] mb-3">The proof</p>
-          <h2 className="font-serif text-3xl sm:text-5xl text-[var(--color-ink)] leading-tight mb-4">
+          <p className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)] mb-3">The proof</p>
+          <h2 className="font-serif text-3xl sm:text-5xl text-[var(--prism-ink)] leading-tight mb-4">
             A result you can hand to anyone — and they can check it.
           </h2>
-          <p className="font-sans text-base text-[var(--color-ink-muted)] leading-relaxed">
+          <p className="font-sans text-base text-[var(--prism-ink-muted)] leading-relaxed">
             Prism issues every score with a {standing}: the report, the quotes behind it
             and the signature travel together.
           </p>
@@ -42,19 +42,19 @@ export default function StoryCredential() {
           {/* The credential card */}
           <motion.div
             style={reduced ? undefined : { rotate: tilt, y: rise }}
-            className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-line)] rounded-[var(--radius-lg)] overflow-hidden shadow-xl"
+            className="lg:col-span-2 bg-[var(--prism-surface)] border border-[var(--prism-border)] rounded-[var(--radius-lg)] overflow-hidden shadow-xl"
           >
-            <div className="h-1.5 bg-[var(--color-success)]" aria-hidden="true" />
+            <div className="h-1.5 bg-[var(--status-positive-ink)]" aria-hidden="true" />
             <div className="p-6">
               <div className="flex items-center justify-between mb-5">
-                <span className="font-mono text-[10px] tracking-[0.08em] uppercase text-[var(--color-success)]">
+                <span className="font-mono text-[10px] tracking-[0.08em] uppercase text-[var(--status-positive-ink)]">
                   ✓ valid credential
                 </span>
-                <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">sample</span>
+                <span className="font-mono text-[10px] text-[var(--prism-ink-muted)]">sample</span>
               </div>
-              <p className="font-serif text-2xl text-[var(--color-ink)] mb-1">Prism Score</p>
-              <p className="font-mono text-5xl tabular-nums text-[var(--color-ink)] mb-4">78</p>
-              <div className="flex flex-col gap-1.5 font-mono text-[11px] text-[var(--color-ink-muted)]">
+              <p className="font-serif text-2xl text-[var(--prism-ink)] mb-1">Prism Score</p>
+              <p className="font-mono text-5xl tabular-nums text-[var(--prism-ink)] mb-4">78</p>
+              <div className="flex flex-col gap-1.5 font-mono text-[11px] text-[var(--prism-ink-muted)]">
                 <span>signature — verifies</span>
                 <span>AI panel consistency — shown, never hidden</span>
                 <span>evidence — disclosed on the holder's terms</span>
@@ -71,14 +71,14 @@ export default function StoryCredential() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, margin: '-80px' }}
                 transition={{ delay: i * 0.12 }}
-                className="flex gap-4 items-start bg-[var(--color-surface)] border border-[var(--color-line)] rounded-[var(--radius-md)] p-5"
+                className="flex gap-4 items-start bg-[var(--prism-surface)] border border-[var(--prism-border)] rounded-[var(--radius-md)] p-5"
               >
-                <span className="shrink-0 w-9 h-9 rounded-full bg-[var(--color-paper)] border border-[var(--color-line)] flex items-center justify-center">
-                  <step.Icon size={16} className="text-[var(--color-accent)]" aria-hidden="true" />
+                <span className="shrink-0 w-9 h-9 rounded-full bg-[var(--prism-canvas)] border border-[var(--prism-border)] flex items-center justify-center">
+                  <step.Icon size={16} className="text-[var(--prism-signal)]" aria-hidden="true" />
                 </span>
                 <div>
-                  <h3 className="font-sans text-sm font-semibold text-[var(--color-ink)] mb-1">{step.title}</h3>
-                  <p className="font-sans text-sm text-[var(--color-ink-muted)] leading-relaxed">{step.text}</p>
+                  <h3 className="font-sans text-sm font-semibold text-[var(--prism-ink)] mb-1">{step.title}</h3>
+                  <p className="font-sans text-sm text-[var(--prism-ink-muted)] leading-relaxed">{step.text}</p>
                 </div>
               </motion.div>
             ))}

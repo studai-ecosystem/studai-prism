@@ -45,7 +45,7 @@ function matchScore(declaredName, ocrText) {
 function Field({ label, type = 'text', value, onChange, placeholder, maxLength, inputMode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="font-sans text-xs font-semibold text-[var(--color-ink)] tracking-wide">{label}</span>
+      <span className="font-sans text-xs font-semibold text-[var(--prism-ink)] tracking-wide">{label}</span>
       <input
         type={type}
         value={value}
@@ -53,7 +53,7 @@ function Field({ label, type = 'text', value, onChange, placeholder, maxLength, 
         placeholder={placeholder}
         maxLength={maxLength}
         inputMode={inputMode}
-        className="w-full px-4 py-3 rounded-xl bg-[var(--color-paper)] border border-[var(--color-line)] font-sans text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/20 transition-all"
+        className="w-full px-4 py-3 rounded-xl bg-[var(--prism-canvas)] border border-[var(--prism-border)] font-sans text-sm text-[var(--prism-ink)] placeholder:text-[var(--prism-ink-muted)] focus:outline-none focus:border-[var(--prism-signal)] focus:ring-2 focus:ring-[var(--prism-signal)]/20 transition-all"
       />
     </label>
   )
@@ -88,24 +88,24 @@ function DocUpload({ title, hint, declaredName, onResult }) {
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--color-line)] bg-white p-5">
+    <div className="rounded-2xl border border-[var(--prism-border)] bg-prism-surface p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-sans text-sm font-semibold text-[var(--color-ink)]">{title}</h3>
-          <p className="mt-0.5 font-sans text-xs text-[var(--color-ink-muted)]">{hint}</p>
+          <h3 className="font-sans text-sm font-semibold text-[var(--prism-ink)]">{title}</h3>
+          <p className="mt-0.5 font-sans text-xs text-[var(--prism-ink-muted)]">{hint}</p>
         </div>
         {status === 'matched' && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+          <span className="inline-flex items-center gap-1 rounded-full bg-prism-positive-soft px-2.5 py-1 text-xs font-semibold text-prism-positive">
             <Check size={13} /> Match
           </span>
         )}
         {status === 'mismatch' && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600">
+          <span className="inline-flex items-center gap-1 rounded-full bg-prism-blocked-soft px-2.5 py-1 text-xs font-semibold text-prism-blocked">
             <X size={13} /> No match
           </span>
         )}
         {status === 'scanning' && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--color-accent)]">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--prism-signal)]/10 px-2.5 py-1 text-xs font-semibold text-[var(--prism-signal)]">
             <Loader2 size={13} className="animate-spin" /> Reading
           </span>
         )}
@@ -122,21 +122,21 @@ function DocUpload({ title, hint, declaredName, onResult }) {
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={status === 'scanning'}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--color-accent)]/50 bg-[var(--color-paper)] px-4 py-3 font-sans text-sm font-semibold text-[var(--color-accent)] transition-colors hover:bg-[var(--color-warn-surface)] disabled:opacity-60"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--prism-signal)]/50 bg-[var(--prism-canvas)] px-4 py-3 font-sans text-sm font-semibold text-[var(--prism-signal)] transition-colors hover:bg-[var(--status-partial-soft)] disabled:opacity-60"
       >
         <Upload size={16} />
         {fileName ? 'Choose a different image' : 'Upload photo of document'}
       </button>
       {fileName && (
-        <p className="mt-2 truncate font-sans text-xs text-[var(--color-ink-muted)]">{fileName}</p>
+        <p className="mt-2 truncate font-sans text-xs text-[var(--prism-ink-muted)]">{fileName}</p>
       )}
       {status === 'mismatch' && score !== null && (
-        <p className="mt-2 font-sans text-xs text-red-600">
+        <p className="mt-2 font-sans text-xs text-prism-blocked">
           The name on this document doesn’t match your registered name.
         </p>
       )}
       {status === 'error' && (
-        <p className="mt-2 font-sans text-xs text-red-600">
+        <p className="mt-2 font-sans text-xs text-prism-blocked">
           Couldn’t read this image. Try a clearer, well-lit photo.
         </p>
       )}
@@ -228,8 +228,8 @@ export default function VerifyIdentity() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[var(--color-ink)] flex flex-col">
-      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[var(--color-line)]">
+    <div className="min-h-screen bg-prism-surface text-[var(--prism-ink)] flex flex-col">
+      <header className="shrink-0 flex items-center px-6 h-16 border-b border-[var(--prism-border)]">
         <Link to="/" aria-label="Prism home">
           <PrismLogo size={32} />
         </Link>
@@ -243,12 +243,12 @@ export default function VerifyIdentity() {
           className="w-full max-w-2xl"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-accent)]/12 text-[var(--color-accent)]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--prism-signal)]/12 text-[var(--prism-signal)]">
               <ShieldCheck size={22} />
             </div>
             <div>
-              <h1 className="font-serif text-2xl font-bold text-[var(--color-ink)]">Verify your identity</h1>
-              <p className="font-sans text-sm text-[var(--color-ink-muted)]">
+              <h1 className="font-serif text-2xl font-bold text-[var(--prism-ink)]">Verify your identity</h1>
+              <p className="font-sans text-sm text-[var(--prism-ink-muted)]">
                 A quick check before your proctored test begins.
               </p>
             </div>
@@ -273,25 +273,25 @@ export default function VerifyIdentity() {
               />
             </div>
 
-            <div className="flex items-start gap-2 rounded-xl bg-[var(--color-paper)] px-4 py-3">
-              <Lock size={15} className="mt-0.5 shrink-0 text-[var(--color-accent)]" />
-              <p className="font-sans text-xs leading-relaxed text-[var(--color-ink-muted)]">
+            <div className="flex items-start gap-2 rounded-xl bg-[var(--prism-canvas)] px-4 py-3">
+              <Lock size={15} className="mt-0.5 shrink-0 text-[var(--prism-signal)]" />
+              <p className="font-sans text-xs leading-relaxed text-[var(--prism-ink-muted)]">
                 Your documents are processed in your browser and never uploaded. We store only the
                 match result and the last 4 digits of your Aadhaar.
               </p>
             </div>
 
             {!nameMatch && aadhaarDoc.score !== null && !scanning && (
-              <p className="font-sans text-sm font-medium text-red-600">
+              <p className="font-sans text-sm font-medium text-prism-blocked">
                 The name on your document does not match your registered name. You cannot proceed.
               </p>
             )}
-            {error && <p className="font-sans text-sm font-medium text-red-600">{error}</p>}
+            {error && <p className="font-sans text-sm font-medium text-prism-blocked">{error}</p>}
 
             <button
               type="submit"
               disabled={!canContinue}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] px-6 py-3.5 font-sans text-sm font-bold text-[var(--color-ink)] transition-all hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--prism-signal)] px-6 py-3.5 font-sans text-sm font-bold text-[var(--prism-ink)] transition-all hover:bg-[var(--prism-signal)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
               {submitting ? 'Verifying…' : 'Continue'}
@@ -301,7 +301,7 @@ export default function VerifyIdentity() {
               <button
                 type="button"
                 onClick={() => navigate(`/room-scan?session=${sessionId}`)}
-                className="w-full text-center font-sans text-xs font-semibold text-[var(--color-accent)] hover:underline"
+                className="w-full text-center font-sans text-xs font-semibold text-[var(--prism-signal)] hover:underline"
               >
                 Skip verification (dev only) →
               </button>

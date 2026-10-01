@@ -7,8 +7,8 @@ export default function FAQItem({ question, answer }) {
 
   return (
     <div
-      className={`bg-white rounded-2xl border px-6 shadow-sm transition-colors ${
-        open ? 'border-[var(--color-accent)]' : 'border-[var(--color-line)]'
+      className={`bg-prism-surface rounded-2xl border px-6 shadow-sm transition-colors ${
+        open ? 'border-[var(--prism-signal)]' : 'border-[var(--prism-border)]'
       }`}
     >
       <button
@@ -16,10 +16,10 @@ export default function FAQItem({ question, answer }) {
         aria-expanded={open}
         className="w-full flex items-center justify-between gap-4 py-5 text-left group"
       >
-        <span className="font-sans font-medium text-[var(--color-ink)] text-base group-hover:text-[var(--color-accent)] transition-colors">
+        <span className="font-sans font-medium text-[var(--prism-ink)] text-base group-hover:text-[var(--prism-signal)] transition-colors">
           {question}
         </span>
-        <span className="shrink-0 flex items-center justify-center w-6 h-6 text-[var(--color-accent)]">
+        <span className="shrink-0 flex items-center justify-center w-6 h-6 text-[var(--prism-signal)]">
           {open ? <Minus size={16} /> : <Plus size={16} />}
         </span>
       </button>
@@ -34,7 +34,7 @@ export default function FAQItem({ question, answer }) {
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <p className="font-sans text-sm text-[var(--color-ink-muted)] leading-relaxed pb-5 pr-10">
+            <p className="font-sans text-sm text-[var(--prism-ink-muted)] leading-relaxed pb-5 pr-10">
               {answer}
             </p>
           </motion.div>

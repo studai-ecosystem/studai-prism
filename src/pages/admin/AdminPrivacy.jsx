@@ -42,8 +42,8 @@ function NewRequestForm({ onDone }) {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 mb-5 flex flex-col gap-2 max-w-2xl">
-      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Open a data-subject request</p>
+    <form onSubmit={submit} className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4 mb-5 flex flex-col gap-2 max-w-2xl">
+      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Open a data-subject request</p>
       <ErrorNotice error={error} />
       <div className="flex gap-2 flex-wrap">
         <select className={field} value={form.kind} onChange={(e) => set({ kind: e.target.value })} aria-label="Kind">
@@ -71,9 +71,9 @@ function NewRequestForm({ onDone }) {
 function PlanView({ title, plan }) {
   if (!plan) return null
   return (
-    <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-paper)] p-3 mt-3">
-      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">{title}</p>
-      <pre className="font-mono text-[11px] text-[var(--color-ink)] whitespace-pre-wrap overflow-x-auto max-h-80 overflow-y-auto">
+    <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-canvas)] p-3 mt-3">
+      <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">{title}</p>
+      <pre className="font-mono text-[11px] text-[var(--prism-ink)] whitespace-pre-wrap overflow-x-auto max-h-80 overflow-y-auto">
         {JSON.stringify(plan, null, 2)}
       </pre>
     </div>
@@ -110,19 +110,19 @@ function RequestDetail({ id, onChanged, onClose }) {
   const open = !['completed', 'rejected'].includes(r.status)
 
   return (
-    <div className="rounded-[10px] border border-[var(--color-accent)] bg-[var(--color-surface)] p-4 mb-5">
+    <div className="rounded-[10px] border border-[var(--prism-signal)] bg-[var(--prism-surface)] p-4 mb-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <p className="font-mono text-[12px] text-[var(--color-ink)]">
+          <p className="font-mono text-[12px] text-[var(--prism-ink)]">
             {mono(r.request_id, 12)} · <strong>{r.kind}</strong> · {r.scope}{' '}
             <Pill tone={STATUS_TONE[r.status] || 'muted'}>{r.status}</Pill>
           </p>
-          <p className="font-sans text-[13px] text-[var(--color-ink-muted)]">
+          <p className="font-sans text-[13px] text-[var(--prism-ink-muted)]">
             {r.candidate_email || r.session_id || r.candidate_user_id || '—'} · opened by {r.opened_by_email} · {when(r.created_at)}
           </p>
-          <p className="font-sans text-[13px] text-[var(--color-ink)] mt-1">{r.details}</p>
+          <p className="font-sans text-[13px] text-[var(--prism-ink)] mt-1">{r.details}</p>
           {r.decided_reason && (
-            <p className="font-sans text-[13px] text-[var(--color-ink-muted)] mt-1">Resolution: {r.decided_reason}</p>
+            <p className="font-sans text-[13px] text-[var(--prism-ink-muted)] mt-1">Resolution: {r.decided_reason}</p>
           )}
         </div>
         <button type="button" className={btn} onClick={onClose}>Close</button>
@@ -262,8 +262,8 @@ export default function AdminPrivacy() {
         busy={!data}
       />
 
-      <h2 className="mt-8 font-display text-base text-[var(--color-ink)] mb-2">Retention rules</h2>
-      <p className="font-sans text-[13px] text-[var(--color-ink-muted)] mb-3">
+      <h2 className="mt-8 font-display text-base text-[var(--prism-ink)] mb-2">Retention rules</h2>
+      <p className="font-sans text-[13px] text-[var(--prism-ink-muted)] mb-3">
         Documented policy per data class. Nothing auto-deletes on a timer — enforcement is a deliberate, audited action.
       </p>
       <DataTable

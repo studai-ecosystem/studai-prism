@@ -9,7 +9,7 @@ import { PageHeader, ErrorNotice, Pill, btn, mono } from './ui.jsx'
 
 function Money({ value }) {
   if (!value || value.status === 'unknown') {
-    return <span className="text-[var(--color-ink-muted)]" title={value?.note || value?.reason || 'not measured'}>UNKNOWN</span>
+    return <span className="text-[var(--prism-ink-muted)]" title={value?.note || value?.reason || 'not measured'}>UNKNOWN</span>
   }
   const amount = value.amount === null ? 'UNKNOWN' : `${value.currency === 'INR' ? '₹' : '$'}${Number(value.amount).toLocaleString('en-IN')}`
   if (value.status === 'partial') {
@@ -67,18 +67,18 @@ export default function AdminMargin() {
 
       {summary && (
         <>
-          <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] overflow-x-auto mb-6">
+          <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] overflow-x-auto mb-6">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left border-b border-[var(--color-line)]">
+                <tr className="text-left border-b border-[var(--prism-border)]">
                   {['Channel', 'Starts', 'Completions', 'Not completed', 'Revenue', 'Revenue / completion'].map((h) => (
-                    <th key={h} className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{h}</th>
+                    <th key={h} className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {summary.channels.map((c) => (
-                  <tr key={c.channel} className="border-b border-[var(--color-line)] last:border-0">
+                  <tr key={c.channel} className="border-b border-[var(--prism-border)] last:border-0">
                     <td className="px-4 py-2.5">{CHANNEL_LABEL[c.channel] || c.channel}</td>
                     <td className={`px-4 py-2.5 ${mono} tabular-nums`}>{c.starts}</td>
                     <td className={`px-4 py-2.5 ${mono} tabular-nums`}>{c.completions}</td>
@@ -92,27 +92,27 @@ export default function AdminMargin() {
           </div>
 
           <div className="grid sm:grid-cols-3 gap-4 mb-6">
-            <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">AI cost (measured)</p>
+            <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">AI cost (measured)</p>
               <p className="text-lg mt-1"><Money value={summary.aiCostUsd} /></p>
             </div>
-            <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Gross margin</p>
+            <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Gross margin</p>
               <p className="text-lg mt-1"><Money value={summary.grossMargin} /></p>
-              <p className="text-[11px] text-[var(--color-ink-muted)] mt-1">{summary.grossMargin.scope}</p>
+              <p className="text-[11px] text-[var(--prism-ink-muted)] mt-1">{summary.grossMargin.scope}</p>
             </div>
-            <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Contribution margin</p>
+            <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Contribution margin</p>
               <p className="text-lg mt-1"><Money value={summary.contributionMargin} /></p>
-              <p className="text-[11px] text-[var(--color-ink-muted)] mt-1">{summary.contributionMargin.reason}</p>
+              <p className="text-[11px] text-[var(--prism-ink-muted)] mt-1">{summary.contributionMargin.reason}</p>
             </div>
           </div>
 
-          <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 mb-6">
-            <p className="font-semibold text-[var(--color-ink)] mb-2">Cost categories (§23)</p>
+          <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4 mb-6">
+            <p className="font-semibold text-[var(--prism-ink)] mb-2">Cost categories (§23)</p>
             <div className="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-sm">
               {summary.costCategories.map((c) => (
-                <div key={c.key} className="flex items-center justify-between border-b border-[var(--color-line)] last:border-0 py-1.5">
+                <div key={c.key} className="flex items-center justify-between border-b border-[var(--prism-border)] last:border-0 py-1.5">
                   <span>{c.label}</span>
                   <Pill tone={c.status === 'instrumented' ? 'ok' : 'muted'}>
                     {c.status === 'instrumented' ? 'measured' : 'UNKNOWN — not instrumented'}
@@ -120,26 +120,26 @@ export default function AdminMargin() {
                 </div>
               ))}
             </div>
-            <p className="text-[12px] text-[var(--color-ink-muted)] mt-3">{summary.disclaimer}</p>
+            <p className="text-[12px] text-[var(--prism-ink-muted)] mt-3">{summary.disclaimer}</p>
           </div>
         </>
       )}
 
-      <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] overflow-x-auto">
+      <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left border-b border-[var(--color-line)]">
+            <tr className="text-left border-b border-[var(--prism-border)]">
               {['Cohort', 'Institution', 'Seats', 'Completions', 'Review allowance', 'AI cost', 'Revenue', 'Margin'].map((h) => (
-                <th key={h} className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{h}</th>
+                <th key={h} className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {cohorts.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--color-ink-muted)]">No cohorts yet.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--prism-ink-muted)]">No cohorts yet.</td></tr>
             )}
             {cohorts.map((c) => (
-              <tr key={c.inviteId} className="border-b border-[var(--color-line)] last:border-0">
+              <tr key={c.inviteId} className="border-b border-[var(--prism-border)] last:border-0">
                 <td className="px-4 py-2.5">{c.label}</td>
                 <td className="px-4 py-2.5">{c.institution || '—'}</td>
                 <td className={`px-4 py-2.5 ${mono} tabular-nums`}>{c.used}/{c.seats}</td>

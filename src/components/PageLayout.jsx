@@ -27,7 +27,7 @@ export default function PageLayout({ children }) {
   )
 }
 
-// Reusable page heading with the gold divider used across all pages.
+// Reusable page heading with the green divider used across all pages.
 export function PageHeading({ title, subtitle }) {
   return (
     <header className="text-center max-w-3xl mx-auto">

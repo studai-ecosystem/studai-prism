@@ -81,7 +81,7 @@ export function AdminReportDetail() {
 
   if (!data && !error) {
     return (
-      <div className="p-8 flex items-center gap-2 font-sans text-sm text-[var(--color-ink-muted)]">
+      <div className="p-8 flex items-center gap-2 font-sans text-sm text-[var(--prism-ink-muted)]">
         <Loader2 size={15} className="animate-spin" aria-hidden="true" /> Loading report…
       </div>
     )
@@ -122,25 +122,25 @@ export function AdminReportDetail() {
       <Notice>{notice}</Notice>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Dimension scores</h2>
-          <dl className="mt-2 font-sans text-[13px] text-[var(--color-ink)] space-y-0.5">
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">Dimension scores</h2>
+          <dl className="mt-2 font-sans text-[13px] text-[var(--prism-ink)] space-y-0.5">
             {Object.entries(report.scores || {}).filter(([k]) => k !== 'overall').map(([k, v]) => (
-              <div key={k} className="flex justify-between"><dt className="text-[var(--color-ink-muted)]">{k}</dt><dd className="tabular-nums">{v ?? 'insufficient evidence'}</dd></div>
+              <div key={k} className="flex justify-between"><dt className="text-[var(--prism-ink-muted)]">{k}</dt><dd className="tabular-nums">{v ?? 'insufficient evidence'}</dd></div>
             ))}
           </dl>
-          <p className="mt-2 font-mono text-[11px] text-[var(--color-ink-muted)]">
+          <p className="mt-2 font-mono text-[11px] text-[var(--prism-ink-muted)]">
             panel consistency {report.reliability?.level || report.reliability?.label || '—'} · composite: internal (research plane only)
           </p>
           {report.correction && (
-            <p className="mt-1 font-mono text-[11px] text-[var(--color-reliability-moderate)]">
+            <p className="mt-1 font-mono text-[11px] text-[var(--status-partial-ink)]">
               corrected {when(report.correction.correctedAt)}. “{report.correction.reason}”
             </p>
           )}
         </section>
 
-        <section className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)] mb-2">Delivery & lifecycle</h2>
+        <section className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)] mb-2">Delivery & lifecycle</h2>
           <div className="flex flex-wrap gap-2">
             {canResend && (
               <button type="button" className={btn} disabled={!mailEnabled || delivery.deliveryHold}
@@ -167,8 +167,8 @@ export function AdminReportDetail() {
               </button>
             )}
           </div>
-          {!mailEnabled && <p className="mt-2 font-mono text-[10px] text-[var(--color-ink-muted)]">Resend disabled: SMTP is not configured.</p>}
-          <p className="mt-2 font-mono text-[10px] text-[var(--color-ink-muted)] leading-relaxed">
+          {!mailEnabled && <p className="mt-2 font-mono text-[10px] text-[var(--prism-ink-muted)]">Resend disabled: SMTP is not configured.</p>}
+          <p className="mt-2 font-mono text-[10px] text-[var(--prism-ink-muted)] leading-relaxed">
             Supersession requires an approval row (action “supersede_report”, this session id) decided by a
             DIFFERENT administrator, raised under People → Administrators → Approvals. The internal composite is
             recomputed server-side from the published weights — it cannot be set directly and is not shown here.
@@ -177,26 +177,26 @@ export function AdminReportDetail() {
       </div>
 
       {correcting && canSupersede && (
-        <section className="mt-4 rounded-[10px] border border-[var(--color-reliability-moderate)] bg-[var(--color-surface)] p-4">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-reliability-moderate)] mb-2">
+        <section className="mt-4 rounded-[10px] border border-[var(--status-partial-ink)] bg-[var(--prism-surface)] p-4">
+          <h2 className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--status-partial-ink)] mb-2">
             Reviewed score correction (dual-approved, versioned, decision-trailed)
           </h2>
           <div className="grid gap-2 md:grid-cols-3">
             {Object.entries(draftScores).map(([k, v]) => (
-              <label key={k} className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+              <label key={k} className="font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
                 {k}
                 <input type="number" min="0" max="100" className={`${field} w-full mt-1 tabular-nums`}
                   value={v ?? ''} onChange={(e) => setDraftScores({ ...draftScores, [k]: e.target.value })} />
               </label>
             ))}
           </div>
-          <label className="block mt-3 font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+          <label className="block mt-3 font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
             Reason (10+ characters, recorded everywhere)
             <input className={`${field} w-full mt-1`} value={reason} onChange={(e) => setReason(e.target.value)} />
           </label>
           <div className="mt-3 flex items-center gap-3">
             <button type="button" className={btn} onClick={submitCorrection}>Submit correction</button>
-            <p className="font-mono text-[10px] text-[var(--color-ink-muted)]">
+            <p className="font-mono text-[10px] text-[var(--prism-ink-muted)]">
               The composite is NOT an input — the server recomputes it internally from the canonical weights.
               Dimensions issued as “Insufficient evidence” must stay empty — a correction can never invent a score.
             </p>
@@ -204,16 +204,16 @@ export function AdminReportDetail() {
         </section>
       )}
 
-      <section className="mt-4 mb-10 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)]">
-        <h2 className="p-4 pb-0 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Version history</h2>
+      <section className="mt-4 mb-10 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)]">
+        <h2 className="p-4 pb-0 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Version history</h2>
         {versions.length === 0 ? (
-          <p className="p-4 font-sans text-sm text-[var(--color-ink-muted)]">Single version — never corrected.</p>
+          <p className="p-4 font-sans text-sm text-[var(--prism-ink-muted)]">Single version — never corrected.</p>
         ) : (
           versions.map((v) => (
-            <div key={v.version_id} className="p-4 border-b border-[var(--color-line)] last:border-0 flex items-center gap-3 flex-wrap font-sans text-[13px]">
+            <div key={v.version_id} className="p-4 border-b border-[var(--prism-border)] last:border-0 flex items-center gap-3 flex-wrap font-sans text-[13px]">
               <Pill tone={v.kind === 'correction' ? 'warn' : 'muted'}>v{v.version} · {v.kind}</Pill>
-              <span className="text-[var(--color-ink)]">“{v.reason}”</span>
-              <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{v.created_by || 'system'} · {when(v.created_at)}</span>
+              <span className="text-[var(--prism-ink)]">“{v.reason}”</span>
+              <span className="font-mono text-[11px] text-[var(--prism-ink-muted)]">{v.created_by || 'system'} · {when(v.created_at)}</span>
             </div>
           ))
         )}

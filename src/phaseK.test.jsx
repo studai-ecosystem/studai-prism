@@ -3,7 +3,7 @@
 // legal and research pages are documents with an index, metadata and visible
 // study status.
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { screen, within, waitFor, render as rtlRender } from '@testing-library/react'
+import { screen, within, render as rtlRender } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { renderApp, mockFetch, meBody, signIn, jsonResponse } from './test/utils.jsx'

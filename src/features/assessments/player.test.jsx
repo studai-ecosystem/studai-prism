@@ -5,7 +5,7 @@
 // draft; early finish is explicit; mobile tabs + large-screen notice; the V3
 // consent wording is identical to the legacy briefing; no scenario vocabulary
 // in the generic work-material components.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { render as rtlRender, screen, waitFor, within } from '@testing-library/react'

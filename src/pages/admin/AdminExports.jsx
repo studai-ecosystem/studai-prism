@@ -54,20 +54,20 @@ export default function AdminExports() {
       <ErrorNotice error={error} />
       <Notice>{notice}</Notice>
 
-      <form onSubmit={runExport} className="mb-5 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 grid gap-3 md:grid-cols-3">
-        <label className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+      <form onSubmit={runExport} className="mb-5 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4 grid gap-3 md:grid-cols-3">
+        <label className="font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
           Dataset
           <select className={`${field} w-full mt-1`} value={form.dataset}
             onChange={(e) => setForm({ ...form, dataset: e.target.value })}>
             {(data?.datasets || ['timeline']).map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </label>
-        <label className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+        <label className="font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
           Row limit (blank = {data?.defaultCap ?? 1000})
           <input type="number" min="1" className={`${field} w-full mt-1 tabular-nums`} value={form.rowLimit}
             onChange={(e) => setForm({ ...form, rowLimit: e.target.value })} />
         </label>
-        <label className="font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+        <label className="font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
           Purpose (goes on the ledger)
           <input required minLength={10} className={`${field} w-full mt-1`} value={form.purpose}
             onChange={(e) => setForm({ ...form, purpose: e.target.value })} />
@@ -77,7 +77,7 @@ export default function AdminExports() {
         </div>
       </form>
 
-      <h2 className="font-display text-base text-[var(--color-ink)] mb-2">Export ledger</h2>
+      <h2 className="font-display text-base text-[var(--prism-ink)] mb-2">Export ledger</h2>
       <Toolbar onRefresh={load} />
       <DataTable
         rowKey={(e) => e.export_id}

@@ -2,7 +2,7 @@
 // Sections: Profile, Account, Workspaces, Privacy, Sharing, Assessment
 // preferences, Accessibility, Security. No internal fields are shown.
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { Panel } from '../../../components/ui/Card.jsx'

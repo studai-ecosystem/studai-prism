@@ -41,10 +41,10 @@ export default function ShellHome() {
   const pending = licence && licence !== 'error' ? licence.pendingSessionId : null
 
   return (
-    <div className="room-dark min-h-screen bg-[var(--color-paper)] text-[var(--color-ink)] flex flex-col">
+    <div className="room-dark min-h-screen bg-[var(--prism-canvas)] text-[var(--prism-ink)] flex flex-col">
       <header className="shrink-0 flex items-center justify-between px-6 py-4">
         <PrismLogo size={28} />
-        <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+        <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)]">
           Assessment app
         </span>
       </header>
@@ -52,56 +52,56 @@ export default function ShellHome() {
       <main className="flex-1 flex items-center justify-center px-6">
         <div className="w-full max-w-md flex flex-col gap-6">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--color-accent-bright)]/10 mb-4">
-              <ShieldCheck size={22} className="text-[var(--color-accent-bright)]" aria-hidden="true" />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[var(--brand-green)]/10 mb-4">
+              <ShieldCheck size={22} className="text-[var(--brand-green)]" aria-hidden="true" />
             </div>
             <h1 className="font-serif text-3xl mb-2">Prism Assessment</h1>
-            <p className="font-sans text-sm text-[var(--color-ink-muted)]">
+            <p className="font-sans text-sm text-[var(--prism-ink-muted)]">
               One 30-minute conversation · five dimensions · a verifiable result
             </p>
           </div>
 
           {!authed ? (
-            <div className="bg-[var(--color-room-surface)] border border-[var(--color-room-line)] rounded-[var(--radius-lg)] p-6 text-center">
-              <p className="font-sans text-sm text-[var(--color-ink)] mb-4">
+            <div className="bg-[var(--brand-navy)] border border-[var(--border-on-dark)] rounded-[var(--radius-lg)] p-6 text-center">
+              <p className="font-sans text-sm text-[var(--prism-ink)] mb-4">
                 Sign in with your Prism account to check your licence and begin.
               </p>
               <button
                 onClick={() => navigate('/login')}
-                className="w-full py-3.5 rounded-[var(--radius-md)] bg-[var(--color-room-ink)] font-sans font-semibold text-sm text-[var(--color-room)] hover:opacity-90 transition-opacity cursor-pointer"
+                className="w-full py-3.5 rounded-[var(--radius-md)] bg-[var(--brand-soft)] font-sans font-semibold text-sm text-[var(--brand-navy-deep)] hover:opacity-90 transition-opacity cursor-pointer"
               >
                 Sign in
               </button>
-              <p className="mt-3 font-sans text-xs text-[var(--color-ink-muted)]">
+              <p className="mt-3 font-sans text-xs text-[var(--prism-ink-muted)]">
                 No account? You can create one and get your licence on the website —
                 this app then runs the assessment.
               </p>
             </div>
           ) : (
-            <div className="bg-[var(--color-room-surface)] border border-[var(--color-room-line)] rounded-[var(--radius-lg)] p-6">
+            <div className="bg-[var(--brand-navy)] border border-[var(--border-on-dark)] rounded-[var(--radius-lg)] p-6">
               {/* Licence status — server facts, never invented */}
               {licence === null ? (
-                <div className="flex items-center gap-2 font-mono text-xs text-[var(--color-ink-muted)]" role="status">
+                <div className="flex items-center gap-2 font-mono text-xs text-[var(--prism-ink-muted)]" role="status">
                   <Loader2 size={13} className="animate-spin" aria-hidden="true" />
                   Checking your licence…
                 </div>
               ) : licence === 'error' ? (
-                <p className="font-sans text-sm text-[var(--color-danger)]">
+                <p className="font-sans text-sm text-[var(--status-blocked-ink)]">
                   Could not reach the licence service. Check the connection and try again.
                 </p>
               ) : (
                 <>
-                  <div className="flex items-start gap-3 pb-4 border-b border-[var(--color-room-line)]">
-                    <BadgeCheck size={18} className="text-[var(--color-accent-bright)] shrink-0 mt-0.5" aria-hidden="true" />
+                  <div className="flex items-start gap-3 pb-4 border-b border-[var(--border-on-dark)]">
+                    <BadgeCheck size={18} className="text-[var(--brand-green)] shrink-0 mt-0.5" aria-hidden="true" />
                     <div className="min-w-0">
-                      <p className="font-sans text-sm font-semibold text-[var(--color-ink)]">
+                      <p className="font-sans text-sm font-semibold text-[var(--prism-ink)]">
                         {pending
                           ? 'Licence active — an assessment is waiting'
                           : licence.canPurchase
                             ? 'Ready — start when you are'
                             : 'No licence available'}
                       </p>
-                      <p className="font-mono text-[11px] text-[var(--color-ink-muted)] mt-1 truncate">
+                      <p className="font-mono text-[11px] text-[var(--prism-ink-muted)] mt-1 truncate">
                         {user?.email || licence.email}
                         {licence.completed > 0 && ` · ${licence.completed} completed`}
                       </p>
@@ -112,7 +112,7 @@ export default function ShellHome() {
                     {pending ? (
                       <button
                         onClick={() => navigate(`/briefing?session=${pending}`)}
-                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[var(--radius-md)] bg-[var(--color-room-ink)] font-sans font-semibold text-sm text-[var(--color-room)] hover:opacity-90 transition-opacity cursor-pointer"
+                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[var(--radius-md)] bg-[var(--brand-soft)] font-sans font-semibold text-sm text-[var(--brand-navy-deep)] hover:opacity-90 transition-opacity cursor-pointer"
                       >
                         <RotateCcw size={15} aria-hidden="true" />
                         Resume your assessment
@@ -121,14 +121,14 @@ export default function ShellHome() {
                       <button
                         onClick={() => navigate('/payment')}
                         disabled={!licence.canPurchase}
-                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[var(--radius-md)] bg-[var(--color-room-ink)] font-sans font-semibold text-sm text-[var(--color-room)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[var(--radius-md)] bg-[var(--brand-soft)] font-sans font-semibold text-sm text-[var(--brand-navy-deep)] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Play size={15} aria-hidden="true" />
                         Start an assessment
                       </button>
                     )}
                     {!pending && (
-                      <p className="flex items-center justify-center gap-1.5 font-mono text-[11px] text-[var(--color-ink-muted)]">
+                      <p className="flex items-center justify-center gap-1.5 font-mono text-[11px] text-[var(--prism-ink-muted)]">
                         <CreditCard size={11} aria-hidden="true" />
                         {licence.mode === 'dummy'
                           ? 'Trial period — no charge at checkout.'
@@ -137,7 +137,7 @@ export default function ShellHome() {
                     )}
                     <button
                       onClick={handleSignOut}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-[var(--radius-md)] border border-[var(--color-room-line)] font-sans text-xs text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-[var(--radius-md)] border border-[var(--border-on-dark)] font-sans text-xs text-[var(--prism-ink-muted)] hover:text-[var(--prism-ink)] transition-colors cursor-pointer"
                     >
                       <LogOut size={13} aria-hidden="true" />
                       Sign out
@@ -151,7 +151,7 @@ export default function ShellHome() {
       </main>
 
       <footer className="shrink-0 px-6 py-4 text-center">
-        <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">
+        <p className="font-mono text-[11px] text-[var(--prism-ink-muted)]">
           Prism exam window · the website at prism.studai.one manages accounts, licences and reports
         </p>
       </footer>

@@ -60,9 +60,9 @@ export default function AdminPayments() {
             ['Unconsumed', metrics.unconsumed],
             ['Total entitlements', metrics.totalEntitlements],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{label}</p>
-              <p className="font-display text-xl text-[var(--color-ink)] tabular-nums">{value}</p>
+            <div key={label} className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-3">
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">{label}</p>
+              <p className="font-display text-xl text-[var(--prism-ink)] tabular-nums">{value}</p>
             </div>
           ))}
         </div>

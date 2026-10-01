@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, field, when, actWithReason, askText } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, DataTable, Pill, btn, field, when, actWithReason, askText } from './ui.jsx'
 
 // ── /admin/raters — human-rater administration (Phase 3) ─────────────────────
 // Tokens are shown exactly once. Hashes are never revealed. Training
@@ -123,7 +123,7 @@ export default function AdminRaters() {
 
       {/* ── Training references ─────────────────────────────────────────── */}
       <div className="mt-8 flex items-center justify-between">
-        <h2 className="font-display text-base text-[var(--color-ink)]">Training references</h2>
+        <h2 className="font-display text-base text-[var(--prism-ink)]">Training references</h2>
         {canManage && (
           <button type="button" className={btn} onClick={() => setShowRefForm((v) => !v)}>
             {showRefForm ? 'Cancel' : 'New reference (draft)'}
@@ -132,8 +132,8 @@ export default function AdminRaters() {
       </div>
 
       {showRefForm && (
-        <div className="mt-3 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-          <label className="block font-mono text-[11px] uppercase text-[var(--color-ink-muted)]">
+        <div className="mt-3 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
+          <label className="block font-mono text-[11px] uppercase text-[var(--prism-ink-muted)]">
             Transcript JSON (blinded — no scores, no identity)
             <textarea rows={5} className={`${field} w-full mt-1 font-mono text-[12px]`}
               value={refDraft.transcript}
@@ -142,7 +142,7 @@ export default function AdminRaters() {
           </label>
           <div className="grid gap-2 md:grid-cols-5 mt-3">
             {DIMS.map((d) => (
-              <label key={d} className="font-mono text-[10px] uppercase text-[var(--color-ink-muted)]">
+              <label key={d} className="font-mono text-[10px] uppercase text-[var(--prism-ink-muted)]">
                 {d}
                 <input type="number" min="0" max="4" className={`${field} w-full mt-1 tabular-nums`}
                   value={refDraft.levels[d] ?? ''}
@@ -190,7 +190,7 @@ export default function AdminRaters() {
       </div>
 
       {/* ── IRR ─────────────────────────────────────────────────────────── */}
-      <h2 className="mt-8 font-display text-base text-[var(--color-ink)]">Inter-rater reliability (human–human)</h2>
+      <h2 className="mt-8 font-display text-base text-[var(--prism-ink)]">Inter-rater reliability (human–human)</h2>
       <div className="mt-2 mb-10">
         <DataTable
           rowKey={(p) => `${p.raterA}|${p.raterB}`}
@@ -201,7 +201,7 @@ export default function AdminRaters() {
             {
               key: 'kappa', label: 'Weighted κ',
               render: (p) => (
-                <span className={`tabular-nums font-mono text-[12px] ${p.kappa >= (irr?.threshold ?? 0.6) ? 'text-[var(--color-success)]' : 'text-[var(--color-reliability-moderate)]'}`}>
+                <span className={`tabular-nums font-mono text-[12px] ${p.kappa >= (irr?.threshold ?? 0.6) ? 'text-[var(--status-positive-ink)]' : 'text-[var(--status-partial-ink)]'}`}>
                   {p.kappa != null ? Number(p.kappa).toFixed(3) : '—'}
                 </span>
               ),

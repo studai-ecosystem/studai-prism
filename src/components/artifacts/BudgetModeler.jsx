@@ -6,7 +6,7 @@
 // Saving goes through `controller` (V3 versioned store, or the legacy store).
 import { useState } from 'react'
 import { ArtifactUnavailable } from './ArtifactUnavailable.jsx'
-import { ArtifactShell, ArtifactSaveStatus } from './ArtifactShell.jsx'
+import { ArtifactShell } from './ArtifactShell.jsx'
 import { humanizeKey, formatValue } from './format.js'
 
 export default function BudgetModeler({ artifactId, title, data, controller }) {

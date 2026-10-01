@@ -30,6 +30,7 @@ export default {
           'accent-strong': 'var(--prism-accent-strong)',
           'accent-soft': 'var(--prism-accent-soft)',
           'accent-ink': 'var(--prism-accent-ink)',
+          signal: 'var(--prism-signal)',
           positive: 'var(--prism-positive)',
           'positive-soft': 'var(--prism-positive-soft)',
           partial: 'var(--prism-partial)',

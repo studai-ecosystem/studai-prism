@@ -38,14 +38,14 @@ export default function StoryHonesty() {
   ]
 
   return (
-    <section className="relative bg-[var(--color-surface)] border-y border-[var(--color-line)] py-24 sm:py-32" aria-label="What we do not claim yet">
+    <section className="relative bg-[var(--prism-surface)] border-y border-[var(--prism-border)] py-24 sm:py-32" aria-label="What we do not claim yet">
       <div className="max-w-6xl mx-auto px-6">
         <div className="max-w-2xl mb-12">
-          <p className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)] mb-3">The honesty</p>
-          <h2 className="font-serif text-3xl sm:text-5xl text-[var(--color-ink)] leading-tight mb-4">
+          <p className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)] mb-3">The honesty</p>
+          <h2 className="font-serif text-3xl sm:text-5xl text-[var(--prism-ink)] leading-tight mb-4">
             What we don't claim. Yet.
           </h2>
-          <p className="font-sans text-base text-[var(--color-ink-muted)] leading-relaxed">
+          <p className="font-sans text-base text-[var(--prism-ink-muted)] leading-relaxed">
             Assessment companies usually claim first and validate later — if ever.
             We preregistered instead. Nothing on this site states a validation result
             that the study registry doesn't hold; the benchmark card below reads its
@@ -61,25 +61,25 @@ export default function StoryHonesty() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-60px' }}
               transition={{ delay: (i % 2) * 0.08 }}
-              className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[var(--radius-md)] p-5"
+              className="bg-[var(--prism-canvas)] border border-[var(--prism-border)] rounded-[var(--radius-md)] p-5"
             >
               <div className="flex items-center justify-between gap-3 mb-2.5">
-                <span className="font-mono text-[10px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+                <span className="font-mono text-[10px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)]">
                   {s.key}
                 </span>
-                <span className="font-mono text-[10px] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--color-reliability-moderate)] text-[var(--color-reliability-moderate)]">
+                <span className="font-mono text-[10px] px-2 py-0.5 rounded-[var(--radius-full)] border border-[var(--status-partial-ink)] text-[var(--status-partial-ink)]">
                   {s.status}{s.live && ' · live'}
                 </span>
               </div>
-              <p className="font-sans text-sm text-[var(--color-ink)] leading-relaxed">{s.title}</p>
+              <p className="font-sans text-sm text-[var(--prism-ink)] leading-relaxed">{s.title}</p>
             </motion.div>
           ))}
         </div>
 
-        <p className="mt-8 font-sans text-sm text-[var(--color-ink-muted)] max-w-2xl">
+        <p className="mt-8 font-sans text-sm text-[var(--prism-ink-muted)] max-w-2xl">
           Results publish here either way they come out. Red-team researchers are
           invited under the preregistered protocol — responsible-disclosure contact:{' '}
-          <a href="mailto:security@studai.one" className="text-[var(--color-accent)] underline underline-offset-4">
+          <a href="mailto:security@studai.one" className="text-[var(--prism-signal)] underline underline-offset-4">
             security@studai.one
           </a>
         </p>

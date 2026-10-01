@@ -5,8 +5,8 @@
 
    Layers: 1) brand (issued by the brand pack, plus marked derivations)
            2) semantic roles (surface, text, border, status, evidence, data)
-           3) compatibility aliases (--color-*, --prism-*) so every existing
-              page follows the brand without a per-file edit. */
+           3) application tokens (--prism-*): the names pages and Tailwind use,
+              themeable per scope (.theme-assessment, .room-dark). */
 
 :root {
   /* 1. brand: issued colours */
@@ -152,30 +152,10 @@
   --thread-tick: 7px;
   --thread-color: var(--brand-green-ink);
 
-  /* 3a. compatibility aliases: legacy --color-* (marketing, auth, assessment, report, admin) */
-  --color-paper: var(--surface-canvas);
-  --color-surface: var(--surface-raised);
-  --color-ink: var(--text-primary);
-  --color-ink-muted: var(--text-secondary);
-  --color-line: var(--border-subtle);
-  --color-accent: var(--brand-green-ink);
-  --color-accent-bright: var(--brand-green);
-  --color-room: var(--brand-navy-deep);
-  --color-room-surface: var(--brand-navy);
-  --color-room-ink: var(--brand-soft);
-  --color-room-line: var(--border-on-dark);
-  --color-reliability-high: var(--status-positive-ink);
-  --color-reliability-moderate: var(--status-partial-ink);
-  --color-reliability-low: var(--status-blocked-ink);
-  --color-info: var(--status-info-ink);
-  --color-danger: var(--status-blocked-ink);
-  --color-danger-surface: var(--status-blocked-soft);
-  --color-success: var(--status-positive-ink);
-  --color-success-surface: var(--status-positive-soft);
-  --color-warn-surface: var(--status-partial-soft);
-  --color-info-surface: var(--status-info-soft);
-
-  /* 3b. compatibility aliases: --prism-* (application shell, campus, student) */
+  /* 3. application tokens: shell, campus, student, marketing, auth, report, admin.
+     --prism-signal is the green used for text and thin marks: green-ink on light
+     surfaces, brand green on dark ones. */
+  --prism-signal: var(--brand-green-ink);
   --prism-canvas: var(--surface-canvas);
   --prism-surface: var(--surface-raised);
   --prism-subtle: var(--surface-subtle);
@@ -229,15 +209,16 @@
   --prism-insufficient: #C5CFE6;
   --prism-insufficient-soft: #132C6B;
   --prism-focus: var(--brand-green);
+  --prism-signal: var(--brand-green);
   color-scheme: dark;
 }
 
 .room-dark {
-  --color-paper: var(--color-room);
-  --color-ink: var(--color-room-ink);
-  --color-ink-muted: #A9B6D3;
-  --color-line: var(--color-room-line);
-  --color-accent: var(--brand-green);
+  --prism-canvas: var(--brand-navy-deep);
+  --prism-ink: var(--brand-soft);
+  --prism-ink-muted: #A9B6D3;
+  --prism-border: var(--border-on-dark);
+  --prism-signal: var(--brand-green);
   --thread-color: var(--brand-green);
   --focus-color: var(--brand-green);
   color-scheme: dark;

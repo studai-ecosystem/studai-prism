@@ -75,7 +75,7 @@ export const evidenceThreadStyles = `
   font-family: var(--font-body);
   font-size: var(--text-sm);
   line-height: var(--leading-base);
-  color: var(--color-ink-muted);
+  color: var(--prism-ink-muted);
   max-width: 52ch;
 }
 .evidence-thread__source-label {
@@ -92,7 +92,7 @@ export const evidenceThreadStyles = `
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-sm);
-  color: var(--color-ink-muted);
+  color: var(--prism-ink-muted);
 }
 .evidence-tick__mark {
   display: inline-block;

@@ -97,8 +97,8 @@ export default function AdminInvites() {
       <Notice>{notice}</Notice>
 
       {createdLink && (
-        <div className="mb-4 rounded-[10px] border border-[var(--color-accent)] bg-[var(--color-surface)] p-4">
-          <p className="text-sm font-semibold text-[var(--color-ink)]">
+        <div className="mb-4 rounded-[10px] border border-[var(--prism-signal)] bg-[var(--prism-surface)] p-4">
+          <p className="text-sm font-semibold text-[var(--prism-ink)]">
             Invite created — copy this link now. It is shown only once.
           </p>
           <div className="flex items-center gap-2 mt-2">
@@ -111,7 +111,7 @@ export default function AdminInvites() {
               Copy
             </button>
           </div>
-          <p className="text-[12px] text-[var(--color-ink-muted)] mt-2">
+          <p className="text-[12px] text-[var(--prism-ink-muted)] mt-2">
             {createdLink.invite.label} · {createdLink.invite.maxUses} seats · closes {fmt(createdLink.invite.expiresAt)}
             {createdLink.code ? ` · coupon code: ${createdLink.code.toLowerCase()} (works on the payment page too)` : ''}
           </p>
@@ -119,53 +119,53 @@ export default function AdminInvites() {
       )}
 
       {creating && (
-        <form onSubmit={handleCreate} className="mb-6 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4 flex flex-col gap-3 max-w-md">
+        <form onSubmit={handleCreate} className="mb-6 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4 flex flex-col gap-3 max-w-md">
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Label (college · batch)</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Label (college · batch)</span>
             <input className={field} required value={form.label}
               onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
               placeholder="e.g. IIT Madras — Placement batch 2027" />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Seats (1–100)</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Seats (1–100)</span>
             <input className={field} type="number" min={1} max={100} required value={form.maxUses}
               onChange={(e) => setForm((f) => ({ ...f, maxUses: e.target.value }))} />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Link closes at</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Link closes at</span>
             <input className={field} type="datetime-local" required value={form.expiresAt}
               onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))} />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Custom coupon code (optional, e.g. msw)</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Custom coupon code (optional, e.g. msw)</span>
             <input className={field} value={form.code} maxLength={32}
               onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
               placeholder="leave empty for a random link" />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Sponsoring institution (optional)</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Sponsoring institution (optional)</span>
             <input className={field} value={form.institution} maxLength={200}
               onChange={(e) => setForm((f) => ({ ...f, institution: e.target.value }))}
               placeholder="e.g. IIT Madras placement cell" />
           </label>
           <div className="grid grid-cols-3 gap-3">
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Planned cohort</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Planned cohort</span>
               <input className={field} type="number" min={1} max={10000} value={form.cohortPlanned}
                 onChange={(e) => setForm((f) => ({ ...f, cohortPlanned: e.target.value }))} placeholder="e.g. 100" />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Review allowance %</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Review allowance %</span>
               <input className={field} type="number" min={0} max={100} value={form.reviewAllowancePct}
                 onChange={(e) => setForm((f) => ({ ...f, reviewAllowancePct: e.target.value }))} />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">Term</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">Term</span>
               <input className={field} value={form.term} maxLength={100}
                 onChange={(e) => setForm((f) => ({ ...f, term: e.target.value }))} placeholder="e.g. 2026-27 odd" />
             </label>
           </div>
-          <p className="text-[11px] text-[var(--color-ink-muted)]">
+          <p className="text-[11px] text-[var(--prism-ink-muted)]">
             Plans carry no prices — pricing is provisional and lives in the internal pricing package until approved (HA-015).
             Institution-required candidates never pay.
           </p>
@@ -175,30 +175,30 @@ export default function AdminInvites() {
         </form>
       )}
 
-      <div className="rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] overflow-x-auto">
+      <div className="rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left border-b border-[var(--color-line)]">
+            <tr className="text-left border-b border-[var(--prism-border)]">
               {['Label', 'Status', 'Seats', 'Window', 'Created', ''].map((h) => (
-                <th key={h} className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{h}</th>
+                <th key={h} className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {invites.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--color-ink-muted)]">No invites yet.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--prism-ink-muted)]">No invites yet.</td></tr>
             )}
             {invites.map((inv) => (
-              <tr key={inv.inviteId} className="border-b border-[var(--color-line)] last:border-0">
-                <td className="px-4 py-2.5 text-[var(--color-ink)]">{inv.label}</td>
+              <tr key={inv.inviteId} className="border-b border-[var(--prism-border)] last:border-0">
+                <td className="px-4 py-2.5 text-[var(--prism-ink)]">{inv.label}</td>
                 <td className="px-4 py-2.5"><Pill tone={STATUS_TONE[inv.status] || 'muted'}>{inv.status}</Pill></td>
                 <td className={`px-4 py-2.5 ${mono} tabular-nums`}>{inv.usedCount}/{inv.maxUses}</td>
-                <td className="px-4 py-2.5 text-[12px] text-[var(--color-ink-muted)]">{fmt(inv.startsAt)} → {fmt(inv.expiresAt)}</td>
-                <td className="px-4 py-2.5 text-[12px] text-[var(--color-ink-muted)]">{fmt(inv.createdAt)}</td>
+                <td className="px-4 py-2.5 text-[12px] text-[var(--prism-ink-muted)]">{fmt(inv.startsAt)} → {fmt(inv.expiresAt)}</td>
+                <td className="px-4 py-2.5 text-[12px] text-[var(--prism-ink-muted)]">{fmt(inv.createdAt)}</td>
                 <td className="px-4 py-2.5 whitespace-nowrap">
                   <button type="button" className="underline text-[13px] mr-3" onClick={() => openDetail(inv)}>Roster</button>
                   {canManage && !inv.revokedAt && (
-                    <button type="button" className="underline text-[13px] text-[var(--color-danger)]" onClick={() => handleRevoke(inv)}>Revoke</button>
+                    <button type="button" className="underline text-[13px] text-[var(--status-blocked-ink)]" onClick={() => handleRevoke(inv)}>Revoke</button>
                   )}
                 </td>
               </tr>
@@ -208,9 +208,9 @@ export default function AdminInvites() {
       </div>
 
       {detail && (
-        <div className="mt-6 rounded-[10px] border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
+        <div className="mt-6 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">
           <div className="flex items-center justify-between">
-            <p className="font-semibold text-[var(--color-ink)]">Roster — {detail.invite.label}</p>
+            <p className="font-semibold text-[var(--prism-ink)]">Roster — {detail.invite.label}</p>
             <button type="button" className="underline text-[13px]" onClick={() => setDetail(null)}>Close</button>
           </div>
           {detail.accounting && (
@@ -222,36 +222,36 @@ export default function AdminInvites() {
                 ['Reviews used', `${detail.accounting.reviewsUsed}${detail.accounting.reviewAllowance != null ? ` / ${detail.accounting.reviewAllowance} allowed` : ''}`],
                 ['Institution', detail.invite.institution || '—'],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-[8px] border border-[var(--color-line)] p-2">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{label}</p>
-                  <p className={`${mono} tabular-nums text-[var(--color-ink)]`}>{value}</p>
+                <div key={label} className="rounded-[8px] border border-[var(--prism-border)] p-2">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">{label}</p>
+                  <p className={`${mono} tabular-nums text-[var(--prism-ink)]`}>{value}</p>
                 </div>
               ))}
             </div>
           )}
           {detail.redemptions.length === 0 ? (
-            <p className="mt-3 text-sm text-[var(--color-ink-muted)]">No redemptions yet.</p>
+            <p className="mt-3 text-sm text-[var(--prism-ink-muted)]">No redemptions yet.</p>
           ) : (
             <table className="w-full text-sm mt-3">
               <thead>
-                <tr className="text-left border-b border-[var(--color-line)]">
+                <tr className="text-left border-b border-[var(--prism-border)]">
                   {['Candidate', 'Assessment', 'Redeemed'].map((h) => (
-                    <th key={h} className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">{h}</th>
+                    <th key={h} className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--prism-ink-muted)]">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {detail.redemptions.map((r) => (
-                  <tr key={r.redemptionId} className="border-b border-[var(--color-line)] last:border-0">
+                  <tr key={r.redemptionId} className="border-b border-[var(--prism-border)] last:border-0">
                     <td className="px-3 py-2">{r.userEmail || '—'}</td>
                     <td className="px-3 py-2">
                       {r.reportReady ? (
                         <Link to={`/admin/reports/${r.sessionId}`} className="underline text-[13px]">View report</Link>
                       ) : (
-                        <span className="text-[12px] text-[var(--color-ink-muted)]">not completed yet</span>
+                        <span className="text-[12px] text-[var(--prism-ink-muted)]">not completed yet</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-[var(--color-ink-muted)]">{fmt(r.redeemedAt)}</td>
+                    <td className="px-3 py-2 text-[12px] text-[var(--prism-ink-muted)]">{fmt(r.redeemedAt)}</td>
                   </tr>
                 ))}
               </tbody>

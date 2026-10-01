@@ -28,9 +28,9 @@ export default function AboutStudAI() {
 
       {/* Section 1 — Who we are */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">Who we are</h2>
-          <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
+        <div className="bg-prism-surface rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto">
+          <h2 className="text-2xl font-bold text-[var(--prism-ink)] mb-4">Who we are</h2>
+          <p className="text-[var(--prism-ink-muted)] leading-relaxed text-lg">
             StudAI One is a privately held intelligence company built in
             Chennai, India. We build AI-powered products for students, colleges,
             and employers across India and APAC. Prism is our skills
@@ -42,11 +42,11 @@ export default function AboutStudAI() {
 
       {/* Section 2 — Why we built Prism */}
       <section className="py-12 px-6 max-w-6xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-brand-green">
-          <h2 className="text-2xl font-bold text-[var(--color-ink)] mb-4">
+        <div className="bg-prism-surface rounded-2xl shadow-sm p-8 md:p-12 max-w-3xl mx-auto border-l-4 border-brand-green">
+          <h2 className="text-2xl font-bold text-[var(--prism-ink)] mb-4">
             Why we built Prism
           </h2>
-          <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
+          <p className="text-[var(--prism-ink-muted)] leading-relaxed text-lg">
             We kept hearing the same thing from placement officers and hiring
             managers — resumes tell us where someone studied, not what they can
             do. We built Prism to fix that. One conversation. A report you can verify.
@@ -61,10 +61,10 @@ export default function AboutStudAI() {
           {stats.map((s) => (
             <div
               key={s.label}
-              className="bg-white rounded-2xl shadow-sm p-8 text-center"
+              className="bg-prism-surface rounded-2xl shadow-sm p-8 text-center"
             >
               <p className="text-4xl font-bold text-brand-green-ink mb-2">{s.value}</p>
-              <p className="text-[var(--color-ink-muted)]">{s.label}</p>
+              <p className="text-[var(--prism-ink-muted)]">{s.label}</p>
             </div>
           ))}
         </div>
@@ -72,21 +72,21 @@ export default function AboutStudAI() {
 
       {/* Section 4 — Company details */}
       <section className="py-12 pb-20 px-6 max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-[var(--color-ink)] text-center mb-12">
+        <h2 className="text-3xl font-bold text-[var(--prism-ink)] text-center mb-12">
           Company details
         </h2>
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden max-w-2xl mx-auto">
+        <div className="bg-prism-surface rounded-2xl shadow-sm overflow-hidden max-w-2xl mx-auto">
           <table className="w-full text-left border-collapse">
             <tbody>
               {details.map((row, i) => (
                 <tr
                   key={row.label}
-                  className={i === 0 ? '' : 'border-t border-[var(--color-line)]'}
+                  className={i === 0 ? '' : 'border-t border-[var(--prism-border)]'}
                 >
-                  <td className="py-4 px-6 font-semibold text-[var(--color-ink)] w-1/3 align-top">
+                  <td className="py-4 px-6 font-semibold text-[var(--prism-ink)] w-1/3 align-top">
                     {row.label}
                   </td>
-                  <td className="py-4 px-6 text-[var(--color-ink-muted)] align-top">
+                  <td className="py-4 px-6 text-[var(--prism-ink-muted)] align-top">
                     {row.value}
                   </td>
                 </tr>

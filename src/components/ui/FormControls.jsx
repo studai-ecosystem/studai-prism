@@ -157,7 +157,7 @@ export function Switch({ id: idProp, label, checked, onChange, disabled, descrip
         onClick={() => onChange(!checked)}
         className={cx('relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors disabled:opacity-50', checked ? 'border-prism-accent bg-prism-accent' : 'border-prism-border-strong bg-prism-subtle')}
       >
-        <span className={cx('inline-block h-4 w-4 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-6' : 'translate-x-1')} />
+        <span className={cx('inline-block h-4 w-4 rounded-full bg-prism-surface shadow transition-transform', checked ? 'translate-x-6' : 'translate-x-1')} />
         <span className="sr-only">{checked ? 'On' : 'Off'}</span>
       </button>
     </div>

@@ -15,52 +15,52 @@ export default function ScenarioCard({ scenario, onDismiss }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="room-dark fixed inset-0 z-[110] bg-[var(--color-room)]/92 backdrop-blur-sm flex items-center justify-center px-4"
+      className="room-dark fixed inset-0 z-[110] bg-[var(--brand-navy-deep)]/92 backdrop-blur-sm flex items-center justify-center px-4"
     >
       <motion.div
         initial={{ scale: 0.96, y: 16 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.96, y: 16 }}
         transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--color-room-surface)] border border-[var(--color-room-line)] rounded-[var(--radius-lg)] shadow-2xl"
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--brand-navy)] border border-[var(--border-on-dark)] rounded-[var(--radius-lg)] shadow-2xl"
       >
         {/* The accent rule: measurement begins here */}
-        <div className="h-[3px] bg-[var(--color-accent-bright)]" aria-hidden="true" />
+        <div className="h-[3px] bg-[var(--brand-green)]" aria-hidden="true" />
 
         {/* Header */}
-        <div className="px-6 pt-5 pb-4 border-b border-[var(--color-room-line)]">
+        <div className="px-6 pt-5 pb-4 border-b border-[var(--border-on-dark)]">
           <div className="flex items-center gap-2 mb-2.5">
-            <Briefcase size={13} className="text-[var(--color-accent-bright)]" aria-hidden="true" />
-            <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-accent-bright)]">
+            <Briefcase size={13} className="text-[var(--brand-green)]" aria-hidden="true" />
+            <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--brand-green)]">
               {domain || 'Scenario briefing'}
             </span>
           </div>
-          <h2 className="font-serif text-2xl text-[var(--color-ink)] leading-snug">{title}</h2>
+          <h2 className="font-serif text-2xl text-[var(--prism-ink)] leading-snug">{title}</h2>
         </div>
 
         {/* Context */}
         <div className="px-6 py-5">
           {yourRole && (
-            <div className="mb-4 p-3.5 rounded-[var(--radius-md)] bg-[var(--color-room)] border border-[var(--color-accent-bright)]/40">
+            <div className="mb-4 p-3.5 rounded-[var(--radius-md)] bg-[var(--brand-navy-deep)] border border-[var(--brand-green)]/40">
               <div className="flex items-center gap-2 mb-1.5">
-                <UserCheck size={13} className="text-[var(--color-accent-bright)]" aria-hidden="true" />
-                <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-accent-bright)]">
+                <UserCheck size={13} className="text-[var(--brand-green)]" aria-hidden="true" />
+                <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--brand-green)]">
                   Your role
                 </span>
               </div>
-              <p className="font-sans text-sm font-semibold text-[var(--color-ink)] leading-relaxed">{yourRole}</p>
+              <p className="font-sans text-sm font-semibold text-[var(--prism-ink)] leading-relaxed">{yourRole}</p>
             </div>
           )}
 
           <div className="flex items-center gap-2 mb-2">
-            <Briefcase size={13} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
-            <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+            <Briefcase size={13} className="text-[var(--prism-ink-muted)]" aria-hidden="true" />
+            <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)]">
               The situation
             </span>
           </div>
-          <p className="font-sans text-sm text-[var(--color-ink)] leading-[1.7]">{context}</p>
+          <p className="font-sans text-sm text-[var(--prism-ink)] leading-[1.7]">{context}</p>
 
-          <p className="mt-4 p-3.5 rounded-[var(--radius-md)] bg-[var(--color-room)] border border-[var(--color-room-line)] font-sans text-xs text-[var(--color-ink-muted)] leading-relaxed">
+          <p className="mt-4 p-3.5 rounded-[var(--radius-md)] bg-[var(--brand-navy-deep)] border border-[var(--border-on-dark)] font-sans text-xs text-[var(--prism-ink-muted)] leading-relaxed">
             There is no right or wrong answer, and you don't need to know this field.
             Just talk through how you'd handle it — we're listening to how you think.
           </p>
@@ -68,20 +68,20 @@ export default function ScenarioCard({ scenario, onDismiss }) {
           {participants.length > 0 && (
             <div className="mt-5">
               <div className="flex items-center gap-2 mb-3">
-                <Users size={13} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
-                <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+                <Users size={13} className="text-[var(--prism-ink-muted)]" aria-hidden="true" />
+                <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)]">
                   In the room
                 </span>
               </div>
               <ul className="flex flex-col gap-2">
                 {participants.map((p) => (
-                  <li key={p.name} className="flex items-center gap-3 p-2.5 rounded-[var(--radius-md)] bg-[var(--color-room)] border border-[var(--color-room-line)]">
-                    <span className="w-8 h-8 rounded-full bg-[var(--color-room-surface)] border border-[var(--color-room-line)] text-[var(--color-ink)] flex items-center justify-center font-mono text-xs shrink-0" aria-hidden="true">
+                  <li key={p.name} className="flex items-center gap-3 p-2.5 rounded-[var(--radius-md)] bg-[var(--brand-navy-deep)] border border-[var(--border-on-dark)]">
+                    <span className="w-8 h-8 rounded-full bg-[var(--brand-navy)] border border-[var(--border-on-dark)] text-[var(--prism-ink)] flex items-center justify-center font-mono text-xs shrink-0" aria-hidden="true">
                       {p.name.charAt(0).toUpperCase()}
                     </span>
                     <div>
-                      <p className="font-sans text-sm font-semibold text-[var(--color-ink)] leading-tight">{p.name}</p>
-                      <p className="font-mono text-[11px] text-[var(--color-ink-muted)]">{p.role}</p>
+                      <p className="font-sans text-sm font-semibold text-[var(--prism-ink)] leading-tight">{p.name}</p>
+                      <p className="font-mono text-[11px] text-[var(--prism-ink-muted)]">{p.role}</p>
                     </div>
                   </li>
                 ))}
@@ -92,12 +92,12 @@ export default function ScenarioCard({ scenario, onDismiss }) {
           {/* How the conversation works — sets expectations before the first turn */}
           <div className="mt-5">
             <div className="flex items-center gap-2 mb-2">
-              <MessagesSquare size={13} className="text-[var(--color-ink-muted)]" aria-hidden="true" />
-              <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--color-ink-muted)]">
+              <MessagesSquare size={13} className="text-[var(--prism-ink-muted)]" aria-hidden="true" />
+              <span className="font-mono text-[11px] tracking-[0.08em] uppercase text-[var(--prism-ink-muted)]">
                 How this works
               </span>
             </div>
-            <p className="font-sans text-xs text-[var(--color-ink-muted)] leading-relaxed">
+            <p className="font-sans text-xs text-[var(--prism-ink-muted)] leading-relaxed">
               {lead ? `${lead} leads the discussion and asks you one question at a time.` : 'The panel asks you one question at a time.'}{' '}
               Answer by speaking or typing — take a moment to think first.
               New details will come up as the conversation goes; there's no script to follow.
@@ -109,11 +109,11 @@ export default function ScenarioCard({ scenario, onDismiss }) {
         <div className="px-6 pb-6">
           <button
             onClick={onDismiss}
-            className="w-full py-3.5 rounded-[var(--radius-md)] bg-[var(--color-room-ink)] font-sans font-semibold text-sm text-[var(--color-room)] tracking-wide hover:opacity-90 transition-opacity cursor-pointer"
+            className="w-full py-3.5 rounded-[var(--radius-md)] bg-[var(--brand-soft)] font-sans font-semibold text-sm text-[var(--brand-navy-deep)] tracking-wide hover:opacity-90 transition-opacity cursor-pointer"
           >
             Got it — continue
           </button>
-          <p className="mt-2.5 flex items-center justify-center gap-1.5 font-mono text-[11px] text-[var(--color-ink-muted)]">
+          <p className="mt-2.5 flex items-center justify-center gap-1.5 font-mono text-[11px] text-[var(--prism-ink-muted)]">
             <Timer size={11} aria-hidden="true" />
             Your 30 minutes begin when you continue.
           </p>
@@ -122,7 +122,7 @@ export default function ScenarioCard({ scenario, onDismiss }) {
         <button
           onClick={onDismiss}
           aria-label="Dismiss scenario briefing"
-          className="absolute top-4 right-4 text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors cursor-pointer"
+          className="absolute top-4 right-4 text-[var(--prism-ink-muted)] hover:text-[var(--prism-ink)] transition-colors cursor-pointer"
         >
           <X size={18} />
         </button>
