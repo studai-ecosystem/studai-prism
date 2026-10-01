@@ -68,6 +68,10 @@ test('json→pg migration rehearsal: copy, reconcile, verify, idempotent', { ski
   // A second, incomplete session (no report — exercises null completedAt).
   await jsonStore.createEntitlement({ sessionId: sid2, mode: 'dev', amount: 0 })
   await jsonStore.createSession(sid2, { scenarioId: 'design-sprint', userId: user.id, userEmail: user.email, exchangeCount: 0 })
+  // An owned entitlement and an anonymous session (null owner) exercise the owner-column copy and the null-vs-absent normalization.
+  const sid3 = `mig3-${suffix}`
+  await jsonStore.createEntitlement({ sessionId: sid3, mode: 'dev', amount: 0, userId: user.id, userEmail: user.email })
+  await jsonStore.createSession(sid3, { scenarioId: 'design-sprint', userId: null, userEmail: null, exchangeCount: 0 })
 
   // ── Dry run copies nothing ─────────────────────────────────────────────────
   const dry = await migration.migrateJsonStoreToPg({ dryRun: true })
@@ -94,6 +98,9 @@ test('json→pg migration rehearsal: copy, reconcile, verify, idempotent', { ski
   const pgReport = await pgStore.getReport(sid)
   assert.equal(pgReport.composite.value, 68)
   assert.equal(pgReport.scores.criticalThinking, 71)
+  const pgOwned = await pgStore.getEntitlement(sid3)
+  assert.equal(pgOwned.userId, user.id, 'payment owner columns are copied')
+  assert.equal(pgOwned.userEmail, user.email)
   const pgEnt = await pgStore.getEntitlement(sid)
   assert.equal(pgEnt.consumed, true)
   const pgDispute = await pgStore.getDispute(sid)
@@ -122,6 +129,7 @@ test('json→pg migration rehearsal: copy, reconcile, verify, idempotent', { ski
   assert.equal(await pgStore.getEntitlement(sid2), null)
 
   // Clean up the first session's rows too so repeated CI runs stay stable.
+  await pgStore.eraseSession(sid3)
   await pgStore.eraseSession(sid)
   await dbPg.deleteUser(user.id)
   await query('DELETE FROM v1_device_links WHERE pair_code = $1', [`pair-${suffix}`])

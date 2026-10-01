@@ -94,14 +94,15 @@ async function copyPayments(payments, apply) {
     copied += 1
     if (!apply) continue
     await query(
-      `INSERT INTO v1_payments (session_id, payment_id, order_id, amount, mode, consumed, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO v1_payments (session_id, payment_id, order_id, amount, mode, consumed, created_at, user_id, user_email)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT (session_id) DO UPDATE SET
          payment_id = EXCLUDED.payment_id, order_id = EXCLUDED.order_id,
          amount = EXCLUDED.amount, mode = EXCLUDED.mode, consumed = EXCLUDED.consumed,
-         created_at = EXCLUDED.created_at`,
+         created_at = EXCLUDED.created_at, user_id = EXCLUDED.user_id, user_email = EXCLUDED.user_email`,
       [rec.sessionId, rec.paymentId ?? null, rec.orderId ?? null, rec.amount ?? null,
-        rec.mode || 'paid', Boolean(rec.consumed), rec.createdAt || new Date().toISOString()],
+        rec.mode || 'paid', Boolean(rec.consumed), rec.createdAt || new Date().toISOString(),
+        rec.userId ?? null, rec.userEmail ?? null],
     )
   }
   return copied
@@ -282,14 +283,20 @@ export async function migrateJsonStoreToPg({ dryRun = true } = {}) {
 // canonical SHA-256 hashes over each backend's record set, and the list of
 // mismatched keys.
 
-function normalize(rec, defaults) {
+// absentWhenNull: owner/scenario keys that legacy JSON records store as null (or omit)
+// while the PG mapper omits them; null and absent are the same 'no value' at the read
+// contract, so both sides are compared with those keys removed when null.
+function normalize(rec, defaults, absentWhenNull = []) {
   if (!rec || typeof rec !== 'object' || Array.isArray(rec)) return rec
   const out = { ...defaults, ...Object.fromEntries(Object.entries(rec).filter(([, v]) => v !== undefined)) }
+  for (const k of absentWhenNull) if (out[k] === null) delete out[k]
   return out
 }
 
 const USER_DEFAULTS = { name: '', college: '', year: '', candidateId: null, accountState: 'active', tokenVersion: 0, ageDeclaration: null }
 const SESSION_DEFAULTS = { startedAt: null, completedAt: null, updatedAt: null }
+const SESSION_ABSENT_WHEN_NULL = ['scenarioId', 'userId', 'userEmail']
+const PAYMENT_DEFAULTS = { userId: null, userEmail: null }
 const DEVICE_DEFAULTS = { sessionId: '', status: 'pending', phoneUserAgent: '' }
 
 export async function reconcileStores() {
@@ -300,14 +307,14 @@ export async function reconcileStores() {
   const snap = await readJsonSnapshot()
   const buckets = {}
 
-  async function compareKeyed(name, keys, jsonGet, pgGet, defaults = {}) {
+  async function compareKeyed(name, keys, jsonGet, pgGet, defaults = {}, absentWhenNull = []) {
     const mismatched = []
     const jsonCanon = []
     const pgCanon = []
     for (const key of keys) {
       const [j, p] = await Promise.all([jsonGet(key), pgGet(key)])
-      const cj = canonicalStringify(normalize(j, defaults))
-      const cp = canonicalStringify(normalize(p, defaults))
+      const cj = canonicalStringify(normalize(j, defaults, absentWhenNull))
+      const cp = canonicalStringify(normalize(p, defaults, absentWhenNull))
       jsonCanon.push(cj)
       pgCanon.push(cp)
       if (cj !== cp) mismatched.push(key)
@@ -322,8 +329,8 @@ export async function reconcileStores() {
   }
 
   await compareKeyed('users', snap.users.map((u) => u.id), dbJson.findUserById, dbPg.findUserById, USER_DEFAULTS)
-  await compareKeyed('payments', Object.keys(snap.payments), jsonStore.getEntitlement, pgStore.getEntitlement)
-  await compareKeyed('sessions', Object.keys(snap.sessions), jsonStore.getSession, pgStore.getSession, SESSION_DEFAULTS)
+  await compareKeyed('payments', Object.keys(snap.payments), jsonStore.getEntitlement, pgStore.getEntitlement, PAYMENT_DEFAULTS)
+  await compareKeyed('sessions', Object.keys(snap.sessions), jsonStore.getSession, pgStore.getSession, SESSION_DEFAULTS, SESSION_ABSENT_WHEN_NULL)
   await compareKeyed('reports', Object.keys(snap.reports), jsonStore.getReport, pgStore.getReport)
   await compareKeyed('calibrations', Object.keys(snap.calibrations), jsonStore.getCalibration, pgStore.getCalibration)
   await compareKeyed('consents', Object.keys(snap.consents), jsonStore.getConsent, pgStore.getConsent)
