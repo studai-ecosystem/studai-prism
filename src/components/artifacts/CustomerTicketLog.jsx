@@ -1,13 +1,14 @@
-// src/components/artifacts/CustomerTicketLog.jsx — customer tickets rendered
-// only from the artifact's data. Marks are a reading aid on this page; no
-// automatic tags or hints are added to what the candidate sees.
+// Customer tickets rendered only from the artifact's data. Marks are a
+// reading aid on this page; no automatic tags or hints are added to what the
+// candidate sees.
 import { useState } from 'react'
 import { ArtifactUnavailable } from './ArtifactUnavailable.jsx'
+import { ArtifactShell, ArtifactFilterGroup } from './ArtifactShell.jsx'
 
 const FILTERS = [
   { id: 'ALL', label: 'All' },
-  { id: 'LOW', label: '1–2 stars' },
-  { id: 'HIGH', label: '4–5 stars' },
+  { id: 'LOW', label: '1\u20132 stars' },
+  { id: 'HIGH', label: '4\u20135 stars' },
 ]
 
 export default function CustomerTicketLog({ title, data }) {
@@ -25,31 +26,17 @@ export default function CustomerTicketLog({ title, data }) {
   })
 
   return (
-    <div className="space-y-4 text-prism-ink">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="text-xs text-prism-ink-muted">Marked: {marked.size} (for your reference on this page)</p>
-      </div>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by rating">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            aria-pressed={filter === f.id}
-            onClick={() => setFilter(f.id)}
-            className={filter === f.id
-              ? 'rounded-[var(--prism-radius-md)] bg-prism-accent px-2.5 py-1 text-xs font-medium text-prism-accent-ink'
-              : 'rounded-[var(--prism-radius-md)] bg-prism-subtle px-2.5 py-1 text-xs font-medium text-prism-ink'}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+    <ArtifactShell
+      title={title}
+      kind="Ticket log"
+      status={<span className="text-xs">Marked: {marked.size} (for your reference on this page)</span>}
+      toolbar={<ArtifactFilterGroup label="Filter by rating" options={FILTERS} value={filter} onChange={setFilter} />}
+    >
       <ul className="space-y-3">
         {shown.map((t) => (
           <li key={t.id} className="rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-surface p-3">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-prism-ink-muted">
-              <span><span className="font-mono">{t.id}</span>{t.customer ? ` · ${t.customer}` : ''}{t.rating != null ? ` · ${t.rating} of 5 stars` : ''}</span>
+              <span><span className="font-mono">{t.id}</span>{t.customer ? ` \u00b7 ${t.customer}` : ''}{t.rating != null ? ` \u00b7 ${t.rating} of 5 stars` : ''}</span>
               <button
                 type="button"
                 aria-pressed={marked.has(t.id)}
@@ -63,6 +50,6 @@ export default function CustomerTicketLog({ title, data }) {
           </li>
         ))}
       </ul>
-    </div>
+    </ArtifactShell>
   )
 }

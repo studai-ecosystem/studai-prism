@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: autopilot
-active_phase: E
+active_phase: F
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -107,18 +107,30 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase E - Assessment funnel, simulation workspace and artifacts
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 0b04a08 (build, vitest 247, server 620/596/0, static audit, playwright chromium + mobile-chromium 286)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] E.01 Measurement-sensitive inventory documented in the state file
-- [ ] E.02 Invitation, briefing (role, duration, can-do, observed, not assessed, accommodations, integrity, privacy, technical readiness), consent, identity and integrity screens
-- [ ] E.03 Workspace desktop layout: context bar, conversation, artifact tabs and tools, composer; reconnecting and submission states; focus management and keyboard navigation
-- [ ] E.04 Purpose-built responsive workspace mode (not stacked panes)
-- [ ] E.05 Common artifact shell, toolbar, tabs, tables, editable cells, selection, save and focus states, empty states; every artifact component brought into it
-- [ ] E.06 Submission, evaluation and completion states with calm copy and what happens next
-- [ ] E.07 Assessment e2e and axe checks pass; no hints or rubric text introduced
-- [ ] E.08 Gates, visual QA, commit
+- [x] E.01 Measurement-sensitive inventory documented in the state file - evidence: section "E.01 Measurement-sensitive inventory" below (stimulus, leak risks, turn order, artifacts, timing, probes, candidate actions, documented-not-implemented ideas)
+- [x] E.02 Invitation, briefing (role, duration, can-do, observed, not assessed, accommodations, integrity, privacy, technical readiness), consent, identity and integrity screens - evidence: FunnelSteps.jsx (Briefing, Device and consent, Assessment, Report; text-labelled for assistive technology, no progress figures) on BriefingPage and SystemCheckPage; the ten briefing sections, sponsored disclosure and consent already complete from the campus programme. The legacy proctored identity and room screens are unchanged and move to tokens in phase M
+- [x] E.03 Workspace desktop layout: context bar, conversation, artifact tabs and tools, composer; reconnecting and submission states; focus management and keyboard navigation - evidence: AssessmentShell fill mode (viewport-height frame from 768 px, panes scroll inside, composer pinned); AssessmentHeader brand mark and role line; sticky ResponseComposer; existing reconnect banner, save status, focus return and tab arrow keys retained (player.test.jsx). Screenshots: audit-results/ui/phase-e/player-*.png
+- [x] E.04 Purpose-built responsive workspace mode (not stacked panes) - evidence: from 1024 px two panes side by side; below that a Conversation or Workspace switch (not stacked); the Workspace choice reads "(needs attention)" when a work-material save failed; at 390 px the composer stays in view while the page scrolls. Test: player.test.jsx small-screen attention test
+- [x] E.05 Common artifact shell, toolbar, tabs, tables, editable cells, selection, save and focus states, empty states; every artifact component brought into it - evidence: components/artifacts/ArtifactShell.jsx (ArtifactShell, ArtifactFilterGroup, ArtifactTable, ArtifactSaveStatus); AnalyticsDashboard, CustomerTicketLog and BudgetModeler now use it with identical behaviour and copy. Only these three artifact types exist in the server contract; any other type renders the honest "cannot be displayed" state, so no further artifact components were invented. Test: player.test.jsx shared frame test
+- [x] E.06 Submission, evaluation and completion states with calm copy and what happens next - evidence: SubmissionProgress.jsx (Answers submitted, Review, Report; each state in words) above the existing completion, review and review-did-not-finish messages; no outcome implied. Tests: player.test.jsx (completed, review in progress, review did not finish)
+- [x] E.07 Assessment e2e and axe checks pass; no hints or rubric text introduced - evidence: playwright chromium + mobile-chromium 286 passed including the campus workspace, keyboard and axe specs; header test asserts no percentage, score or parts-remaining text
+- [x] E.08 Gates, visual QA, commit - evidence: build, vitest 247, server 620/596/0, static audit, playwright 286; screenshots at 1440, 1024, 768 and 390 for briefing, system check and player (live start needs AWS Bedrock credentials that have expired in this environment, so the player was rendered from a synthetic session contract in a throwaway script that is not committed)
+
+### E.01 Measurement-sensitive inventory (recorded before any edit)
+
+* Stimulus text: scenario title, context, role, participants, every message and the work-material data come from the server session contract (SessionContractSchema); the client never writes or reorders stimulus. Presentation changes touch layout and chrome only.
+* Rubric and score leak risks: the player shows no score, band, percentage, rubric, hint or evaluation while IN_PROGRESS. Required-exchange counts appear only in the finish dialog. The header gains the brand mark and the scenario role line (already part of the briefing stimulus); nothing else.
+* Turn order: the transcript only grows with turns the server returned; an unsent answer is a labelled pending bubble, never a turn; same client event id on every retry. Unchanged.
+* Artifact behaviour: work materials render only their own data; saves are versioned (If-Match) with server-wins conflicts and a recoverable draft; "Saved" appears only after server confirmation; filters and ticket marks are local reading aids. The shared frame changes markup and styling only; behaviour and copy are identical.
+* Timing: server-authoritative clock, role=timer, polite warnings at 10, 5 and 1 minutes, time-up state. Unchanged.
+* Probes: all probes and follow-ups are server turns; the client contains none. Unchanged.
+* Candidate actions: send, retry, edit a refused answer, edit and save work materials, resolve a conflict, view the briefing, finish (early finish is explicit). Unchanged; the mobile Workspace choice now says "(needs attention)" when a work-material save failed, which only reports state the candidate already sees.
+* Documented, NOT implemented (could change measurement conditions): a progress bar or "parts remaining" in the header (would steer effort allocation); artifact completeness cues; per-turn feedback or typing hints; colour-coding the timer; auto-focusing work materials; any change to the 30 minute framing on the legacy briefing; the legacy character picker tilt and shake effects (kept, restyle deferred).
+* Out of scope here: the legacy proctored room flow (Briefing, VerifyIdentity, LinkPhone, PhoneProctor, RoomScan, Assessment.jsx) keeps its behaviour; it already renders through the brand compatibility aliases and moves to tokens in phase M with the alias removal.
 
 ## Phase F - Report V3 and the Evidence UI system
 

@@ -15,6 +15,8 @@ import { renderApp, mockFetch, meBody, signIn, jsonResponse } from '../../test/u
 import { createArtifactStore } from './state/artifactStore.js'
 import AssessmentPlayerPage from './pages/AssessmentPlayerPage.jsx'
 import AnalyticsDashboard from '../../components/artifacts/AnalyticsDashboard.jsx'
+import CustomerTicketLog from '../../components/artifacts/CustomerTicketLog.jsx'
+import { FunnelSteps } from './components/FunnelSteps.jsx'
 import { humanizeKey } from '../../components/artifacts/format.js'
 import { ASSESSMENT_CONSENT_ITEMS, CONSENT_VERSION } from '../../lib/copy/assessmentConsent.js'
 
@@ -166,6 +168,12 @@ describe('Assessment Workspace V3 player (§12)', () => {
     expect(screen.getByRole('timer')).toHaveTextContent(/Time remaining: \d+:\d{2} left/)
   })
 
+  it('the header shows the scenario role and no score, progress figure or percentage', async () => {
+    renderPlayer({ '/api/v1/assessment-sessions/sess-v3-0001': { data: contract() } })
+    expect(await screen.findByText('Your role: Analyst')).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/\d\s*%|score|of 3 parts/i)
+  })
+
   it('a failed send keeps the answer, invents nothing, and retries with the same event id', async () => {
     let fail = true
     const { spy } = renderPlayer({
@@ -246,6 +254,24 @@ describe('Assessment Workspace V3 player (§12)', () => {
     expect(screen.queryByLabelText('Your answer')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Briefing' }), 'no briefing toggle without a briefing panel').not.toBeInTheDocument()
     expect(screen.queryByText('All work saved')).not.toBeInTheDocument()
+    expect(screen.getByTestId('submission-progress')).toHaveTextContent('Report (done)')
+  })
+
+  it('while the review runs, submission progress says so and promises nothing about the result', async () => {
+    renderPlayer({ '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ status: 'SCORING' }) } })
+    expect(await screen.findByText('Your answers are being reviewed')).toBeInTheDocument()
+    const progress = screen.getByTestId('submission-progress')
+    expect(progress).toHaveTextContent('Answers submitted (done)')
+    expect(progress).toHaveTextContent('Review (in progress)')
+    expect(progress).toHaveTextContent('Report (not yet)')
+    expect(screen.queryByLabelText('Your answer')).not.toBeInTheDocument()
+  })
+
+  it('a review that did not finish is stated plainly with a retry', async () => {
+    renderPlayer({ '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ status: 'SCORING_FAILED' }) } })
+    expect(await screen.findByText('Review did not finish')).toBeInTheDocument()
+    expect(screen.getByTestId('submission-progress')).toHaveTextContent('Review (did not finish)')
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
   })
 
   it('an unknown session is not available; an unknown scenario is never substituted', async () => {
@@ -276,9 +302,51 @@ describe('Assessment Workspace V3 player (§12)', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Workspace' }))
     expect(await screen.findByLabelText('Your reasoning')).toBeInTheDocument()
   })
+
+  it('small screens: a work material that could not be saved is flagged on the Workspace choice', async () => {
+    setWide(false)
+    renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001/artifacts/SYN-ART': () => jsonResponse(500, { error: { code: 'INTERNAL', message: 'x', requestId: 'r' } }),
+      '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ artifacts: [budgetArtifact], device: { requiresLargeScreen: true, allowSmallScreen: true } }) },
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Continue on this device' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Workspace' }))
+    await userEvent.type(await screen.findByLabelText('Your reasoning'), 'x')
+    await userEvent.click(screen.getByRole('button', { name: 'Save plan' }))
+    expect(await screen.findByRole('radio', { name: 'Workspace (needs attention)' }, { timeout: 4000 })).toBeInTheDocument()
+  })
+})
+
+describe('assessment funnel steps', () => {
+  it('marks the current step, earlier steps done and later steps not yet, for assistive technology too', () => {
+    rtlRender(<FunnelSteps current="check" />)
+    const items = screen.getAllByRole('listitem')
+    expect(items).toHaveLength(4)
+    expect(items[0]).toHaveTextContent('Briefing (done)')
+    expect(items[1]).toHaveAttribute('aria-current', 'step')
+    expect(items[1]).toHaveTextContent('Device and consent (current step)')
+    expect(items[3]).toHaveTextContent('Report (later)')
+    expect(document.body.textContent).not.toMatch(/\d\s*%/)
+  })
 })
 
 describe('consent and work-material content', () => {
+  it('every work material shares one frame: kind, title, toolbar, and honest filters', async () => {
+    const { container } = rtlRender(<>
+      <AnalyticsDashboard title="Synthetic table" data={{ channels: [{ name: 'Row A', units: 3 }, { name: 'Row B', units: 5 }] }} />
+      <CustomerTicketLog title="Synthetic tickets" data={{ tickets: [{ id: 'T-1', rating: 1, comment: 'Synthetic one' }, { id: 'T-2', rating: 5, comment: 'Synthetic two' }] }} />
+    </>)
+    expect(container.querySelectorAll('[data-artifact-shell]')).toHaveLength(2)
+    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Ticket log')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Row B' }))
+    expect(screen.getByRole('button', { name: 'Row B' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('rowheader', { name: 'Row A' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /^1.2 stars$/ }))
+    expect(screen.getByText(/Synthetic one/)).toBeInTheDocument()
+    expect(screen.queryByText(/Synthetic two/)).not.toBeInTheDocument()
+  })
+
   it('V3 consent wording and scopes are identical to the legacy briefing', () => {
     const legacy = readFileSync(resolve(process.cwd(), 'src/pages/Briefing.jsx'), 'utf-8')
     for (const item of ASSESSMENT_CONSENT_ITEMS) {

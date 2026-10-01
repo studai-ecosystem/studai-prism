@@ -12,7 +12,7 @@ export const ResponseComposer = forwardRef(function ResponseComposer({ draft, on
     onSend()
   }
   return (
-    <form onSubmit={submit} className="space-y-2 border-t border-prism-border p-3">
+    <form onSubmit={submit} className="sticky bottom-0 space-y-2 border-t border-prism-border bg-prism-canvas p-3">
       <label htmlFor="answer" className="sr-only">Your answer</label>
       <div className="flex gap-2">
         <textarea

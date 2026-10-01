@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
+import { FunnelSteps } from '../components/FunnelSteps.jsx'
 import { Card } from '../../../components/ui/Card.jsx'
 import { Badge } from '../../../components/ui/Badge.jsx'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
@@ -80,6 +81,7 @@ export default function BriefingPage() {
         context={active}
         breadcrumbs={[{ label: 'Assessments', to: assignmentsListPath(active) }, { label: 'Briefing' }]}
       />
+      <FunnelSteps current="briefing" className="!mb-0" />
       <Badge tone={sponsored ? 'accent' : 'neutral'}>{sponsored ? SCOPE_LABEL.SPONSORED(sponsorName) : SCOPE_LABEL.PERSONAL}</Badge>
 
       <Card className="space-y-6 p-6">

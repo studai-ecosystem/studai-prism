@@ -26,6 +26,7 @@ import { ConversationPane } from '../components/ConversationPane.jsx'
 import { ResponseComposer } from '../components/ResponseComposer.jsx'
 import { ArtifactPane } from '../components/ArtifactPane.jsx'
 import { AssessmentExitDialog } from '../components/AssessmentExitDialog.jsx'
+import { SubmissionProgress } from '../components/SubmissionProgress.jsx'
 import { overallSaveState } from '../components/SessionSaveStatus.jsx'
 import { PLAYER_COPY } from '../../../lib/copy/player.js'
 
@@ -265,6 +266,7 @@ export default function AssessmentPlayerPage() {
     <AssessmentHeader
       title={contract?.scenario.title || 'Assessment'}
       scopeLabel={contract ? scopeLabel : null}
+      contextLine={contract?.scenario.yourRole ? `Your role: ${contract.scenario.yourRole}` : null}
       remainingMs={inProgress ? remainingMs : null}
       saveState={inProgress ? saveState : null}
       briefingOpen={briefingOpen}
@@ -273,7 +275,7 @@ export default function AssessmentPlayerPage() {
       finishing={exit.submitting || exit.scoring}
     />
   )
-  const frame = (body) => <AssessmentShell header={header}><DocumentTitle title={contract?.scenario.title || 'Assessment'} />{body}</AssessmentShell>
+  const frame = (body, { fill = false } = {}) => <AssessmentShell header={header} fill={fill}><DocumentTitle title={contract?.scenario.title || 'Assessment'} />{body}</AssessmentShell>
 
   if (wsParam && !meLoading && !target) return frame(<div className="p-6"><UnauthorizedState title={PLAYER_COPY.notAvailable} homeTo="/app/assessments" homeLabel="Back to assessments" /></div>)
   if (!aligned || session.isPending) {
@@ -314,6 +316,7 @@ export default function AssessmentPlayerPage() {
   if (contract.status === 'COMPLETED' || contract.status === 'SCORING' || contract.status === 'SCORING_FAILED') {
     return frame(
       <div className="mx-auto w-full max-w-2xl p-6">
+        <SubmissionProgress stage={contract.status === 'SCORING_FAILED' ? 'FAILED' : contract.status === 'COMPLETED' && contract.reportPath ? 'REPORT' : 'REVIEW'} />
         {contract.status === 'COMPLETED' && (
           <Callout tone="positive" title={PLAYER_COPY.completeTitle}>
             <p>{PLAYER_COPY.completeBody}</p>
@@ -337,15 +340,16 @@ export default function AssessmentPlayerPage() {
   const interrupted = connection === 'INTERRUPTED' && online
   const hasWork = contract.artifacts.length > 0
   const needsLarge = contract.device.requiresLargeScreen && small && !smallOk
+  const workNeedsAttention = artifactState.items.some((i) => i.status === 'ERROR' || i.status === 'CONFLICT')
   const conversation = (
-    <section aria-label="Conversation" className={hasWork && wide ? 'flex min-h-[50vh] w-[45%] min-w-0 shrink-0 flex-col border-r border-prism-border' : 'mx-auto flex min-h-[50vh] w-full min-w-0 max-w-3xl flex-col'}>
+    <section aria-label="Conversation" className={hasWork && wide ? 'flex min-h-[50vh] w-[45%] min-w-0 shrink-0 flex-col border-r border-prism-border md:min-h-0' : 'mx-auto flex min-h-[50vh] w-full min-w-0 max-w-3xl flex-col md:min-h-0'}>
       <ConversationPane messages={contract.messages} pending={pending} onRetry={() => pending && deliver(pending)} onEdit={editPending} />
       {timeUp && <div className="px-3"><Callout tone="partial" title={PLAYER_COPY.timeUpTitle}>{PLAYER_COPY.timeUp}</Callout></div>}
       <ResponseComposer ref={answerRef} draft={draft} onDraft={setDraft} onSend={onSend} disabled={timeUp} readOnly={Boolean(pending)} busy={pending?.status === 'SENDING'} />
     </section>
   )
   const workspace = (
-    <section aria-label="Work materials" className="flex min-h-[50vh] min-w-0 flex-1 flex-col">
+    <section aria-label="Work materials" className="flex min-h-[50vh] min-w-0 flex-1 flex-col md:min-h-0">
       <ArtifactPane items={artifactState.items} activeId={activeArtifact} onSelect={setActiveArtifact} store={store} />
     </section>
   )
@@ -360,7 +364,7 @@ export default function AssessmentPlayerPage() {
         </div>
       )}
       {briefingOpen && (
-        <section id="player-briefing" aria-label="Briefing" className="grid gap-4 border-b border-prism-border bg-prism-surface p-4 text-sm md:grid-cols-3">
+        <section id="player-briefing" aria-label="Briefing" className="grid max-h-[40vh] gap-4 overflow-y-auto border-b border-prism-border bg-prism-surface p-4 text-sm md:grid-cols-3">
           {contract.scenario.context && <div><h2 className="font-semibold text-prism-ink">Context</h2><p className="mt-1 text-prism-ink-muted">{contract.scenario.context}</p></div>}
           {contract.scenario.yourRole && <div><h2 className="font-semibold text-prism-ink">Your role</h2><p className="mt-1 text-prism-ink-muted">{contract.scenario.yourRole}</p></div>}
           {contract.scenario.participants.length > 0 && (
@@ -393,7 +397,7 @@ export default function AssessmentPlayerPage() {
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="border-b border-prism-border p-2">
-            <SegmentedControl label="Show" value={pane} onChange={setPane} options={[{ value: 'conversation', label: 'Conversation' }, { value: 'workspace', label: 'Workspace' }]} />
+            <SegmentedControl label="Show" value={pane} onChange={setPane} options={[{ value: 'conversation', label: 'Conversation' }, { value: 'workspace', label: workNeedsAttention ? 'Workspace (needs attention)' : 'Workspace' }]} />
           </div>
           {pane === 'workspace' ? workspace : conversation}
         </div>
@@ -409,5 +413,6 @@ export default function AssessmentPlayerPage() {
         error={exit.error}
       />
     </>,
+    { fill: true },
   )
 }

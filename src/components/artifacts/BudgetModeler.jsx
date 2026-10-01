@@ -6,6 +6,7 @@
 // Saving goes through `controller` (V3 versioned store, or the legacy store).
 import { useState } from 'react'
 import { ArtifactUnavailable } from './ArtifactUnavailable.jsx'
+import { ArtifactShell, ArtifactSaveStatus } from './ArtifactShell.jsx'
 import { humanizeKey, formatValue } from './format.js'
 
 export default function BudgetModeler({ artifactId, title, data, controller }) {
@@ -49,11 +50,7 @@ export default function BudgetModeler({ artifactId, title, data, controller }) {
   const saved = !failed && (save.state === 'saved' || status === 'SAVED')
 
   return (
-    <div className="space-y-4 text-prism-ink">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        <p className="text-sm">Allocated {formatValue(used)} of {formatValue(total)}</p>
-      </div>
+    <ArtifactShell title={title} kind="Planner" status={<p className="text-sm">Allocated {formatValue(used)} of {formatValue(total)}</p>}>
       {over && <p role="alert" className="text-sm font-medium text-prism-blocked">Over the total by {formatValue(used - total)}. Reduce an allocation to save.</p>}
       {!over && <p className="text-sm text-prism-ink-muted">Remaining: {formatValue(total - used)}</p>}
       {constraints.length > 0 && (
@@ -108,6 +105,6 @@ export default function BudgetModeler({ artifactId, title, data, controller }) {
           {failed && <span className="text-prism-blocked">Not saved — retry. Your plan is still here.</span>}
         </span>
       </div>
-    </div>
+    </ArtifactShell>
   )
 }

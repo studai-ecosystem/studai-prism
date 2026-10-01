@@ -1,4 +1,5 @@
 import { Button } from '../../../components/ui/Button.jsx'
+import PrismLogo from '../../../components/ui/PrismLogo.jsx'
 import { SessionSaveStatus } from './SessionSaveStatus.jsx'
 
 function formatRemaining(ms) {
@@ -11,13 +12,17 @@ function formatRemaining(ms) {
 
 // Player header (spec §12.1): scenario, time left (server clock), save state,
 // briefing and finish. No scoring details while the assessment is active.
-export function AssessmentHeader({ title, scopeLabel, remainingMs, saveState, briefingOpen, onToggleBriefing, onFinish, finishing, canFinish = true }) {
+export function AssessmentHeader({ title, scopeLabel, contextLine, remainingMs, saveState, briefingOpen, onToggleBriefing, onFinish, finishing, canFinish = true }) {
   const remaining = formatRemaining(remainingMs)
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-prism-border bg-prism-surface px-4 py-3">
-      <div className="min-w-0">
-        {scopeLabel && <p className="text-xs font-medium uppercase tracking-wide text-prism-ink-muted">{scopeLabel}</p>}
-        <h1 id="page-title" tabIndex={-1} className="truncate text-base font-semibold text-prism-ink focus:outline-none">{title}</h1>
+      <div className="flex min-w-0 items-center gap-3">
+        <PrismLogo variant="icon" tone="reverse" size={24} decorative className="shrink-0" />
+        <div className="min-w-0">
+          {scopeLabel && <p className="text-xs font-medium uppercase tracking-wide text-prism-ink-muted">{scopeLabel}</p>}
+          <h1 id="page-title" tabIndex={-1} className="truncate text-base font-semibold text-prism-ink focus:outline-none">{title}</h1>
+          {contextLine && <p className="truncate text-xs text-prism-ink-muted">{contextLine}</p>}
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         {remaining && (

@@ -8,6 +8,7 @@ import { startAssignment } from '../api/assessmentSessionApi.js'
 import { ASSESSMENT_CONSENT_ITEMS, CONSENT_VERSION } from '../../../lib/copy/assessmentConsent.js'
 import { track } from '../../../lib/telemetry.js'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
+import { FunnelSteps } from '../components/FunnelSteps.jsx'
 import { Card } from '../../../components/ui/Card.jsx'
 import { StatusChip } from '../../../components/ui/Badge.jsx'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
@@ -124,6 +125,7 @@ export default function SystemCheckPage() {
         context={active}
         breadcrumbs={[{ label: 'Assessments', to: assignmentsListPath(active) }, { label: 'Briefing', to: `${base}/briefing` }, { label: 'System check' }]}
       />
+      <FunnelSteps current="check" className="!mb-0" />
       {start.allowed && start.mode === 'V3' && !resume && (
         <a href="#begin" className="inline-block text-sm font-medium text-prism-accent underline underline-offset-2">Go to consent and start</a>
       )}
