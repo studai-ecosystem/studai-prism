@@ -9,6 +9,7 @@ import { Modal } from '../../../components/ui/Modal.jsx'
 import { ErrorState } from '../../../components/states/ErrorState.jsx'
 import { useToast } from '../../../components/ui/Toast.jsx'
 import { MEMBER_STATUS_LABELS, ASSESSMENT_STATUS_LABELS } from '../../../lib/copy/campus.js'
+import { DataBoundaryKey } from '../components/DataBoundaryKey.jsx'
 import { campusAdminApi } from '../../../api/campusAdmin.js'
 import { CampusPage, AssessmentStatus, MutationError, downloadText } from '../components/CampusPage.jsx'
 import { useCampusOrg, useStudents, useCohorts, useMoveStudents, useResendInvite } from '../hooks.js'
@@ -91,7 +92,8 @@ export default function CampusStudentsPage() {
         </>
       )}
     >
-      <form role="search" aria-label="Filter students" className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={(e) => e.preventDefault()}>
+      <DataBoundaryKey className="mb-4" />
+        <form role="search" aria-label="Filter students" className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={(e) => e.preventDefault()}>
         <Input label="Search" type="search" value={filters.q} onChange={setFilter('q')} placeholder="Name or email" />
         <Select label="Cohort" value={filters.cohortId} onChange={setFilter('cohortId')} options={cohortOptions} placeholder="All cohorts" />
         <Select label="Enrolment" value={filters.status} onChange={setFilter('status')} placeholder="Any" options={['ACTIVE', 'INVITED', 'SUSPENDED'].map((v) => ({ value: v, label: MEMBER_STATUS_LABELS[v] }))} />

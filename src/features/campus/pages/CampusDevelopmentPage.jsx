@@ -4,6 +4,7 @@
 // student's practice work — and completion never changes formal results.
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { DataTable } from '../../../components/ui/DataTable.jsx'
 import { Button } from '../../../components/ui/Button.jsx'
@@ -17,6 +18,7 @@ import { formatDate } from '../../student/QueryState.jsx'
 import { fetchInterventions, fetchPracticeCatalogue, createIntervention, setInterventionStatus } from '../../../api/development.js'
 import { CampusPage, ConfirmDialog, MutationError, focusFirstInvalid, focusPageTitle } from '../components/CampusPage.jsx'
 import { useCampusOrg, useCohorts } from '../hooks.js'
+import { InterventionLoop } from '../components/InterventionLoop.jsx'
 
 const STATUS = { ACTIVE: ['positive', 'Active'], COMPLETED: ['accent', 'Completed'], CANCELLED: ['insufficient', 'Cancelled'] }
 // The admin's own calendar day (local), not the UTC one.
@@ -25,7 +27,7 @@ const today = () => dayOf(new Date())
 const inDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return dayOf(d) }
 const students = (n) => `${n} ${n === 1 ? 'student' : 'students'}`
 
-function InterventionBuilder({ open, onClose }) {
+function InterventionBuilder({ open, onClose, preset = {} }) {
   const { orgId, key } = useCampusOrg()
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -39,7 +41,7 @@ function InterventionBuilder({ open, onClose }) {
       onClose()
     },
   })
-  const defaults = () => ({ name: '', targetCapabilityId: '', cohortId: '', startsOn: today(), endsOn: inDays(28), missionIds: [], reassessmentPlanned: false })
+  const defaults = () => ({ name: '', targetCapabilityId: preset.capability || '', cohortId: preset.cohort || '', startsOn: today(), endsOn: inDays(28), missionIds: [], reassessmentPlanned: false })
   const { register, handleSubmit, watch, setValue, formState: { errors }, reset } = useForm({ defaultValues: defaults() })
   // Closing the builder discards what was typed and any validation messages.
   useEffect(() => { if (!open) { reset(defaults()); create.reset() } }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -121,7 +123,9 @@ export default function CampusDevelopmentPage() {
   const queryClient = useQueryClient()
   const toast = useToast()
   const query = useQuery({ queryKey: key('interventions'), queryFn: () => fetchInterventions(orgId) })
-  const [builderOpen, setBuilderOpen] = useState(false)
+  const [searchParams] = useSearchParams()
+  const preset = { capability: searchParams.get('capability') || '', cohort: searchParams.get('cohort') || '' }
+  const [builderOpen, setBuilderOpen] = useState(Boolean(preset.capability) && can('interventions.write'))
   const [detail, setDetail] = useState(null)
   const [ending, setEnding] = useState(null)
   const status = useMutation({
@@ -164,7 +168,7 @@ export default function CampusDevelopmentPage() {
           Changes in formal results are shown only after a comparable reassessment. Outcome views arrive with campus analytics and reassessment.
         </Callout>
       </div>
-      {write && <InterventionBuilder open={builderOpen} onClose={() => setBuilderOpen(false)} />}
+      {write && <InterventionBuilder open={builderOpen} onClose={() => setBuilderOpen(false)} preset={preset} />}
       <Modal
         open={Boolean(detail)}
         onClose={() => setDetail(null)}
@@ -189,6 +193,7 @@ export default function CampusDevelopmentPage() {
               </dd>
             </div>
             <div className="sm:col-span-3"><dt className="text-prism-ink-muted">Reassessment</dt><dd className="mt-1">{detail.reassessmentPlanned ? 'Planned after this intervention' : 'Not planned'}</dd></div>
+            <div className="sm:col-span-3"><dt className="mb-2 text-prism-ink-muted">From baseline to change</dt><dd><InterventionLoop compact intervention={detail} orgId={orgId} canReassess={can('reassessments.read') || can('reassessments.write')} canAnalytics={can('analytics.read')} /></dd></div>
           </dl>
         )}
       </Modal>

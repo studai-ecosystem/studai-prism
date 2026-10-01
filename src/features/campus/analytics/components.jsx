@@ -6,6 +6,7 @@ import { Suspense, lazy, useState } from 'react'
 import { Button } from '../../../components/ui/Button.jsx'
 import { DataTable } from '../../../components/ui/DataTable.jsx'
 import { Input, Select } from '../../../components/ui/FormControls.jsx'
+import { ChartFrame } from '../../../components/charts/ChartFrame.jsx'
 import { ANALYTICS_COPY } from '../../../lib/copy/campus.js'
 
 const Charts = lazy(() => import('./charts.jsx').then((m) => ({ default: m.DistributionBars })))
@@ -33,13 +34,14 @@ export function CapabilityDistributionChart({ view }) {
   const visible = view.capabilities.filter((c) => !c.suppressed)
   const hidden = view.capabilities.filter((c) => c.suppressed)
   return (
-    <div className="space-y-3">
-      {visible.length > 0 && (
-        <Suspense fallback={<p className="text-sm text-prism-ink-muted">Loading chart…</p>}>
-          <Charts rows={visible} bucketLabels={view.bucketLabels} buckets={BUCKETS} />
-        </Suspense>
-      )}
-      <TableEquivalent
+    <ChartFrame
+      description="Each bar is a capability; its segments count the students at each level. Axes start at zero and show numbers of students, never percentages."
+      n={typeof view.assessed === 'number' ? view.assessed : undefined}
+      status={visible.length > 0 ? 'ready' : hidden.length > 0 ? 'insufficient' : 'empty'}
+      emptyText={ANALYTICS_COPY.empty}
+      table={(
+        <div className="space-y-3">
+          <TableEquivalent
         caption="Students by capability level"
         rowKey={(r) => r.capabilityId}
         rows={view.capabilities}
@@ -50,8 +52,14 @@ export function CapabilityDistributionChart({ view }) {
           ...BUCKETS.map((b) => ({ key: b, header: view.bucketLabels[b] || b, render: (r) => (r.suppressed ? '—' : r.buckets[b]) })),
         ]}
       />
-      {hidden.length > 0 && <SuppressedNote />}
-    </div>
+          {hidden.length > 0 && <SuppressedNote />}
+        </div>
+      )}
+    >
+      <Suspense fallback={<p className="text-sm text-prism-ink-muted">Loading chart…</p>}>
+          <Charts rows={visible} bucketLabels={view.bucketLabels} buckets={BUCKETS} />
+        </Suspense>
+    </ChartFrame>
   )
 }
 

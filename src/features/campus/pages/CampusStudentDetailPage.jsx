@@ -7,6 +7,7 @@ import { Callout } from '../../../components/ui/Notice.jsx'
 import { DataTable } from '../../../components/ui/DataTable.jsx'
 import { formatDate } from '../../student/QueryState.jsx'
 import { MEMBER_STATUS_LABELS, STUDENT_DETAIL_PRIVACY } from '../../../lib/copy/campus.js'
+import { DataBoundaryKey } from '../components/DataBoundaryKey.jsx'
 import { CampusPage, AssessmentStatus, crumbs } from '../components/CampusPage.jsx'
 import { useCampusOrg, useStudent } from '../hooks.js'
 
@@ -27,6 +28,7 @@ export default function CampusStudentDetailPage() {
       {d && (
         <div className="space-y-6">
           <Callout title="What you can see here">{STUDENT_DETAIL_PRIVACY}</Callout>
+          <DataBoundaryKey />
           <Panel title="Cohorts">
             {d.cohorts.length ? (
               <ul className="flex flex-wrap gap-2">

@@ -6,6 +6,9 @@ import { Panel } from '../../../components/ui/Card.jsx'
 import { DataTable } from '../../../components/ui/DataTable.jsx'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
 import { Textarea } from '../../../components/ui/FormControls.jsx'
+import { Tabs } from '../../../components/ui/Tabs.jsx'
+import { useFlag } from '../../../app/providers/FeatureFlagProvider.jsx'
+import { CohortOverview, CohortCapabilities, CohortNeeds, CohortInterventions, CohortCycles, CohortReports } from '../components/CohortInsights.jsx'
 import { useToast } from '../../../components/ui/Toast.jsx'
 import { formatDate } from '../../student/QueryState.jsx'
 import { CampusPage, ConfirmDialog, MutationError, crumbs, focusFirstInvalid } from '../components/CampusPage.jsx'
@@ -26,6 +29,9 @@ export default function CampusCohortDetailPage() {
   const [emailError, setEmailError] = useState(null)
   const [removing, setRemoving] = useState(null)
   const [archiving, setArchiving] = useState(false)
+  const [tab, setTab] = useState('overview')
+  const { enabled: analyticsOn } = useFlag('PRISM_CAMPUS_ANALYTICS')
+  const showAnalytics = analyticsOn && can('analytics.read')
   const manage = can('students.manage')
   const d = query.data
   const name = d?.cohort.name || 'Cohort'
@@ -61,7 +67,14 @@ export default function CampusCohortDetailPage() {
       )}
     >
       {d && (
-        <div className="space-y-6">
+        <Tabs
+          label="Cohort sections"
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { id: 'overview', label: 'Overview', content: <CohortOverview d={d} onOpen={setTab} /> },
+            { id: 'students', label: 'Students', content: (
+              <div className="space-y-6">
           <Panel title="Students">
             <DataTable
               caption={`Students in ${name}`}
@@ -96,7 +109,17 @@ export default function CampusCohortDetailPage() {
               </form>
             </Panel>
           )}
-        </div>
+              </div>
+            ) },
+            ...(showAnalytics ? [
+              { id: 'capabilities', label: 'Capability distribution', content: <CohortCapabilities cohortId={cohortId} /> },
+              { id: 'needs', label: 'Development needs', content: <CohortNeeds cohortId={cohortId} /> },
+            ] : []),
+            { id: 'interventions', label: 'Interventions', content: <CohortInterventions cohortId={cohortId} /> },
+            { id: 'cycles', label: 'Assessment cycles and growth', content: <CohortCycles cohortId={cohortId} /> },
+            ...(showAnalytics ? [{ id: 'reports', label: 'Reports', content: <CohortReports /> }] : []),
+          ]}
+        />
       )}
       <ConfirmDialog
         open={Boolean(removing)}

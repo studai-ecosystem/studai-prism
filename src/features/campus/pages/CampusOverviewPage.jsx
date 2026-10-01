@@ -14,13 +14,21 @@ import { CampusPage } from '../components/CampusPage.jsx'
 import { CapabilityDistributionChart, SuppressedNote } from '../analytics/components.jsx'
 import { useCampusOrg, useOverview, useOnboarding } from '../hooks.js'
 
-function CapabilityOverview() {
+function CapabilityOverview({ canCreate = false }) {
   const { orgId, key } = useCampusOrg()
   const query = useQuery({ queryKey: key('analytics', 'capabilities', {}), queryFn: () => analyticsApi.capabilities(orgId, {}) })
   if (query.isPending) return <p className="text-sm text-prism-ink-muted">Loading capability overview…</p>
   if (query.isError) return <p className="text-sm text-prism-ink-muted">The capability overview could not be loaded.</p>
   const v = query.data
+  const top = !v.suppressed && v.topNeeds[0]
   return (
+    <div className="space-y-4">
+      {top && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--prism-radius-lg)] border border-prism-accent-soft bg-prism-subtle p-4" data-testid="campus-insight">
+          <p className="text-sm font-medium text-prism-ink">{top.name} is the largest development opportunity among assessed students.</p>
+          {canCreate && <LinkButton to={`/campus/${orgId}/development?capability=${encodeURIComponent(top.capabilityId)}`} variant="primary" size="sm">Create development intervention</LinkButton>}
+        </div>
+      )}
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Panel title="Capability overview" headingLevel={3} description={v.suppressed ? ANALYTICS_COPY.provisionalNote : `${v.assessed} assessed ${v.assessed === 1 ? 'student' : 'students'}. ${ANALYTICS_COPY.provisionalNote}`}>
         {v.suppressed ? <SuppressedNote /> : v.capabilities.length === 0 ? <p className="text-sm text-prism-ink-muted">{ANALYTICS_COPY.empty}</p> : <CapabilityDistributionChart view={v} />}
@@ -31,6 +39,7 @@ function CapabilityOverview() {
         )}
         <p className="mt-2 text-xs text-prism-ink-subtle">{v.method}</p>
       </Panel>
+    </div>
     </div>
   )
 }
@@ -77,7 +86,7 @@ export default function CampusOverviewPage() {
           {analyticsOn && can('analytics.read') && (
             <section aria-labelledby="capability-heading" className="space-y-3">
               <h2 id="capability-heading" className="text-base font-semibold text-prism-ink">Capabilities</h2>
-              <CapabilityOverview />
+              <CapabilityOverview canCreate={can('interventions.write') && d.missionsActive !== null} />
             </section>
           )}
           {d.enrolled === 0 && d.invited === 0 ? (

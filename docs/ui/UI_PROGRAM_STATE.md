@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: autopilot
-active_phase: I
+active_phase: J
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -171,18 +171,18 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase I - Campus experience
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 56fa904 (build, vitest 275, server 620/596/0, static audit, playwright chromium + mobile-chromium 285 passed and 1 flaky that passed on retry: accessibility baseline /research/science on mobile)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] I.01 Campus overview as executive intelligence with actionable insights
-- [ ] I.02 Students directory with filters and privacy labelling (Institution-sponsored, Personal-private, Shared by student)
-- [ ] I.03 Cohorts and cohort detail sections
-- [ ] I.04 Interventions with the baseline to development to reassessment to change loop
-- [ ] I.05 Reusable Prism chart wrappers (legend, tooltip, labels, empty and insufficient-data states, table equivalents)
-- [ ] I.06 Assessments, assignments, reports, settings, billing and integrations surfaces on the new system
-- [ ] I.07 Student-side sponsored views and workspace privacy cues
-- [ ] I.08 Tests (including campus journeys) and gates, commit
+- [x] I.01 Campus overview as executive intelligence with actionable insights - evidence: CampusOverviewPage names the largest development opportunity from the server top-needs rule ("X is the largest development opportunity among assessed students") with "Create development intervention", shown only to someone with interventions.write and only when the segment is not hidden; the Development page opens the builder prefilled with that capability (and cohort). Participation counts, capability distribution and top needs were already present. Tests: campusExperience.test.jsx (2)
+- [x] I.02 Students directory with filters and privacy labelling (Institution-sponsored, Personal-private, Shared by student) - evidence: DataBoundaryKey.jsx on the Students list and the student detail page (three labelled kinds, personal-private dashed and "Never shown here"); filters (search, cohort, enrolment, sponsored assessment), sponsored-only columns and the "Shared by the student" panel were already present; access stays server-enforced. Tests: campusExperience.test.jsx
+- [x] I.03 Cohorts and cohort detail sections - evidence: CampusCohortDetailPage is now tabbed: Overview, Students, Capability distribution, Development needs, Interventions, Assessment cycles and growth, Reports (CohortInsights.jsx); analytic tabs need the analytics flag and analytics.read, interventions and cycles are filtered to the cohort, a hidden segment shows the standard sentence, no student ranking. Tests: campusExperience.test.jsx (3)
+- [x] I.04 Interventions with the baseline to development to reassessment to change loop - evidence: InterventionLoop.jsx (Baseline, Development with started of members, Reassessment planned or not with a permitted link, Change "Shown only after a comparable reassessment") in the intervention detail and the cohort Interventions tab; it never states a result. Tests: campusExperience.test.jsx (2)
+- [x] I.05 Reusable Prism chart wrappers (legend, tooltip, labels, empty and insufficient-data states, table equivalents) - evidence: components/charts/ChartFrame.jsx (title, plain-words description, "Based on N students", empty and too-few-students states, table equivalent slot) now frames the capability distribution chart; the existing Recharts bars keep their legend, tooltip, zero-based count axes, aria-hidden duplicate and Show as table equivalent. The outcome chart keeps its own frame because its data states are already explicit; folding it in is a phase L tidy. Tests: campusExperience.test.jsx, analytics.test.jsx unchanged and green
+- [x] I.06 Assessments, assignments, reports, settings, billing and integrations surfaces on the new system - evidence: these pages already render through CampusPage, the token system and the standard states; the Playwright campus journeys, shell, keyboard and axe specs pass; no copy or behaviour change was needed
+- [x] I.07 Student-side sponsored views and workspace privacy cues - evidence: unchanged and green (sponsored scope labels, campus privacy notes on Home, Assessments and Development, acknowledgement before a sponsored assessment); phase D and E added the scope labels on the assessment detail and funnel
+- [x] I.08 Tests (including campus journeys) and gates, commit - evidence: vitest 275, server 620/596/0 (claimsCeiling and campusCopyCeiling included), static audit, playwright 285 passed + 1 flaky retry incl. campus journeys; screenshots audit-results/ui/phase-i (overview insight at 4 widths, students, cohort sections, capability distribution, interventions loop, intervention modal; no overflow, no console errors; analytics and cohort data intercepted in a throwaway script that is not committed because the local demo database has no assessments or cohorts)
 
 ## Phase J - Marketing site, pricing and authentication
 
