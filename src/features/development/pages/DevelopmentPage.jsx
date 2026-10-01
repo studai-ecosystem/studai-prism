@@ -8,13 +8,15 @@ import { MissionCard } from '../../../components/missions/MissionCard.jsx'
 import { EvidenceTracePanel } from '../../../components/evidence/EvidenceTracePanel.jsx'
 import { EmptyState } from '../../../components/states/index.js'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
-import { useDevelopmentPlan } from '../../student/hooks.js'
+import { useDevelopmentPlan, useGrowth } from '../../student/hooks.js'
+import { ReassessmentEntry } from '../../growth/components/ReassessmentEntry.jsx'
 import { queryStateView, formatDate } from '../../student/QueryState.jsx'
 import { DEVELOPMENT_COPY } from '../../../lib/copy/student.js'
 
 export default function DevelopmentPage() {
   const { active } = useWorkspace()
   const query = useDevelopmentPlan()
+  const growth = useGrowth()
   const header = <PageHeader title="Development" description="What to work on next, and how to practise it." context={active} />
   const state = queryStateView(query, { label: 'Loading your development plan' })
   if (state) return <div>{header}{state}</div>
@@ -48,6 +50,7 @@ export default function DevelopmentPage() {
           </>
         )}
       </section>
+      <ReassessmentEntry reassessments={growth.data?.reassessments} assessmentsPath={active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/assignments` : '/app/assessments'} />
       <section aria-labelledby="missions-title" className="space-y-3">
         <h2 id="missions-title" className="text-lg font-semibold text-prism-ink">{DEVELOPMENT_COPY.missionsSoon.title}</h2>
         {!plan.missionsAvailable ? (

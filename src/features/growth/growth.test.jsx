@@ -80,6 +80,22 @@ describe('Growth page (V2)', () => {
     expect(screen.queryByText('What is compared')).not.toBeInTheDocument()
   })
 
+  it('marks the baseline and the reassessment on the timeline', async () => {
+    renderGrowth(growthBody())
+    const timeline = await screen.findByTestId('growth-timeline')
+    const roles = within(timeline).getAllByRole('listitem').map((li) => li.getAttribute('data-role'))
+    expect(roles).toEqual(['Baseline', null, 'Reassessment'])
+  })
+
+  it('a later assessment that cannot be compared is a visible warning; with nothing to compare it stays a plain empty state', async () => {
+    const a = renderGrowth(growthBody({ comparable: false, reason: 'FORMS_NOT_VALIDATED_FOR_COMPARISON', comparison: null, changes: [] }))
+    expect(await screen.findByTestId('growth-not-comparable')).toHaveTextContent('A later assessment exists')
+    a.unmount()
+    renderGrowth(growthBody({ comparable: false, reason: 'NEEDS_COMPARABLE_REASSESSMENT', comparison: null, changes: [], assessments: [ref('s1', '2026-10-11T10:00:00.000Z', '1.0.0')] }))
+    expect(await screen.findByRole('heading', { level: 2, name: /comparable|Not enough|reassess/i })).toBeInTheDocument()
+    expect(screen.queryByTestId('growth-not-comparable')).not.toBeInTheDocument()
+  })
+
   it('an approved pair without enough evidence says so and shows no change', async () => {
     renderGrowth(growthBody({ comparable: false, reason: 'EVIDENCE_NOT_SUFFICIENT_FOR_COMPARISON', changes: [{ capabilityId: 'CAP-B', name: 'Stakeholder communication', comparable: false, reason: 'EVIDENCE_NOT_SUFFICIENT_IN_BOTH' }] }))
     expect(await screen.findByText('Not enough evidence to show a change yet')).toBeInTheDocument()

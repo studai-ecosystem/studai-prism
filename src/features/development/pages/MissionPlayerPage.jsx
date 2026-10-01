@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { Panel } from '../../../components/ui/Card.jsx'
-import { Badge } from '../../../components/ui/Badge.jsx'
+import { PracticeLabel } from '../../../components/missions/PracticeLabel.jsx'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
 import { Drawer } from '../../../components/ui/Drawer.jsx'
 import { Modal } from '../../../components/ui/Modal.jsx'
@@ -16,6 +16,7 @@ import { DEVELOPMENT_COPY } from '../../../lib/copy/student.js'
 import { useMission, useMissionAttempt, useMissionActions } from '../hooks.js'
 import { MissionArtifactEditor } from '../components/MissionArtifactEditor.jsx'
 import { MissionFeedback } from '../components/MissionFeedback.jsx'
+import { MissionNextSteps } from '../components/MissionNextSteps.jsx'
 
 const SAVE_DELAY_MS = 1200
 
@@ -142,8 +143,8 @@ export default function MissionPlayerPage() {
   return (
     <div className="space-y-6">
       {header}
+      <PracticeLabel variant="band" />
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone="neutral">Practice</Badge>
         {mission.targetCapability.name && <span className="text-sm text-prism-ink-muted">Focus: {mission.targetCapability.name}</span>}
         {intervention && <span className="text-sm text-prism-ink-muted">· Part of {intervention.name}{intervention.endsOn ? `, until ${formatDate(intervention.endsOn)}` : ''}</span>}
       </div>
@@ -203,6 +204,12 @@ export default function MissionPlayerPage() {
               {attempt.result && (
                 <Panel>
                   <MissionFeedback ref={feedbackRef} result={attempt.result} />
+                  <MissionNextSteps
+                    result={attempt.result}
+                    missionId={missionId}
+                    missionPath={(id) => `${devPath}/missions/${id}`}
+                    assessmentsPath={active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/assignments` : '/app/assessments'}
+                  />
                   {actions.start.error && <div role="alert" className="mt-3"><InlineNotice tone="blocked">{actions.start.error.message}</InlineNotice></div>}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button onClick={() => start(true)} loading={actions.start.isPending}>{copy.retry}</Button>

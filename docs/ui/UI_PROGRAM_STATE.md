@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: autopilot
-active_phase: G
+active_phase: H
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -147,16 +147,16 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase G - Development missions and growth
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 65a40c1 (build, vitest 264, server 620/596/0, static audit, playwright chromium + mobile-chromium 286)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] G.01 Mission list and detail: objective, target behaviour, why it matters, instructions, optional hints, artifact workspace, reflection, feedback, retry, next mission
-- [ ] G.02 Clear Practice Mission / Development Mission labelling distinct from formal assessment
-- [ ] G.03 Growth page with comparability honesty, baseline to reassessment timeline, non-comparable warning
-- [ ] G.04 Reassessment entry points
-- [ ] G.05 Calm completion states without confetti
-- [ ] G.06 Tests and gates, commit
+- [x] G.01 Mission list and detail: objective, target behaviour, why it matters, instructions, optional hints, artifact workspace, reflection, feedback, retry, next mission - evidence: the mission player already carried situation, task, instructions, constraints, what will be checked, artifact editors, optional hints drawer, autosave, criterion feedback and retry; MissionNextSteps.jsx adds what was observed, a reflection prompt and the next mission (the first one not yet completed). No "why it matters" text and no reflection input exist in the mission contract, so none was invented; both are recorded as backend gaps in the final report. Tests: development.test.jsx
+- [x] G.02 Clear Practice Mission / Development Mission labelling distinct from formal assessment - evidence: components/missions/PracticeLabel.jsx (dashed pill on mission cards; dashed band "Practice mission - practice, not a formal assessment" at the top of the player); formal evidence stays solid and labelled "Formal assessment". Tests: development.test.jsx (dashed class, band wording)
+- [x] G.03 Growth page with comparability honesty, baseline to reassessment timeline, non-comparable warning - evidence: GrowthPage shows a visible partial-tone warning when a later assessment exists but cannot be compared (a plain empty state when there is nothing to compare); GrowthTimeline marks the baseline and reassessment points with a larger ring and data-role; change appears only for an approved comparable pair, as before. Tests: growth.test.jsx (2 new)
+- [x] G.04 Reassessment entry points - evidence: features/growth/components/ReassessmentEntry.jsx (open now with a link to assessments, or scheduled with its date; the not-comparable note when the pair is not approved) on the Development page and after mission feedback; nothing renders when the server lists no reassessment. Tests: development.test.jsx (2 new)
+- [x] G.05 Calm completion states without confetti - evidence: completion is observed, reflect, next action in plain text; no points, levels, streaks, badges, exclamation marks or motion; asserted in development.test.jsx
+- [x] G.06 Tests and gates, commit - evidence: vitest 264, server 620/596/0, static audit, playwright 286; screenshots audit-results/ui/phase-g (mission completion at 1440, 1024, 768 and 390; development and growth at 1440 and 390; no overflow, no console errors) rendered from a synthetic contract in a throwaway script that is not committed
 
 ## Phase H - Explore and role discovery
 

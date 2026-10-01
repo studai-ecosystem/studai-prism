@@ -7,6 +7,7 @@ import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { Panel } from '../../../components/ui/Card.jsx'
 import { LinkButton } from '../../../components/ui/Button.jsx'
 import { EmptyState } from '../../../components/states/index.js'
+import { Callout } from '../../../components/ui/Notice.jsx'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useGrowth } from '../../student/hooks.js'
 import { queryStateView, formatDate, formatDateTime } from '../../student/QueryState.jsx'
@@ -49,7 +50,9 @@ export default function GrowthPage() {
           <LinkButton className="mt-3" to={assessmentsPath}>Go to your assessments</LinkButton>
         </Panel>
       )}
-      {!g.comparable && <EmptyState title={copy.title} description={copy.description} headingLevel={2} />}
+      {!g.comparable && (g.assessments.length >= 2
+        ? <div data-testid="growth-not-comparable"><Callout tone="partial" title={copy.title}>{copy.description}</Callout></div>
+        : <EmptyState title={copy.title} description={copy.description} headingLevel={2} />)}
       {g.comparison && (
         <section aria-labelledby="growth-comparison" className="space-y-3">
           <h2 id="growth-comparison" className="text-lg font-semibold text-prism-ink">What is compared</h2>

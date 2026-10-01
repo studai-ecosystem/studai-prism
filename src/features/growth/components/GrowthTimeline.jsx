@@ -16,7 +16,7 @@ export function GrowthTimeline({ assessments = [], interventions = [], reassessm
   const role = (sessionId) => (comparison?.baseline.sessionId === sessionId ? 'Baseline' : comparison?.reassessment.sessionId === sessionId ? 'Reassessment' : null)
   const items = [
     ...assessments.map((a) => ({
-      key: `a-${a.sessionId}`, date: a.completedAt,
+      key: `a-${a.sessionId}`, date: a.completedAt, role: role(a.sessionId),
       title: a.title || 'Assessment',
       detail: [formatDate(a.completedAt), role(a.sessionId), 'Completed', a.form ? `form version ${a.form.version}` : null].filter(Boolean).join(' · '),
     })),
@@ -38,8 +38,8 @@ export function GrowthTimeline({ assessments = [], interventions = [], reassessm
       <h2 id="growth-timeline" className="text-lg font-semibold text-prism-ink">{GROWTH_COPY.timelineTitle}</h2>
       <ol className="space-y-2 border-l border-prism-border pl-4" data-testid="growth-timeline">
         {items.map((it) => (
-          <li key={it.key} className="relative">
-            <span aria-hidden="true" className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-prism-accent" />
+          <li key={it.key} className="relative" data-role={it.role || undefined}>
+            <span aria-hidden="true" className={it.role ? 'absolute -left-[23px] top-1 h-3.5 w-3.5 rounded-full border-2 border-prism-accent bg-prism-surface ring-2 ring-prism-accent-soft' : 'absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-prism-accent'} />
             <p className="text-sm font-semibold text-prism-ink">{it.title}</p>
             <p className="text-sm text-prism-ink-muted">{it.detail}</p>
             {it.note && <p className="text-xs text-prism-ink-subtle">{it.note}</p>}

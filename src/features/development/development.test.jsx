@@ -76,11 +76,48 @@ describe('Development page (V2)', () => {
     expect(screen.getByRole('link', { name: (n) => n.startsWith('Open mission') && n.includes(card.title) })).toHaveAttribute('href', `/app/development/missions/${MID}`)
     expect(screen.getByText('Mission completed — 2 of 4 target behaviours demonstrated.')).toBeInTheDocument()
     expect(screen.getAllByText('Practice').length).toBeGreaterThan(0)
+    expect(screen.getAllByTestId('practice-label')[0].className).toMatch(/border-dashed/)
     expect(document.body.textContent).not.toMatch(/level 4|achieved|points|\d+\s*%/i)
+  })
+
+  it('offers the way into a reassessment only when the server lists one', async () => {
+    const plan = { data: { status: 'NO_PLAN', priorities: [], missions: [], catalogue: [], missionsAvailable: false, missionsEnabled: false, upcomingReassessment: null, practiceEvidence: [], completedMissions: [] } }
+    const growth = (reassessments) => ({ data: { comparable: false, reason: 'NEEDS_COMPARABLE_REASSESSMENT', assessments: [], comparison: null, changes: [], reassessments, interventions: [], growthEnabled: true } })
+    const open = { id: 'r1', name: 'December reassessment', windowStart: '2026-12-01T08:00:00.000Z', windowEnd: '2026-12-15T18:00:00.000Z', status: 'ACTIVE', assignmentId: 'a-2', rosterStatus: 'ASSIGNED', endedAt: null, comparability: 'PENDING' }
+    const a = renderStudent('/app/development', <DevelopmentPage />, { '/api/v1/me/development-plan': plan, '/api/v1/me/growth': growth([open]) })
+    const entry = await screen.findByTestId('reassessment-entry')
+    expect(entry).toHaveTextContent('December reassessment is open until')
+    expect(within(entry).getByRole('link', { name: 'Go to your assessments' })).toHaveAttribute('href', '/app/assessments')
+    expect(entry).toHaveTextContent('will not show a change yet')
+    a.unmount()
+    renderStudent('/app/development', <DevelopmentPage />, { '/api/v1/me/development-plan': plan, '/api/v1/me/growth': growth([]) })
+    expect(await screen.findByRole('heading', { name: 'Current priorities' })).toBeInTheDocument()
+    expect(screen.queryByTestId('reassessment-entry')).not.toBeInTheDocument()
   })
 })
 
 describe('Mission player', () => {
+  it('is labelled as practice before anything starts, and completion is calm: observed, reflect, next, reassessment', async () => {
+    const other = { ...card, id: 'MIS-OTHER', title: 'Write a clear update for a stakeholder' }
+    const open = { id: 'r1', name: 'December reassessment', windowStart: '2026-12-01T08:00:00.000Z', windowEnd: '2026-12-15T18:00:00.000Z', status: 'SCHEDULED', assignmentId: 'a-2', rosterStatus: 'ASSIGNED', endedAt: null, comparability: 'APPROVED' }
+    const partial = { ...result, summary: 'Mission completed - 1 of 2 target behaviours demonstrated.', counts: { demonstrated: 1, uncertain: 0, total: 2 } }
+    renderStudent('/app/development/missions/:missionId', <MissionPlayerPage />, {
+      [`/api/v1/missions/${MID}`]: { data: { ...mission, openAttemptId: ATT } },
+      '/api/v1/mission-attempts/': { data: attempt({ status: 'EVALUATED', version: 3, result: partial, submittedAt: '2026-10-10T09:00:00Z' }) },
+      '/api/v1/me/development-plan': { data: { status: 'NO_PLAN', priorities: [], missions: [card], catalogue: [other], missionsAvailable: true, missionsEnabled: true, upcomingReassessment: null, practiceEvidence: [], completedMissions: [] } },
+      '/api/v1/me/growth': { data: { comparable: false, reason: 'NEEDS_COMPARABLE_REASSESSMENT', assessments: [], comparison: null, changes: [], reassessments: [open], interventions: [], growthEnabled: true } },
+    })
+    const label = await screen.findByTestId('practice-label')
+    expect(label).toHaveTextContent('This is practice, not a formal assessment')
+    const next = await screen.findByTestId('mission-next-steps')
+    expect(next).toHaveTextContent('What was observed: 1 of 2 behaviours in this attempt.')
+    expect(next).toHaveTextContent('Reflect: pick one behaviour that was not observed')
+    expect(within(next).getByRole('link', { name: 'Write a clear update for a stakeholder' })).toHaveAttribute('href', '/app/development/missions/MIS-OTHER')
+    expect(await within(next).findByText(/December reassessment opens/)).toBeInTheDocument()
+    expect(within(next).queryByRole('link', { name: 'Go to your assessments' })).not.toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/congrat|well done|great job|you.ve earned|streak|badge|!|level\s*\d|\d+\s*%/i)
+  })
+
   it('starts, autosaves with If-Match, submits after confirmation, shows criterion feedback, and retries', async () => {
     let saved = 1
     const calls = renderStudent('/app/development/missions/:missionId', <MissionPlayerPage />, {
