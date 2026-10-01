@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, field, when, mono } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/studies — Study Runner administration (Phase 3) ───────────────────
 // Preregistrations are editable ONLY before activation. Arm assignments are
@@ -57,16 +57,16 @@ export default function AdminStudies() {
 
   const transition = (study, status) =>
     run(async () => {
-      const reason = window.prompt(`Reason for moving '${study.study_key}' to ${status} (audited):`)
+      const reason = await askText(`Reason for moving '${study.study_key}' to ${status} (audited):`)
       if (!reason) return null
       return adminFetch(`/api/admin/studies/${study.study_key}/status`, { method: 'POST', body: { status, reason } })
     }, `Study moved to ${status}.`)
 
   const editStudy = (study) =>
     run(async () => {
-      const title = window.prompt('New title (editable only while preregistered):', study.title)
+      const title = await askText('New title (editable only while preregistered):', study.title)
       if (title === null) return null
-      const reason = window.prompt('Reason for the amendment (audited):')
+      const reason = await askText('Reason for the amendment (audited):')
       if (!reason) return null
       return adminFetch(`/api/admin/studies/${study.study_key}`, { method: 'PATCH', body: { title, reason } })
     }, 'Preregistration amended.')

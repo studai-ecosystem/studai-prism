@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { KeyRound } from 'lucide-react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, SearchBox, DataTable, Pill, btn, btnDanger, field, when, mono } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, SearchBox, DataTable, Pill, btn, btnDanger, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/credentials — credential console (Phase 4) ────────────────────────
 // Signed contents have NO edit control anywhere: revoke and reissue
@@ -51,21 +51,21 @@ export default function AdminCredentials() {
 
   const issue = () =>
     run(async () => {
-      const sessionId = window.prompt('Session id with a completed report to certify:')
+      const sessionId = await askText('Session id with a completed report to certify:')
       if (!sessionId) return null
       return adminFetch(`/api/admin/credentials/session/${sessionId.trim()}/issue`, { method: 'POST', body: {} })
     })
 
   const revoke = (credentialId) =>
     run(async () => {
-      const reason = window.prompt('Reason for REVOCATION (10+ characters — recorded on the credential and both audit trails):')
+      const reason = await askText('Reason for REVOCATION (10+ characters — recorded on the credential and both audit trails):')
       if (!reason) return null
       return adminFetch(`/api/admin/credentials/${credentialId}/revoke`, { method: 'POST', body: { reason } })
     }, 'Credential revoked. Public status endpoints reflect it immediately.')
 
   const reissue = (credentialId) =>
     run(async () => {
-      const reason = window.prompt('Reason for REISSUE (10+ characters — creates a superseding credential; the old one stays in the chain):')
+      const reason = await askText('Reason for REISSUE (10+ characters — creates a superseding credential; the old one stays in the chain):')
       if (!reason) return null
       return adminFetch(`/api/admin/credentials/${credentialId}/reissue`, { method: 'POST', body: { reason } })
     })

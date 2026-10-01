@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Pill, btn, btnDanger, field, when, actWithReason } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Pill, btn, btnDanger, field, when, actWithReason, askText } from './ui.jsx'
 
 // ── /admin/candidates/:id — candidate 360° (Phase 2) ─────────────────────────
 // Tabs: Overview · Assessments · Reports · Payments · Consent · Verification ·
@@ -71,7 +71,7 @@ export default function AdminCandidateDetail() {
 
   const saveProfile = async () => {
     await run(async () => {
-      const reason = window.prompt('Reason for this profile edit (audited):')
+      const reason = await askText('Reason for this profile edit (audited):')
       if (!reason) return null
       return adminFetch(`/api/admin/users/${id}`, { method: 'PATCH', body: { ...draft, reason } })
     }, 'Profile updated.')
@@ -183,7 +183,7 @@ export default function AdminCandidateDetail() {
             )}
             <button type="button" className={`${btn} mt-2`}
               onClick={() => run(async () => {
-                const body = window.prompt('Note (internal, never shown to the candidate):')
+                const body = await askText('Note (internal, never shown to the candidate):')
                 if (!body) return null
                 return adminFetch(`/api/admin/users/${id}/notes`, { method: 'POST', body: { body } })
               }, 'Note added.')}>

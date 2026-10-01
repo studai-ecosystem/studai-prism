@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import {
-  PageHeader, ErrorNotice, Notice, Toolbar, Pill, DataTable, btn, btnDanger, field, when, mono,
-} from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, Pill, DataTable, btn, btnDanger, field, when, mono, askText, askConfirm } from './ui.jsx'
 
 // ── /admin/privacy — data-subject requests + retention rules (Phase 6, §21) ──
 // Erasure is a governed pipeline: verify → dry-run plan → dual approval →
@@ -151,8 +149,8 @@ function RequestDetail({ id, onChanged, onClose }) {
           )}
           {canExecute && r.kind === 'erasure' && r.status === 'awaiting_approval' && (
             <button type="button" className={btnDanger}
-              onClick={() => {
-                if (!window.confirm('Execute the approved erasure? This permanently deletes the data in the plan. This cannot be undone.')) return
+              onClick={async () => {
+                if (!await askConfirm('Execute the approved erasure? This permanently deletes the data in the plan. This cannot be undone.')) return
                 run(() => adminFetch(`/api/admin/privacy/${id}/execute`, { method: 'POST', body: {} }),
                   'Erasure executed — receipt recorded below and in the audit trail.')
               }}>
@@ -171,8 +169,8 @@ function RequestDetail({ id, onChanged, onClose }) {
           )}
           {canManage && ['correction', 'restriction', 'sharing_revocation'].includes(r.kind) && r.status === 'verifying' && (
             <button type="button" className={btn}
-              onClick={() => {
-                const resolution = window.prompt('Written resolution — name the governed workflow that handled it (10+ chars):')
+              onClick={async () => {
+                const resolution = await askText('Written resolution — name the governed workflow that handled it (10+ chars):')
                 if (!resolution) return
                 run(() => adminFetch(`/api/admin/privacy/${id}/fulfil`, { method: 'POST', body: { resolution } }),
                   'Resolution recorded.')
@@ -182,8 +180,8 @@ function RequestDetail({ id, onChanged, onClose }) {
           )}
           {canManage && (
             <button type="button" className={btnDanger}
-              onClick={() => {
-                const reason = window.prompt('Reason for rejecting this request (10+ chars, audited):')
+              onClick={async () => {
+                const reason = await askText('Reason for rejecting this request (10+ chars, audited):')
                 if (!reason) return
                 run(() => adminFetch(`/api/admin/privacy/${id}/reject`, { method: 'POST', body: { reason } }),
                   'Request rejected.')
@@ -215,9 +213,9 @@ export default function AdminPrivacy() {
   useEffect(() => { load() }, [load])
 
   const setRetention = async (rule) => {
-    const days = window.prompt(`Retention days for ${rule.entity} (positive integer, empty = undecided):`, rule.retention_days ?? '')
+    const days = await askText(`Retention days for ${rule.entity} (positive integer, empty = undecided):`, rule.retention_days ?? '')
     if (days === null) return
-    const basis = window.prompt('Legal/operational basis for this retention period (10+ chars, audited):', rule.basis || '')
+    const basis = await askText('Legal/operational basis for this retention period (10+ chars, audited):', rule.basis || '')
     if (!basis) return
     setError('')
     try {

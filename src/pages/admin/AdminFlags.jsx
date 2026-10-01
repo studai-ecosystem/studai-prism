@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission, currentAdmin } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, Pill, btn, field, when } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, Pill, btn, field, when, askText } from './ui.jsx'
 
 // ── /admin/flags — feature-flag registry (Phase 5, §24) ──────────────────────
 // THE ONE LAW: the console never flips a flag. Requests → (dual) approval →
@@ -34,9 +34,9 @@ export default function AdminFlags() {
 
   const request = (flag, state) =>
     run(async () => {
-      const environment = window.prompt('Environment (development | staging | production):', 'production')
+      const environment = await askText('Environment (development | staging | production):', 'production')
       if (!environment) return null
-      const reason = window.prompt(`Reason for requesting ${flag.flag_key} → ${state} in ${environment} (10+ chars, audited):`)
+      const reason = await askText(`Reason for requesting ${flag.flag_key} → ${state} in ${environment} (10+ chars, audited):`)
       if (!reason) return null
       return adminFetch(`/api/admin/flags/${flag.flag_key}/request`, {
         method: 'POST', body: { environment: environment.trim(), requestedState: state, reason },
@@ -98,7 +98,7 @@ export default function AdminFlags() {
                   <>
                     <button type="button" className={btn}
                       onClick={() => run(async () => {
-                        const reason = window.prompt('Approval reason (audited):')
+                        const reason = await askText('Approval reason (audited):')
                         if (!reason) return null
                         return adminFetch(`/api/admin/flags/changes/${c.change_id}/decide`, { method: 'POST', body: { decision: 'approved', reason } })
                       }, 'Approved — an operator applies the env change, then marks it applied.')}>
@@ -106,7 +106,7 @@ export default function AdminFlags() {
                     </button>
                     <button type="button" className={btn}
                       onClick={() => run(async () => {
-                        const reason = window.prompt('Rejection reason (audited):')
+                        const reason = await askText('Rejection reason (audited):')
                         if (!reason) return null
                         return adminFetch(`/api/admin/flags/changes/${c.change_id}/decide`, { method: 'POST', body: { decision: 'rejected', reason } })
                       }, 'Rejected.')}>

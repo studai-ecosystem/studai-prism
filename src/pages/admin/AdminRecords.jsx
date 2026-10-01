@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import {
-  useAdminList, PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pager,
-  Pill, btn, field, when, mono,
-} from './ui.jsx'
+import { useAdminList, PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pager,
+  Pill, btn, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/records — consents, verifications, integrity events (Phase 2) ─────
 // One component, three modes (routes /admin/consents, /admin/verifications,
@@ -119,7 +117,7 @@ function Integrity() {
 
   const review = async (e, decision) => {
     setActionError(''); setNotice('')
-    const note = window.prompt(`Note for marking this ${e.type} as ${decision} (audited):`)
+    const note = await askText(`Note for marking this ${e.type} as ${decision} (audited):`)
     if (note === null) return
     try {
       await adminFetch('/api/admin/records/events/review', {

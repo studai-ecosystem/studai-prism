@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Pill, btn, field, mono } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Pill, btn, field, mono, askText } from './ui.jsx'
 
 // ── /admin/invites — group assessment invite links ────────────────────────────
 // An invite link admits up to N signed-in candidates (default 10) to start one
@@ -62,7 +62,7 @@ export default function AdminInvites() {
   }
 
   const handleRevoke = async (invite) => {
-    const reason = window.prompt(`Reason for revoking "${invite.label}" (audited):`)
+    const reason = await askText(`Reason for revoking "${invite.label}" (audited):`)
     if (!reason) return
     setError(''); setNotice('')
     try {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, UserPlus, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react'
 import { adminFetch, adminHasPermission, currentAdmin } from '../../lib/adminApi.js'
+import { askText } from './ui.jsx'
 
 // ── /admin/admins — administrator management (Phase 1) ───────────────────────
 // List, invite, role grant/revoke, account state, dual-approval queue. Actions
@@ -80,7 +81,7 @@ export default function AdminAdmins() {
   }
 
   const changeState = async (admin, state) => {
-    const reason = window.prompt(`Reason for setting ${admin.email} to ${state}? (recorded in the audit trail)`)
+    const reason = await askText(`Reason for setting ${admin.email} to ${state}? (recorded in the audit trail)`)
     if (!reason) return
     setError('')
     try {
@@ -92,7 +93,7 @@ export default function AdminAdmins() {
   }
 
   const decide = async (approval, decision) => {
-    const reason = window.prompt(`Reason to mark this request ${decision}?`)
+    const reason = await askText(`Reason to mark this request ${decision}?`)
     if (!reason) return
     setError('')
     try {

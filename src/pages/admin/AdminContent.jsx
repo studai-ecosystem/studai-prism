@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, btnDanger, field, when, actWithReason } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, btnDanger, field, when, actWithReason, askText, askConfirm } from './ui.jsx'
 
 // ── /admin/content — CMS (Phase 5): blog, careers, applications ──────────────
 
@@ -65,9 +65,9 @@ function BlogTab() {
 
   const createDraft = () =>
     run(async () => {
-      const slug = window.prompt('Slug (a-z, 0-9, hyphens):')
+      const slug = await askText('Slug (a-z, 0-9, hyphens):')
       if (!slug) return null
-      const title = window.prompt('Title:')
+      const title = await askText('Title:')
       if (!title) return null
       return adminFetch('/api/admin/content/posts', { method: 'POST', body: { slug: slug.trim(), title: title.trim() } })
     }, 'Draft created.')
@@ -76,10 +76,10 @@ function BlogTab() {
     run(async () => {
       let scheduledFor
       if (status === 'scheduled') {
-        scheduledFor = window.prompt('Publish at (ISO datetime, e.g. 2026-08-01T09:00:00Z):')
+        scheduledFor = await askText('Publish at (ISO datetime, e.g. 2026-08-01T09:00:00Z):')
         if (!scheduledFor) return null
       }
-      const reason = window.prompt(`Reason for ${status} (audited):`)
+      const reason = await askText(`Reason for ${status} (audited):`)
       if (reason === null) return null
       return adminFetch(`/api/admin/content/posts/${post.postId}/status`, {
         method: 'POST', body: { status, scheduledFor, reason },
@@ -88,7 +88,7 @@ function BlogTab() {
 
   const saveBody = () =>
     run(async () => {
-      const changeNote = window.prompt('Change note (goes in the version history):')
+      const changeNote = await askText('Change note (goes in the version history):')
       if (changeNote === null) return null
       return adminFetch(`/api/admin/content/posts/${detail.post.postId}`, {
         method: 'PATCH',
@@ -135,7 +135,7 @@ function BlogTab() {
                 {canWrite && p.status === 'draft' && !p.publishedAt && (
                   <button type="button" className={btnDanger}
                     onClick={() => run(async () => {
-                      if (!window.confirm('Hard-delete this never-published draft? This is the only hard delete in the CMS.')) return null
+                      if (!await askConfirm('Hard-delete this never-published draft? This is the only hard delete in the CMS.')) return null
                       return adminFetch(`/api/admin/content/posts/${p.postId}`, { method: 'DELETE' })
                     }, 'Draft deleted.')}>
                     Delete draft
@@ -216,9 +216,9 @@ function CareersTab() {
         {canWrite && (
           <button type="button" className={btn}
             onClick={() => run(async () => {
-              const slug = window.prompt('Role slug (a-z, 0-9, hyphens):')
+              const slug = await askText('Role slug (a-z, 0-9, hyphens):')
               if (!slug) return null
-              const title = window.prompt('Role title:')
+              const title = await askText('Role title:')
               if (!title) return null
               return adminFetch('/api/admin/content/jobs-list', { method: 'POST', body: { slug: slug.trim(), title: title.trim() } })
             }, 'Role created as draft.')}>
@@ -317,7 +317,7 @@ function ApplicationsTab() {
                 </select>
                 <button type="button" className={btnDanger}
                   onClick={() => run(async () => {
-                    const reason = window.prompt('Retention reason for deleting this application (it carries applicant PII):')
+                    const reason = await askText('Retention reason for deleting this application (it carries applicant PII):')
                     if (!reason) return null
                     return adminFetch(`/api/admin/content/applications/${a.application_id}`, { method: 'DELETE', body: { reason } })
                   }, 'Application deleted per retention policy.')}>

@@ -27,7 +27,6 @@ const RoomScan = lazy(() => import('../pages/RoomScan.jsx'))
 const Assessment = lazy(() => import('../pages/Assessment.jsx'))
 const ScoreReport = lazy(() => import('../pages/ScoreReport.jsx'))
 const Verify = lazy(() => import('../pages/Verify.jsx'))
-const Profile = lazy(() => import('../pages/Profile.jsx'))
 const RaterWorkbench = lazy(() => import('../pages/RaterWorkbench.jsx'))
 const AssessmentWorkspace = lazy(() => import('../pages/AssessmentWorkspace.jsx'))
 const ExploreMode = lazy(() => import('../pages/ExploreMode.jsx'))
@@ -325,7 +324,7 @@ export default function AppRouter() {
           <Route path="/verify/:id" element={<Verify />} />
           <Route path="/rater" element={<RaterWorkbench />} />
           <Route path="/rater/evidence" element={<EvidenceRatingPage />} />
-          <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+          <Route path="/profile" element={<Navigate to="/app/settings#profile" replace />} />
           {/* Legacy URLs (spec §6.5): move to V3 only when its flag is on. */}
           <Route path="/explore" element={<LegacyAlias flag="PRISM_ROLE_EXPLORATION_V2" requiresShell v3Path="/app/explore" legacy={<ExploreMode />} />} />
           <Route path="/workspace/:sessionId" element={<LegacyAlias flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell v3Path="/app/assessment/:sessionId" legacy={<AssessmentWorkspace />} />} />

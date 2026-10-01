@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, field, when, actWithReason } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, field, when, actWithReason, askText } from './ui.jsx'
 
 // ── /admin/raters — human-rater administration (Phase 3) ─────────────────────
 // Tokens are shown exactly once. Hashes are never revealed. Training
@@ -45,7 +45,7 @@ export default function AdminRaters() {
 
   const createRater = () =>
     run(async () => {
-      const handle = window.prompt('Rater handle (no PII — an operator-chosen pseudonym):')
+      const handle = await askText('Rater handle (no PII — an operator-chosen pseudonym):')
       if (!handle) return null
       return adminFetch('/api/admin/raters', { method: 'POST', body: { handle: handle.trim() } })
     })

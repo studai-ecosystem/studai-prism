@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, field, when, mono, actWithReason } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, field, when, mono, actWithReason, askText } from './ui.jsx'
 
 // ── /admin/teamfit — team simulation administration (Phase 4) ────────────────
 // Consent-gated membership; qualitative observations only (no numeric fit —
@@ -70,7 +70,7 @@ export default function AdminTeamfit() {
 
   const removeMember = (teamId, sessionId) =>
     run(async () => {
-      const reason = window.prompt('Reason for removing this member (audited; recorded simulations remain unchanged):')
+      const reason = await askText('Reason for removing this member (audited; recorded simulations remain unchanged):')
       if (!reason) return null
       return adminFetch(`/api/admin/teamfit/teams/${teamId}/members/${sessionId}`, {
         method: 'DELETE', body: { reason },
@@ -155,7 +155,7 @@ export default function AdminTeamfit() {
               {canManage && !teamDetail.team.archived_at && (
                 <button type="button" className={`${btn} mt-2`}
                   onClick={() => run(async () => {
-                    const memberSessionId = window.prompt('Session id of the consented member to add:')
+                    const memberSessionId = await askText('Session id of the consented member to add:')
                     if (!memberSessionId) return null
                     return adminFetch(`/api/admin/teamfit/teams/${teamDetail.team.team_id}/members`, {
                       method: 'POST', body: { memberSessionId: memberSessionId.trim() },

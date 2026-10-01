@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, btnDanger, field, when, mono } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, btnDanger, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/calibrations — calibration-run lifecycle (Phase 3) ────────────────
 // Freeze and Apply are SEPARATE dual-approved actions; Apply has live scoring
@@ -29,7 +29,7 @@ export default function AdminCalibrations() {
 
   const act = async (run, action, promptText) => {
     setError(''); setNotice('')
-    const reason = window.prompt(promptText)
+    const reason = await askText(promptText)
     if (!reason) return
     try {
       const r = await adminFetch(`/api/admin/calibrations/${run.run_id}/${action}`, { method: 'POST', body: { reason } })

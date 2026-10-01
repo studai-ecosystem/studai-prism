@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Pill, btn, btnDanger, when, actWithReason } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Pill, btn, btnDanger, when, actWithReason, askText } from './ui.jsx'
 
 // ── /admin/sessions/:id — session file (Phase 2) ─────────────────────────────
 // Summary · Conversation (blinded) · Integrity · Decisions · Related · Actions.
@@ -221,7 +221,7 @@ export default function AdminSessionDetail() {
             )}
             <button type="button" className={btn}
               onClick={() => run(async () => {
-                const body = window.prompt('Internal note:')
+                const body = await askText('Internal note:')
                 if (!body) return null
                 return adminFetch(`/api/admin/sessions/${id}/notes`, { method: 'POST', body: { body } })
               }, 'Note added.')}>

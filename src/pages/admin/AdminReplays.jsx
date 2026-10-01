@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, when, mono } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, when, mono, askText } from './ui.jsx'
 
 // ── /admin/replays — practice replays (Phase 4) ──────────────────────────────
 // Practice-only ledger: structurally unable to touch certified scores. Erasure
@@ -25,7 +25,7 @@ export default function AdminReplays() {
 
   const flag = async (replay) => {
     setError(''); setNotice('')
-    const reason = window.prompt('Reason for flagging this replay for abuse review (10+ characters):')
+    const reason = await askText('Reason for flagging this replay for abuse review (10+ characters):')
     if (!reason) return
     try {
       await adminFetch(`/api/admin/replays/${replay.replay_id}/flag`, { method: 'POST', body: { reason } })
@@ -36,7 +36,7 @@ export default function AdminReplays() {
 
   const exportReplays = async () => {
     setError(''); setNotice('')
-    const purpose = window.prompt('Purpose for this research export (goes on the export ledger):')
+    const purpose = await askText('Purpose for this research export (goes on the export ledger):')
     if (!purpose) return
     try {
       const r = await adminFetch(`/api/admin/replays/export?limit=200&purpose=${encodeURIComponent(purpose)}`)

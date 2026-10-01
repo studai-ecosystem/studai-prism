@@ -40,7 +40,7 @@ export function TopBar({ onOpenNav, navLabel = 'Open navigation' }) {
           )}
           items={[
             { id: 'settings', label: 'Settings', onSelect: () => navigate('/app/settings') },
-            { id: 'profile', label: 'Profile & password', onSelect: () => navigate('/profile') },
+            { id: 'profile', label: 'Profile and security', onSelect: () => navigate('/app/settings#profile') },
             { id: 'signout', label: 'Sign out', onSelect: () => { signOut(); navigate('/') } },
           ]}
         />

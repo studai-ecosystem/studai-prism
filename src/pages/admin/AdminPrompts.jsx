@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
-import { PageHeader, ErrorNotice, Notice, Pill, btn, field, when } from './ui.jsx'
+import { PageHeader, ErrorNotice, Notice, Pill, btn, field, when, askText } from './ui.jsx'
 
 // ── /admin/prompts — Prompt Registry (Phase 3) ───────────────────────────────
 // draft → testing → approved → production (dual-approved) → deprecated /
@@ -61,7 +61,7 @@ export default function AdminPrompts() {
     run(async () => {
       let reason
       if (status === 'production') {
-        reason = window.prompt('Reason for PUBLISHING to production (10+ chars — requires a pre-approved "publish_prompt" request for this version id):')
+        reason = await askText('Reason for PUBLISHING to production (10+ chars — requires a pre-approved "publish_prompt" request for this version id):')
         if (!reason) return null
       }
       return adminFetch(`/api/admin/prompts/versions/${v.version_id}/status`, {
@@ -71,9 +71,9 @@ export default function AdminPrompts() {
 
   const rollback = (v) =>
     run(async () => {
-      const toVersionId = window.prompt('Version id of the DEPRECATED predecessor to re-promote:')
+      const toVersionId = await askText('Version id of the DEPRECATED predecessor to re-promote:')
       if (!toVersionId) return null
-      const reason = window.prompt('Reason for the rollback (10+ chars, audited):')
+      const reason = await askText('Reason for the rollback (10+ chars, audited):')
       if (!reason) return null
       return adminFetch(`/api/admin/prompts/versions/${v.version_id}/rollback`, {
         method: 'POST', body: { toVersionId: toVersionId.trim(), reason },

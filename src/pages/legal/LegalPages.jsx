@@ -3,34 +3,30 @@
 // behaviour (what is collected, what is stored, what is never stored) and is
 // pending formal legal review; factual claims are kept consistent with the
 // consent canon in the Briefing flow.
-import PageLayout, { PageHeading } from '../../components/PageLayout.jsx'
+import { Children, isValidElement } from 'react'
+import DocumentLayout, { DocH, slugify } from '../../components/DocumentLayout.jsx'
 
 const COMPANY = 'Studai Edutech Private Limited'
 const CIN = 'U85500TN2024PTC168744'
 const EFFECTIVE = '30 July 2026'
 
 function LegalShell({ title, subtitle, children }) {
+  const toc = Children.toArray(children)
+    .filter((c) => isValidElement(c) && c.type === DocH)
+    .map((c) => ({ id: slugify(c.props.children), label: c.props.children }))
   return (
-    <PageLayout>
-      <section className="py-16 px-6 max-w-4xl mx-auto">
-        <PageHeading title={title} subtitle={subtitle} />
-      </section>
-      <section className="pb-20 px-6 max-w-4xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 space-y-8 text-[var(--color-ink-muted)] leading-relaxed">
-          {children}
-          <p className="text-sm pt-6 border-t border-[var(--color-line)]">
-            {COMPANY} · CIN {CIN} · Chennai, Tamil Nadu, India · Effective {EFFECTIVE}
-          </p>
-        </div>
-      </section>
-    </PageLayout>
+    <DocumentLayout title={title} subtitle={subtitle} meta={`Effective ${EFFECTIVE}`} toc={toc}>
+      <div className="space-y-4 text-base leading-relaxed text-prism-ink-muted [&_a]:text-brand-green-ink [&_a]:underline [&_a]:underline-offset-4 [&_li]:leading-relaxed [&_strong]:text-prism-ink">
+        {children}
+      </div>
+      <p className="border-t border-prism-border pt-6 text-sm text-prism-ink-subtle">
+        {COMPANY} &middot; CIN {CIN} &middot; Chennai, Tamil Nadu, India &middot; Effective {EFFECTIVE}
+      </p>
+    </DocumentLayout>
   )
 }
 
-function H({ children }) {
-  return <h2 className="text-xl font-bold text-[var(--color-ink)] mt-2">{children}</h2>
-}
-
+const H = DocH
 export function PrivacyPolicy() {
   return (
     <LegalShell title="Privacy Policy" subtitle="What we collect, why, and the rights you keep">

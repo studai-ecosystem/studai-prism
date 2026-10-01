@@ -2,10 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { adminFetch, adminHasPermission, currentAdmin } from '../../lib/adminApi.js'
-import {
-  useAdminList, PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pager,
-  Pill, btn, field, when, mono,
-} from './ui.jsx'
+import { useAdminList, PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pager,
+  Pill, btn, field, when, mono, askText } from './ui.jsx'
 
 // ── /admin/disputes — dispute workspace (Phase 2, §10 state machine) ─────────
 
@@ -107,11 +105,11 @@ export function AdminDisputeDetail() {
 
   const transition = (state) =>
     run(async () => {
-      const reason = window.prompt(`Reason for moving to '${state}' (audited):`)
+      const reason = await askText(`Reason for moving to '${state}' (audited):`)
       if (!reason) return null
       let decision
       if (state === 'resolved' || state === 'rejected') {
-        decision = window.prompt('Written decision (10+ characters, shown in the record):')
+        decision = await askText('Written decision (10+ characters, shown in the record):')
         if (!decision) return null
       }
       return adminFetch(`/api/admin/disputes/${sessionId}/transition`, {
@@ -187,7 +185,7 @@ export function AdminDisputeDetail() {
                 {['upheld', 'invalidated_reassessment', 'superseded', 'second_review'].map((outcome) => (
                   <button key={outcome} type="button" className={btn}
                     onClick={() => run(async () => {
-                      const explanation = window.prompt(`Candidate-readable explanation for '${outcome}' (20+ chars):`)
+                      const explanation = await askText(`Candidate-readable explanation for '${outcome}' (20+ chars):`)
                       if (!explanation) return null
                       return adminFetch(`/api/admin/disputes/${sessionId}/decide`, {
                         method: 'POST', body: { outcome, explanation },
@@ -219,7 +217,7 @@ export function AdminDisputeDetail() {
             ))}
           <button type="button" className={`${btn} mt-2`}
             onClick={() => run(async () => {
-              const body = window.prompt('Note (internal):')
+              const body = await askText('Note (internal):')
               if (!body) return null
               return adminFetch(`/api/admin/disputes/${sessionId}/notes`, { method: 'POST', body: { body } })
             }, 'Note added.')}>

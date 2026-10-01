@@ -4,8 +4,8 @@ Live checklist for `.github/skills/prism-ui/references/master-spec.md`. Keep the
 Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, autopilot.
 
 <!-- UI-STATE:BEGIN
-run_mode: autopilot
-active_phase: K
+run_mode: off
+active_phase: L
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -198,15 +198,15 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase K - Admin, research, legal and profile or settings
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 37b37bf (build, vitest 303, server 620/596/0 incl. claimsCeiling, campusCopyCeiling and designSystem, static audit, playwright chromium + mobile-chromium 300 passed; e2e database prism_e2e on the local PostgreSQL service)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] K.01 Profile and settings consolidated: Profile, Account, Workspaces, Privacy, Sharing, Assessment preferences, Accessibility, Security
-- [ ] K.02 Admin console on the design system: compact tables, filters, status labels, confirmations
-- [ ] K.03 Research and science pages: editorial width, citation hierarchy, method cards, study status
-- [ ] K.04 Legal pages: documentation layout, anchors, table of contents, last-updated metadata
-- [ ] K.05 Tests and gates, commit
+- [x] K.01 Profile and settings consolidated - evidence: SettingsPage.jsx now has Profile (edit in place), Account (email, resume banner when a licence has an assessment in progress), Workspaces (each with who can see it, switch), Privacy, Sharing, Assessment preferences (accommodations are arranged before the start and never change judging), Accessibility, Security (change password, delete data behind a typed DELETE), with an index of anchors; /profile redirects to /app/settings#profile; the legacy Profile.jsx (marketing layout, percent history and band labels) is deleted and the account menu points at settings. No internal fields are shown. Tests: phaseK.test.jsx (Settings 6, old profile address 1)
+- [x] K.02 Admin console on the design system - evidence: admin/ui.jsx and AdminShell.jsx moved off the legacy aliases to brand tokens; Pill carries a text label and a shape marker; DataTable is compact with a sticky header, column scopes and an optional caption; all 45 window.prompt and window.confirm calls in 16 admin pages are now in-app dialogs (askText, askConfirm in ui.jsx: labelled, focus trapped, Esc cancels, cancel returns null so audited actions do not run). The other admin pages still use the legacy aliases and are migrated in phase M with the alias removal. Not visually checked: the admin pages need an admin session and a running API, which were not available locally, so they are listed for human visual approval. Tests: phaseK.test.jsx (Admin building blocks 5)
+- [x] K.03 Research and science pages - evidence: components/DocumentLayout.jsx (one readable column, On this page index, MethodCard, StudyStatus with text and marker); ScienceBehindPrism, ValidityStudy and AIEvaluation rebuilt on it; the scoring methodology lists all four preregistered studies as "Preregistered, not yet run" (the adversarial one reads the live registry); removed an unattributable quotation ("StudAI One Research Team"), the claim that the score is combined into one Prism Score (the page itself says no composite is issued in the pilot) and the band descriptions that promised job readiness ("Ready for most roles", "Stands out in competitive hiring"), replaced by a reading guide that says it is not a prediction and repeats the not-sole-basis policy. Tests: phaseK.test.jsx (Research pages 3)
+- [x] K.04 Legal pages - evidence: LegalPages.jsx text unchanged; LegalShell now uses DocumentLayout with an index built from the headings, anchors on every heading, "Effective 30 July 2026" under the title, no marketing furniture. Tests: phaseK.test.jsx (Documents 2)
+- [x] K.05 Tests and gates, commit - evidence: vitest 303; accessibility.spec.js baseline now also covers /login, /invite, /research/validity, /research/ai-evaluation, /refund-policy, /security and /contact (300 playwright passes); designSystem.test.js caught a numeric character entity that reads as a hex colour in AIEvaluation.jsx and it was replaced with an escape. Screenshots audit-results/ui/phase-k (privacy, terms, science, validity, ai-evaluation, settings at 1440, 1024, 768, 390 where listed: no horizontal overflow, 0 console errors, index present on every document)
 
 ## Phase L - Responsive, accessibility and polish
 
