@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: autopilot
-active_phase: J
+active_phase: K
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -186,15 +186,15 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase J - Marketing site, pricing and authentication
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ 3eeb877 (build, vitest 286, server 620/596/0 incl. claimsCeiling and campusCopyCeiling, static audit, playwright chromium + mobile-chromium 286 passed; e2e database prism_e2e on the local PostgreSQL service because the usual instance on port 55433 was down)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] J.01 Landing narrative sections on the new system, restrained motion
-- [ ] J.02 Pricing: personal and campus positioning; outdated Verified Prism Score style wording replaced where it conflicts
-- [ ] J.03 Login, registration, invite redemption, password flows redesigned; institution invite context preserved; no duplicate identity
-- [ ] J.04 Footer, public layouts, contact
-- [ ] J.05 Tests and gates, visual QA, commit
+- [x] J.01 Landing narrative sections on the new system, restrained motion - evidence: HeroThesis.jsx rebuilt on brand tokens with the positioning line "Work-readiness and capability intelligence" and two doors (Take the assessment, Bring Prism to your institution); new StoryLoop.jsx act "Measure. Improve. Prove." (practice labelled as practice, growth only after a comparable reassessment, campus strip); StoryPaths copy; StoryDimensions animated SVG radius replaced by a plain circle, which removes the 5 console errors; motion limited to one-shot reveals that honour reduced motion. Tests: publicSite.test.jsx (Landing page, 4)
+- [x] J.02 Pricing: personal and campus positioning, conflicting wording replaced, no new prices - evidence: Pricing.jsx and PricingCard.jsx (Personal with the existing 499 rupee price, Campus "Custom", the "Most popular" badge, the 500-student cap and "Employer-facing cohort reports" removed because nothing backs them); FAQ "What does a Prism report show?" and "What does my university see?"; Mission.jsx and AboutStudAI.jsx lose "skill verification", "no human bias" and "A verified score". Tests: publicSite.test.jsx (exactly one rupee amount on the page, plan names, campus features)
+- [x] J.03 Login, registration, invite redemption, password flows - evidence: Auth.jsx on the shared primitives (full wordmark, Input, Select, Checkbox, Button, notices, no spring animation); a campus invitation shows "<Institution> has invited you to Prism" from the public preview (role, email hint, closed state), tells the person to sign in if they already have an account, and the Login and Register tabs and links keep ?next so an invitation is never dropped; InviteRedeem.jsx on the primitives with the one-account note. Password flows: the product has no self-service password reset (admins issue temporary passwords), so none was drawn; this is a backend gap. Tests: publicSite.test.jsx (Sign in and registration 5, Assessment invitation 1)
+- [x] J.04 Footer, public layouts, contact - evidence: Footer.jsx on brand tokens with the full wordmark (the tagline lives in the artwork, so it is not repeated as text under the logo), in-app links through the router, "For universities" added, pilot notice kept; PageLayout.jsx tokens. Contact page content unchanged. Tests: publicSite.test.jsx (footer)
+- [x] J.05 Tests and gates, visual QA, commit - evidence: tagline decision: "Measure. Improve. Prove." appears as the StoryLoop heading and inside the full wordmark; claimsCeiling stays green (the test file itself had to avoid spelling the banned words). Screenshots audit-results/ui/phase-j (landing at 4 widths, register, login, login with invitation, assessment invitation; no horizontal overflow, 0 console errors)
 
 ## Phase K - Admin, research, legal and profile or settings
 

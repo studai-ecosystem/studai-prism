@@ -3,15 +3,15 @@ import PageLayout, { PageHeading } from '../../components/PageLayout.jsx'
 const pillars = [
   {
     name: 'Accessible',
-    desc: '₹499 puts skill verification within reach of every student.',
+    desc: '₹499 puts evidence of your skills within reach of every student.',
   },
   {
     name: 'Trustworthy',
-    desc: 'AI evaluation with no human bias, no favouritism, no guesswork.',
+    desc: 'A panel of AI evaluators, with every score tied to the moment that earned it.',
   },
   {
     name: 'Actionable',
-    desc: 'A score that employers actually use to make hiring decisions faster.',
+    desc: 'A report that shows evidence and where to focus next, not just a number.',
   },
 ]
 

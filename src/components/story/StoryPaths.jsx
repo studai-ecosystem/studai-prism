@@ -36,7 +36,7 @@ export default function StoryPaths({ onGetAssessed }) {
             </h3>
             <p className="font-sans text-sm text-[var(--color-ink-muted)] leading-relaxed mb-8">
               {ASSESSMENT_MINUTES} minutes, browser or the Prism app. A report where every
-              number carries its moment, and a credential valid for {SCORE_VALIDITY_MONTHS} months.
+              number carries its moment, where to focus next, and a cryptographically verifiable report valid for {SCORE_VALIDITY_MONTHS} months.
             </p>
             <button
               onClick={onGetAssessed}
@@ -62,9 +62,7 @@ export default function StoryPaths({ onGetAssessed }) {
               See a cohort the way you wish transcripts worked.
             </h3>
             <p className="font-sans text-sm text-[var(--color-ink-muted)] leading-relaxed mb-8">
-              Placement cells and teams run Prism on real cohorts — with the same
-              glass-box reports, a study registry your DPO can read, and a pilot
-              programme that starts small on purpose.
+              Universities and colleges run Prism on real cohorts: capability evidence by cohort, development interventions and comparable reassessment, with the same glass-box reports, a study registry your DPO can read, and a pilot programme that starts small on purpose.
             </p>
             <a
               href="mailto:institutions@studaione.com?subject=Prism%20for%20our%20institution"

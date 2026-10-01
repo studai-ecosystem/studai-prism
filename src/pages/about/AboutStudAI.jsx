@@ -49,8 +49,8 @@ export default function AboutStudAI() {
           <p className="text-[var(--color-ink-muted)] leading-relaxed text-lg">
             We kept hearing the same thing from placement officers and hiring
             managers — resumes tell us where someone studied, not what they can
-            do. We built Prism to fix that. One conversation. A verified score.
-            Proof that works.
+            do. We built Prism to fix that. One conversation. A report you can verify.
+            Evidence that works.
           </p>
         </div>
       </section>

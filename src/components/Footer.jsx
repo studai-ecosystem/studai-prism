@@ -1,39 +1,59 @@
+import { Link } from 'react-router-dom'
 import { Linkedin, Twitter } from 'lucide-react'
 import PrismLogo from './ui/PrismLogo.jsx'
 import { PILOT_NOTICE, NOT_SOLE_BASIS_POLICY } from '../../server/lib/sharedConstants.js'
 
 const productLinks = [
-  { label: 'How it works', href: '#how-it-works' },
-  { label: 'Dimensions', href: '#dimensions' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'Hire Marketplace', href: 'https://hire.studaione.com', external: true },
-  { label: 'All Products', href: 'https://studaione.com', external: true },
+  { label: 'How it works', to: '/#how-it-works' },
+  { label: 'Dimensions', to: '/#dimensions' },
+  { label: 'For universities', to: '/#who-its-for' },
+  { label: 'Pricing', to: '/#pricing' },
+  { label: 'Hire Marketplace', href: 'https://hire.studaione.com' },
+  { label: 'All Products', href: 'https://studaione.com' },
 ]
 
 const companyLinks = [
-  { label: 'About StudAI One', href: 'https://studaione.com/about', external: true },
-  { label: 'Careers', href: 'https://studaione.com/careers', external: true },
-  { label: 'Press', href: 'https://studaione.com/press', external: true },
-  { label: 'Contact', href: '/contact' },
+  { label: 'About StudAI One', href: 'https://studaione.com/about' },
+  { label: 'Careers', href: 'https://studaione.com/careers' },
+  { label: 'Press', href: 'https://studaione.com/press' },
+  { label: 'Contact', to: '/contact' },
 ]
 
 const legalLinks = [
-  { label: 'Privacy Policy', href: '/privacy' },
-  { label: 'Terms of Service', href: '/terms' },
-  { label: 'Refund Policy', href: '/refund-policy' },
-  { label: 'Security', href: '/security' },
+  { label: 'Privacy Policy', to: '/privacy' },
+  { label: 'Terms of Service', to: '/terms' },
+  { label: 'Refund Policy', to: '/refund-policy' },
+  { label: 'Security', to: '/security' },
 ]
+
+const LINK = 'text-sm text-prism-ink-muted transition-colors hover:text-prism-ink'
+
+function FooterLink({ link }) {
+  if (link.to) return <Link to={link.to} className={LINK}>{link.label}</Link>
+  return <a href={link.href} target="_blank" rel="noopener noreferrer" className={LINK}>{link.label}</a>
+}
+
+function Column({ title, links }) {
+  return (
+    <nav aria-label={title}>
+      <p className="mb-4 font-mono text-xs font-semibold uppercase tracking-widest text-brand-green-ink">{title}</p>
+      <ul className="flex flex-col gap-3">
+        {links.map((l) => <li key={l.label}><FooterLink link={l} /></li>)}
+      </ul>
+    </nav>
+  )
+}
 
 export default function Footer() {
   return (
-    <footer className="bg-[var(--color-paper)] border-t border-[var(--color-line)]">
-      <div className="max-w-7xl mx-auto px-6 py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
-          {/* Brand */}
+    <footer className="border-t border-prism-border bg-prism-canvas">
+      <div className="mx-auto max-w-6xl px-6 py-14">
+        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col gap-4">
-            <PrismLogo size={34} />
-            <p className="font-sans text-sm text-[var(--color-ink-muted)] leading-relaxed max-w-[220px]">
-              Building the skills layer for India's workforce.
+            {/* The full wordmark carries the brand line; it is not repeated as text. */}
+            <PrismLogo variant="full" width={240} />
+            <p className="max-w-[240px] text-sm leading-relaxed text-prism-ink-muted">
+              Work-readiness and capability intelligence.
             </p>
             <div className="flex gap-3">
               <a
@@ -41,97 +61,35 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="StudAI One on LinkedIn"
-                className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--color-paper)] text-[var(--color-ink-muted)] hover:text-[var(--color-accent)] transition-colors"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-prism-ink-muted transition-colors hover:text-prism-ink"
               >
-                <Linkedin size={14} />
+                <Linkedin size={14} aria-hidden="true" />
               </a>
               <a
                 href="https://twitter.com/studaione"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="StudAI One on X (Twitter)"
-                className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--color-paper)] text-[var(--color-ink-muted)] hover:text-[var(--color-accent)] transition-colors"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-prism-ink-muted transition-colors hover:text-prism-ink"
               >
-                <Twitter size={14} />
+                <Twitter size={14} aria-hidden="true" />
               </a>
             </div>
           </div>
 
-          {/* Product */}
-          <div>
-            <p className="font-sans text-xs font-semibold tracking-[0.15em] text-[var(--color-accent)] uppercase mb-4">
-              Product
-            </p>
-            <ul className="flex flex-col gap-3">
-              {productLinks.map((l) => (
-                <li key={l.label}>
-                  <a
-                    href={l.href}
-                    target={l.external ? '_blank' : undefined}
-                    rel={l.external ? 'noopener noreferrer' : undefined}
-                    className="font-sans text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
-                  >
-                    {l.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Company */}
-          <div>
-            <p className="font-sans text-xs font-semibold tracking-[0.15em] text-[var(--color-accent)] uppercase mb-4">
-              Company
-            </p>
-            <ul className="flex flex-col gap-3">
-              {companyLinks.map((l) => (
-                <li key={l.label}>
-                  <a
-                    href={l.href}
-                    target={l.external ? '_blank' : undefined}
-                    rel={l.external ? 'noopener noreferrer' : undefined}
-                    className="font-sans text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
-                  >
-                    {l.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <p className="font-sans text-xs font-semibold tracking-[0.15em] text-[var(--color-accent)] uppercase mb-4">
-              Legal
-            </p>
-            <ul className="flex flex-col gap-3">
-              {legalLinks.map((l) => (
-                <li key={l.label}>
-                  <a
-                    href={l.href}
-                    className="font-sans text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] transition-colors"
-                  >
-                    {l.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <Column title="Product" links={productLinks} />
+          <Column title="Company" links={companyLinks} />
+          <Column title="Legal" links={legalLinks} />
         </div>
 
-        {/* Bottom bar */}
-        <div className="mt-12 pt-6 border-t border-[var(--color-line)] flex flex-col gap-3">
-          {/* Charter §2: pilot positioning — visible on every marketing page. */}
-          <p className="font-sans text-xs text-[var(--color-ink-muted)] max-w-3xl">
-            {PILOT_NOTICE} {NOT_SOLE_BASIS_POLICY}
-          </p>
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <p className="font-sans text-xs text-[var(--color-ink-muted)]">
-              © 2026 Studai Edutech Private Limited · CIN U85500TN2024PTC168744 · Chennai, India
+        <div className="mt-12 flex flex-col gap-3 border-t border-prism-border pt-6">
+          {/* Charter: pilot positioning is visible on every marketing page. */}
+          <p className="max-w-3xl text-xs text-prism-ink-muted">{PILOT_NOTICE} {NOT_SOLE_BASIS_POLICY}</p>
+          <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+            <p className="text-xs text-prism-ink-muted">
+              &copy; 2026 Studai Edutech Private Limited &middot; CIN U85500TN2024PTC168744 &middot; Chennai, India
             </p>
-            <p className="font-sans text-xs text-[var(--color-ink-muted)]">
-              Built in Chennai. In production across India and APAC.
-            </p>
+            <p className="text-xs text-prism-ink-muted">Built in Chennai. In production across India and APAC.</p>
           </div>
         </div>
       </div>

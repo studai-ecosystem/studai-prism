@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
 import { DIMENSION_KEYS, DIMENSION_WEIGHTS, DIMENSION_LABELS } from '../../../server/lib/sharedConstants.js'
 
 // ── Act VI — The Dimensions ──────────────────────────────────────────────────
@@ -21,7 +20,6 @@ function vertexPoint(i, n, r, cx, cy) {
 }
 
 export default function StoryDimensions() {
-  const reduced = useReducedMotion()
   const [active, setActive] = useState('criticalThinking')
   const keys = DIMENSION_KEYS
   const cx = 150
@@ -61,14 +59,13 @@ export default function StoryDimensions() {
               return (
                 <g key={k} onClick={() => setActive(k)} style={{ cursor: 'pointer' }}>
                   <line x1={cx} y1={cy} x2={x} y2={y} stroke={isActive ? 'var(--color-accent)' : 'var(--color-line)'} strokeWidth={isActive ? 1.6 : 1} />
-                  <motion.circle
+                  <circle
                     cx={x}
                     cy={y}
                     r={isActive ? 7 : 4.5}
                     fill={isActive ? 'var(--color-accent)' : 'var(--color-surface)'}
                     stroke="var(--color-accent)"
                     strokeWidth="1.5"
-                    animate={reduced ? undefined : { r: isActive ? 7 : 4.5 }}
                   />
                   <text
                     x={lx}

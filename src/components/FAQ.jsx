@@ -11,9 +11,9 @@ const faqs = [
       'No. Prism is a live 30-minute AI conversation — a scenario where multiple AI participants engage with you in real time. There are no predetermined answer choices.',
   },
   {
-    question: 'What does a Prism Score look like?',
+    question: 'What does a Prism report show?',
     answer:
-      'You receive a score between 0–100 with a breakdown across five dimensions: Critical Thinking, Collaboration, Communication, Problem Solving, and AI & Digital Fluency. You also get a detailed skill map report.',
+      'You receive a score between 0–100 with a breakdown across five dimensions: Critical Thinking, Collaboration, Communication, Problem Solving, and AI & Digital Fluency. Each dimension is tied to the evidence behind it, and where there is not enough evidence the report says so instead of guessing.',
   },
   {
     question: 'How long is my score valid?',
@@ -35,6 +35,11 @@ const faqs = [
       "Hire is StudAI One's job marketplace where employers can filter candidates by Prism Score. A strong Prism Score gives you visibility with companies that have set score-based filters.",
   },
   {
+    question: 'What does my university see?',
+    answer:
+      'Only what your institution sponsors, and what you choose to share. Your personal practice, exploration and anything you have not shared stay private to you, and you can change what you share at any time.',
+  },
+  {
     question: 'Is my conversation data private?',
     answer:
       'Yes. Your assessment conversation is processed for scoring only and is not shared with employers or third parties without your consent.',
@@ -43,7 +48,7 @@ const faqs = [
 
 export default function FAQ() {
   return (
-    <section id="faq" className="py-24 bg-[var(--color-paper)]">
+    <section id="faq" className="py-24 bg-prism-canvas">
       <div className="max-w-3xl mx-auto px-6">
         {/* Header */}
         <motion.div
@@ -58,7 +63,7 @@ export default function FAQ() {
           </motion.div>
           <motion.h2
             variants={fadeUp}
-            className="font-serif text-4xl md:text-5xl text-[var(--color-ink)] leading-tight mt-1"
+            className="text-3xl font-bold tracking-tight text-prism-ink leading-tight mt-1 md:text-4xl"
           >
             Common questions.
           </motion.h2>

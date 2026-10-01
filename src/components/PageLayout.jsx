@@ -16,7 +16,7 @@ export default function PageLayout({ children }) {
 
   return (
     <main
-      className="bg-[var(--color-paper)] min-h-screen overflow-x-hidden"
+      className="bg-prism-canvas min-h-screen overflow-x-hidden"
       style={{ fontFamily: 'var(--font-body)' }}
     >
       <Nav onGetAssessed={handleGetAssessed} />
@@ -31,12 +31,12 @@ export default function PageLayout({ children }) {
 export function PageHeading({ title, subtitle }) {
   return (
     <header className="text-center max-w-3xl mx-auto">
-      <h1 className="text-4xl md:text-5xl font-bold text-[var(--color-ink)] tracking-tight">
+      <h1 className="text-4xl md:text-5xl font-bold text-prism-ink tracking-tight">
         {title}
       </h1>
       <div className="w-16 h-1 bg-brand-green mx-auto mt-4" />
       {subtitle && (
-        <p className="mt-6 text-lg text-[var(--color-ink-muted)] leading-relaxed">{subtitle}</p>
+        <p className="mt-6 text-lg text-prism-ink-muted leading-relaxed">{subtitle}</p>
       )}
     </header>
   )
