@@ -384,6 +384,34 @@ describe('Explore Roles V2 (§18)', () => {
     noPercent()
     expect(document.body.textContent).not.toMatch(/\bmatch\b|\bfit\b/i)
   })
+  it('keeps interest and observed capability apart, assumes no interest, and states what is unknown', async () => {
+    const result = { data: {
+      selfReported: { interests: ['A'] }, demonstrated: [],
+      recommendations: [
+        { roleId: 'R1', title: 'Synthetic Role One', basis: 'SELF_REPORTED', selfReportedReasons: ['You said you enjoy Creative work.'], demonstratedReasons: [], unknowns: ['No formal evidence yet for Campaign Analytics.'], nextStep: { type: 'FORMAL_ASSESSMENT', label: 'Complete an assessment that covers the capabilities we have no evidence for yet.' } },
+        { roleId: 'R2', title: 'Synthetic Role Two', basis: 'BOTH', selfReportedReasons: ['You said you enjoy Creative work.'], demonstratedReasons: ['Your assessment evidence shows developing Reasoning & Decision Quality (provisional).'], unknowns: [], nextStep: { type: 'EXPLORE', label: 'Talk to someone who works in this role about a typical week.' } },
+      ],
+      evaluated: true,
+    } }
+    const { spy } = render(<ExplorePage />, { routes: { '/api/v1/me/role-exploration': result, '/api/v1/me/capabilities': describedCapabilities() } })
+    expect(await screen.findByText('Interest and capability are different things')).toBeInTheDocument()
+    expect(screen.getByText('Self-reported')).toBeInTheDocument()
+    expect(screen.getByText('Formal evidence')).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { checked: true })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('role-card')).not.toBeInTheDocument()
+    expect(spy.mock.calls.some(([u]) => String(u).includes('role-exploration'))).toBe(false)
+    await userEvent.click(screen.getByLabelText('Creating and designing'))
+    await userEvent.click(screen.getByRole('button', { name: 'Show roles' }))
+    const cards = await screen.findAllByTestId('role-card')
+    expect(cards).toHaveLength(2)
+    expect(within(cards[0]).getByTestId('role-evidence')).toHaveTextContent('No formal evidence connects to this role yet.')
+    expect(within(cards[0]).getByRole('link', { name: 'Go to assessments' })).toHaveAttribute('href', '/app/assessments')
+    expect(within(cards[1]).getByTestId('role-interest')).toHaveTextContent('You said you enjoy Creative work.')
+    expect(within(cards[1]).getByTestId('role-evidence')).toHaveTextContent('Prism observed')
+    expect(within(cards[1]).queryByRole('link', { name: 'Go to assessments' })).not.toBeInTheDocument()
+    expect(within(cards[1]).getByRole('link', { name: /Practise in Development/ })).toHaveAttribute('href', '/app/development')
+    expect(document.body.textContent).not.toMatch(/\b(match|fit|best|perfect|ideal|suited|should become|you will)\b|\d\s*%/i)
+  })
   it('at most three interests can be chosen', async () => {
     render(<ExplorePage />)
     for (const label of ['Hands-on, practical work', 'Investigating and analysing', 'Creating and designing']) {

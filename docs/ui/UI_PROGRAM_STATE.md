@@ -5,7 +5,7 @@ Status values: NOT_STARTED, IN_PROGRESS, COMPLETE. run_mode values: off, phase, 
 
 <!-- UI-STATE:BEGIN
 run_mode: autopilot
-active_phase: H
+active_phase: I
 target_phase: M
 branch: ui/prism-brand-transformation
 last_updated: 2026-10-01
@@ -160,14 +160,14 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Phase H - Explore and role discovery
 
-Status: NOT_STARTED
-Gates: -
-Commit: -
+Status: COMPLETE
+Gates: PASS 2026-10-01 @ edf1ab3 (build, vitest 265, server 620/596/0 including claimsCeiling and campusCopyCeiling, static audit, playwright chromium + mobile-chromium 286)
+Commit: this commit (ui/prism-brand-transformation)
 
-- [ ] H.01 Explore page: relevant role families, why it appeared, supporting evidence, what remains unknown, required capabilities, try a mission, learn more
-- [ ] H.02 Interest input asked or omitted, never defaulted; interest visibly separate from demonstrated capability
-- [ ] H.03 Copy review against the claims ceiling
-- [ ] H.04 Tests and gates, commit
+- [x] H.01 Explore page: relevant role families, why it appeared, supporting evidence, what remains unknown, required capabilities, try a mission, learn more - evidence: RoleExplorationCard.jsx now shows two separate blocks (From what you told us, dashed; From your assessments, solid) each with its own honest empty line, what remains unknown, the server next step (a link to assessments for FORMAL_ASSESSMENT) and a generic "Practise in Development" link that says it is not specific to the role. The exploration contract carries no required-capability or learn-more data, so those two were not invented (recorded as backend gaps). Tests: studentPages.test.jsx (new Explore test)
+- [x] H.02 Interest input asked or omitted, never defaulted; interest visibly separate from demonstrated capability - evidence: ExplorePage opens with "Interest and capability are different things" and "Nothing is assumed about your interests: roles appear only after you choose"; panels labelled Self-reported and Formal evidence; no checkbox is preselected and no request is sent until a choice is made (asserted). Skipping interests entirely is not offered because the server evaluates roles from chosen interests
+- [x] H.03 Copy review against the claims ceiling - evidence: the Explore render is asserted free of match, fit, best, perfect, ideal, suited, "should become", "you will" and any percentage; server claimsCeiling and campusCopyCeiling tests pass
+- [x] H.04 Tests and gates, commit - evidence: vitest 265, server 620/596/0, static audit, playwright 286; screenshots audit-results/ui/phase-h (empty and results at 1440, 1024, 768, 390; no overflow, no console errors) from a synthetic response in a throwaway script that is not committed
 
 ## Phase I - Campus experience
 
