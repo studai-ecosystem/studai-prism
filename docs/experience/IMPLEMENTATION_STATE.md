@@ -1,5 +1,41 @@
 # Experience programme - source traceability and execution checkpoints
 
+## Current P9-P10 checkpoint - 2026-10-03
+
+Status: **Code-safe programme COMPLETE locally. Release: NO-GO until human gates close.**
+
+- P9.1/9.2: `domain/metrics/events.js` (21 canonical events + legacy aliases, strict allow-list),
+  `definitions.js` METRIC_DEFINITIONS v1 (frozen; synthetic/DEV excluded), admin quality views
+  `/quality/{operational,measurement,customer}` (aggregates only; 503 NO_DB). `alerts.js` 8 detectors.
+- P9.3: `faultInjection.test.js` 12 real-router fault cases (timeout, malformed, ack loss, dup key,
+  payload mismatch, If-Match conflict, race, lease reclaim + fencing, quote mismatch → review,
+  publication race, ownership/share 404, erasure mid-job, sparse early-ended honest report).
+- P9.5/9.6: `scripts/live-model-smoke.mjs` (manifest; BLOCKED without authorization — no transcript),
+  `scripts/load-pilot.mjs` (refuses without target + --synthetic; planning targets, not SLA).
+- P9.7/9.8: `RESEARCH_PROTOCOLS.md`, `VALIDATION_PLAN.md`, `METRICS.md` — prepared, NOT executed.
+- P10.2: `domain/release/config.js` RELEASE_CONFIG v1 per stage; `readiness()` never collapses
+  UNVERIFIED into READY; `assertAllocatable()` runs before any credit reserve for new universal runs
+  (`RUN_NOT_ALLOCATABLE` 503); legacy start unchanged. Diagnostic `--stage` shows `allocatable:false`
+  locally with named blockers and no secrets.
+- P10.3: `scripts/rehearse-migrations.mjs` on a disposable cluster: up 49 → down 0049..0040 → up,
+  schema identical, every ≥0040 migration has `.down.sql` (static test).
+- P10.5: `rollback.js` (stop allocations → pin/drain V3 → keep readers/shares; `canDisable` false
+  with active runs); `RUN_VERSION_UNSUPPORTED` instead of legacy fallback; stale fenced/late/erased
+  writes rejected (tests).
+- P10.6: `route-usage-inventory.mjs` (LEGACY_CREATION 8 / LEGACY_READER 7 / V3 25; deletions 0);
+  `legacyReadersRetained.test.js`. No pages or readers removed.
+- P10.7/10.8/10.9: `MANUAL_JOURNEYS.md`, `SUPPORT_RUNBOOK.md`; `goNoGo.js` → NO_GO while any HA-C
+  item is OPEN (tested). ROLLOUT appendix lists stage order and drain-window criteria.
+
+Verification: server 808 (783/0/25 DB skips); frontend 35 files 474/0; static + flag checks PASS;
+isolated PG 6/6 (49 migrations); browser-p1 124/0; full browser-all in progress at commit time.
+
+### What remains (human / external)
+HA-C001 flags, HA-C002 thresholds/labels, HA-C003 content approval (CORE_TEAMREADY_A, M01-M10 are DRAFT),
+HA-C004 form equivalence, HA-C005 counsel copy, HA-C006 pricing (₹499 is a test hypothesis;
+professional pack has no quota), HA-C008 validation studies, HA-C012 security review, HA-C013 manual
+accessibility; live-model Layer C run; production migration/backfill operations; retention/backup policy.
+
 ## Current P8 checkpoint - 2026-10-03
 
 Status: **IMPLEMENTED locally; pricing/tax/policy/live payment remain external gates.**

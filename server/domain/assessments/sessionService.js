@@ -8,7 +8,7 @@ import { ApiError } from '../http/errors.js'
 import { buildSessionContract, scenarioView } from './sessionContract.js'
 import { reportPath } from './assignmentService.js'
 import { createMemorySessionLocks } from './sessionLocks.js'
-import { draftSegmentFor, buildRunPin, evaluateJobKey, DRAFT_EVALUATE_JOB_KIND, DRAFT_SEGMENT_ID, isUniversalSnapshot } from './draftSegments.js'
+import { draftSegmentFor, buildRunPin, evaluateJobKey, DRAFT_EVALUATE_JOB_KIND, DRAFT_SEGMENT_ID, SLICE_METHOD_VERSION, isUniversalSnapshot } from './draftSegments.js'
 import { timingPolicyFor, legacyPolicy, isLegacyPolicy, deadlinesFor } from './timingPolicy.js'
 import { selectNext, stageStrip, parentOpportunityId } from './director.js'
 import { validateBoardPatch, worldStateFor } from './universalForm.js'
@@ -35,6 +35,10 @@ export function createAssessmentSessionService({
   sliceEvaluator = null,
   // Called once a sponsored roster row turns COMPLETED (completion notifications).
   onSponsoredCompleted = async () => {},
+  // P10.2 release gate (domain/release/config.js): NEW universal/draft runs are
+  // allocated only when readiness is READY; null → no gate (legacy path and
+  // fixture tests are unchanged).
+  releaseGate = null,
 }) {
   const localLocks = createMemorySessionLocks()
   const withLock = (resource, work) => {
@@ -81,11 +85,21 @@ export function createAssessmentSessionService({
     if (!snapshot || !jobs()) return null
     const startEvent = await repos.sessionIo.getClientEvent(sessionId, START_EVENT)
     const pin = startEvent?.response?.runPin
-    if (!pin || pin.snapshotHash !== buildRunPin({ formId: pin.formId, engineVersion: pin.engineVersion, scenarioId: pin.scenarioId || DRAFT_SEGMENT_ID }).snapshotHash) {
-      // Pinned to a snapshot this code no longer carries: never re-interpret.
+    if (!pin || pin.methodVersion !== SLICE_METHOD_VERSION || pin.snapshotHash !== buildRunPin({ formId: pin.formId, engineVersion: pin.engineVersion, scenarioId: pin.scenarioId || DRAFT_SEGMENT_ID }).snapshotHash) {
+      // Pinned to a snapshot/method this code no longer carries: never re-interpret.
       return pin ? { snapshot: null, pin } : null
     }
     return { snapshot, pin }
+  }
+  // P10.5: a pinned run this build cannot serve fails closed. It is never
+  // handed to the legacy engine and its timer is never reset by a new Start.
+  function assertRunSupported(run) {
+    if (run && !run.snapshot) {
+      throw new ApiError('RUN_VERSION_UNSUPPORTED', 'This assessment was started on a version this service cannot continue. Your saved work is preserved; please contact support.', {
+        details: { methodVersion: run.pin?.methodVersion || null, snapshotVersion: run.pin?.snapshotVersion || null, supportedMethodVersion: SLICE_METHOD_VERSION },
+      })
+    }
+    return run
   }
   const evaluationJob = async (sessionId) => (jobs() ? repos.sessionIo.getJob(evaluateJobKey(sessionId)) : null)
 
@@ -206,6 +220,9 @@ export function createAssessmentSessionService({
       if (universal) {
         for (const row of opportunities) if (['ACTION_RECEIVED', 'EVALUATION_PENDING'].includes(row.state)) await io.setOpportunityState(job.sessionId, row.opportunityId, 'EVALUATED')
       }
+      // P10.5: a model result that arrives after an erasure marker is never
+      // written back (tombstone check on both sides of the external call).
+      if (await io.hasErasureMarker(job.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
       const done = await io.completeJob(job.jobId, job.fencingToken, 'DONE')
       audit('assessment.evaluation_completed', job.sessionId, { sessionId: job.sessionId, jobId: job.jobId, attempt: job.attempts, units: units.length, requestId })
       return done
@@ -321,6 +338,10 @@ export function createAssessmentSessionService({
       const missing = requiredConsentScopes.filter((s) => !scopes.includes(s))
       if (missing.length) throw new ApiError('CONSENT_REQUIRED', 'Please accept every consent item to continue.', { details: { missing } })
       const scenarioId = await fixedScenarioId(item)
+      // P10.2: a NEW universal/draft run is allocated only when the release
+      // configuration says the whole chain is READY — checked BEFORE any seat
+      // is reserved or credit consumed. The legacy start path is unchanged.
+      if (releaseGate && draftSegmentFor(scenarioId)) await releaseGate.assertAllocatable({ scenarioId })
 
       const sponsored = card.scope === 'SPONSORED'
       let sessionId
@@ -458,7 +479,7 @@ export function createAssessmentSessionService({
           })
           audit('assessment.begun', sessionId, { sessionId, policyVersion: begun.policyVersion, startedAt: begun.timedStartedAt, deadlineAt: begun.answerDeadlineAt, requestId })
           // P4: the Director presents the first opportunity once the clock runs.
-          const run = await draftRun(sessionId, session)
+          const run = assertRunSupported(await draftRun(sessionId, session))
           if (isUniversalRun(run)) await presentNext(sessionId, run, { requestId })
         }
         return { startedAt: begun.timedStartedAt, deadlineAt: begun.answerDeadlineAt, graceDeadlineAt: begun.graceDeadlineAt, policyVersion: begun.policyVersion, replayed: begun.replayed }
@@ -487,7 +508,13 @@ export function createAssessmentSessionService({
         // learner's text is attached to the opportunity shown, a fact
         // question gets the authored boundary answer, then the next
         // authored opportunity is presented.
-        const run = await draftRun(sessionId, session)
+        let run
+        try {
+          run = assertRunSupported(await draftRun(sessionId, session))
+        } catch (err) {
+          await failed(action, err)
+          throw err
+        }
         if (isUniversalRun(run)) {
           await attachAction(sessionId, run, action)
           const actions = await repos.sessionIo.listActions(sessionId)
@@ -560,7 +587,13 @@ export function createAssessmentSessionService({
         // P4.3: a universal run validates the board patch against the schema
         // (participants, rows, statuses, dependencies) without completing any
         // field on the learner's behalf.
-        const run = await draftRun(sessionId, session)
+        let run
+        try {
+          run = assertRunSupported(await draftRun(sessionId, session))
+        } catch (err) {
+          await failed(action, err)
+          throw err
+        }
         const universal = isUniversalRun(run)
         if (universal && updates != null) {
           const check = validateBoardPatch(run.snapshot.form, updates)
@@ -624,7 +657,7 @@ export function createAssessmentSessionService({
         if (!existing && exchanges < required && !early) {
           throw new ApiError('FINISH_CONFIRMATION_REQUIRED', 'You have not reached every part of this assessment yet.', { details: { exchanges, requiredExchanges: required } })
         }
-        if (!run.snapshot) throw new ApiError('UPSTREAM_UNAVAILABLE', 'The review could not be completed.')
+        assertRunSupported(run)
         const io = jobs()
         if (!existing) {
           await io.acceptAction({ sessionId, clientEventId: 'finish', kind: 'FINISH', payload: { early: exchanges < required } }).catch((err) => { if (err?.code !== 'CONFLICT') throw err })
@@ -664,6 +697,8 @@ export function createAssessmentSessionService({
   }
   return {
     ...service,
+    // One evaluation worker pass (operators/tests drive it; finish() drives it inline).
+    runEvaluationWorkerOnce,
     start(args) {
       requireStore()
       return withLock(`assignment:${args.assignmentId}:${args.user.id}`, () => service.start(args))

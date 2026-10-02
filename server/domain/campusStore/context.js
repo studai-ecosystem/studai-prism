@@ -29,6 +29,9 @@ import { createValidationService } from '../validation/service.js'
 import { createPreparationService } from '../preparation/service.js'
 import { createGrantService } from '../commerce/grants.js'
 import { createPreviewService } from '../commerce/preview.js'
+import { createReleaseGate } from '../release/config.js'
+import { buildRunPin } from '../assessments/draftSegments.js'
+import { contentRegistry } from '../content/versions.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 // Account directory (read-only) for admin views: `{ id, name, email }` or null.
@@ -97,6 +100,26 @@ export function createCampusContext({
   const auditWriter = audit || auditLog
   const dataAccess = createDataAccessAudit({ repos })
   const development = createDevelopmentService({ repos: storeView, evaluator: missionEvaluator, clock, audit: auditWriter, sourceSession: async (sessionId) => (legacy.getSession ? legacy.getSession(sessionId) : null) })
+  // P10.2 release gate for NEW universal/draft runs. Probes report facts this
+  // process can actually observe; anything else stays UNVERIFIED. Migration
+  // state is not probed here (the diagnostic script does that read-only).
+  const hasFns = (obj, names) => Boolean(obj) && names.every((n) => typeof obj[n] === 'function')
+  const releaseGate = createReleaseGate({
+    probes: {
+      player: ({ scenarioId }) => { try { return Boolean(buildRunPin({ formId: null, scenarioId }).methodVersion) } catch { return false } },
+      durableWriter: () => hasFns(liveRepos()?.sessionIo, ['acceptAction', 'enqueueJob', 'allocateRunTiming', 'listOpportunities', 'hasErasureMarker']),
+      migrationsApplied: async () => { const r = liveRepos(); return typeof r?.listAppliedMigrations === 'function' ? r.listAppliedMigrations() : null },
+      evaluator: () => Boolean(sliceEvaluator),
+      publication: () => hasFns(liveRepos()?.reportVersions, ['append', 'latest']),
+      contentState: async ({ scenarioId }) => {
+        const formId = (await catalog.getCatalog()).forms.find((f) => f.scenarioId === scenarioId)?.id || null
+        return formId ? contentRegistry.stateOf(formId) : null
+      },
+      // The evaluation worker runs in-process from finish(); it is reachable
+      // exactly when the evaluator and the durable job store are present.
+      worker: () => (sliceEvaluator && hasFns(liveRepos()?.sessionIo, ['claimJob', 'completeJob']) ? true : null),
+    },
+  })
   const developmentOn = () => isEnabled('PRISM_DEVELOPMENT_V2') && Boolean(liveRepos())
   // Practice evidence reaches the student read models only while Development V2 is on.
   const practiceSource = practice || { list: async (user, workspace) => (developmentOn() ? development.listPractice(user, workspace) : []) }
@@ -166,7 +189,7 @@ export function createCampusContext({
     preview: createPreviewService({ repos: storeView, clock, telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }) }),
     sessions: engine
       ? createAssessmentSessionService({
-        repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter, sliceEvaluator,
+        repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter, sliceEvaluator, releaseGate,
         onSponsoredCompleted: ({ organizationId, assignmentId }) => admin.checkCompletionThresholds(organizationId, assignmentId),
       })
       : null,

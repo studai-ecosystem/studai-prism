@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import { readdir } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { checkStudentFlowFlags } from './check-student-flow-flags.mjs'
+import { readiness, stageConfig } from '../server/domain/release/config.js'
 
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const { z } = require('zod')
@@ -146,12 +147,30 @@ export async function inspectDatabase(client) {
   }
 }
 
-export function baselineReport(env, database = null) {
+// P10.2: safe effective release readiness. Only facts this read-only
+// diagnostic can observe become READY/NOT_READY; everything else (worker,
+// evaluator, publication, content approval) stays UNVERIFIED here.
+function releaseReadiness(env, database, stage) {
+  const migrations = database?.status === 'AVAILABLE' && database.migrations
+    ? database.migrations.pending === 0 && database.migrations.unknown === 0 : null
+  return readiness({
+    env, stage,
+    checks: {
+      player: null, evaluator: null, publication: null, contentState: null, worker: null,
+      durableWriter: database?.status === 'AVAILABLE' ? true : database?.status === 'INCOMPATIBLE' ? false : null,
+      migrationsApplied: migrations === true ? ['0040_candidate_actions_jobs'] : migrations === false ? [] : null,
+    },
+  })
+}
+
+export function baselineReport(env, database = null, { stage = env.PRISM_RELEASE_STAGE || 'LOCAL' } = {}) {
   const config = configuration(env)
+  const parsed = database === null ? { status: 'UNVERIFIED' } : Database.parse(database)
   return {
     kind: 'P0_DIAGNOSTIC_NOT_RELEASE_APPROVAL',
     configuration: config,
-    database: database === null ? { status: 'UNVERIFIED' } : Database.parse(database),
+    database: parsed,
+    release: releaseReadiness(env, parsed, stage),
     build: 'OPERATOR_PROVENANCE_REQUIRED',
     worker: 'UNVERIFIED_NO_DURABLE_WORKER_PROBE',
     contentApproval: 'HUMAN_REVIEW_REQUIRED',
@@ -167,9 +186,18 @@ export async function runDiagnostic({ args = [], env = process.env, clientFactor
   let client
   let output
   let failed = false
+  let stage = env.PRISM_RELEASE_STAGE || 'LOCAL'
   try {
-    if (args.some((arg) => arg !== '--database') || args.length > 1) throw new Error('DIAGNOSTIC_INVALID_ARGUMENTS')
-    if (args.includes('--database')) {
+    // Accepted: `--database` (once) and `--stage <LOCAL|STAGING|...>` (once).
+    // Anything else — in particular identifiers or connection strings — is refused.
+    let wantDatabase = false
+    let sawStage = false
+    for (let i = 0; i < args.length; i += 1) {
+      if (args[i] === '--database' && !wantDatabase) { wantDatabase = true; continue }
+      if (args[i] === '--stage' && !sawStage && stageConfig(args[i + 1] || '')) { stage = stageConfig(args[i + 1]).stage; sawStage = true; i += 1; continue }
+      throw new Error('DIAGNOSTIC_INVALID_ARGUMENTS')
+    }
+    if (wantDatabase) {
       if (!env.PRISM_DIAGNOSTIC_DATABASE_URL?.trim()) throw new Error('DIAGNOSTIC_DATABASE_NOT_CONFIGURED')
       const factory = clientFactory || ((connectionString) => {
         const { Client } = require('pg')
@@ -177,19 +205,19 @@ export async function runDiagnostic({ args = [], env = process.env, clientFactor
       })
       client = factory(env.PRISM_DIAGNOSTIC_DATABASE_URL)
       await client.connect()
-      output = baselineReport(env, await inspectDatabase(client))
-    } else output = baselineReport(env)
+      output = baselineReport(env, await inspectDatabase(client), { stage })
+    } else output = baselineReport(env, null, { stage })
   } catch (error) {
     failed = true
     const allowed = ['DIAGNOSTIC_INVALID_ARGUMENTS', 'DIAGNOSTIC_DATABASE_NOT_CONFIGURED']
-    output = { ...baselineReport(env), database: {
+    output = { ...baselineReport(env, null, { stage }), database: {
       status: 'ERROR', code: allowed.includes(error.message) ? error.message : 'DIAGNOSTIC_READ_FAILED',
     } }
   } finally {
     if (client) {
       try { await client.end() } catch {
         failed = true
-        output = { ...baselineReport(env), database: { status: 'ERROR', code: 'DIAGNOSTIC_CONNECTION_CLOSE_FAILED' } }
+        output = { ...baselineReport(env, null, { stage }), database: { status: 'ERROR', code: 'DIAGNOSTIC_CONNECTION_CLOSE_FAILED' } }
       }
     }
   }

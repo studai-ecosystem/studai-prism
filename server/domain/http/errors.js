@@ -37,6 +37,11 @@ export const ERROR_STATUS = Object.freeze({
   // P6 practice: a bounded allowance is used up / no unfamiliar setting left.
   ALLOWANCE_EXHAUSTED: 409,
   NO_FRESH_CHALLENGE: 409,
+  // P10.2/P10.5 release gates: a new run is refused before any credit moves;
+  // a pinned run whose method this build no longer carries fails closed
+  // (never a legacy-engine fallback).
+  RUN_NOT_ALLOCATABLE: 503,
+  RUN_VERSION_UNSUPPORTED: 409,
   NOT_IMPLEMENTED: 501,
   INTERNAL: 500,
 })

@@ -39,6 +39,9 @@ export function createMemoryCampusRepos(options = {}) {
   return {
     kind: 'memory',
     db,
+    // P10.2 readiness probe: the memory store carries every repo the current
+    // schema needs, so it reports the required floor as applied.
+    listAppliedMigrations: async () => ['0040_candidate_actions_jobs', '0043_run_timing', '0044_opportunity_ledger'],
     organizations: createOrganizationsRepoMemory(db),
     memberships: createMembershipsRepoMemory(db),
     workspaces: createWorkspacesRepoMemory(db),
@@ -66,8 +69,16 @@ export function createMemoryCampusRepos(options = {}) {
 
 export function createPgCampusRepos({ query, getPool, getLockPool }) {
   const deps = { query, getPool }
+  // P10.2 readiness probe (read-only, cached briefly): applied migration names.
+  let migrationsCache = null
   return {
     kind: 'pg',
+    async listAppliedMigrations() {
+      if (migrationsCache && Date.now() - migrationsCache.at < 60_000) return migrationsCache.names
+      const { rows } = await query('SELECT name FROM schema_migrations ORDER BY name')
+      migrationsCache = { at: Date.now(), names: rows.map((r) => r.name) }
+      return migrationsCache.names
+    },
     organizations: createOrganizationsRepoPg(deps),
     memberships: createMembershipsRepoPg(deps),
     workspaces: createWorkspacesRepoPg(deps),

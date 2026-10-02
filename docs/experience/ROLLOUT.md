@@ -266,3 +266,64 @@ handoff. No runtime, credits, flags, schema, scoring, evidence, authorization or
 retention behaviour was changed. No fresh build, unit/server/database/browser
 tests, live-model calls or production checks were run for this documentation-only
 work. Pending human gates and existing full-journey NO-GO are preserved.
+
+## P10 release configuration and go/no-go
+
+Appended by P10 (code-safe work only; nothing deployed, no flag flipped).
+
+**Release configuration v1** (`server/domain/release/config.js`): stages
+`LOCAL`, `STAGING`, `INTERNAL_CANARY`, `EXTERNAL_PILOT`, `WIDER`, each with a
+required flag set (growth is never required) and six readiness checks:
+`COMPATIBLE_PLAYER`, `DURABLE_WRITER` (store surface + migrations >= 0040),
+`EVALUATOR`, `PUBLICATION`, `APPROVED_CONTENT` (content state >= the stage
+minimum: DRAFT locally/staging, APPROVED_FOR_PILOT for canary/pilot,
+APPROVED_FOR_INTENDED_USE for wider), `WORKER_REACHABILITY`. Each check is
+`READY | NOT_READY | UNVERIFIED`; UNVERIFIED is never collapsed into READY.
+`sessionService.start` calls `assertAllocatable()` for NEW universal/draft runs
+BEFORE any seat is reserved or credit consumed -> `RUN_NOT_ALLOCATABLE` (503,
+state-only details). The legacy start path is unchanged. Diagnostic:
+`node scripts/check-experience-baseline.mjs [--database] [--stage <stage>]`
+now reports `release` (safe, no secrets); unprobed checks stay UNVERIFIED.
+
+**Migration rehearsal** (`node scripts/rehearse-migrations.mjs`): on a new
+throwaway embedded-postgres cluster, up all (head 0049_preview_attempts) ->
+down 0049..0040 one by one -> up again; schema identical and idempotent; every
+0040+ migration has a `.down.sql`; no pre-0040 table is dropped
+(`server/test/migrationsReversible.test.js`). This is a schema rehearsal with
+no data; backup/restore and production migration-resume evidence remain
+operator-owned.
+
+**Rollback safety** (`server/domain/release/rollback.js`): `rollbackPlan`
+orders stop-new-allocations -> inventory -> drain/pin active runs -> preserve
+readers/shares -> disable serving flags only when `canDisable()` -> reviewed
+recovery disposition -> customer communication -> schema rollback as a separate
+review. `canDisable(flag, activeRuns)` is false while active V3 runs exist. A
+universal run pinned to a method this build does not carry fails with
+`RUN_VERSION_UNSUPPORTED` and is never handed to the legacy engine; a model
+result arriving after an erasure marker is never written; stale fencing tokens
+cannot complete; payment webhooks stay idempotent after rollback
+(`server/test/rollback.test.js`).
+
+**Retirement inventory** (`node scripts/route-usage-inventory.mjs`, no
+deletion): LEGACY_CREATION (`/assessment`, `/payment`, `/workspace/:sessionId`,
+`/missions*`, `/explore`, `/api/assessment`, `/api/payment`), LEGACY_READER
+(`/score`, `/report/:sessionId/v2`, `/report/:sessionId/employee`,
+`/shared/:token` - keep), V3 (`/app/*`, `/api/v1`).
+Drain-window criteria before any LEGACY_CREATION removal: no active V3 run
+depends on the route (`canDisable` true for every serving flag); zero new
+sessions through LEGACY_CREATION routes for an operator-agreed window (proposal
+14 days) measured from route telemetry; route tests green on the deployment
+candidate (`server/test/legacyReadersRetained.test.js`); every LEGACY_READER
+still serves owned reports and approved shares; operator sign-off recorded here
+(HA-C007 covers the deploy). Readers are never retirement candidates.
+
+**Monitoring/support**: alert definitions in `server/domain/release/alerts.js`
+(operational view only), triage paths in `docs/experience/SUPPORT_RUNBOOK.md`,
+manual journey URLs with placeholders in `docs/experience/MANUAL_JOURNEYS.md`
+(untested in production).
+
+**Go/no-go** (`server/domain/release/goNoGo.js`): verdict from readiness plus
+HA-C001-HA-C013 statuses; every human gate defaults to OPEN; any OPEN gate of
+the stage, missing flag, NOT_READY or UNVERIFIED required check -> `NO_GO`.
+Current verdict for every stage above LOCAL: **NO_GO** (all human gates OPEN,
+real environment UNVERIFIED). Nothing in P10 closes or weakens HA-C001-HA-C013.

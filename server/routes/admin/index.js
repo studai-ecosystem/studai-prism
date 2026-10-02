@@ -51,6 +51,7 @@ import accommodationsRouter from './accommodations.js'
 import marginRouter from './margin.js'
 import organizationsRouter from './organizations.js'
 import validationRouter from './validation.js'
+import qualityRouter from './quality.js'
 
 const router = Router()
 
@@ -139,5 +140,7 @@ router.use('/margin', marginRouter)
 router.use('/organizations', organizationsRouter)
 // Campus Phase 12 — blinded double-rating queue for V3 evidence (dark behind PRISM_V3_RATING_QUEUE).
 router.use('/validation', validationRouter)
+// P9.1 — three independent quality views (aggregate counts only).
+router.use('/quality', qualityRouter)
 
 export default router

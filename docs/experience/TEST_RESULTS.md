@@ -1,5 +1,19 @@
 # P0 - Verification results
 
+## P9-P10 checkpoint - 2026-10-03
+
+| Check | Layer | Result |
+| --- | --- | --- |
+| `npm --prefix server test` | A | 808: 783 pass, 0 fail, 25 DB skips (new: metricsDefinitions 12, qualityViews 4, faultInjection 12, metricsAlerts 5, release/rollback/migrationsReversible/legacyReadersRetained 37) |
+| `npm run test:unit` | A | 35 files, 474 pass |
+| `npm run build`, `audit:static`, `audit:flow-flags` | Build/static/config | PASS |
+| `node scripts/rehearse-migrations.mjs` | B (disposable cluster) | REHEARSED: up 49, idempotent re-up 0, down 0049→0040 one by one, up again 10, schema identical, missingDown [] |
+| `check-experience-baseline.mjs --stage INTERNAL_CANARY` | Diagnostic | allocatable:false; blockers listed (flags off, checks UNVERIFIED); no secrets |
+| `live-model-smoke.mjs` | C | BLOCKED (6 named blockers); no transcript fabricated |
+| `load-pilot.mjs` | - | REFUSED without target + --synthetic (by design) |
+| `browser-all` (4 projects, isolated) | A UI + journeys | see entry below when complete |
+
+
 ## P4-P5 checkpoint - 2026-10-03
 
 | Check | Layer | Result |

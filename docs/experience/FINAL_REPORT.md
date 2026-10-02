@@ -1,4 +1,37 @@
-# P0 diagnostic-only handoff
+# Programme handoff - P0 to P10 (code-safe)
+
+**Local implementation of P0-P10 is complete and verified at Layers A and B. Release verdict: NO-GO**
+(`domain/release/goNoGo.js`) until the human gates listed in IMPLEMENTATION_STATE close. No deployment,
+flag flip, push, live-model spend, production migration, pricing activation or participant contact occurred.
+
+## Commits on `ui/prism-brand-transformation`
+| Phase | Commit | Summary |
+| --- | --- | --- |
+| P0 | `ff6002c` | diagnostic baseline, read-only tooling, 112-ID ledger |
+| P1 | `9d68738` | identity/history, durable actions (0040), erasure cascade, reconciliation |
+| P2-P5 | `2079629` | evidence slice, jobs/publication (0041), practice origin (0042), timing/begin (0043), universal form + Director + ledger (0044), review requests (0045), Your Prism report |
+| P6-P7 | `b9a97e4` | ten draft missions, meaning evaluator, replay/challenge, allowance (0046), private preparation + self-report (0047) |
+| P8 | `c2a38dd` | product grants (0048), webhook idempotency, free first experience (0049), intent onboarding, offer/checkout config, Campus content gate |
+| P9-P10 | this commit | metrics/events/alerts, fault suite, load/live harnesses, release config, rollback, migration rehearsal, retirement inventory, runbooks |
+
+## Final verification (this checkout)
+Server 808 tests: 783 pass / 0 fail / 25 DB-gated skips. Frontend 35 files, 474 pass. Build, static audit,
+flag check PASS. Isolated PostgreSQL (embedded, 49 migrations) 6/6 incl. real scorer, erasure cascade,
+durable actions. Browser (isolated, 4 projects): p1 set 124/0; full `browser-all` recorded in TEST_RESULTS.
+Migration rehearsal: up 49 → down to 0040 → up, schema identical. Layer C: BLOCKED (no authorization).
+
+## Invariants preserved
+No fourth player (V3 `AssessmentPlayerPage` canonical; legacy readers/adapters retained); Report V3 evolved
+in place with immutable versions; one history projection (no second store); practice/preparation/self-report
+isolated from formal evidence; legacy scoring/stimulus/35-minute timing byte-identical for legacy runs;
+sufficiency floors unchanged; all new content DRAFT behind `PRISM_DRAFT_CONTENT`; prices unchanged.
+
+## Next human actions
+See IMPLEMENTATION_STATE "What remains" and ROLLOUT "P10 release configuration and go/no-go";
+SUPPORT_RUNBOOK and MANUAL_JOURNEYS for operators; RESEARCH_PROTOCOLS / VALIDATION_PLAN for the
+measurement lead and product owner.
+
+---
 
 ## Current P1 handoff checkpoint - 2026-10-02
 
