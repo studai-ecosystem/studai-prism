@@ -17,7 +17,7 @@ flag flip, push, live-model spend, production migration, pricing activation or p
 ## Final verification (this checkout)
 Server 808 tests: 783 pass / 0 fail / 25 DB-gated skips. Frontend 35 files, 474 pass. Build, static audit,
 flag check PASS. Isolated PostgreSQL (embedded, 49 migrations) 6/6 incl. real scorer, erasure cascade,
-durable actions. Browser (isolated, 4 projects): p1 set 124/0; full `browser-all` recorded in TEST_RESULTS.
+durable actions. Browser (isolated, 4 projects): full `browser-all` 803 passed / 0 failed / 3 flaky-on-retry / 18 skipped.
 Migration rehearsal: up 49 → down to 0040 → up, schema identical. Layer C: BLOCKED (no authorization).
 
 ## Invariants preserved

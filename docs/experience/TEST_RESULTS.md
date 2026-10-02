@@ -11,7 +11,7 @@
 | `check-experience-baseline.mjs --stage INTERNAL_CANARY` | Diagnostic | allocatable:false; blockers listed (flags off, checks UNVERIFIED); no secrets |
 | `live-model-smoke.mjs` | C | BLOCKED (6 named blockers); no transcript fabricated |
 | `load-pilot.mjs` | - | REFUSED without target + --synthetic (by design) |
-| `browser-all` (4 projects, isolated) | A UI + journeys | see entry below when complete |
+| `browser-all` (4 projects, isolated) | A UI + journeys | **803 passed, 0 failed, 3 flaky (passed on retry: one axe timing, two firefox navigation timeouts), 18 skipped (ui-matrix non-chromium / DB-gated)** — 35.4 min, commit ace35a2 |
 
 
 ## P4-P5 checkpoint - 2026-10-03
