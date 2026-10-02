@@ -201,9 +201,12 @@ describe('AppRouter — PRISM_APP_SHELL_V3 on', () => {
     renderApp(app, { route: '/app' })
     expect(await screen.findByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening), Synthetic$/ })).toBeInTheDocument()
     expect(screen.getByTestId('where')).toHaveTextContent('/app/home')
-    // A new learner (no owned history) is offered the intention chooser; the
-    // supported first experience is the assessment, by the server's link.
-    const chooser = screen.getByTestId('intent-chooser')
+    // A new learner (no owned history) first meets the skippable intent step
+    // (P8.2); skipping it offers the intention chooser, whose supported first
+    // experience is the assessment, by the server's link.
+    const step = await screen.findByTestId('intent-step')
+    await userEvent.click(within(step).getByRole('button', { name: 'Skip for now' }))
+    const chooser = await screen.findByTestId('intent-chooser')
     expect(within(chooser).getByRole('heading', { name: 'What would you like to do?' })).toBeInTheDocument()
     expect(within(chooser).getByRole('link', { name: 'Take the assessment' })).toHaveAttribute('href', '/payment')
     expect(within(chooser).getByRole('link', { name: 'See practice missions' })).toHaveAttribute('href', '/app/development')

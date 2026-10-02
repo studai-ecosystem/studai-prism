@@ -133,6 +133,8 @@ export function buildApp(v1Deps = {}) {
   const globalJson = express.json({ limit: '2mb' })
   app.use((req, res, next) => {
     if (req.path === '/api/assessment/send-report') return next()
+    // The payment webhook verifies an HMAC over the RAW body (its own parser).
+    if (req.path === '/api/payment/webhook') return next()
     return globalJson(req, res, next)
   })
 

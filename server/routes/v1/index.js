@@ -21,6 +21,7 @@ import { createGrowthRouter } from './growth.js'
 import { createAnalyticsRouter } from './analytics.js'
 import { createBillingRouter } from './billing.js'
 import { createPreparationRouter } from './preparation.js'
+import { createPreviewRouter } from './preview.js'
 
 export function createV1Router(deps = {}) {
   const requireUser = deps.requireUser || defaultRequireUser
@@ -44,6 +45,7 @@ export function createV1Router(deps = {}) {
   router.use(createAnalyticsRouter({ requireUser, campus }))
   router.use(createBillingRouter({ requireUser, campus }))
   router.use(createPreparationRouter({ requireUser, campus }))
+  router.use(createPreviewRouter({ requireUser, campus }))
   router.use(createOrgInvitesRouter({ requireUser, campus }))
   router.use(createStudentRouter({ requireUser, campus }))
   router.use(createTelemetryRouter({ requireUser, campus }))

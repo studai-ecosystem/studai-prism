@@ -10,6 +10,10 @@ import { iso } from '../campusStore/pgUtil.js'
 export const STUDENT_EVENTS = Object.freeze([
   'invite_received', 'membership_accepted', 'briefing_opened', 'assessment_started', 'assessment_resumed',
   'assessment_completed', 'report_viewed', 'mission_started', 'mission_completed', 'reassessment_started', 'reassessment_completed',
+  // P8.9 voluntary-value funnel: preview → offer → purchase. Pseudonymous ids,
+  // enums and counts only; never answer text, prices typed by a person, or
+  // payment identifiers.
+  'preview_started', 'preview_completed', 'preview_claimed', 'offer_viewed', 'checkout_started', 'purchase_completed', 'purchase_failed',
 ])
 export const CAMPUS_EVENTS = Object.freeze([
   'org_created', 'students_imported', 'program_created', 'assignment_created', 'assignment_launched',
@@ -33,6 +37,8 @@ export const PROP_RULES = Object.freeze({
   scope: (v) => v === 'PERSONAL' || v === 'SPONSORED',
   surface: (v) => typeof v === 'string' && ENUM.test(v),
   outcome: (v) => typeof v === 'string' && ENUM.test(v),
+  productCode: (v) => typeof v === 'string' && ENUM.test(v),
+  fundingSource: (v) => typeof v === 'string' && ENUM.test(v),
   count: isCount,
   at: (v) => typeof v === 'string' && ISO.test(v),
 })

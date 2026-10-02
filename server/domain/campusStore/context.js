@@ -27,6 +27,8 @@ import { createAnalyticsService } from '../analytics/service.js'
 import { createBillingService } from '../billing/service.js'
 import { createValidationService } from '../validation/service.js'
 import { createPreparationService } from '../preparation/service.js'
+import { createGrantService } from '../commerce/grants.js'
+import { createPreviewService } from '../commerce/preview.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 // Account directory (read-only) for admin views: `{ id, name, email }` or null.
@@ -159,6 +161,9 @@ export function createCampusContext({
       },
     }),
     telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }),
+    // P8: product grants over the ledger, and the guest free first experience.
+    commerce: createGrantService({ repos: storeView, ledger, clock, audit: auditWriter }),
+    preview: createPreviewService({ repos: storeView, clock, telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }) }),
     sessions: engine
       ? createAssessmentSessionService({
         repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter, sliceEvaluator,

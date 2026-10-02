@@ -32,6 +32,7 @@ import { createBillingRepoMemory, createBillingRepoPg } from '../billing/reposit
 import { createValidationRepoMemory, createValidationRepoPg } from '../validation/repository.js'
 import { createPreparationRepoMemory, createPreparationRepoPg } from '../preparation/repository.js'
 import { createMemorySessionLocks, createPgSessionLocks } from '../assessments/sessionLocks.js'
+import { createCommerceRepoMemory, createCommerceRepoPg } from '../commerce/repository.js'
 
 export function createMemoryCampusRepos(options = {}) {
   const db = options.db || createMemoryDb(options)
@@ -59,6 +60,7 @@ export function createMemoryCampusRepos(options = {}) {
     billing: createBillingRepoMemory(db),
     validation: createValidationRepoMemory(db),
     preparation: createPreparationRepoMemory(db),
+    commerce: createCommerceRepoMemory(db),
   }
 }
 
@@ -89,5 +91,6 @@ export function createPgCampusRepos({ query, getPool, getLockPool }) {
     billing: createBillingRepoPg(deps),
     validation: createValidationRepoPg(deps),
     preparation: createPreparationRepoPg(deps),
+    commerce: createCommerceRepoPg(deps),
   }
 }

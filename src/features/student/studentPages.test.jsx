@@ -6,7 +6,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Routes, Route } from 'react-router-dom'
 import { renderApp, mockFetch, meBody, signIn, jsonResponse } from '../../test/utils.jsx'
-import { studentRoutes, home, card, briefing, describedCapabilities, growth } from '../../test/studentFixtures.js'
+import { studentRoutes, home, card, briefing, describedCapabilities, growth, preferences } from '../../test/studentFixtures.js'
 import HomePage from '../home/pages/HomePage.jsx'
 import AssessmentsPage from '../assessments/pages/AssessmentsPage.jsx'
 import BriefingPage from '../assessments/pages/BriefingPage.jsx'
@@ -91,8 +91,15 @@ describe('Student Home (§9, P3.3)', () => {
     expect(within(section).queryByRole('link', { name: /View report/ })).not.toBeInTheDocument()
   })
 
-  it('a new learner (no history) chooses an intention: Understand, Practise, Prepare (not yet available)', async () => {
+  it('a new learner (no history, no saved intent) first sees the skippable intent step; skipping shows the intention chooser', async () => {
     render(<HomePage />)
+    const step = await screen.findByTestId('intent-step')
+    expect(screen.queryByTestId('intent-chooser')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('next-action')).not.toBeInTheDocument()
+    expect(within(step).getByText(/never used to measure you/)).toBeInTheDocument()
+    expect(within(step).getByLabelText(/Speaking \(speech\)/)).toBeDisabled()
+    expect(within(step).getByText(/Speech responses are not supported yet/)).toBeInTheDocument()
+    await userEvent.click(within(step).getByRole('button', { name: 'Skip for now' }))
     const chooser = await screen.findByTestId('intent-chooser')
     expect(screen.queryByTestId('next-action')).not.toBeInTheDocument()
     expect(within(chooser).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Understand', 'Practise', 'Prepare'])
@@ -102,6 +109,23 @@ describe('Student Home (§9, P3.3)', () => {
     expect(within(within(chooser).getByTestId('intent-prepare')).queryByRole('link')).not.toBeInTheDocument()
     expect(within(chooser).getByTestId('intent-prepare')).toHaveTextContent('Not yet available')
     noPercent()
+  })
+
+  it('the intent step saves segment, intention and text response mode as display-only preferences and then shows the chooser', async () => {
+    const { spy } = render(<HomePage />)
+    const step = await screen.findByTestId('intent-step')
+    await userEvent.click(within(step).getByLabelText('Student'))
+    await userEvent.click(within(step).getByLabelText(/Practise what matters next/))
+    await userEvent.click(within(step).getByRole('button', { name: 'Continue' }))
+    await screen.findByTestId('intent-chooser')
+    const put = spy.mock.calls.find(([url, init]) => String(url).includes('/api/v1/me/preferences') && init?.method === 'PUT')
+    expect(JSON.parse(put[1].body)).toEqual({ reducedMotion: false, largerText: false, segment: 'STUDENT', intention: 'PRACTISE', responseMode: 'TEXT' })
+  })
+
+  it('a new learner with a saved intent goes straight to the chooser', async () => {
+    render(<HomePage />, { routes: { '/api/v1/me/preferences': preferences({ segment: 'OTHER', intention: 'UNDERSTAND', responseMode: 'TEXT' }) } })
+    await screen.findByTestId('intent-chooser')
+    expect(screen.queryByTestId('intent-step')).not.toBeInTheDocument()
   })
 
   it('a learner with history but nothing active gets the single get-started action, not the chooser', async () => {

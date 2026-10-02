@@ -11,10 +11,23 @@ import { ROLES } from '../permissions/roles.js'
 import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../sharing/copyVersions.js'
 import { validateImport, IMPORT_LIMITS, csvCell } from './csv.js'
 import { csvRosterAdapter } from '../integrations/sis/index.js'
+import { contentRegistry } from '../content/versions.js'
 
 export const ONBOARDING_STEPS = Object.freeze(['profile', 'structure', 'team', 'students', 'program', 'assessment', 'schedule', 'privacy', 'launch'])
 export const STAFF_ROLES = Object.freeze(ROLES.filter((r) => !['STUDENT', 'PRISM_REVIEWER', 'STUDAI_ADMIN'].includes(r)))
 const APPROVED_DEFINITION_STATUSES = new Set(['active', 'APPROVED'])
+// P8.7: governed (universal) content is assignable only once a reviewer has
+// moved it to at least APPROVED_FOR_PILOT. Forms unknown to the content
+// registry (the frozen legacy bank) are governed by the catalog status alone.
+export const ASSIGNABLE_CONTENT_STATES = new Set(['APPROVED_FOR_PILOT', 'APPROVED_FOR_INTENDED_USE'])
+export function assertContentAssignable(formId, registry = contentRegistry) {
+  if (!formId || !registry.listForms().some((f) => f.formId === formId)) return null
+  const state = registry.stateOf(formId)
+  if (!ASSIGNABLE_CONTENT_STATES.has(state)) {
+    throw new ApiError('CONTENT_NOT_APPROVED', 'This content has not been approved for pilot use and cannot be assigned yet.', { status: 409, details: { formId, state } })
+  }
+  return state
+}
 const COMPLETION_THRESHOLDS = [50, 100]
 
 // The exact disclosure a student reads before a sponsored assessment
@@ -32,6 +45,8 @@ export function consentPreviewFor(organizationName) {
 export function createCampusAdminService({
   repos, users, invites, catalog, clock = () => new Date(), audit = () => {},
   sendAssignmentEmail = async () => false, appUrl = '', ledger = null,
+  // P8.7 content approval registry (tests inject one with a known state).
+  contentRegistry: registry = contentRegistry,
   // Called whenever a student is (re)attached to a cohort (Phase 8 interventions).
   onRosterSync = async () => {},
 }) {
@@ -602,6 +617,7 @@ export function createCampusAdminService({
       }
       const cat = await catalog.getCatalog()
       const form = def.formPolicy === 'FIXED_FORM' ? cat.forms.find((f) => f.definitionId === def.id && f.status === 'FROZEN') : null
+      assertContentAssignable(form?.id, registry)
       const status = windowStart > clock() ? 'SCHEDULED' : 'ACTIVE'
       const a = await repos.assessments.createAssignment({
         id: randomUUID(), definitionId: def.id, formPolicy: def.formPolicy, formId: form?.id || null, sponsorType: 'INSTITUTION', organizationId, programId,

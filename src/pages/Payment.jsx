@@ -7,10 +7,13 @@ import PrismLogo from '../components/ui/PrismLogo.jsx'
 import { SCORE_VALIDITY_MONTHS } from '../../server/lib/sharedConstants.js'
 
 const INCLUDES = [
-  { icon: Clock, text: '30-minute live AI scenario assessment' },
-  { icon: Layers, text: 'Scored across 5 workplace skill dimensions' },
-  { icon: BadgeCheck, text: 'Verifiable & shareable Prism credential' },
+  { icon: Clock, text: '30-minute live AI scenario assessment with its evidence-backed report' },
+  { icon: Layers, text: 'Four development missions of your choice, two attempts each' },
+  { icon: BadgeCheck, text: 'One fresh practice challenge; a shareable report you control' },
 ]
+
+// Paise → rupee string from the SERVER amount; never a constant in this file.
+const formatInr = (paise) => (typeof paise === 'number' && Number.isFinite(paise) ? `\u20B9${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : null)
 
 // Inject the Razorpay Checkout script once; resolves when window.Razorpay exists.
 function loadRazorpayScript() {
@@ -71,6 +74,10 @@ export default function Payment() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [dummyMode, setDummyMode] = useState(false)
+  // P8.6: amount, tax treatment, allowance, window and policy come from the
+  // server config; null = not loaded yet (shown as pending, never guessed).
+  const [offer, setOffer] = useState(null)
+  const [configState, setConfigState] = useState('loading') // loading | ready | error
   const [coupon, setCoupon] = useState('')
   const [couponBusy, setCouponBusy] = useState(false)
   const [couponError, setCouponError] = useState(null)
@@ -101,14 +108,25 @@ export default function Payment() {
   // Surface test/dummy mode so nobody thinks a real charge happens (the server
   // decides the mode — the client only displays it).
   useEffect(() => {
+    let cancelled = false
     fetch('/api/payment/config')
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((cfg) => setDummyMode(Boolean(cfg.dummyMode)))
-      .catch(() => {})
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('config'))))
+      .then((cfg) => {
+        if (cancelled) return
+        setDummyMode(Boolean(cfg.dummyMode))
+        setOffer(cfg.offer || { amount: cfg.amount, currency: cfg.currency, purchasable: true, taxTreatment: null, windowDays: null, included: null, limits: [], policy: null })
+        setConfigState('ready')
+      })
+      .catch(() => { if (!cancelled) setConfigState('error') })
+    return () => { cancelled = true }
   }, [])
 
+  const amountLabel = formatInr(offer?.amount)
+  const purchasable = Boolean(offer?.purchasable)
+  const inc = offer?.included || null
+
   const handlePay = async () => {
-    if (loading) return
+    if (loading || !purchasable) return
     setLoading(true)
     setError(null)
     try {
@@ -178,13 +196,17 @@ export default function Payment() {
           </div>
 
           {/* Summary card */}
-          <div className="rounded-2xl border border-[var(--prism-border)] bg-[var(--prism-canvas)] overflow-hidden">
-            <div className="px-6 py-5 border-b border-[var(--prism-border)] flex items-center justify-between">
+          <div className="rounded-2xl border border-[var(--prism-border)] bg-[var(--prism-canvas)] overflow-hidden" data-testid="checkout-summary">
+            <div className="px-6 py-5 border-b border-[var(--prism-border)] flex items-center justify-between gap-4">
               <div>
-                <p className="font-sans font-semibold text-sm text-[var(--prism-ink)]">30-minute Prism Assessment</p>
-                <p className="font-sans text-xs text-[var(--prism-ink-muted)] mt-0.5">One-time · Score valid {SCORE_VALIDITY_MONTHS} months</p>
+                <p className="font-sans font-semibold text-sm text-[var(--prism-ink)]">{offer?.title || 'Personal development sprint'}</p>
+                <p className="font-sans text-xs text-[var(--prism-ink-muted)] mt-0.5">
+                  One-time · {offer?.windowDays ? `${offer.windowDays}-day activity window · ` : ''}Report valid {SCORE_VALIDITY_MONTHS} months
+                </p>
               </div>
-              <p className="font-serif text-2xl text-[var(--prism-ink)]">₹499</p>
+              <p className="font-serif text-2xl text-[var(--prism-ink)] tabular-nums" data-testid="checkout-amount">
+                {configState === 'loading' ? 'Loading…' : amountLabel || 'Not available'}
+              </p>
             </div>
 
             <ul className="px-6 py-5 flex flex-col gap-3">
@@ -196,25 +218,59 @@ export default function Payment() {
               ))}
             </ul>
 
+            <dl className="px-6 pb-5 grid grid-cols-1 gap-2 font-sans text-xs text-[var(--prism-ink-muted)]" data-testid="checkout-terms">
+              <div className="flex justify-between gap-4">
+                <dt>Allowance</dt>
+                <dd className="text-right text-[var(--prism-ink)]">
+                  {inc ? `Formal assessment ×${inc.formalAssessments} · missions ×${inc.missionsSelectable} (${inc.attemptsPerMission} attempts each) · fresh challenge ×${inc.freshChallenges}` : 'Pending'}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>Activity window</dt>
+                <dd className="text-right text-[var(--prism-ink)]">{offer?.windowDays ? `${offer.windowDays} days; your report stays readable afterwards` : 'Pending'}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>Tax treatment</dt>
+                <dd className="text-right text-[var(--prism-ink)]" data-testid="checkout-tax">{configState !== 'ready' ? 'Pending' : offer?.taxTreatment || 'Tax treatment to be confirmed'}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>Recovery / review</dt>
+                <dd className="text-right text-[var(--prism-ink)]">{offer?.policy ? `${offer.policy.recovery}; ${offer.policy.review}. Policy ${String(offer.policy.status || '').toLowerCase()}, pending approval.` : 'Pending'}</dd>
+              </div>
+              {(offer?.limits || []).map((l) => (
+                <div key={l} className="flex gap-2"><dt className="sr-only">Limit</dt><dd>· {l}</dd></div>
+              ))}
+            </dl>
+
             <div className="px-6 py-4 border-t border-[var(--prism-border)] flex items-center justify-between bg-prism-surface">
               <span className="font-sans text-sm font-semibold text-[var(--prism-ink)]">Total</span>
-              <span className="font-sans text-sm font-semibold text-[var(--prism-ink)]">₹499</span>
+              <span className="font-sans text-sm font-semibold text-[var(--prism-ink)] tabular-nums">{configState === 'loading' ? '…' : amountLabel || 'Not available'}</span>
             </div>
           </div>
 
+          {configState === 'error' && (
+            <p className="font-sans text-sm text-[var(--status-blocked-ink)] text-center mt-4" role="alert">
+              The offer could not be loaded, so checkout is paused. Please reload the page or try again later.
+            </p>
+          )}
+          {configState === 'ready' && !purchasable && (
+            <p className="font-sans text-sm text-[var(--prism-ink-muted)] text-center mt-4" role="status" data-testid="checkout-unavailable">
+              This package is not available for purchase yet.
+            </p>
+          )}
           {error && (
             <p className="font-sans text-sm text-[var(--status-blocked-ink)] text-center mt-4">{error}</p>
           )}
 
           <motion.button
             onClick={handlePay}
-            disabled={loading}
-            className="mt-6 w-full py-4 rounded-xl bg-[var(--prism-ink)] font-sans font-semibold text-sm text-[var(--prism-canvas)] tracking-wide hover:opacity-90 transition-colors cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+            disabled={loading || configState !== 'ready' || !purchasable}
+            className="mt-6 w-full py-4 rounded-xl bg-[var(--prism-ink)] font-sans font-semibold text-sm text-[var(--prism-canvas)] tracking-wide hover:opacity-90 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             whileHover={loading ? {} : { scale: 1.01 }}
             whileTap={loading ? {} : { scale: 0.98 }}
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={15} />}
-            {loading ? 'Starting…' : dummyMode ? 'Continue (free preview)' : 'Pay ₹499 & Continue'}
+            {loading ? 'Starting…' : dummyMode ? 'Continue (free preview)' : amountLabel ? `Pay ${amountLabel} & Continue` : 'Checkout unavailable'}
           </motion.button>
 
           {dummyMode ? (

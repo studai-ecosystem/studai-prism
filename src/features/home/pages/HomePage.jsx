@@ -14,6 +14,7 @@ import { queryStateView } from '../../student/QueryState.jsx'
 import { PERSONAL_PRIVACY_NOTE, SPONSORED_PRIVACY_NOTE } from '../../../lib/copy/privacy.js'
 import { NextActionCard } from '../components/NextActionCard.jsx'
 import { IntentChooser } from '../components/IntentChooser.jsx'
+import { NewLearnerStart } from '../components/IntentStep.jsx'
 import { RecentActivityList } from '../components/RecentActivityList.jsx'
 
 function greeting(name) {
@@ -60,7 +61,9 @@ export default function HomePage() {
       />
       <DocumentTitle title="Home" />
       {newLearner
-        ? <IntentChooser assessmentTo={data.primaryAction.to} practiceTo="/app/development" />
+        ? (campus
+          ? <IntentChooser assessmentTo={data.primaryAction.to} practiceTo="/app/development" />
+          : <NewLearnerStart assessmentTo={data.primaryAction.to} practiceTo="/app/development" />)
         : <NextActionCard action={data.primaryAction} sponsorName={campus ? org : null} historyTo={historyTo} />}
 
       <RecentActivityList historyTo={historyTo} />

@@ -72,6 +72,10 @@ export function createEntitlementsRepoPg({ query, getPool }) {
       const { rows } = await query('SELECT * FROM entitlement_consumptions WHERE entitlement_id = $1 ORDER BY created_at ASC', [entitlementId])
       return rows.map(cons)
     },
+    async findConsumptionById(id) {
+      const { rows } = await query('SELECT * FROM entitlement_consumptions WHERE id = $1', [id])
+      return cons(rows[0]) || null
+    },
     async appendEvent({ entitlementId, userId, organizationId = null, sessionId = null, event, idempotencyKey, requireOpenReservation = false }) {
       const replayOf = async (client) => {
         const prior = await client.query('SELECT * FROM entitlement_consumptions WHERE idempotency_key = $1', [idempotencyKey])

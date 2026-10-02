@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import express, { Router } from 'express'
 import Razorpay from 'razorpay'
 import crypto from 'node:crypto'
 import jwt from 'jsonwebtoken'
@@ -6,11 +6,32 @@ import { v4 as uuidv4 } from 'uuid'
 import logger from '../lib/logger.js'
 import { createEntitlement, getReportsByUser, getSessionIdsByUser, getReport, getSession } from '../lib/store.js'
 import { getJwtSecret } from '../lib/security.js'
+import { getCommerceService, offerView, PRODUCT_CODES } from '../domain/commerce/index.js'
 
 const router = Router()
 
 const PRICE_PAISE = 49900 // ₹499 in paise (INR — the live Razorpay account settles in INR)
 const PRICE_CURRENCY = 'INR'
+// P8.4: the package a verified personal payment grants. The amount above is
+// the same test-hypothesis price the product config carries; nothing here is
+// an approved live price.
+const PURCHASE_PRODUCT = 'PERSONAL_DEVELOPMENT_SPRINT'
+
+// Additive P8.5 grant alongside the existing entitlement. A grant failure is
+// logged and never fails the already-verified payment (the entitlement is
+// the access record the launcher reads; the grant is the package record).
+async function grantAfterPayment({ userId, providerEventKey, purchaseRef, fundingSource, requestId }) {
+  try {
+    const commerce = getCommerceService()
+    const result = fundingSource === 'DEV'
+      ? await commerce.grantForDev({ userId, reference: providerEventKey, productCode: PURCHASE_PRODUCT })
+      : await commerce.grantFromPayment({ userId, providerEventKey, purchaseRef, productCode: PURCHASE_PRODUCT })
+    return result
+  } catch (err) {
+    logger.captureException(err, { msg: 'payment_grant_failed', requestId })
+    return null
+  }
+}
 
 // Dummy-payments mode (PRISM_DUMMY_PAYMENTS=true): checkout is bypassed and a
 // free session entitlement is minted instead — INCLUDING in production. Used
@@ -57,6 +78,7 @@ function getRazorpay() {
 // dev-session flow (non-production only).
 router.get('/config', (_req, res) => {
   const dummy = isDummyPayments()
+  const offer = offerView(PURCHASE_PRODUCT)
   res.json({
     enabled: Boolean(!dummy && RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
     keyId: dummy ? null : RAZORPAY_KEY_ID || null,
@@ -69,6 +91,11 @@ router.get('/config', (_req, res) => {
     // decide whether the phone-camera step exists and whether gaze warnings
     // are shown. Both default OFF.
     proctoring: { phoneCam: isPhoneCamEnabled(), gaze: isGazeEnabled() },
+    // P8.6: the offer the checkout displays — configured amount, finance
+    // tax treatment (null = to be confirmed), allowance, window, limits and
+    // the PROPOSED recovery/review policy. No tax rate lives in the client.
+    offer,
+    offers: PRODUCT_CODES.map((code) => offerView(code)),
   })
 })
 
@@ -81,7 +108,9 @@ router.post('/create-order', async (req, res) => {
       amount: PRICE_PAISE, // always use server-side amount
       currency: PRICE_CURRENCY,
       receipt: `prism_${uuidv4()}`,
-      notes: { product: 'Prism AI Assessment' },
+      // The user id in notes lets the webhook attribute a captured payment
+      // without trusting the client; no email or name is placed here.
+      notes: { product: 'Prism AI Assessment', productCode: PURCHASE_PRODUCT, userId: authUser.id },
     })
     res.json({ id: order.id, amount: order.amount, currency: order.currency })
   } catch (err) {
@@ -148,8 +177,46 @@ router.post('/verify', async (req, res) => {
     logger.captureException(err, { msg: 'payment_verify_entitlement_failed', requestId: req.requestId })
     return res.status(500).json({ error: 'Failed to register payment' })
   }
+  // P8.5: the package grant, idempotent on the provider payment id — the
+  // webhook for the same payment returns this same grant.
+  const granted = await grantAfterPayment({ userId: authUser.id, providerEventKey: `razorpay:payment:${razorpay_payment_id}`, purchaseRef: razorpay_order_id, fundingSource: 'PAID', requestId: req.requestId })
 
-  res.json({ success: true, sessionId })
+  res.json({ success: true, sessionId, grantId: granted?.grant?.id || null })
+})
+
+// ── POST /api/payment/webhook ────────────────────────────────────────────────
+// Razorpay server-to-server callback. The raw body is verified against
+// RAZORPAY_WEBHOOK_SECRET (HMAC-SHA256, x-razorpay-signature). Grants are
+// idempotent on the payment id, so a repeated or reordered delivery answers
+// 200 and never duplicates a grant. Without a configured secret the route is
+// closed (503) except in dummy-payments mode, where a reviewed fixture body
+// is accepted for tests — never a live transaction.
+router.post('/webhook', express.raw({ type: '*/*', limit: '1mb' }), async (req, res) => {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET
+  const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from(typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}))
+  if (secret) {
+    const expected = Buffer.from(crypto.createHmac('sha256', secret).update(raw).digest('hex'), 'hex')
+    let provided
+    try { provided = Buffer.from(String(req.headers['x-razorpay-signature'] || ''), 'hex') } catch { provided = Buffer.alloc(0) }
+    if (!provided.length || expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
+      return res.status(400).json({ error: 'Invalid webhook signature' })
+    }
+  } else if (!isDummyPayments()) {
+    return res.status(503).json({ error: 'Webhook not configured' })
+  }
+  let event
+  try { event = JSON.parse(raw.toString('utf8')) } catch { return res.status(400).json({ error: 'Invalid webhook body' }) }
+  const payment = event?.payload?.payment?.entity
+  if (!payment?.id) return res.status(200).json({ received: true, ignored: 'no payment entity' })
+  if (!['payment.captured', 'payment.authorized', 'order.paid'].includes(event.event)) {
+    return res.status(200).json({ received: true, ignored: event.event || 'unknown event' })
+  }
+  const userId = payment.notes?.userId
+  if (!userId || typeof userId !== 'string' || userId.length > 80) return res.status(200).json({ received: true, ignored: 'no user attribution' })
+  const granted = await grantAfterPayment({ userId, providerEventKey: `razorpay:payment:${payment.id}`, purchaseRef: payment.order_id || null, fundingSource: 'PAID', requestId: req.requestId })
+  // Payment ids and event ids never reach the log line; only outcome flags do.
+  logger.info('payment_webhook_processed', { created: Boolean(granted?.created), duplicate: Boolean(granted && !granted.created), requestId: req.requestId })
+  res.status(200).json({ received: true, duplicate: Boolean(granted && !granted.created) })
 })
 
 // ── POST /api/payment/dev-session ─────────────────────────────────────────────
@@ -166,8 +233,10 @@ router.post('/dev-session', async (req, res) => {
   const sessionId = uuidv4()
   const mode = dummy && process.env.NODE_ENV === 'production' ? 'dummy' : 'dev'
   await createEntitlement({ sessionId, mode, amount: 0, userId: authUser.id, userEmail: authUser.email })
+  // P8.5: a DEV-funded package grant keyed on the minted session (idempotent).
+  const granted = await grantAfterPayment({ userId: authUser.id, providerEventKey: sessionId, purchaseRef: null, fundingSource: 'DEV', requestId: req.requestId })
   logger.info('payment_session_minted', { sessionId, mode, requestId: req.requestId })
-  res.json({ sessionId })
+  res.json({ sessionId, grantId: granted?.grant?.id || null })
 })
 
 // ── POST /api/payment/invite/redeem ──────────────────────────────────────────

@@ -36,26 +36,34 @@ export default function HeroThesis({ onGetAssessed, onSeeHow }) {
               Capability you can <em className="not-italic text-brand-green-ink">see inside</em>.
             </h1>
             <p className="mt-5 max-w-[46ch] text-lg leading-relaxed text-prism-ink-muted">
-              Thirty minutes in realistic workplace situations with three AI colleagues. Prism observes
-              what you do, scores five skill dimensions with a panel of AI evaluators, and ties every
-              number to the moment in the conversation that earned it.
+              Understand how you work. Practise what matters next. Thirty minutes in realistic
+              workplace situations with AI colleagues; Prism observes what you do, ties every
+              conclusion to the moment that earned it, and points to one useful next behaviour.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" onClick={onGetAssessed}>
-                Take the assessment <ArrowRight size={16} aria-hidden="true" />
-              </Button>
-              <LinkButton size="lg" variant="secondary" href="mailto:institutions@studaione.com?subject=Prism%20for%20our%20institution">
-                Bring Prism to your institution
+              <LinkButton size="lg" variant="primary" to="/try">
+                Try a short situation <ArrowRight size={16} aria-hidden="true" />
               </LinkButton>
+              <Button size="lg" variant="secondary" onClick={onSeeHow}>
+                See how Prism works
+              </Button>
             </div>
-            <button
-              type="button"
-              onClick={onSeeHow}
-              className="mt-4 inline-flex min-h-6 items-center text-sm text-brand-green-ink underline underline-offset-4 hover:text-prism-ink"
-            >
-              See exactly how scoring works
-            </button>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              <button
+                type="button"
+                onClick={onGetAssessed}
+                className="inline-flex min-h-6 items-center text-brand-green-ink underline underline-offset-4 hover:text-prism-ink"
+              >
+                Take the assessment
+              </button>
+              <a
+                href="mailto:institutions@studaione.com?subject=Prism%20for%20our%20institution"
+                className="inline-flex min-h-6 items-center text-prism-ink-muted underline underline-offset-4 hover:text-prism-ink"
+              >
+                Bring Prism to your institution
+              </a>
+            </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
               <EvidenceTick>

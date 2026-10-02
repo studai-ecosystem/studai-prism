@@ -131,6 +131,8 @@ const MissionPlayerPage = lazy(() => import('../features/development/pages/Missi
 const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusInvitePage.jsx'))
 const StudentReportPage = lazy(() => import('../features/reports/pages/StudentReportPage.jsx'))
 const SharedReportPage = lazy(() => import('../features/reports/pages/SharedReportPage.jsx'))
+// P8.3 free first experience (public).
+const TryPage = lazy(() => import('../features/preview/pages/TryPage.jsx'))
 
 // Preserve the explicit legacy funnel destination through account creation.
 function RequireAuth({ children }) {
@@ -333,6 +335,7 @@ export default function AppRouter() {
 
           <Route path="/invite/:token" element={<InviteRedeem />} />
           <Route path="/" element={<LandingPage />} />
+          <Route path="/try" element={<TryPage />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/register" element={<Auth />} />
           <Route path="/payment" element={<RequireAuth><Payment /></RequireAuth>} />

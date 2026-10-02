@@ -53,6 +53,9 @@ export function createEntitlementsRepoMemory(db) {
     async listConsumptions(entitlementId) {
       return db.consumptions.filter((c) => c.entitlementId === entitlementId).map(clone)
     },
+    async findConsumptionById(id) {
+      return clone(db.consumptions.find((c) => c.id === String(id)) || null)
+    },
     // Atomic: append the event and adjust the held-seat count together.
     // requireOpenReservation (CONSUMED/RELEASED): the session must hold an
     // open RESERVED seat; an already-closed seat replays its closing row.

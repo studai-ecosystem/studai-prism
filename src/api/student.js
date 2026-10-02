@@ -225,7 +225,14 @@ const ExplorationSchema = z.object({
   evaluated: z.boolean(),
 })
 
-const PreferencesSchema = z.object({ reducedMotion: z.boolean(), largerText: z.boolean(), updatedAt: z.string().nullable() })
+const PreferencesSchema = z.object({
+  reducedMotion: z.boolean(),
+  largerText: z.boolean(),
+  segment: z.enum(['STUDENT', 'EARLY_CAREER', 'OTHER']).nullable().optional(),
+  intention: z.enum(['UNDERSTAND', 'PRACTISE', 'PREPARE']).nullable().optional(),
+  responseMode: z.enum(['TEXT']).nullable().optional(),
+  updatedAt: z.string().nullable(),
+})
 
 const GrantSchema = z.object({
   id: z.string(),

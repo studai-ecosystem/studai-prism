@@ -9,6 +9,7 @@ export const TRACKED_EVENTS = Object.freeze([
   'assessment_completed', 'report_viewed', 'mission_started', 'mission_completed', 'reassessment_started', 'reassessment_completed',
   'org_created', 'students_imported', 'program_created', 'assignment_created', 'assignment_launched',
   'cohort_report_viewed', 'intervention_created', 'reassessment_created', 'renewal_intent_recorded',
+  'preview_started', 'preview_completed', 'preview_claimed', 'offer_viewed', 'checkout_started', 'purchase_completed', 'purchase_failed',
 ])
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9:._-]{0,79}$/
@@ -24,6 +25,8 @@ const RULES = {
   scope: (v) => v === 'PERSONAL' || v === 'SPONSORED',
   surface: (v) => typeof v === 'string' && ENUM.test(v),
   outcome: (v) => typeof v === 'string' && ENUM.test(v),
+  productCode: (v) => typeof v === 'string' && ENUM.test(v),
+  fundingSource: (v) => typeof v === 'string' && ENUM.test(v),
   count: (v) => Number.isInteger(v) && v >= 0 && v <= 100000,
 }
 

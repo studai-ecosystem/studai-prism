@@ -1,5 +1,30 @@
 # Experience programme - source traceability and execution checkpoints
 
+## Current P8 checkpoint - 2026-10-03
+
+Status: **IMPLEMENTED locally; pricing/tax/policy/live payment remain external gates.**
+
+- CH-42 / T53-T55: `domain/commerce/*` PRODUCTS frozen (FREE_FIRST_EXPERIENCE; PERSONAL_DEVELOPMENT_SPRINT
+  reusing existing PRICE_PAISE 49900 as TEST_HYPOTHESIS_PENDING_APPROVAL; PROFESSIONAL_PREPARATION_PACK
+  UNAVAILABLE_PENDING_OWNER_QUOTA). Migration 0048 `product_grants`; grant idempotent on
+  provider_event_key/purchase_ref; `POST /api/payment/webhook` HMAC-verified, replay → one grant;
+  `PACKAGE_EXPIRED`/`ALLOWANCE_EXHAUSTED` gate new activity only (report reads untouched, asserted);
+  `releaseForTechnicalFailure` audited, policy PROPOSED (no refund issued). Existing ₹499 entitlement
+  semantics unchanged; `assertNewActivity` deliberately not enforced on the legacy start path.
+- CH-43 / T59: `/try` free first experience (briefing + one prompt, deterministic quoted observation,
+  one retry, HMAC scoped claim token 1h hashed at rest, `preview_attempts` 0049 with is_synthetic;
+  no formal map, no credential). Landing: "Try a short situation" / "See how Prism works"; offer table
+  shows allowance, window, limits, provisional results, policy "proposed, pending approval"; one ₹499.
+- P8.2: skippable IntentStep (segment/intention/response mode; display-only preferences).
+- P8.6: checkout reads server offer config (tax treatment null → "to be confirmed"; purchase disabled
+  when not purchasable). No tax rate in frontend.
+- CH-37 / T07/T43/T47: Campus can assign only content ≥ APPROVED_FOR_PILOT (409 CONTENT_NOT_APPROVED
+  for DRAFT); sponsor isolation from preparation/practice/self-report tested (table scan + 404).
+- T58: cost tags {mode, runIdHash, methodVersion, productCode}; `unitEconomics.contribution`;
+  telemetry allow-lists extended with pseudonymous ids only.
+
+Verification: server 754 (729/0/25 skips); frontend 35 files 474/0; isolated PG 6/6 (49 migrations).
+
 ## Current P6-P7 checkpoint - 2026-10-03
 
 Status: **IMPLEMENTED locally (DRAFT content, flag-gated); P8 in progress.**

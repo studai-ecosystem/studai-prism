@@ -13,7 +13,7 @@ import { z } from 'zod'
 import { asyncHandler } from '../../domain/http/asyncHandler.js'
 import { ApiError, ok } from '../../domain/http/errors.js'
 import { requireFlag } from '../../domain/flags/index.js'
-import { DEFAULT_PREFERENCES } from '../../domain/preferences/repository.js'
+import { DEFAULT_PREFERENCES, SEGMENTS, INTENTIONS, RESPONSE_MODES } from '../../domain/preferences/repository.js'
 import { studentScoped } from './studentScope.js'
 
 const ASSIGNMENT_ID = /^(pa_[0-9a-f]{32}|[0-9a-f-]{36})$/i
@@ -29,7 +29,15 @@ const EvidenceQuery = z.object({
   to: z.string().date().optional(),
 }).strict()
 const Acknowledge = z.object({ copyVersion: z.string().min(1).max(80), acknowledged: z.literal(true) }).strict()
-const Preferences = z.object({ reducedMotion: z.boolean(), largerText: z.boolean() }).strict()
+const Preferences = z.object({
+  reducedMotion: z.boolean(),
+  largerText: z.boolean(),
+  // P8.2 display-only intent (never a scoring input); all optional/skippable.
+  segment: z.enum(SEGMENTS).nullable().optional(),
+  intention: z.enum(INTENTIONS).nullable().optional(),
+  responseMode: z.enum(RESPONSE_MODES).nullable().optional(),
+}).strict()
+const preferencesView = (p) => ({ reducedMotion: p.reducedMotion, largerText: p.largerText, segment: p.segment ?? null, intention: p.intention ?? null, responseMode: p.responseMode ?? null, updatedAt: p.updatedAt })
 const Interests = z.object({ interests: z.record(z.number().min(0).max(1)).nullable() }).strict()
 const HistoryQuery = z.object({
   cursor: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/).optional(),
@@ -98,16 +106,14 @@ export function createStudentRouter({ requireUser, campus, clock = () => new Dat
 
   router.get('/me/preferences', shell, requireUser, requireStore, asyncHandler(async (req, res) => {
     const stored = await campus.store.preferences.getPreferences(req.user.id)
-    return ok(res, stored
-      ? { reducedMotion: stored.reducedMotion, largerText: stored.largerText, updatedAt: stored.updatedAt }
-      : { ...DEFAULT_PREFERENCES, updatedAt: null })
+    return ok(res, stored ? preferencesView(stored) : { ...DEFAULT_PREFERENCES, updatedAt: null })
   }))
 
   router.put('/me/preferences', shell, requireUser, requireStore, asyncHandler(async (req, res) => {
     const parsed = Preferences.safeParse(req.body || {})
     if (!parsed.success) throw new ApiError('VALIDATION_FAILED', 'Those preferences are not valid.')
     const saved = await campus.store.preferences.savePreferences(req.user.id, parsed.data)
-    return ok(res, { reducedMotion: saved.reducedMotion, largerText: saved.largerText, updatedAt: saved.updatedAt })
+    return ok(res, preferencesView(saved))
   }))
 
   router.get('/me/share-grants', shell, requireUser, requireStore, asyncHandler(async (req, res) => {

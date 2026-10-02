@@ -1,5 +1,23 @@
 import logger from '../../lib/logger.js'
+import { createHash } from 'node:crypto'
 import { query, isDbConfigured } from '../../db/pool.js'
+
+// P8.8 — every usage record is tagged by delivery context so cost can be
+// read by run, mode, method/model version and package. The run id is hashed
+// (never the raw session/run identifier), and unknown tags stay null.
+export const USAGE_MODES = Object.freeze(['FORMAL', 'PRACTICE', 'PREPARATION', 'SELF_REPORT', 'PREVIEW', 'SYSTEM'])
+const ENUM = /^[A-Z][A-Z0-9_]{0,39}$/
+const SHORT = /^[A-Za-z0-9][A-Za-z0-9:._-]{0,79}$/
+export const hashRunId = (runId) => (runId ? createHash('sha256').update(String(runId)).digest('hex').slice(0, 24) : null)
+
+export function usageTags({ mode = null, runId = null, methodVersion = null, productCode = null } = {}) {
+  return {
+    mode: USAGE_MODES.includes(mode) ? mode : null,
+    runIdHash: hashRunId(runId),
+    methodVersion: typeof methodVersion === 'string' && SHORT.test(methodVersion) ? methodVersion : null,
+    productCode: typeof productCode === 'string' && ENUM.test(productCode) ? productCode : null,
+  }
+}
 
 const DEFAULT_RATES = Object.freeze({
   // Promotional price through 2026-08-31; the standard rate is applied after.
@@ -57,9 +75,10 @@ export function estimateCost(modelId, usage, now = new Date()) {
   return +cost.toFixed(8)
 }
 
-export function recordUsage({ task, modelId, response, fallback = false, sessionId = null }) {
+export function recordUsage({ task, modelId, response, fallback = false, sessionId = null, tags = {} }) {
   const usage = response?.usage || {}
   const costUsd = estimateCost(modelId, usage)
+  const tagged = usageTags({ runId: sessionId, ...tags })
   const record = {
     provider: 'aws-bedrock',
     task,
@@ -72,6 +91,7 @@ export function recordUsage({ task, modelId, response, fallback = false, session
     cacheWriteInputTokens: Number(usage.cacheWriteInputTokens) || 0,
     latencyMs: Number(response?.metrics?.latencyMs) || null,
     estimatedCostUsd: costUsd,
+    ...tagged,
   }
   logger.info('ai_usage', record)
   // Charter §23: persist per-call usage into the queryable margin plane.
@@ -82,11 +102,11 @@ export function recordUsage({ task, modelId, response, fallback = false, session
     query(
       `INSERT INTO ai_usage_events
          (session_id, task, provider, model_id, fallback, input_tokens, output_tokens,
-          cache_read_tokens, cache_write_tokens, latency_ms, estimated_cost_usd)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          cache_read_tokens, cache_write_tokens, latency_ms, estimated_cost_usd, tags_json)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
       [sessionId || null, task, record.provider, modelId, Boolean(fallback),
         record.inputTokens, record.outputTokens, record.cacheReadInputTokens,
-        record.cacheWriteInputTokens, record.latencyMs, costUsd],
+        record.cacheWriteInputTokens, record.latencyMs, costUsd, JSON.stringify(tagged)],
     ).catch((err) => {
       logger.warn('ai_usage_persist_failed', { task, detail: err?.code || err?.message || 'unknown' })
     })

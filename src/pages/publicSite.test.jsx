@@ -27,6 +27,44 @@ describe('Landing page', () => {
     expect(screen.getAllByRole('button', { name: /Take the assessment/ }).length).toBeGreaterThan(0)
   })
 
+  it('P8.1: the primary entry is the free short situation, the secondary explains how Prism works, and the campus inquiry stays separate', () => {
+    mockFetch({ '/api/': notFound })
+    renderApp(<LandingPage />)
+    const hero = screen.getByRole('region', { name: /work-readiness and capability intelligence/i })
+    expect(within(hero).getByRole('link', { name: /Try a short situation/ })).toHaveAttribute('href', '/try')
+    expect(within(hero).getByRole('button', { name: 'See how Prism works' })).toBeInTheDocument()
+    expect(within(hero).getByRole('link', { name: 'Bring Prism to your institution' }).getAttribute('href')).toMatch(/^mailto:/)
+    expect(within(hero).getByText(/Understand how you work\. Practise what matters next\./)).toBeInTheDocument()
+  })
+
+  it('P8.1: no unsupported employability, placement-guarantee or percentage pitch anywhere on the public page', () => {
+    mockFetch({ '/api/': notFound })
+    renderApp(<LandingPage />)
+    const text = document.body.textContent
+    expect(text).not.toMatch(/employab/i)
+    expect(text).not.toMatch(/guaranteed? (placement|job)/i)
+    expect(text).not.toMatch(/\d\s*%\s*(match|placement|employ|hired|job|of (students|graduates|candidates))/i)
+    expect(text).not.toMatch(/job-ready|layoff/i)
+    expect(text).not.toMatch(new RegExp(['verified' + ' skills', 'soft skills? score', 'subscription'].join('|'), 'i'))
+  })
+
+  it('P8.6: the offer table explains what you get, allowance, window, limits, provisional results and the proposed policy; the professional pack is not yet available', () => {
+    mockFetch({ '/api/': notFound })
+    renderApp(<LandingPage />)
+    const pricing = document.getElementById('pricing')
+    const table = within(pricing).getByRole('table')
+    for (const header of ['What you get', 'Allowance', 'Window', 'Limits', 'Provisional results', 'Recovery / review']) {
+      expect(within(table).getByRole('columnheader', { name: header })).toBeInTheDocument()
+    }
+    const sprint = within(pricing).getByTestId('offer-sprint')
+    expect(sprint).toHaveTextContent('Test price, pending approval')
+    expect(sprint).toHaveTextContent('30 days of activity')
+    expect(sprint).toHaveTextContent('proposed, pending approval')
+    expect(within(pricing).getByTestId('offer-free')).toHaveTextContent('One answer and one retry')
+    expect(within(pricing).getByTestId('offer-professional')).toHaveTextContent('Not yet available')
+    expect(within(pricing).getByRole('link', { name: 'Try a short situation' })).toHaveAttribute('href', '/try')
+  })
+
   it('uses no conflicting verification wording', () => {
     mockFetch({ '/api/': notFound })
     renderApp(<LandingPage />)
