@@ -18,6 +18,7 @@ import { DocumentTitle } from '../../../components/ui/DocumentTitle.jsx'
 import { ErrorState, UnauthorizedState } from '../../../components/states/index.js'
 import { track } from '../../../lib/telemetry.js'
 import { useAssessmentSession } from '../hooks/useAssessmentSession.js'
+import { useAssessmentClock } from '../hooks/useAssessmentClock.js'
 import { useAssessmentAutosave } from '../hooks/useAssessmentAutosave.js'
 import { createArtifactStore } from '../state/artifactStore.js'
 import { sendSessionMessage, saveSessionArtifact, finishSession } from '../api/assessmentSessionApi.js'
@@ -45,18 +46,6 @@ function useMedia(query, fallback = true) {
     return () => m.removeEventListener?.('change', on)
   }, [query])
   return match
-}
-
-function useRemaining(timing, receivedAt) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [])
-  if (!timing?.deadlineAt || !timing.serverTime) return null
-  // Server-authoritative clock: correct for the client's offset at receipt.
-  const offset = Date.parse(timing.serverTime) - receivedAt
-  return Math.max(0, Date.parse(timing.deadlineAt) - (now + offset))
 }
 
 const storageKey = (kind, sessionId) => `prism.${kind}.${sessionId}`
@@ -97,8 +86,7 @@ export default function AssessmentPlayerPage() {
 
   const session = useAssessmentSession(sessionId, { enabled: aligned && !meLoading })
   const contract = session.data
-  const receivedAt = session.dataUpdatedAt || Date.now()
-  const remainingMs = useRemaining(contract?.timing, receivedAt)
+  const remainingMs = useAssessmentClock(contract?.timing, contract?.clockReceivedAt)
 
   const store = useMemo(() => createArtifactStore({ save: (artifactId, args) => saveSessionArtifact(sessionId, artifactId, args) }), [sessionId])
   useEffect(() => { if (contract) store.load(contract.artifacts) }, [contract, store])
@@ -238,6 +226,7 @@ export default function AssessmentPlayerPage() {
   const onSend = () => {
     const text = draft.trim()
     if (!text) return
+    setPane('conversation')
     setDraft('')
     deliver({ clientEventId: newIdempotencyKey('evt'), text })
   }
@@ -342,14 +331,12 @@ export default function AssessmentPlayerPage() {
   const needsLarge = contract.device.requiresLargeScreen && small && !smallOk
   const workNeedsAttention = artifactState.items.some((i) => i.status === 'ERROR' || i.status === 'CONFLICT')
   const conversation = (
-    <section aria-label="Conversation" className={hasWork && wide ? 'flex min-h-[50vh] w-[45%] min-w-0 shrink-0 flex-col border-r border-prism-border md:min-h-0' : 'mx-auto flex min-h-[50vh] w-full min-w-0 max-w-3xl flex-col md:min-h-0'}>
+    <section aria-label="Conversation" className={hasWork && wide ? 'flex min-h-0 w-[45%] min-w-0 shrink-0 flex-col overflow-hidden border-r border-prism-border' : 'mx-auto flex min-h-0 w-full min-w-0 max-w-4xl flex-col overflow-hidden'}>
       <ConversationPane messages={contract.messages} pending={pending} onRetry={() => pending && deliver(pending)} onEdit={editPending} />
-      {timeUp && <div className="px-3"><Callout tone="partial" title={PLAYER_COPY.timeUpTitle}>{PLAYER_COPY.timeUp}</Callout></div>}
-      <ResponseComposer ref={answerRef} draft={draft} onDraft={setDraft} onSend={onSend} disabled={timeUp} readOnly={Boolean(pending)} busy={pending?.status === 'SENDING'} />
     </section>
   )
   const workspace = (
-    <section aria-label="Work materials" className="flex min-h-[50vh] min-w-0 flex-1 flex-col md:min-h-0">
+    <section aria-label="Work materials" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <ArtifactPane items={artifactState.items} activeId={activeArtifact} onSelect={setActiveArtifact} store={store} />
     </section>
   )
@@ -358,13 +345,13 @@ export default function AssessmentPlayerPage() {
     <>
       <p className="sr-only" role="status" aria-live="polite">{timeNotice}</p>
       {interrupted && (
-        <div role="status" aria-live="polite" className="flex items-center gap-2 border-b border-prism-partial-soft bg-prism-partial-soft px-4 py-2 text-sm text-prism-ink" data-testid="reconnect-banner">
+        <div role="status" aria-live="polite" className="flex shrink-0 items-center gap-2 border-b border-prism-partial-soft bg-prism-partial-soft px-4 py-2 text-sm text-prism-ink" data-testid="reconnect-banner">
           <WifiOff size={16} aria-hidden="true" className="shrink-0 text-prism-partial" />
           <span><strong className="font-semibold">Connection interrupted.</strong> Your latest saved work is safe. Reconnecting…</span>
         </div>
       )}
       {briefingOpen && (
-        <section id="player-briefing" aria-label="Briefing" className="grid max-h-[40vh] gap-4 overflow-y-auto border-b border-prism-border bg-prism-surface p-4 text-sm md:grid-cols-3">
+        <section id="player-briefing" aria-label="Briefing" tabIndex={0} className="grid max-h-[40dvh] shrink-0 gap-4 overflow-y-auto overscroll-contain border-b border-prism-border bg-prism-surface p-4 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-prism-accent md:grid-cols-3">
           {contract.scenario.context && <div><h2 className="font-semibold text-prism-ink">Context</h2><p className="mt-1 text-prism-ink-muted">{contract.scenario.context}</p></div>}
           {contract.scenario.yourRole && <div><h2 className="font-semibold text-prism-ink">Your role</h2><p className="mt-1 text-prism-ink-muted">{contract.scenario.yourRole}</p></div>}
           {contract.scenario.participants.length > 0 && (
@@ -384,7 +371,7 @@ export default function AssessmentPlayerPage() {
         </section>
       )}
       {needsLarge ? (
-        <div className="mx-auto max-w-xl p-6">
+        <div className="mx-auto min-h-0 max-w-xl overflow-y-auto p-6">
           <Callout tone="partial" title={PLAYER_COPY.largeScreenTitle}>
             <p>{PLAYER_COPY.largeScreenBody}</p>
             {contract.device.allowSmallScreen && (
@@ -393,13 +380,19 @@ export default function AssessmentPlayerPage() {
           </Callout>
         </div>
       ) : wide || !hasWork ? (
-        <div className="flex min-h-0 flex-1 flex-row">{conversation}{hasWork && workspace}</div>
+        <div className="flex min-h-0 flex-1 flex-row overflow-hidden" data-layout={hasWork ? 'split' : 'conversation'}>{conversation}{hasWork && workspace}</div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="border-b border-prism-border p-2">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-layout="switchable">
+          <div className="shrink-0 border-b border-prism-border p-2">
             <SegmentedControl label="Show" value={pane} onChange={setPane} options={[{ value: 'conversation', label: 'Conversation' }, { value: 'workspace', label: workNeedsAttention ? 'Workspace (needs attention)' : 'Workspace' }]} />
           </div>
           {pane === 'workspace' ? workspace : conversation}
+        </div>
+      )}
+      {!needsLarge && (
+        <div className={hasWork ? 'min-w-0 shrink-0' : 'mx-auto w-full min-w-0 max-w-4xl shrink-0'}>
+          {timeUp && <div className="px-3"><Callout tone="partial" title={PLAYER_COPY.timeUpTitle}>{PLAYER_COPY.timeUp}</Callout></div>}
+          <ResponseComposer ref={answerRef} draft={draft} onDraft={setDraft} onSend={onSend} disabled={timeUp} readOnly={Boolean(pending)} busy={pending?.status === 'SENDING'} />
         </div>
       )}
       <AssessmentExitDialog

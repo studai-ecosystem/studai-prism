@@ -4,13 +4,14 @@
 // the share dialog (token shown once), revoke, the public shared page with
 // selective disclosure, and a PDF built from structured data only.
 import { describe, it, expect } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Routes, Route } from 'react-router-dom'
 import { renderApp, mockFetch, meBody, signIn, jsonResponse } from '../../test/utils.jsx'
 import StudentReportPage from './pages/StudentReportPage.jsx'
 import SharedReportPage from './pages/SharedReportPage.jsx'
 import { reportPdfLines } from '../../lib/reportPdf.js'
+import { ReportCapabilityCard } from './components/ReportCapabilityCard.jsx'
 
 const CAMPUS_WS = { id: '11111111-1111-4111-8111-111111111111', type: 'CAMPUS_STUDENT', name: 'Synthetic University', organizationId: '22222222-2222-4222-8222-222222222222', organizationName: 'Synthetic University', visibilityPolicy: 'OWNER_AND_SPONSOR', permissions: [] }
 const PERSONAL_WS = { id: 'personal', type: 'PERSONAL', name: 'Personal', organizationId: null, organizationName: null, visibilityPolicy: 'OWNER_ONLY' }
@@ -65,6 +66,19 @@ function renderReport(routes, { campus = false, route = '/app/reports/sess-repor
 }
 
 describe('Student Report V3 page', () => {
+  it('a capability with no evidence shows one absence explanation and no empty level badge', () => {
+    const cap = { ...reportFixture().summary.capabilities[1], statusReasons: ['NO_EVIDENCE'], summary: {
+      claimId: null, text: 'No evidence for this was recorded in the synthetic assessment, so it is not described.', status: 'INSUFFICIENT', evidenceIds: [],
+    } }
+    render(<ReportCapabilityCard cap={cap} />)
+    const card = screen.getByTestId('report-capability')
+    expect(within(card).getAllByText('Insufficient evidence')).toHaveLength(1)
+    expect(within(card).getByText(cap.summary.text)).toBeInTheDocument()
+    expect(within(card).queryByText('No evidence was recorded for this capability.')).not.toBeInTheDocument()
+    expect(within(card).queryByText('Observed level')).not.toBeInTheDocument()
+    expect(within(card).queryByRole('list')).not.toBeInTheDocument()
+  })
+
   it('shows validated capability cards, insufficient evidence honestly, and no scores', async () => {
     renderReport({ '/api/v1/assessment-sessions/sess-report-0001/report': ownerBody() })
     expect(await screen.findByRole('heading', { level: 1, name: 'Your report' })).toBeInTheDocument()

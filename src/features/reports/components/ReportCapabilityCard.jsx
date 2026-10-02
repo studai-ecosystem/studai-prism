@@ -10,7 +10,8 @@ import { REPORT_COPY } from '../../../lib/copy/report.js'
 export function ReportCapabilityCard({ cap, onSeeEvidence, evidenceCount = 0, headingLevel = 3, audience = 'OWNER' }) {
   const H = `h${headingLevel}`
   const described = Boolean(cap.level)
-  const reasons = [...new Set((cap.statusReasons || []).map((r) => reasonText(r, { audience })))]
+  const statusReasons = (cap.statusReasons || []).filter((r) => r !== 'NO_EVIDENCE')
+  const reasons = [...new Set(statusReasons.map((r) => reasonText(r, { audience })))]
   return (
     <Card className="space-y-3 p-5" data-testid="report-capability">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -20,7 +21,7 @@ export function ReportCapabilityCard({ cap, onSeeEvidence, evidenceCount = 0, he
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-prism-ink-muted">
           {described && <span className="inline-flex items-center gap-1">Observed level <CapabilityLevelBadge level={cap.level} provisional={cap.status === 'PROVISIONAL'} /></span>}
-          <span className="inline-flex items-center gap-1">Evidence <EvidenceSufficiencyBadge status={cap.status} reasons={cap.statusReasons} /></span>
+          <span className="inline-flex items-center gap-1">Evidence <EvidenceSufficiencyBadge status={cap.status} reasons={statusReasons} /></span>
         </div>
       </div>
       {described ? (

@@ -5,7 +5,7 @@
 // draft; early finish is explicit; mobile tabs + large-screen notice; the V3
 // consent wording is identical to the legacy briefing; no scenario vocabulary
 // in the generic work-material components.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { render as rtlRender, screen, waitFor, within } from '@testing-library/react'
@@ -42,7 +42,7 @@ const setWide = (wide) => {
   window.matchMedia = (q) => ({ matches: wide, media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false })
 }
 const original = window.matchMedia
-afterEach(() => { window.matchMedia = original })
+afterEach(() => { window.matchMedia = original; vi.restoreAllMocks() })
 
 function renderPlayer(routes, { route = '/app/assessment/sess-v3-0001' } = {}) {
   signIn()
@@ -148,6 +148,93 @@ describe('artifact store (§39.3)', () => {
 
 describe('Assessment Workspace V3 player (§12)', () => {
   beforeEach(() => setWide(true))
+
+  it('conversation-only mode has no empty workspace and the composer is outside the scrolling conversation', async () => {
+    renderPlayer({ '/api/v1/assessment-sessions/sess-v3-0001': { data: contract() } })
+    const answer = await screen.findByLabelText('Your answer')
+    const conversation = screen.getByRole('region', { name: 'Conversation' })
+    expect(conversation.contains(answer)).toBe(false)
+    expect(screen.getByRole('log', { name: 'Assessment conversation' })).toHaveAttribute('tabindex', '0')
+    expect(screen.queryByRole('region', { name: 'Work materials' })).not.toBeInTheDocument()
+    expect(document.querySelector('[data-layout="conversation"]')).toBeInTheDocument()
+  })
+
+  it('mobile work materials keep the same composer and draft mounted while panes switch', async () => {
+    setWide(false)
+    renderPlayer({ '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ artifacts: [budgetArtifact] }) } })
+    const answer = await screen.findByLabelText('Your answer')
+    await userEvent.type(answer, 'Synthetic draft')
+    await userEvent.click(screen.getByRole('radio', { name: 'Workspace' }))
+    expect(screen.getByLabelText('Your answer')).toBe(answer)
+    expect(answer).toHaveValue('Synthetic draft')
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('tabindex', '0')
+    await userEvent.click(screen.getByRole('radio', { name: 'Conversation' }))
+    expect(screen.getByLabelText('Your answer')).toBe(answer)
+    expect(answer).toHaveValue('Synthetic draft')
+  })
+
+  it('message-cache updates do not reset the clock receipt or countdown', async () => {
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const { queryClient } = renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001/messages': { data: { messages: [], exchanges: 1, replayed: false } },
+      '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ timing: { ...contract().timing, deadlineAt: '2026-10-01T10:35:00.000Z' } }) },
+    })
+    await screen.findByLabelText('Your answer')
+    expect(screen.getByRole('timer')).toHaveTextContent('35:00')
+    const key = ['ws', 'personal', 'assessment-session', 'sess-v3-0001']
+    expect(queryClient.getQueryData(key).clockReceivedAt).toBe(0)
+    now = 60000
+    await userEvent.type(screen.getByLabelText('Your answer'), 'Synthetic response')
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(queryClient.getQueryData(key).progress.exchanges).toBe(1))
+    expect(queryClient.getQueryData(key).clockReceivedAt).toBe(0)
+    expect(screen.getByRole('timer')).toHaveTextContent('34:00')
+  })
+
+  it('sending from the mobile workspace returns to the conversation and uses the existing message endpoint', async () => {
+    setWide(false)
+    const { spy } = renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001/messages': { data: {
+        messages: [{ speaker: 'Synthetic Colleague', role: 'Manager', content: 'Synthetic workspace reply.' }],
+        exchanges: 1, replayed: false,
+      } },
+      '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ artifacts: [budgetArtifact] }) },
+    })
+    await screen.findByLabelText('Your answer')
+    await userEvent.click(screen.getByRole('radio', { name: 'Workspace' }))
+    await userEvent.type(screen.getByLabelText('Your answer'), 'Synthetic workspace answer')
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(await screen.findByText('Synthetic workspace reply.')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Conversation' })).toBeChecked()
+    expect(bodyOf(spy, '/messages')).toHaveLength(1)
+    expect(bodyOf(spy, '/messages')[0].text).toBe('Synthetic workspace answer')
+  })
+
+  it.each([
+    [600000, 'Less than 10 minutes left.'],
+    [300000, 'Less than 5 minutes left.'],
+    [60000, 'Less than 1 minute left.'],
+  ])('announces the server countdown warning at %i ms', async (remainingMs, text) => {
+    const clock = contract().timing
+    renderPlayer({ '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ timing: {
+      ...clock, deadlineAt: new Date(Date.parse(clock.serverTime) + remainingMs).toISOString(), remainingMs,
+    } }) } })
+    expect(await screen.findByText(text)).toHaveAttribute('role', 'status')
+  })
+
+  it('an expired server deadline disables new sends but retains the unsent draft', async () => {
+    sessionStorage.setItem('prism.draft.sess-v3-0001', 'Synthetic unsent draft')
+    const { spy } = renderPlayer({ '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ timing: {
+      ...contract().timing, deadlineAt: contract().timing.serverTime, remainingMs: 0,
+    } }) } })
+    expect(await screen.findByLabelText('Your answer')).toBeDisabled()
+    expect(screen.getByLabelText('Your answer')).toHaveValue('Synthetic unsent draft')
+    expect(screen.getByRole('timer')).toHaveTextContent('00:00')
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(spy.mock.calls.some(([url]) => String(url).endsWith('/messages'))).toBe(false)
+    expect(sessionStorage.getItem('prism.draft.sess-v3-0001')).toBe('Synthetic unsent draft')
+  })
 
   it('renders the server contract and appends only the turns the server returned', async () => {
     const { spy } = renderPlayer({

@@ -8,7 +8,7 @@ run_mode: off
 active_phase: none
 target_phase: M
 branch: ui/prism-brand-transformation
-last_updated: 2026-10-01
+last_updated: 2026-10-02
 UI-STATE:END -->
 
 ## Baseline
@@ -21,6 +21,35 @@ UI-STATE:END -->
 | Known facts | Two token systems exist (legacy `--color-*` teal/Fraunces and campus `--prism-*` indigo); gold ribbon logo in `components/ui/PrismLogo.jsx`; brand green fails text contrast on white (2.63:1) so green is fill/mark only, derived darker green for text |
 
 ## Decisions log
+
+Independent V3 presentation repair (2026-10-02): active assessment has one
+100dvh frame at all seven widths, independent focusable scroll surfaces, no
+empty workspace and a composer outside pane switching. Network timing snapshots
+carry a monotonic receipt; cache writes no longer reset the display. Absence
+copy in Report V3 is not repeated as an empty level/reason. Gates: build PASS,
+frontend 345/0, server 607/0 plus 24 DB skips, static PASS, scoped four-project
+browser 84/0. One pre-existing load-sensitive Campus test passed unchanged in
+isolation and the full suite with bounded workers. Server timing still uses
+the existing 35-minute contract; intro/scoring/evidence/authorization/retention
+behavior was not changed. This verified presentation checkpoint is not completion
+of the full flow repair, which remains NO-GO.
+
+Flow repair checkpoint (2026-10-02): the UI programme's historical COMPLETE gates
+do not mean the full student journey is repaired. [Repair map](./FLOW_REPAIR_MAP.md)
+and [release readiness](./FLOW_REPAIR_READINESS.md) record a NO-GO. Entry aliases,
+explicit-next priority, dark personal portal recovery and existing-owned history
+presentation are repaired; ownership reconciliation, the governed dialogue
+evidence writer, candidate-clock/start contract, backend security/privacy,
+distributed locking and durable evaluation remain open. No flags, scientific
+rules, authorization, historical reports or retention behavior were changed.
+No test ceiling was relaxed; no completed repair phase commit was made.
+Approved-plan follow-up: V3-only new assessments and unchanged issued history are
+confirmed. Runtime contract baseline rechecked (server 77 passed; player/report
+frontend 30 passed). Domain-owner packets are prepared but their reviewed
+implementation/approval references remain missing; production stays NO-GO.
+The PG completion path purges history used by V3 quote verification, so source
+retention is an explicit privacy/evidence gate, not an automatic transcript-policy
+change.
 
 | Id | Decision |
 | --- | --- |

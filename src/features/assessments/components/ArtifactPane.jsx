@@ -61,7 +61,7 @@ export function ArtifactPane({ items, activeId, onSelect, store }) {
   }
   return (
     <>
-      <div role="tablist" aria-label="Work materials" onKeyDown={onKeyDown} className="flex gap-2 overflow-x-auto border-b border-prism-border p-2 lg:flex-wrap lg:overflow-visible">
+      <div role="tablist" aria-label="Work materials" onKeyDown={onKeyDown} className="flex shrink-0 gap-2 overflow-x-auto border-b border-prism-border p-2 lg:flex-wrap lg:overflow-visible">
         {items.map((art, i) => {
           const selected = active?.artifactId === art.artifactId
           return (
@@ -84,7 +84,7 @@ export function ArtifactPane({ items, activeId, onSelect, store }) {
           )
         })}
       </div>
-      <div role="tabpanel" id="artifact-panel" aria-labelledby={active ? `tab-${active.artifactId}` : undefined} className="min-w-0 flex-1 space-y-4 overflow-y-auto p-6">
+      <div role="tabpanel" id="artifact-panel" aria-labelledby={active ? `tab-${active.artifactId}` : undefined} tabIndex={0} className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-prism-accent">
         {active?.status === 'CONFLICT' && (
           <ConflictPanel
             item={active}

@@ -4,10 +4,10 @@ import { SessionSaveStatus } from './SessionSaveStatus.jsx'
 
 function formatRemaining(ms) {
   if (ms == null) return null
-  const total = Math.max(0, Math.floor(ms / 1000))
+  const total = Math.max(0, Math.ceil(ms / 1000))
   const m = Math.floor(total / 60)
   const s = total % 60
-  return `${m}:${String(s).padStart(2, '0')}`
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 // Player header (spec §12.1): scenario, time left (server clock), save state,
@@ -15,8 +15,8 @@ function formatRemaining(ms) {
 export function AssessmentHeader({ title, scopeLabel, contextLine, remainingMs, saveState, briefingOpen, onToggleBriefing, onFinish, finishing, canFinish = true }) {
   const remaining = formatRemaining(remainingMs)
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-prism-border bg-prism-surface px-4 py-3">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-prism-border bg-prism-surface px-4 py-3">
+      <div className="flex min-w-0 max-w-full items-center gap-3">
         <PrismLogo variant="icon" tone="reverse" size={24} decorative className="shrink-0" />
         <div className="min-w-0">
           {scopeLabel && <p className="text-xs font-medium uppercase tracking-wide text-prism-ink-muted">{scopeLabel}</p>}

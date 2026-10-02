@@ -11,7 +11,7 @@ export function ConversationPane({ messages, pending, onRetry, onEdit }) {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [messages, pending])
   return (
-    <div ref={feedRef} className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite" aria-relevant="additions" data-testid="conversation">
+    <div ref={feedRef} role="log" aria-label="Assessment conversation" tabIndex={0} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-prism-accent" aria-live="polite" aria-relevant="additions" data-testid="conversation">
       {messages.length === 0 && <p className="text-sm text-prism-ink-muted">The conversation has not started yet.</p>}
       {messages.map((msg, i) => (
         <div key={i} className={msg.isUser ? 'flex flex-col items-end' : 'flex flex-col items-start'} data-role={msg.isUser ? 'candidate' : 'participant'}>

@@ -14,6 +14,7 @@
     "test:e2e": "playwright test",
     "test:e2e:critical": "playwright test --grep @critical",
     "audit:static": "node scripts/prism-audit.mjs",
+    "audit:flow-flags": "node scripts/check-student-flow-flags.mjs",
     "audit:all": "npm --prefix server test && python -m pytest calibration/tests -q && npm run build && npm run audit:static && npm run test:e2e",
     "postinstall": "cd server && npm install --omit=dev",
     "start": "node server/index.js",

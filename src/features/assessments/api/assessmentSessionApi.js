@@ -25,7 +25,7 @@ export const SessionContractSchema = z.object({
   progress: z.object({ exchanges: z.number().int().min(0), requiredExchanges: z.number().int().min(0) }),
   integrityPolicy: z.string(),
   device: z.object({ requiresLargeScreen: z.boolean(), allowSmallScreen: z.boolean() }),
-  timing: z.object({ serverTime: z.string(), startedAt: z.string().nullable(), deadlineAt: z.string().nullable(), remainingMs: z.number().nullable() }),
+  timing: z.object({ serverTime: z.string().datetime(), startedAt: z.string().datetime().nullable(), deadlineAt: z.string().datetime().nullable(), remainingMs: z.number().nonnegative().nullable() }),
   reportPath: z.string().nullable(),
 })
 
@@ -38,7 +38,8 @@ const path = (sessionId) => `/api/v1/assessment-sessions/${encodeURIComponent(se
 
 export async function fetchAssessmentSession(sessionId) {
   const { data } = await request(path(sessionId), { schema: SessionContractSchema, defaultErrorMessage: 'Your assessment could not be loaded.' })
-  return data
+  // Keep the network receipt with the snapshot, not React Query cache updates.
+  return { ...data, clockReceivedAt: performance.now() }
 }
 
 export async function startAssignment(assignmentId, { consent, idempotencyKey }) {
