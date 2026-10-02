@@ -72,7 +72,7 @@ export default function Auth() {
   useEffect(() => {
     if (isAuthenticated()) {
       const invite = sessionStorage.getItem('prismInviteToken')
-      navigate(invite ? `/invite/${invite}` : next || '/payment', { replace: true })
+      navigate(invite ? `/invite/${invite}` : next || '/app', { replace: true })
     }
   }, [navigate, next])
 
@@ -111,9 +111,9 @@ export default function Auth() {
     action
       .then(() => {
         // An in-flight assessment invite returns the candidate to their seat;
-        // otherwise continue to where they were going, or to checkout.
+        // otherwise continue to where they were going; a new account goes to checkout, a returning one to the app.
         const invite = sessionStorage.getItem('prismInviteToken')
-        navigate(invite ? `/invite/${invite}` : next || '/payment')
+        navigate(invite ? `/invite/${invite}` : next || (isRegister ? '/payment' : '/app'))
       })
       .catch((err) => setError(err.message || 'Something went wrong. Please try again.'))
       .finally(() => setSubmitting(false))

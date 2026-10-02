@@ -23,7 +23,7 @@ test('CAMPUS-BASELINE-01 @critical @campus-baseline register (age confirm) → l
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(PASSWORD)
   await page.locator('button[type="submit"]').click()
-  await expect(page).toHaveURL(/\/payment/)
+  await expect(page).toHaveURL(/\/app(\/home)?$/)
 
   await page.goto('/app')
   await expect(page.getByRole('heading', { name: 'Prism Assessment' })).toBeVisible()
