@@ -23,11 +23,17 @@ export const ERROR_STATUS = Object.freeze({
   CONSENT_REQUIRED: 422,
   AGE_CONFIRMATION_REQUIRED: 403,
   SESSION_TIME_LIMIT: 410,
+  // P3.8: a draft run accepts formal answers only between Begin and the
+  // answer deadline; before Begin the learner is still reading the briefing.
+  ASSESSMENT_NOT_BEGUN: 409,
   IF_MATCH_REQUIRED: 428,
   UPSTREAM_UNAVAILABLE: 503,
   // Student Report V3 (Phase 6).
   REPORT_NOT_READY: 409,
   REPORT_UNDER_REVIEW: 409,
+  // P2.6/P2.7: the evaluation run failed technically (retry / support), which
+  // is never shown as missing evidence.
+  REPORT_PROCESSING_FAILED: 409,
   NOT_IMPLEMENTED: 501,
   INTERNAL: 500,
 })

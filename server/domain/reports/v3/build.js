@@ -11,13 +11,33 @@ import { LEVEL_LABELS_STATUS } from '../../evidence/levels.js'
 import { buildClaim, validateClaims, verifiedQuote } from '../claims.js'
 import { CATALOG_VERSION, PRIMARY_CAPABILITY_IDS, capabilityInfo } from '../../assessments/catalog.js'
 
-export const REPORT_V3_BUILDER_VERSION = 'student-report.v3.0'
+export const REPORT_V3_BUILDER_VERSION = 'student-report.v3.1'
 export const DISCLOSURE_LEVELS = Object.freeze(['SUMMARY', 'FULL'])
 export const MAX_PRIORITIES = 3
+export const MAX_MOMENTS = 3
 const MAX_EVIDENCE_PER_CAPABILITY = 3
 const ADMISSIBLE = new Set(['PROVISIONAL', 'SUFFICIENT'])
 const GROWTH_BANDS = new Set(['EARLY', 'DEVELOPING'])
 const BAND_ORDER = { EARLY: 0, DEVELOPING: 1, DEMONSTRATED: 2, STRONG: 3 }
+const CONTEXT_MAX_CHARS = 220
+
+// The stimulus a learner actually saw for an opportunity (0044 ledger), as a
+// short plain line. Never the learner's words, never a rubric. Null when the
+// ledger has no presented stimulus for it.
+function opportunityContext(opportunity) {
+  const messages = opportunity?.stimulus?.messages
+  if (!Array.isArray(messages)) return null
+  const m = [...messages].reverse().find((x) => x && typeof x.content === 'string' && x.content.trim() && x.actorKind !== 'SYSTEM') || messages.find((x) => typeof x?.content === 'string' && x.content.trim())
+  if (!m) return null
+  const text = m.content.replace(/\s+/g, ' ').trim()
+  const short = text.length > CONTEXT_MAX_CHARS ? `${text.slice(0, CONTEXT_MAX_CHARS - 1).trimEnd()}…` : text
+  return m.speaker ? `${m.speaker}${m.role ? ` (${m.role})` : ''}: ${short}` : short
+}
+
+function sentence(text) {
+  const t = String(text || '').trim()
+  return /[.!?]$/.test(t) ? t : `${t}.`
+}
 
 // Why a capability has no description, in plain words (never a number).
 function absenceText(decision, title) {
@@ -45,8 +65,9 @@ function provenanceOf(unit) {
  * @param input.turns      verbatim candidate turns of THIS session
  * @param input.header     { candidateName, assessmentTitle, scenarioTitle, completedAt, sponsorName, scope, verification }
  * @param input.disclosure 'FULL' | 'SUMMARY' (share links may restrict)
+ * @param input.opportunities opportunity ledger rows of THIS session (context for moments; optional)
  */
-export function buildStudentReportV3({ sessionId, definition = null, formId = null, units = [], turns = [], header = {}, disclosure = 'FULL' }) {
+export function buildStudentReportV3({ sessionId, definition = null, formId = null, units = [], turns = [], header = {}, disclosure = 'FULL', opportunities = [] }) {
   if (!DISCLOSURE_LEVELS.includes(disclosure)) throw new Error(`Unknown disclosure level: ${disclosure}`)
   const title = header.assessmentTitle || definition?.title || 'your assessment'
   const capabilityIds = definition?.measures?.length ? definition.measures : PRIMARY_CAPABILITY_IDS
@@ -118,6 +139,7 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
     return {
       id: cap.id,
       name: cap.name,
+      displayLabel: cap.displayLabel || null,
       definition: cap.description || null,
       layer: cap.layer,
       status: shown ? decision.status : (decision?.status === 'HUMAN_REVIEW_REQUIRED' ? 'HUMAN_REVIEW_REQUIRED' : 'INSUFFICIENT_EVIDENCE'),
@@ -181,7 +203,85 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
       }
     })
 
+  // 4b. Bounded observations (P2.7): a judged, verified unit whose capability
+  // sits below the sufficiency floor. Shown as "one observed moment", never a
+  // level, never a deficit. Quote required so the learner sees their own words.
+  const boundedObservations = []
+  for (const { cap, decision, admissible } of perCapability) {
+    if (admissible) continue
+    const candidates = ownUnits.filter((u) => u.capability_id === cap.id && u.evidence_status === 'PROVISIONAL' && Number.isInteger(u.rubric_level) && u.observable_behavior)
+    for (const u of candidates.slice(0, 1)) {
+      const quote = verifiedQuote(u, turns)
+      if (!quote) continue
+      const anchor = cap.anchors?.[Math.round(u.rubric_level)]
+      const next = Math.max(3, Math.min(5, u.rubric_level + 1))
+      boundedObservations.push({
+        id: u.evidence_id,
+        capability: { id: cap.id, name: cap.name },
+        observedBehavior: u.observable_behavior.trim(),
+        quote,
+        source: { turn: Number.isInteger(u.source_turn) ? u.source_turn : null, artifactId: u.source_artifact_id || null, opportunityId: u.provenance_json?.opportunityId || null },
+        rubricAnchor: anchor?.criteria ? { criteria: anchor.criteria } : null,
+        nextBehavior: cap.anchors?.[next]?.criteria || null,
+        limitation: `One moment was observed in ${title}. That is not enough to describe ${cap.name} as a whole; sufficiency reasons: ${(decision?.reasons || ['NO_EVIDENCE']).join(', ')}.`,
+        provenance: provenanceOf(u),
+      })
+    }
+  }
+
   const full = disclosure === 'FULL'
+
+  // 4c. Moments that mattered (P5.5): at most three verified observed units,
+  // each with the learner's own verbatim words. Described capabilities first
+  // (one per capability, then more), then bounded observations. A paraphrase
+  // without a verified quote is never a moment.
+  const oppIndex = new Map((opportunities || []).filter((o) => o && o.sessionId === sessionId).map((o) => [o.opportunityId, o]))
+  const contextFor = (u) => {
+    const oppId = u.provenance_json?.opportunityId || null
+    return opportunityContext(oppId ? oppIndex.get(oppId) : null)
+      || `${header.scenarioTitle || title}${Number.isInteger(u.source_turn) ? `, exchange ${u.source_turn}` : ''}`
+  }
+  const momentFrom = (cap, u, quote, { evidenceStatus, basis, next }) => ({
+    id: u.evidence_id,
+    basis,
+    capability: { id: cap.id, name: cap.name, displayLabel: cap.displayLabel || null },
+    observedBehavior: u.observable_behavior.trim(),
+    quote,
+    context: contextFor(u),
+    source: { turn: Number.isInteger(u.source_turn) ? u.source_turn : null, artifactId: u.source_artifact_id || null, opportunityId: u.provenance_json?.opportunityId || null },
+    rubricAnchor: Number.isFinite(u.rubric_level) && cap.anchors?.[Math.round(u.rubric_level)]?.criteria ? { criteria: cap.anchors[Math.round(u.rubric_level)].criteria } : null,
+    nextBehavior: next,
+    evidenceStatus,
+    provenance: provenanceOf(u),
+  })
+  const described = perCapability.filter((e) => e.admissible && ok.has(e.levelClaim.claim_id))
+  const rounds = []
+  for (const e of described) {
+    const verified = e.observations.filter(({ claim }) => ok.has(claim.claim_id) && claim.quote)
+    verified.forEach(({ claim, unit }, i) => {
+      const next = Math.max(3, Math.min(5, Math.floor(Number(e.decision.level.rubricMedian) || 0) + 1))
+      rounds[i] ||= []
+      rounds[i].push(momentFrom(e.cap, unit, claim.quote, { evidenceStatus: unit.evidence_status, basis: 'DESCRIBED', next: e.cap.anchors?.[next]?.criteria || null }))
+    })
+  }
+  const moments = rounds.flat()
+  for (const o of boundedObservations) {
+    if (moments.length >= MAX_MOMENTS) break
+    const cap = capabilityInfo(o.capability.id)
+    const u = ownUnits.find((x) => x.evidence_id === o.id)
+    if (cap && u) moments.push(momentFrom(cap, u, o.quote, { evidenceStatus: u.evidence_status, basis: 'BOUNDED', next: o.nextBehavior }))
+  }
+  moments.splice(MAX_MOMENTS)
+
+  // A short statement bounded to this assessment: one observed behaviour and,
+  // where the evidence supports one, one next behaviour. Null when nothing
+  // verified supports it — never a generic sentence.
+  const lead = moments[0] || null
+  const nextPractice = priorities[0]?.behaviorToImprove || lead?.nextBehavior || null
+  const plainStatement = lead
+    ? `In this assessment you were observed doing this: ${sentence(lead.observedBehavior)}${nextPractice ? ` One thing to practise next: ${sentence(nextPractice)}` : ''}`
+    : null
+
   const shownClaimIds = new Set([
     ...capabilities.map((c) => c.summary.claimId).filter(Boolean),
     ...(full ? evidence.map((e) => e.claimId) : []),
@@ -211,7 +311,12 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
       describedCount: capabilities.filter((c) => c.level).length,
       insufficientCount: capabilities.filter((c) => !c.level).length,
     },
+    plainStatement,
+    displayLabels: capabilityIds.map(capabilityInfo).filter(Boolean).map((c) => ({ id: c.id, name: c.name, displayLabel: c.displayLabel || null })),
     evidence: full ? evidence : [],
+    boundedObservations: full ? boundedObservations : [],
+    // Moments carry verbatim quotes, so a summary disclosure never has them.
+    moments: full ? moments : [],
     development: full ? { priorities, maxPriorities: MAX_PRIORITIES } : null,
     methodology: {
       builderVersion: REPORT_V3_BUILDER_VERSION,

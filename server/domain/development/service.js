@@ -8,13 +8,29 @@ import { ApiError } from '../http/errors.js'
 import { can } from '../permissions/can.js'
 import { capabilityInfo } from '../assessments/catalog.js'
 import { parseMission, MISSION_SCHEMA_VERSION } from './missionSchema.js'
-import { MISSION_LIBRARY } from './missionLibrary.js'
+import { MISSION_LIBRARY, draftContentEnabled } from './missionLibrary.js'
 import { normaliseWork, initialWork, runDeterministicChecks, candidateTextFor } from './validators.js'
 import { evaluateMissionWork, practiceUnitsFrom } from './evaluate.js'
 
 const hash = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex')
 const orgOf = (workspace) => (workspace.type === 'CAMPUS_STUDENT' ? workspace.organizationId : null)
 const sameIntervention = (attempt, intervention) => (attempt.interventionId || null) === (intervention?.id || null)
+
+// Why a practice attempt was started (P2.8). Only identifiers are kept: a
+// practice attempt links to an approved assessment moment without ever
+// receiving transcript text, scores or evidence from it.
+const ORIGIN_ID = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/
+export function normaliseOrigin(origin) {
+  if (origin == null) return { kind: 'GOAL' }
+  if (typeof origin !== 'object' || Array.isArray(origin)) throw new ApiError('VALIDATION_FAILED', 'The practice origin could not be read.')
+  if (origin.kind === 'GOAL') return { kind: 'GOAL' }
+  if (origin.kind === 'ASSESSMENT_MOMENT') {
+    const { sessionId, opportunityId } = origin
+    if (!ORIGIN_ID.test(String(sessionId || '')) || !ORIGIN_ID.test(String(opportunityId || ''))) throw new ApiError('VALIDATION_FAILED', 'The practice origin needs a session and a moment.')
+    return { kind: 'ASSESSMENT_MOMENT', sessionId: String(sessionId), opportunityId: String(opportunityId) }
+  }
+  throw new ApiError('VALIDATION_FAILED', 'The practice origin could not be read.')
+}
 
 export function createDevelopmentService({ repos, evaluator = null, clock = () => new Date(), audit = () => {}, library = MISSION_LIBRARY }) {
   const store = () => repos.development
@@ -58,10 +74,21 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
     return (await store().listPublishedMissions()).map((v) => parseMission(v.content))
   }
 
+  // DRAFT missions are reachable only while PRISM_DRAFT_CONTENT is on
+  // (test/local). They are never part of the published catalogue, so they
+  // cannot be recommended or assigned to real users.
+  async function openable() {
+    const all = await published()
+    if (!draftContentEnabled() || typeof store().listDraftMissions !== 'function') return all
+    const ids = new Set(all.map((m) => m.mission_id))
+    const drafts = (await store().listDraftMissions()).map((v) => parseMission(v.content)).filter((m) => !ids.has(m.mission_id))
+    return [...all, ...drafts]
+  }
+
   // Missions this workspace may open: all published missions in PERSONAL; in
   // a campus workspace only missions of the student's open interventions.
   async function reachable(user, workspace) {
-    const all = await published()
+    const all = await openable()
     if (workspace.type === 'PERSONAL') return { missions: all, interventionFor: new Map() }
     if (workspace.type !== 'CAMPUS_STUDENT') return { missions: [], interventionFor: new Map() }
     // Oldest first, so a mission in two open interventions always resolves to
@@ -79,6 +106,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
     return {
       id: m.mission_id,
       version: m.version,
+      status: m.status,
       title: m.title,
       targetCapabilityId: m.target_capability_id,
       targetCapabilityName: capabilityInfo(m.target_capability_id)?.name || null,
@@ -94,6 +122,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
     return {
       id: m.mission_id,
       version: m.version,
+      status: m.status,
       title: m.title,
       targetCapability: { id: m.target_capability_id, name: capabilityInfo(m.target_capability_id)?.name || null },
       scenario: m.scenario_context,
@@ -138,6 +167,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       work: a.work,
       hints: mission.scaffolding_policy.hints.slice(0, a.hintsUsed),
       hintsRemaining: Math.max(0, mission.scaffolding_policy.hints.length - a.hintsUsed),
+      origin: a.origin || { kind: 'GOAL' },
       result: a.evaluation ? feedbackView(a.evaluation, mission) : null,
       submittedAt: a.submittedAt,
       evidenceType: 'PRACTICE',
@@ -192,18 +222,20 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
 
     // Resumes the open attempt (same mission, workspace and intervention)
     // unless `retry`; an attempt left open in an ended intervention is not
-    // resumed into a new one.
-    async startAttempt(user, workspace, missionId, { idempotencyKey, retry = false }) {
+    // resumed into a new one. A retry is always a NEW attempt: the previous
+    // one is never changed. `origin` says why this practice was started.
+    async startAttempt(user, workspace, missionId, { idempotencyKey, retry = false, origin = null }) {
       if (!idempotencyKey) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
       const { mission, intervention } = await missionFor(user, workspace, missionId)
       const organizationId = orgOf(workspace)
+      const normalisedOrigin = normaliseOrigin(origin)
       if (!retry) {
         const open = (await store().listAttempts({ userId: user.id, organizationId })).find((a) => a.missionId === missionId && a.status === 'IN_PROGRESS' && sameIntervention(a, intervention))
         if (open) return { attempt: attemptView(open, mission), resumed: true }
       }
       const { attempt, replayed } = await store().createAttempt({
         userId: user.id, missionId, missionVersion: mission.version, organizationId, interventionId: intervention?.id || null,
-        work: initialWork(mission), idempotencyKey: `start:${idempotencyKey}`,
+        work: initialWork(mission), idempotencyKey: `start:${idempotencyKey}`, origin: normalisedOrigin,
       })
       if (attempt.missionId !== missionId || (attempt.organizationId || null) !== organizationId || !sameIntervention(attempt, intervention)) throw new ApiError('CONFLICT', 'This request was already used for another mission.')
       return { attempt: attemptView(attempt, mission), resumed: replayed }
@@ -290,6 +322,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
           missionId: a.missionId,
           title: v?.content?.title || null,
           status: a.status,
+          origin: a.origin || { kind: 'GOAL' },
           startedAt: a.createdAt || null,
           submittedAt: a.submittedAt || null,
         })
@@ -306,7 +339,8 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       let plan = null
       if (sourceSessionId) plan = await store().upsertPlan({ userId: user.id, organizationId: orgOf(workspace), sourceSessionId, items: priorities.map((p) => ({ capabilityId: p.capabilityId })) })
       const focus = new Set(priorities.map((p) => p.capabilityId))
-      const recommended = missions.filter((m) => focus.has(m.target_capability_id) || interventionFor.has(m.mission_id))
+      // DRAFT content is never recommended, even when it is openable locally.
+      const recommended = missions.filter((m) => m.status !== 'DRAFT' && (focus.has(m.target_capability_id) || interventionFor.has(m.mission_id)))
       return {
         planId: plan?.id || null,
         recommended: recommended.map((m) => card(m, attempts, interventionFor.get(m.mission_id) || null)),

@@ -8,7 +8,7 @@ const Message = z.object({ speaker: z.string(), role: z.string().nullable(), con
 
 export const SessionContractSchema = z.object({
   sessionId: z.string(),
-  status: z.enum(['IN_PROGRESS', 'SCORING', 'SCORING_FAILED', 'COMPLETED']),
+  status: z.enum(['ALLOCATED', 'IN_PROGRESS', 'SCORING', 'SCORING_FAILED', 'COMPLETED']),
   scope: z.enum(['PERSONAL', 'SPONSORED']),
   sponsorName: z.string().nullable(),
   assessment: z.object({ definitionId: z.string(), title: z.string() }),
@@ -25,14 +25,28 @@ export const SessionContractSchema = z.object({
   progress: z.object({ exchanges: z.number().int().min(0), requiredExchanges: z.number().int().min(0) }),
   integrityPolicy: z.string(),
   device: z.object({ requiresLargeScreen: z.boolean(), allowSmallScreen: z.boolean() }),
-  timing: z.object({ serverTime: z.string().datetime(), startedAt: z.string().datetime().nullable(), deadlineAt: z.string().datetime().nullable(), remainingMs: z.number().nonnegative().nullable() }),
+  timing: z.object({
+    serverTime: z.string().datetime(), startedAt: z.string().datetime().nullable(), deadlineAt: z.string().datetime().nullable(), remainingMs: z.number().nonnegative().nullable(),
+    // P3.8 additive: server-authoritative begin/grace/policy; absent on legacy contracts.
+    begun: z.boolean().optional(), graceDeadlineAt: z.string().datetime().nullable().optional(), policyVersion: z.string().nullable().optional(), policyDurationMs: z.number().nullable().optional(),
+  }),
   reportPath: z.string().nullable(),
+  // P4.6: task-stage strip (names and state only; never scores or coverage).
+  stages: z.array(z.object({ id: z.string(), label: z.string(), state: z.enum(['DONE', 'CURRENT', 'UPCOMING']) })).optional(),
+  // P2.6: system-processing state, separate from any measurement outcome.
+  processing: z.object({
+    state: z.enum(['NONE', 'QUEUED', 'LEASED', 'DONE', 'FAILED']),
+    resultState: z.string().nullable().optional(),
+    retryable: z.boolean().optional(),
+    acceptedActions: z.number().int().min(0).optional(),
+  }).optional(),
 })
 
 const StartSchema = z.object({ sessionId: z.string(), resumed: z.boolean(), to: z.string() })
 const MessageResultSchema = z.object({ messages: z.array(Message), exchanges: z.number().int().min(0), replayed: z.boolean() })
 const ArtifactResultSchema = z.object({ artifactId: z.string(), version: z.number().int().min(1), data: z.unknown(), notes: z.string().optional(), replayed: z.boolean() })
 const FinishSchema = z.object({ state: z.enum(['COMPLETE', 'SCORING']) })
+const BeginSchema = z.object({ startedAt: z.string().datetime(), deadlineAt: z.string().datetime(), graceDeadlineAt: z.string().datetime().nullable().optional(), policyVersion: z.string().nullable().optional(), replayed: z.boolean() })
 
 const path = (sessionId) => `/api/v1/assessment-sessions/${encodeURIComponent(sessionId)}`
 
@@ -83,6 +97,19 @@ export async function finishSession(sessionId, { early = false } = {}) {
     body: early ? { early: true } : {},
     schema: FinishSchema,
     defaultErrorMessage: 'Your assessment could not be submitted.',
+  })
+  return data
+}
+
+// Begins the timed phase once; the same Idempotency-Key always returns the
+// original server timestamps (P3.8). Never called by dismissing the intro.
+export async function beginSession(sessionId, { idempotencyKey }) {
+  const { data } = await request(`${path(sessionId)}/begin`, {
+    method: 'POST',
+    body: {},
+    idempotencyKey,
+    schema: BeginSchema,
+    defaultErrorMessage: 'The assessment did not start.',
   })
   return data
 }

@@ -80,17 +80,24 @@ const ResultSchema = z.object({
     quote: nullableStr, checks: z.array(z.object({ description: z.string(), passed: z.boolean() })), note: nullableStr,
   })),
 })
+const OriginSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('GOAL') }),
+  z.object({ kind: z.literal('ASSESSMENT_MOMENT'), sessionId: z.string(), opportunityId: z.string() }),
+])
 export const AttemptSchema = z.object({
   id: z.string(), missionId: z.string(), missionVersion: z.number(),
   status: z.enum(['IN_PROGRESS', 'EVALUATED', 'EVALUATION_UNAVAILABLE']),
   version: z.number(), work: z.record(z.unknown()), hints: z.array(z.string()), hintsRemaining: z.number(),
+  origin: OriginSchema.nullable().optional(),
   result: ResultSchema.nullable(), submittedAt: nullableStr, evidenceType: z.literal('PRACTICE'),
 })
 
 export const fetchV2Missions = () => request('/api/v1/missions', { schema: z.object({ items: z.array(MissionCardSchema) }).passthrough(), defaultErrorMessage: 'Practice missions could not be loaded.' }).then((r) => r.data.items)
 export const fetchV2Mission = (id) => request(`/api/v1/missions/${encodeURIComponent(id)}`, { schema: MissionViewSchema, defaultErrorMessage: 'This mission could not be loaded.' }).then((r) => r.data)
-export const startMissionAttempt = (id, { retry = false, idempotencyKey = newIdempotencyKey('mission') } = {}) => request(`/api/v1/missions/${encodeURIComponent(id)}/attempts`, {
-  method: 'POST', body: retry ? { retry: true } : {}, idempotencyKey, schema: AttemptSchema, defaultErrorMessage: 'The mission could not be started.',
+// `origin` (P2.8): the learner's goal, or the approved assessment moment this
+// practice was started from — identifiers only, never assessment content.
+export const startMissionAttempt = (id, { retry = false, origin = null, idempotencyKey = newIdempotencyKey('mission') } = {}) => request(`/api/v1/missions/${encodeURIComponent(id)}/attempts`, {
+  method: 'POST', body: { ...(retry ? { retry: true } : {}), ...(origin ? { origin } : {}) }, idempotencyKey, schema: AttemptSchema, defaultErrorMessage: 'The mission could not be started.',
 }).then((r) => r.data)
 export const fetchMissionAttempt = (attemptId) => request(`/api/v1/mission-attempts/${encodeURIComponent(attemptId)}`, { schema: AttemptSchema, defaultErrorMessage: 'Your work could not be loaded.' }).then((r) => r.data)
 export const saveMissionWork = (attemptId, version, work) => request(`/api/v1/mission-attempts/${encodeURIComponent(attemptId)}`, {

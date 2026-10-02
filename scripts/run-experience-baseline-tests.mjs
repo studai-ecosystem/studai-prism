@@ -9,7 +9,7 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'browser', 'browser-smoke', 'browser-all'].includes(mode) || process.argv.length > 3) {
+if (!['database', 'browser', 'browser-smoke', 'browser-all', 'browser-p1'].includes(mode) || process.argv.length > 3) {
   throw new Error('Use database, browser, browser-smoke or browser-all mode; connection strings are never arguments.')
 }
 
@@ -77,6 +77,7 @@ try {
   const browserArgs = ['node_modules/@playwright/test/cli.js', 'test',
     'flow-entry.spec.js', 'flow-player-layout.spec.js', 'flow-recovery.spec.js']
   if (mode === 'browser-all') browserArgs.splice(2)
+  if (mode === 'browser-p1') browserArgs.splice(2, browserArgs.length, 'p1-legacy-report.spec.js', 'p1-account-entry.spec.js', 'flow-entry.spec.js')
   if (mode === 'browser-smoke') browserArgs.push('--grep', 'returning login|pending report')
   exitCode = await run(mode === 'database'
     ? ['--test', 'server/test/experienceBaseline.db.test.js'] : browserArgs, env)

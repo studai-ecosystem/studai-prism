@@ -1,6 +1,6 @@
 // /app/assessments and /app/campus/:organizationId/assignments (spec §10).
 // Active / Completed / Upcoming / History; every card states personal or sponsored.
-import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { Tabs } from '../../../components/ui/Tabs.jsx'
 import { LinkButton } from '../../../components/ui/Button.jsx'
@@ -22,9 +22,20 @@ function List({ items, empty, action }) {
   )
 }
 
+const TAB_IDS = ['active', 'completed', 'upcoming', 'history']
+
 export default function AssessmentsPage() {
   const { active } = useWorkspace()
-  const [tab, setTab] = useState('active')
+  // `?tab=history` lets a practice attempt return to the history list (P2.8)
+  // and is the History navigation entry (P3.2): one projection, one page.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = TAB_IDS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'active'
+  const setTab = (next) => {
+    const params = new URLSearchParams(searchParams)
+    if (next === 'active') params.delete('tab')
+    else params.set('tab', next)
+    setSearchParams(params, { replace: true })
+  }
   const query = useStudentAssessments()
   const personal = active.type === 'PERSONAL'
   const description = personal ? 'Assessments you bought or were given. Only you can see these results.' : 'Assessments your institution assigned to you.'

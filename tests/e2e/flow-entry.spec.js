@@ -68,14 +68,20 @@ test('FLOW-ENTRY enabled aliases and recent report links are usable at every wid
       completed('latest', '2026-10-01T10:00:00.000Z', '/app/reports/latest'),
     ] } },
   }))
+  await page.route('**/api/v1/me/history**', (route) => route.fulfill({
+    json: { data: { items: [
+      { id: 'FORMAL_SESSION:latest', sourceType: 'FORMAL_SESSION', sourceId: 'latest', mode: 'FORMAL', title: 'Synthetic latest', startedAt: null, completedAt: '2026-10-01T10:00:00.000Z', issuedAt: '2026-10-01T10:00:00.000Z', scope: 'PERSONAL', sponsorOrganizationId: null, status: 'COMPLETED', reportFormat: 'V3', permittedAction: { kind: 'VIEW_REPORT', to: '/app/reports/latest' }, recoveryState: 'NONE' },
+      { id: 'LEGACY_REPORT:older', sourceType: 'LEGACY_REPORT', sourceId: 'older', mode: 'FORMAL', title: 'Synthetic older', startedAt: null, completedAt: '2026-09-01T10:00:00.000Z', issuedAt: '2026-09-01T10:00:00.000Z', scope: 'PERSONAL', sponsorOrganizationId: null, status: 'LEGACY', reportFormat: 'LEGACY_V2', permittedAction: { kind: 'VIEW_REPORT', to: '/score?session=older' }, recoveryState: 'NONE' },
+    ], nextCursor: null } },
+  }))
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto(`${CAMPUS_BASE_URL}/dashboard`)
     await expect(page).toHaveURL(`${CAMPUS_BASE_URL}/app/home`)
-    const history = page.getByRole('region', { name: 'Recent assessments' })
+    const history = page.getByRole('region', { name: 'Recent activity' })
     await expect(history.getByRole('link', { name: /^View report\s*:\s*Synthetic latest$/ })).toHaveAttribute('href', '/app/reports/latest')
-    await expect(history.getByRole('link', { name: /^View report\s*:\s*Synthetic older$/ })).toHaveAttribute('href', '/score?session=older')
-    await expect(history.getByRole('link', { name: 'View all assessments' })).toHaveAttribute('href', '/app/assessments')
+    await expect(history.getByRole('link', { name: /^Original report\s*:\s*Synthetic older$/ })).toHaveAttribute('href', '/score?session=older')
+    await expect(history.getByRole('link', { name: 'View all history' })).toHaveAttribute('href', /\/app\/assessments\?tab=history/)
     await expectNoHorizontalOverflow(page)
     if (width === 1440 || width === 390) await expectNoSeriousAxe(page)
     if (width === 1440 || width === 390) await page.screenshot({ path: join('audit-results', 'ui', 'flow-repair', `history-${width}.png`), fullPage: true })

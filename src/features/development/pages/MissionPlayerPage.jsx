@@ -1,8 +1,8 @@
 // Mission player (spec §16.4): concise scenario, clear deliverable, artifact
 // workspace, optional hint drawer, autosave, submit review, criterion
 // feedback and retry. Practice only — no levels, points or badges.
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { Panel } from '../../../components/ui/Card.jsx'
 import { PracticeLabel } from '../../../components/missions/PracticeLabel.jsx'
@@ -19,12 +19,28 @@ import { MissionFeedback } from '../components/MissionFeedback.jsx'
 import { MissionNextSteps } from '../components/MissionNextSteps.jsx'
 
 const SAVE_DELAY_MS = 1200
+const ORIGIN_ID = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/
+
+// Why this practice was started (P2.8). `?source=<sessionId>&moment=<id>`
+// names one approved assessment moment by id; anything else is the learner's
+// own goal (the server default, so nothing is sent). The attempt receives
+// these identifiers only.
+function originFrom(params) {
+  const sessionId = params.get('source') || ''
+  const opportunityId = params.get('moment') || ''
+  if (ORIGIN_ID.test(sessionId) && ORIGIN_ID.test(opportunityId)) return { kind: 'ASSESSMENT_MOMENT', sessionId, opportunityId }
+  return null
+}
 
 export default function MissionPlayerPage() {
   const { missionId } = useParams()
+  const [searchParams] = useSearchParams()
+  const origin = useMemo(() => originFrom(searchParams), [searchParams])
   const { active } = useWorkspace()
   const copy = DEVELOPMENT_COPY.player
   const devPath = active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/development` : '/app/development'
+  const assessmentsPath = active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/assignments` : '/app/assessments'
+  const historyPath = `${assessmentsPath}?tab=history`
   const missionQuery = useMission(missionId)
   const [attemptId, setAttemptId] = useState(null)
   const attemptQuery = useMissionAttempt(attemptId)
@@ -85,7 +101,7 @@ export default function MissionPlayerPage() {
   }
 
   async function start(retry = false) {
-    const a = await actions.start.mutateAsync({ retry }).catch(() => null)
+    const a = await actions.start.mutateAsync({ retry, origin }).catch(() => null)
     if (!a) return // the error is shown next to the button that was pressed
     setDirty(false)
     setSaveState('idle')
@@ -144,6 +160,11 @@ export default function MissionPlayerPage() {
     <div className="space-y-6">
       {header}
       <PracticeLabel variant="band" />
+      {origin?.kind === 'ASSESSMENT_MOMENT' && (
+        <p className="text-sm text-prism-ink-muted" data-testid="practice-origin">
+          {copy.originNote} <Link to={historyPath} className="font-semibold underline">{copy.backToHistory}</Link>
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         {mission.targetCapability.name && <span className="text-sm text-prism-ink-muted">Focus: {mission.targetCapability.name}</span>}
         {intervention && <span className="text-sm text-prism-ink-muted">· Part of {intervention.name}{intervention.endsOn ? `, until ${formatDate(intervention.endsOn)}` : ''}</span>}
@@ -208,12 +229,13 @@ export default function MissionPlayerPage() {
                     result={attempt.result}
                     missionId={missionId}
                     missionPath={(id) => `${devPath}/missions/${id}`}
-                    assessmentsPath={active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/assignments` : '/app/assessments'}
+                    assessmentsPath={assessmentsPath}
                   />
                   {actions.start.error && <div role="alert" className="mt-3"><InlineNotice tone="blocked">{actions.start.error.message}</InlineNotice></div>}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button onClick={() => start(true)} loading={actions.start.isPending}>{copy.retry}</Button>
                     <LinkButton to={devPath}>Back to development</LinkButton>
+                    <LinkButton to={historyPath} variant="secondary">{copy.backToHistory}</LinkButton>
                   </div>
                 </Panel>
               )}

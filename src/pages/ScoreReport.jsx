@@ -681,7 +681,7 @@ export default function ScoreReport() {
 .cert-score-lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.55);margin-bottom:6px}
 .cert-score-tier{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:100px;padding:5px 14px;font-size:13px;font-weight:700;color:white;margin-top:10px}
 .cert-pct-num{font-family:var(--fm);font-size:32px;font-weight:500;color:rgba(255,255,255,0.9);letter-spacing:-0.03em}
-.cert-validity{font-size:11px;color:rgba(255,255,255,0.45);margin-top:6px}
+.cert-validity{font-size:11px;color:rgba(255,255,255,0.75);margin-top:6px}
 .cert-bottom{padding:18px 44px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--bd);flex-wrap:wrap;gap:16px}
 .cert-id-block{display:flex;flex-direction:column;gap:2px}
 .cert-id-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--t4)}
@@ -712,12 +712,13 @@ export default function ScoreReport() {
 .pct-band-arrow{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:5px solid var(--pr);position:absolute;top:-6px;left:50%;transform:translateX(-50%);display:none}
 .pct-band.active .pct-band-arrow{display:block}
 .dims-section{margin-bottom:16px}
+.score-breakdown-row{display:grid;grid-template-columns:168px minmax(60px,1fr) 44px 48px 56px;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--bd)}
 .dims-grid{display:grid;grid-template-columns:1fr;gap:10px}
 .dim-card{background:var(--s0);border:1px solid var(--bd);border-radius:14px;padding:20px;display:flex;gap:16px;align-items:flex-start;transition:border-color 160ms ease}
 .dim-card:hover{border-color:var(--bd2)}
 .dim-ring{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;flex-shrink:0;border:2px solid;font-family:var(--fm)}
 .dim-ring-num{font-size:18px;font-weight:500;line-height:1;letter-spacing:-0.03em}
-.dim-ring-max{font-size:10px;opacity:0.6;letter-spacing:-0.01em}
+.dim-ring-max{font-size:10px;color:var(--t2);letter-spacing:-0.01em}
 .dim-body{flex:1;min-width:0}
 .dim-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
 .dim-name{font-size:15px;font-weight:700;color:var(--t1);letter-spacing:-0.02em}
@@ -773,6 +774,8 @@ export default function ScoreReport() {
   .prism-report .cert-name{font-size:32px}
   .prism-report .cert-bottom,.prism-report .cert-scenario{padding-left:24px;padding-right:24px}
   .prism-report .two-col,.prism-report .sw-grid,.prism-report .interview-qs{grid-template-columns:1fr}
+  .prism-report .score-breakdown-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .prism-report .score-breakdown-row>div:nth-child(-n+2){grid-column:1/-1}
 }
       `}</style>
 
@@ -859,14 +862,14 @@ export default function ScoreReport() {
               <div style={{ textAlign: 'right' }}>
                 {hasComposite && (
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: '14px 20px', flexDirection: 'column' }}>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>National Percentile</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>National Percentile</div>
                     {pctAll != null ? (
                       <>
                         <div className="cert-pct-num">{pctAll}<span style={{ fontSize: 18, opacity: 0.6 }}>{ordinalSuffix(pctAll)}</span></div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Top {Math.max(1, 100 - pctAll)}% nationally</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>Top {Math.max(1, 100 - pctAll)}% nationally</div>
                       </>
                     ) : (
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', maxWidth: 140, lineHeight: 1.5 }}>Available once enough candidates have tested</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', maxWidth: 140, lineHeight: 1.5 }}>Available once enough candidates have tested</div>
                     )}
                   </div>
                 )}
@@ -1030,7 +1033,7 @@ export default function ScoreReport() {
               return (
                 <div
                   key={d.key}
-                  style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: '1px solid var(--bd)' }}
+                  className="score-breakdown-row"
                 >
                   <div style={{ flex: '0 0 168px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                     <div style={{ width: 10, height: 10, borderRadius: 3, background: d.color, flexShrink: 0 }} />

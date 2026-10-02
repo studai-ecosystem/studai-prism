@@ -2,6 +2,7 @@
 // PRISM_APP_SHELL_V3 and PRISM_ASSESSMENT_WORKSPACE_V3 are on.
 //   POST  /assessment-assignments/:id/start          Idempotency-Key + consent
 //   GET   /assessment-sessions/:sessionId            metadata contract (resume)
+//   POST  /assessment-sessions/:sessionId/begin      Idempotency-Key; timed start (P3.8)
 //   POST  /assessment-sessions/:sessionId/messages   idempotent by clientEventId
 //   PATCH /assessment-sessions/:sessionId/artifacts/:artifactId   If-Match version
 //   POST  /assessment-sessions/:sessionId/finish     required-opportunity check
@@ -28,6 +29,7 @@ const Artifact = z.object({
   clientEventId: z.string().regex(EVENT_ID).optional(),
 }).strict()
 const Finish = z.object({ early: z.boolean().optional() }).strict()
+const Begin = z.object({ expectedVersion: z.number().int().min(1).max(1_000_000).optional() }).strict()
 
 export function createAssessmentSessionsRouter({ requireUser, campus }) {
   const router = Router()
@@ -53,6 +55,15 @@ export function createAssessmentSessionsRouter({ requireUser, campus }) {
 
   router.get('/assessment-sessions/:sessionId', ...gates, available, sessionParam, asyncHandler(async (req, res) => {
     return ok(res, await campus.sessions.get({ ...ctx(req), sessionId: req.params.sessionId }))
+  }))
+
+  router.post('/assessment-sessions/:sessionId/begin', ...gates, available, sessionParam, asyncHandler(async (req, res) => {
+    const key = req.get('idempotency-key')
+    if (!key || key.length > 128) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
+    const parsed = Begin.safeParse(req.body || {})
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', 'Invalid request.')
+    const out = await campus.sessions.begin({ ...ctx(req), sessionId: req.params.sessionId, idempotencyKey: key, expectedVersion: parsed.data.expectedVersion ?? null })
+    return ok(res, out)
   }))
 
   router.post('/assessment-sessions/:sessionId/messages', ...gates, available, sessionParam, asyncHandler(async (req, res) => {

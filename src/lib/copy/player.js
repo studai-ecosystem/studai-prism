@@ -25,6 +25,8 @@ export const PLAYER_COPY = {
   completeBody: 'Your answers are submitted. Your report shows what was observed, and says where there was not enough evidence.',
   scoringTitle: 'Your answers are being reviewed',
   scoringBody: 'This can take a few minutes. You can leave this page; your report will appear in Assessments when it is ready.',
+  savedReviewContinuing: (n) => `Your work is saved (${n} ${n === 1 ? 'response' : 'responses'} recorded). The review is continuing; you can leave this page.`,
+  technicalFailedBody: 'We could not complete the review yet. Your saved work is kept. Try again, or contact support with the reference below.',
   statusRefreshFailed: 'We could not refresh the review status. The last saved status is shown.',
   scoringFailedTitle: 'Review did not finish',
   scoringFailedBody: 'The review did not finish, so no completed report is available yet. Try again or contact support.',

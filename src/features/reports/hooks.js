@@ -2,9 +2,9 @@
 // ['ws', workspaceId] so a workspace switch never shows another context's report.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkspace, wsKey } from '../../app/providers/WorkspaceProvider.jsx'
-import { fetchStudentReport, fetchSharedReport, createReportShare, deleteShareGrant } from '../../api/reports.js'
+import { fetchStudentReport, fetchSharedReport, createReportShare, deleteShareGrant, fetchReportVersions, requestReportReview } from '../../api/reports.js'
 
-const noRetry = (count, err) => !['FORBIDDEN', 'NOT_FOUND', 'VALIDATION_FAILED', 'REPORT_NOT_READY', 'REPORT_UNDER_REVIEW'].includes(err?.code) && err?.status !== 404 && count < 1
+const noRetry = (count, err) => !['FORBIDDEN', 'NOT_FOUND', 'VALIDATION_FAILED', 'REPORT_NOT_READY', 'REPORT_UNDER_REVIEW', 'REPORT_PROCESSING_FAILED'].includes(err?.code) && err?.status !== 404 && count < 1
 
 export function useStudentReport(sessionId, { enabled = true } = {}) {
   const { active } = useWorkspace()
@@ -36,5 +36,20 @@ export function useDeleteShare(sessionId) {
       queryClient.invalidateQueries({ queryKey: wsKey(active.id, 'report', sessionId) })
       queryClient.invalidateQueries({ queryKey: ['account', 'share-grants'] })
     },
+  })
+}
+
+// Version history (owner only). Fetched on demand from the details area.
+export function useReportVersions(sessionId, { enabled = true } = {}) {
+  const { active } = useWorkspace()
+  return useQuery({ queryKey: wsKey(active.id, 'report', sessionId, 'versions'), queryFn: () => fetchReportVersions(sessionId), retry: noRetry, enabled })
+}
+
+export function useRequestReview(sessionId) {
+  const { active } = useWorkspace()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body) => requestReportReview(sessionId, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: wsKey(active.id, 'report', sessionId, 'versions') }),
   })
 }

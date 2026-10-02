@@ -150,6 +150,59 @@ describe('artifact store (§39.3)', () => {
 describe('Assessment Workspace V3 player (§12)', () => {
   beforeEach(() => setWide(true))
 
+  it('P3.7/T14-T16 the scenario intro is modal before begin; only the explicit button starts the clock and refresh keeps one start time', async () => {
+    let begun = false
+    const beginCalls = []
+    const allocated = () => contract({
+      status: begun ? 'IN_PROGRESS' : 'ALLOCATED',
+      timing: begun
+        ? { serverTime: '2026-10-01T10:00:00.000Z', startedAt: '2026-10-01T10:00:00.000Z', deadlineAt: '2026-10-01T10:25:00.000Z', graceDeadlineAt: '2026-10-01T10:30:00.000Z', remainingMs: 25 * 60000, begun: true, policyVersion: 'draft-universal-25.v0-proposed', policyDurationMs: 25 * 60000 }
+        : { serverTime: '2026-10-01T10:00:00.000Z', startedAt: null, deadlineAt: null, graceDeadlineAt: null, remainingMs: null, begun: false, policyVersion: 'draft-universal-25.v0-proposed', policyDurationMs: 25 * 60000 },
+    })
+    const { spy } = renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001/begin': (url) => { beginCalls.push(url); begun = true; return jsonResponse(200, { data: { startedAt: '2026-10-01T10:00:00.000Z', deadlineAt: '2026-10-01T10:25:00.000Z', graceDeadlineAt: '2026-10-01T10:30:00.000Z', policyVersion: 'draft-universal-25.v0-proposed', replayed: beginCalls.length > 1 } }) },
+      '/api/v1/assessment-sessions/sess-v3-0001': () => jsonResponse(200, { data: allocated() }),
+    })
+    const dialog = await screen.findByRole('dialog', { name: 'Synthetic Scenario' })
+    expect(within(dialog).getByText('Synthetic context.')).toBeInTheDocument()
+    expect(within(dialog).getByText(/You have 25 minutes to answer once you begin/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/proposed and under review/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Your answer')).not.toBeInTheDocument()
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument()
+    // Escape is "Not yet": it leaves without ever calling begin.
+    expect(within(dialog).getByRole('link', { name: 'Not yet' })).toHaveAttribute('href', '/app/assessments')
+    const beginBtn = within(dialog).getByRole('button', { name: 'Begin timed assessment' })
+    expect(beginBtn).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+    expect(beginCalls).toHaveLength(0)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument()
+  })
+
+  it('P3.7/T15 the explicit Begin button starts once; a double click reuses one idempotency key and the clock appears', async () => {
+    let begun = false
+    const beginCalls = []
+    const allocated = () => contract({
+      status: begun ? 'IN_PROGRESS' : 'ALLOCATED',
+      timing: begun
+        ? { serverTime: '2026-10-01T10:00:00.000Z', startedAt: '2026-10-01T10:00:00.000Z', deadlineAt: '2026-10-01T10:25:00.000Z', graceDeadlineAt: '2026-10-01T10:30:00.000Z', remainingMs: 25 * 60000, begun: true, policyVersion: 'draft-universal-25.v0-proposed', policyDurationMs: 25 * 60000 }
+        : { serverTime: '2026-10-01T10:00:00.000Z', startedAt: null, deadlineAt: null, graceDeadlineAt: null, remainingMs: null, begun: false, policyVersion: 'draft-universal-25.v0-proposed', policyDurationMs: 25 * 60000 },
+    })
+    const { spy } = renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001/begin': (url) => { beginCalls.push(url); begun = true; return jsonResponse(200, { data: { startedAt: '2026-10-01T10:00:00.000Z', deadlineAt: '2026-10-01T10:25:00.000Z', graceDeadlineAt: '2026-10-01T10:30:00.000Z', policyVersion: 'draft-universal-25.v0-proposed', replayed: beginCalls.length > 1 } }) },
+      '/api/v1/assessment-sessions/sess-v3-0001': () => jsonResponse(200, { data: allocated() }),
+    })
+    const dialog = await screen.findByRole('dialog', { name: 'Synthetic Scenario' })
+    const beginBtn = within(dialog).getByRole('button', { name: 'Begin timed assessment' })
+    await userEvent.click(beginBtn)
+    await userEvent.click(beginBtn).catch(() => {})
+    expect(await screen.findByLabelText('Your answer')).toBeInTheDocument()
+    expect(screen.getByRole('timer')).toBeInTheDocument()
+    expect(beginCalls.length).toBeGreaterThanOrEqual(1)
+    const keys = new Set(spy.mock.calls.filter(([u]) => String(u).endsWith('/begin')).map(([, init]) => init.headers['Idempotency-Key']))
+    expect(keys.size).toBe(1)
+  })
+
   it('conversation-only mode has no empty workspace and the composer is outside the scrolling conversation', async () => {
     renderPlayer({ '/api/v1/assessment-sessions/sess-v3-0001': { data: contract() } })
     const answer = await screen.findByLabelText('Your answer')

@@ -4,9 +4,22 @@
 
 export const PRIMARY_ACTION_COPY = {
   ASSESSMENT_DUE: { eyebrow: 'Due soon', cta: 'Open briefing' },
-  ASSESSMENT_IN_PROGRESS: { eyebrow: 'In progress', cta: 'Resume' },
+  ASSESSMENT_IN_PROGRESS: { eyebrow: 'Saved assessment', cta: 'Resume saved assessment', description: 'Your progress is saved. Resuming continues the same assessment under the same timing; it does not use another assessment.' },
   ASSESSMENT_READY: { eyebrow: 'Ready to start', cta: 'Open briefing' },
-  REPORT_READY: { eyebrow: 'Report ready', cta: 'View report' },
+  ASSESSMENT_PROCESSING: {
+    eyebrow: 'Review in progress',
+    title: 'Your work is saved; review is continuing',
+    description: 'Your responses were received and the report is being prepared. There is nothing you need to do. Check History for the current status.',
+    cta: 'Check status',
+  },
+  ASSESSMENT_TECHNICAL_FAILED: {
+    eyebrow: 'Review did not finish',
+    title: 'A technical problem stopped this assessment before a report could be written',
+    description: 'Nothing you did is lost. Open the assessment to let the review try again. If that does not work, contact support and quote the reference below.',
+    cta: 'Open assessment',
+    support: 'Contact support',
+  },
+  REPORT_READY: { eyebrow: 'Report ready', cta: 'Open my report' },
   CAPABILITY_SUMMARY: {
     eyebrow: 'Nothing due right now',
     title: 'Your capability profile',
@@ -25,6 +38,29 @@ export const PRIMARY_ACTION_COPY = {
     description: 'When your institution assigns an assessment, it appears here with its due date.',
   },
 }
+
+// New-learner intention chooser (P3.3): what each path is for, and whether it
+// is available now. Prepare is stated as not yet available rather than hidden.
+export const INTENT_COPY = {
+  heading: 'What would you like to do?',
+  UNDERSTAND: {
+    title: 'Understand',
+    description: 'Take a formal assessment: a workplace simulation that shows how you reason, communicate and work with others, with the evidence behind every conclusion.',
+    cta: 'Take the assessment',
+  },
+  PRACTISE: {
+    title: 'Practise',
+    description: 'Short development missions with coaching. Practice is labelled as practice and never changes your formal results.',
+    cta: 'See practice missions',
+  },
+  PREPARE: {
+    title: 'Prepare',
+    description: 'Private preparation for a specific role or interview. This is not yet available; it opens when the preparation experience is ready.',
+    unavailable: 'Not yet available',
+  },
+}
+
+export const NAV_UNAVAILABLE_NOTE = 'Not yet available. Prepare opens when the preparation experience is ready.'
 
 export const ASSESSMENT_STATUS_COPY = {
   NOT_STARTED: { label: 'Not started', tone: 'neutral' },
@@ -190,6 +226,8 @@ export const DEVELOPMENT_COPY = {
     submitConfirmBody: 'You will see feedback for each behaviour. You cannot edit this attempt afterwards, but you can start a new one.',
     resultTitle: 'Feedback',
     retry: 'Try again',
+    backToHistory: 'Back to history',
+    originNote: 'Started from a moment in one of your assessments. This practice is recorded separately and does not change that assessment or its report.',
     results: { OBSERVED: 'Shown', NOT_OBSERVED: 'Not shown yet', UNCERTAIN: 'Could not be checked' },
     unavailable: 'Part of the feedback could not be produced right now. Nothing was guessed: those behaviours are not counted either way.',
   },

@@ -1,21 +1,20 @@
-// /app/home and /app/campus/:organizationId/home (spec §9): what should I do
-// now? Primary action by server priority, capability snapshot, up to three
-// focus areas, and the privacy context of the active workspace.
+// /app/home and /app/campus/:organizationId/home (spec §9, P3.3): what should
+// I do now? One dominant action by server priority, recent activity from the
+// history projection, capability snapshot, up to three focus areas, and the
+// privacy context of the active workspace.
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { DocumentTitle } from '../../../components/ui/DocumentTitle.jsx'
-import { Card } from '../../../components/ui/Card.jsx'
-import { LinkButton } from '../../../components/ui/Button.jsx'
-import { Badge } from '../../../components/ui/Badge.jsx'
 import { CapabilitySnapshotCard } from '../../../components/capability/CapabilitySnapshotCard.jsx'
 import { CapabilityLevelBadge } from '../../../components/capability/CapabilityLevelBadge.jsx'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { Link } from 'react-router-dom'
-import { useStudentHome, useStudentAssessments, useDevelopmentPlan, useGrowth } from '../../student/hooks.js'
-import { AssessmentAssignmentCard } from '../../assessments/components/AssessmentAssignmentCard.jsx'
+import { useStudentHome, useStudentHistory, useDevelopmentPlan, useGrowth } from '../../student/hooks.js'
 import { assignmentsListPath } from '../../assessments/pages/BriefingPage.jsx'
-import { queryStateView, formatDate } from '../../student/QueryState.jsx'
-import { PRIMARY_ACTION_COPY, SCOPE_LABEL } from '../../../lib/copy/student.js'
+import { queryStateView } from '../../student/QueryState.jsx'
 import { PERSONAL_PRIVACY_NOTE, SPONSORED_PRIVACY_NOTE } from '../../../lib/copy/privacy.js'
+import { NextActionCard } from '../components/NextActionCard.jsx'
+import { IntentChooser } from '../components/IntentChooser.jsx'
+import { RecentActivityList } from '../components/RecentActivityList.jsx'
 
 function greeting(name) {
   const hour = new Date().getHours()
@@ -24,30 +23,10 @@ function greeting(name) {
   return first ? `${part}, ${first}` : part
 }
 
-function PrimaryAction({ action, sponsorName }) {
-  const copy = PRIMARY_ACTION_COPY[action.kind]
-  const assessment = Boolean(action.assignmentId)
-  const due = formatDate(action.dueAt)
-  return (
-    <Card className="space-y-3 border-prism-accent-soft p-6" aria-labelledby="primary-action">
-      <p className="text-xs font-semibold uppercase tracking-wide text-prism-accent-strong">{copy.eyebrow}</p>
-      <h2 id="primary-action" className="text-xl font-semibold text-prism-ink">{assessment ? action.title : copy.title}</h2>
-      {assessment && (
-        <div className="flex flex-wrap items-center gap-2 text-sm text-prism-ink-muted">
-          <Badge tone={action.scope === 'SPONSORED' ? 'accent' : 'neutral'}>{action.scope === 'SPONSORED' ? SCOPE_LABEL.SPONSORED(sponsorName) : SCOPE_LABEL.PERSONAL}</Badge>
-          {due && <span>Due {due}</span>}
-        </div>
-      )}
-      {!assessment && copy.description && <p className="max-w-2xl text-sm text-prism-ink-muted">{copy.description}</p>}
-      {action.to && copy.cta && <LinkButton to={action.to} variant="primary">{copy.cta}</LinkButton>}
-    </Card>
-  )
-}
-
 export default function HomePage() {
   const { active } = useWorkspace()
   const home = useStudentHome()
-  const assessments = useStudentAssessments()
+  const history = useStudentHistory()
   const plan = useDevelopmentPlan()
   const growth = useGrowth()
   const campus = active.type === 'CAMPUS_STUDENT'
@@ -67,12 +46,11 @@ export default function HomePage() {
   const strengths = data.capabilitySnapshot.filter((c) => c.level && (c.level.band === 'DEMONSTRATED' || c.level.band === 'STRONG')).slice(0, 3)
   const mission = !campus && plan.data && plan.data.missionsAvailable ? plan.data.missions[0] : null
   const comparable = Boolean(growth.data && growth.data.comparable)
-  const historyState = queryStateView(assessments, { label: 'Loading recent assessments', homeTo: assignmentsListPath(active) })
-  const recent = assessments.data?.completed
-    .filter((a) => a.status === 'COMPLETED')
-    .slice()
-    .sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''))
-    .slice(0, 3)
+  const historyTo = `${assignmentsListPath(active)}?tab=history`
+  // A new learner: the server offers "get started" and the workspace owns no
+  // record at all. Only then is the intention chooser the primary action.
+  const historyEmpty = Boolean(history.data) && history.data.pages.every((p) => p.items.length === 0)
+  const newLearner = data.primaryAction.kind === 'GET_STARTED' && historyEmpty
   return (
     <div className="space-y-8">
       <PageHeader
@@ -81,21 +59,11 @@ export default function HomePage() {
         context={active}
       />
       <DocumentTitle title="Home" />
-      <PrimaryAction action={data.primaryAction} sponsorName={campus ? org : null} />
+      {newLearner
+        ? <IntentChooser assessmentTo={data.primaryAction.to} practiceTo="/app/development" />
+        : <NextActionCard action={data.primaryAction} sponsorName={campus ? org : null} historyTo={historyTo} />}
 
-      <section aria-labelledby="recent-assessments-title" className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="recent-assessments-title" className="text-lg font-semibold text-prism-ink">Recent assessments</h2>
-          <LinkButton to={assignmentsListPath(active)} variant="secondary" size="sm">View all assessments</LinkButton>
-        </div>
-        {historyState || (recent.length > 0 ? (
-          <ul className="grid gap-4 lg:grid-cols-3">
-            {recent.map((a) => <li key={a.id}><AssessmentAssignmentCard assignment={a} /></li>)}
-          </ul>
-        ) : (
-          <p className="text-sm text-prism-ink-muted">No completed assessments are linked to this workspace yet. If you have an earlier report that is missing, <Link to="/contact" className="font-medium text-prism-accent-strong underline">contact support</Link>.</p>
-        ))}
-      </section>
+      <RecentActivityList historyTo={historyTo} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="strengths-title" className="space-y-3">

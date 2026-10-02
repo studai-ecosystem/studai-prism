@@ -8,9 +8,12 @@
 //   - practice evidence is a separate kind and never alters formal status
 import { evaluateProfile } from '../evidence/sufficiency.js'
 import { LEVEL_LABELS_STATUS } from '../evidence/levels.js'
-import { buildClaim, validateClaims, candidateTurnsFrom } from '../reports/claims.js'
-import { PRIMARY_CAPABILITY_IDS, capabilityInfo, definitionForScenario, formForSession } from '../assessments/catalog.js'
+import { buildClaim, validateClaims, candidateTurnsUnion } from '../reports/claims.js'
+import { PRIMARY_CAPABILITY_IDS, CORE_DEFINITION_ID, capabilityInfo, definitionForScenario, formForSession } from '../assessments/catalog.js'
+import { playerPath } from '../assessments/assignmentService.js'
+import { isEnabled } from '../flags/index.js'
 import { RIASEC_KEYS, sanitizeInterests } from '../../lib/roleAffinityEngine.js'
+import { PROCESSING_GRACE_MS } from './history.js'
 
 const ADMISSIBLE = new Set(['PROVISIONAL', 'SUFFICIENT'])
 const GROWTH_BANDS = new Set(['EARLY', 'DEVELOPING'])
@@ -25,7 +28,11 @@ function verifiedQuote(unit, turns) {
   return turns.some((t) => normalise(t).includes(q)) ? excerpt.trim() : null
 }
 
-export function createStudentReadModels({ directory, catalog, assignments, evidence, practice = { list: async () => [] }, development = { enabled: () => false }, growth = { enabled: () => false }, roles, legacy, clock = () => new Date() }) {
+export function createStudentReadModels({ directory, catalog, assignments, evidence, practice = { list: async () => [] }, development = { enabled: () => false }, growth = { enabled: () => false }, roles, legacy, clock = () => new Date(), repos = null }) {
+  // Accepted candidate actions: the quote source that survives a history purge (T32).
+  const actionsFor = async (sessionId) => (repos?.sessionIo && typeof repos.sessionIo.listActions === 'function'
+    ? repos.sessionIo.listActions(sessionId).catch(() => [])
+    : [])
   // One entry per completed formal session in the workspace (newest first).
   // Held or invalidated sessions are never formal evidence (K59).
   async function formalSessions(user, workspace) {
@@ -44,7 +51,7 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
         definition,
         form: formForSession(cat, s.scenarioId),
         units,
-        turns: candidateTurnsFrom(s.history),
+        turns: candidateTurnsUnion(s.history, await actionsFor(s.sessionId)),
         decisions: evaluateProfile(units, { capabilityIds }),
       })
     }
@@ -184,7 +191,29 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
 
     async home(user, workspace) {
       const at = clock()
-      const [lists, caps] = await Promise.all([assignments.listForWorkspace(user, workspace), capabilities(user, workspace)])
+      const [lists, caps, sessions, cat] = await Promise.all([
+        assignments.listForWorkspace(user, workspace), capabilities(user, workspace), directory.listSessions(user, workspace), catalog.getCatalog(),
+      ])
+      // A finished session without a report is either still being reviewed
+      // (within the grace window) or a technical failure to recover from.
+      // Both outrank "resume": the learner's work is saved, not resumable.
+      // Same facts and thresholds as the history projection (P1.2).
+      const awaiting = sessions
+        .filter((s) => s.integrity === 'OK' && s.hasSession && !s.hasReport && s.sessionCompletedAt)
+        .sort((a, b) => String(b.sessionCompletedAt).localeCompare(String(a.sessionCompletedAt)))
+      const failed = awaiting.find((s) => at.getTime() - new Date(s.sessionCompletedAt).getTime() > PROCESSING_GRACE_MS)
+      const processing = awaiting.find((s) => at.getTime() - new Date(s.sessionCompletedAt).getTime() <= PROCESSING_GRACE_MS)
+      const recoveryTo = (s) => {
+        const sponsored = s.scope === 'SPONSORED'
+        if (isEnabled('PRISM_ASSESSMENT_WORKSPACE_V3')) return playerPath(s.sessionId, sponsored ? workspace.id : null)
+        if (sponsored) return null
+        const definitionId = definitionForScenario(cat, s.scenarioId)
+        return legacy.paths.resume(s.sessionId, Boolean(definitionId) && definitionId !== CORE_DEFINITION_ID)
+      }
+      const fromSession = (kind, s, to) => ({
+        kind, sessionId: s.sessionId, title: cat.definitions.find((d) => d.id === definitionForScenario(cat, s.scenarioId))?.title || null,
+        scope: s.scope, completedAt: s.sessionCompletedAt, to,
+      })
       const due = lists.active.find((a) => a.status === 'NOT_STARTED' && a.dueAt)
       const inProgress = lists.active.find((a) => a.status === 'IN_PROGRESS')
       const ready = lists.active.find((a) => a.status === 'NOT_STARTED')
@@ -194,6 +223,8 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
       let primaryAction
       const fromCard = (kind, a) => ({ kind, assignmentId: a.id, title: a.title, scope: a.scope, dueAt: a.dueAt, to: a.cta.to || `${workspace.type === 'CAMPUS_STUDENT' ? `/app/campus/${workspace.organizationId}/assignments` : '/app/assessments'}/${a.id}/briefing` })
       if (due) primaryAction = fromCard('ASSESSMENT_DUE', due)
+      else if (failed) primaryAction = fromSession('ASSESSMENT_TECHNICAL_FAILED', failed, recoveryTo(failed))
+      else if (processing) primaryAction = fromSession('ASSESSMENT_PROCESSING', processing, null)
       else if (inProgress) primaryAction = fromCard('ASSESSMENT_IN_PROGRESS', inProgress)
       else if (ready) primaryAction = fromCard('ASSESSMENT_READY', ready)
       else if (recentReport) primaryAction = fromCard('REPORT_READY', recentReport)

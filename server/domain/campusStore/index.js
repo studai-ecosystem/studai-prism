@@ -20,7 +20,7 @@ import { createAssessmentsRepoPg } from '../assessments/repository.pg.js'
 import { createPreferencesRepoMemory, createPreferencesRepoPg } from '../preferences/repository.js'
 import { createProductEventsRepoMemory, createProductEventsRepoPg } from '../telemetry/events.js'
 import { createSessionIoRepoMemory, createSessionIoRepoPg } from '../assessments/sessionIoRepository.js'
-import { createReportVersionsRepoMemory, createReportVersionsRepoPg } from '../reports/v3/repository.js'
+import { createReportVersionsRepoMemory, createReportVersionsRepoPg, createReportReviewsRepoMemory, createReportReviewsRepoPg } from '../reports/v3/repository.js'
 import { createCampusAdminRepoMemory } from '../campusAdmin/repository.memory.js'
 import { createCampusAdminRepoPg } from '../campusAdmin/repository.pg.js'
 import { createDevelopmentRepoMemory } from '../development/repository.memory.js'
@@ -50,6 +50,7 @@ export function createMemoryCampusRepos(options = {}) {
     sessionIo: createSessionIoRepoMemory(db),
     sessionLocks: createMemorySessionLocks(),
     reportVersions: createReportVersionsRepoMemory(db),
+    reportReviews: createReportReviewsRepoMemory(db),
     campusAdmin: createCampusAdminRepoMemory(db),
     development: createDevelopmentRepoMemory(db),
     growth: createGrowthRepoMemory(db),
@@ -78,6 +79,7 @@ export function createPgCampusRepos({ query, getPool, getLockPool }) {
       throw new Error('A dedicated assessment lock pool is required.')
     }) }),
     reportVersions: createReportVersionsRepoPg(deps),
+    reportReviews: createReportReviewsRepoPg(deps),
     campusAdmin: createCampusAdminRepoPg(deps),
     development: createDevelopmentRepoPg(deps),
     growth: createGrowthRepoPg(deps),

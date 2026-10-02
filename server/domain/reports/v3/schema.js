@@ -10,6 +10,7 @@ const ClaimStatus = z.enum(['SUPPORTED', 'PROVISIONAL', 'INSUFFICIENT'])
 const Capability = z.object({
   id: z.string(),
   name: z.string(),
+  displayLabel: z.string().nullable(),
   definition: z.string().nullable(),
   layer: z.string(),
   status: Status,
@@ -41,6 +42,40 @@ const Evidence = z.object({
   }).strict(),
 }).strict()
 
+const Provenance = z.object({
+  evidenceId: z.string(), source: z.enum(['CONVERSATION', 'WORK_MATERIAL']), turn: z.number().int().nullable(), artifactId: z.string().nullable(),
+  rubricVersion: z.string().nullable(), reviewedBy: z.enum(['AI', 'AI_AND_HUMAN']), legacy: z.boolean(),
+}).strict()
+
+// One verified observed moment below the sufficiency floor: never a level.
+const BoundedObservation = z.object({
+  id: z.string(),
+  capability: z.object({ id: z.string(), name: z.string() }).strict(),
+  observedBehavior: z.string(),
+  quote: z.string(),
+  source: z.object({ turn: z.number().int().nullable(), artifactId: z.string().nullable(), opportunityId: z.string().nullable() }).strict(),
+  rubricAnchor: z.object({ criteria: z.string() }).strict().nullable(),
+  nextBehavior: z.string().nullable(),
+  limitation: z.string(),
+  provenance: Provenance,
+}).strict()
+
+// A moment that mattered (P5.5): one verified unit, the learner's verbatim
+// words, the stimulus it answered and the next behaviour from the anchors.
+const Moment = z.object({
+  id: z.string(),
+  basis: z.enum(['DESCRIBED', 'BOUNDED']),
+  capability: z.object({ id: z.string(), name: z.string(), displayLabel: z.string().nullable() }).strict(),
+  observedBehavior: z.string().min(1),
+  quote: z.string().min(1),
+  context: z.string().min(1),
+  source: z.object({ turn: z.number().int().nullable(), artifactId: z.string().nullable(), opportunityId: z.string().nullable() }).strict(),
+  rubricAnchor: z.object({ criteria: z.string() }).strict().nullable(),
+  nextBehavior: z.string().nullable(),
+  evidenceStatus: z.enum(['PROVISIONAL', 'SUFFICIENT']),
+  provenance: Provenance,
+}).strict()
+
 const Priority = z.object({
   capabilityId: z.string(),
   name: z.string(),
@@ -70,7 +105,11 @@ export const StudentReportV3Schema = z.object({
     verification: z.object({ identityAssurance: z.string(), credentialId: z.string().nullable() }).strict(),
   }).strict(),
   summary: z.object({ capabilities: z.array(Capability), describedCount: z.number().int().min(0), insufficientCount: z.number().int().min(0) }).strict(),
+  plainStatement: z.string().min(1).nullable(),
+  displayLabels: z.array(z.object({ id: z.string(), name: z.string(), displayLabel: z.string().nullable() }).strict()),
   evidence: z.array(Evidence),
+  boundedObservations: z.array(BoundedObservation).optional(),
+  moments: z.array(Moment).max(3),
   development: z.object({ priorities: z.array(Priority).max(3), maxPriorities: z.literal(3) }).strict().nullable(),
   methodology: z.object({
     builderVersion: z.string(), sufficiencyRulesVersion: z.string(), levelLabelsStatus: z.string(), catalogVersion: z.string(),

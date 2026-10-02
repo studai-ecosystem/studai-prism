@@ -85,12 +85,15 @@ const HomeSchema = z.object({
   user: z.object({ name: z.string().nullable() }),
   workspace: z.object({ id: z.string(), type: z.string(), name: z.string().nullable(), organizationName: z.string().nullable() }),
   primaryAction: z.object({
-    kind: z.enum(['ASSESSMENT_DUE', 'ASSESSMENT_IN_PROGRESS', 'ASSESSMENT_READY', 'REPORT_READY', 'CAPABILITY_SUMMARY', 'GET_STARTED', 'NOTHING_ASSIGNED']),
+    kind: z.enum(['ASSESSMENT_DUE', 'ASSESSMENT_IN_PROGRESS', 'ASSESSMENT_READY', 'ASSESSMENT_PROCESSING', 'ASSESSMENT_TECHNICAL_FAILED', 'REPORT_READY', 'CAPABILITY_SUMMARY', 'GET_STARTED', 'NOTHING_ASSIGNED']),
     to: z.string().nullable(),
-    title: z.string().optional(),
+    title: z.string().nullable().optional(),
     scope: z.enum(['PERSONAL', 'SPONSORED']).optional(),
     dueAt: z.string().nullable().optional(),
     assignmentId: z.string().optional(),
+    // Session-backed kinds (processing / technical failure): the saved run.
+    sessionId: z.string().optional(),
+    completedAt: z.string().nullable().optional(),
   }),
   capabilitySnapshot: z.array(z.object({ id: z.string(), name: z.string(), status: Status, level: Level, change: z.null(), evidenceSummary: z.string() }).passthrough()),
   assessedCount: z.number().int(),

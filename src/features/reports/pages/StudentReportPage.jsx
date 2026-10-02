@@ -110,13 +110,14 @@ export default function StudentReportPage() {
 
   if (wsParam && !meLoading && !target) return <div>{header}<UnauthorizedState title={REPORT_COPY.notAvailable} homeTo={listPath} /></div>
   const err = query.error
-  if (err?.code === 'REPORT_NOT_READY' || err?.code === 'REPORT_UNDER_REVIEW') {
+  if (err?.code === 'REPORT_NOT_READY' || err?.code === 'REPORT_UNDER_REVIEW' || err?.code === 'REPORT_PROCESSING_FAILED') {
     const ready = err.code === 'REPORT_NOT_READY'
+    const failed = err.code === 'REPORT_PROCESSING_FAILED'
     return (
       <div className="space-y-6">
         {header}
-        <Callout tone={ready ? 'info' : 'partial'} title={ready ? REPORT_COPY.notReadyTitle : REPORT_COPY.underReviewTitle}>
-          <p>{ready ? REPORT_COPY.notReadyBody : REPORT_COPY.underReviewBody}</p>
+        <Callout tone={failed ? 'blocked' : ready ? 'info' : 'partial'} title={failed ? REPORT_COPY.processingFailedTitle : ready ? REPORT_COPY.notReadyTitle : REPORT_COPY.underReviewTitle}>
+          <p>{failed ? REPORT_COPY.processingFailedBody : ready ? REPORT_COPY.notReadyBody : REPORT_COPY.underReviewBody}</p>
           {err.requestId && <p className="mt-2 text-xs">Reference: {err.requestId}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => query.refetch()} loading={query.isFetching} loadingLabel="Checking...">Check again</Button>
@@ -161,7 +162,7 @@ export default function StudentReportPage() {
     <div className="space-y-6">
       {header}
       {pdfError && <Callout tone="blocked" role="alert" title="Download failed">{pdfError}</Callout>}
-      <ReportView report={data.report} versionNumber={data.version.number} visibilityText={visibilityText(data)} actions={actions} />
+      <ReportView report={data.report} versionNumber={data.version.number} visibilityText={visibilityText(data)} actions={actions} canReview={Boolean(data.privacy?.canShare)} />
       {data.privacy?.canShare && <ActiveShares shares={data.privacy.activeShares} sessionId={sessionId} />}
       {data.privacy?.canShare && <ShareReportDialog open={shareOpen} onClose={() => setShareOpen(false)} sessionId={sessionId} organizations={organizations} />}
     </div>

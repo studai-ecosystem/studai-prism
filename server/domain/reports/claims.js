@@ -43,6 +43,35 @@ export function candidateTurnsFrom(history = []) {
     .map((m) => m.content.replace(CANDIDATE_PREFIX, ''))
 }
 
+// Candidate-authored text of durably accepted actions (P2.3). Report
+// retention may purge session history after scoring; the accepted action
+// rows outlive it, so a verified quote still has its source. Only CANDIDATE
+// message text and candidate-changed artifact values count — never seeded
+// rows, system text or participant turns.
+function flattenStrings(value, out = []) {
+  if (typeof value === 'string') { if (value.trim()) out.push(value); return out }
+  if (Array.isArray(value)) { for (const v of value) flattenStrings(v, out); return out }
+  if (value && typeof value === 'object') { for (const v of Object.values(value)) flattenStrings(v, out); return out }
+  return out
+}
+export function candidateTurnsFromActions(actions = []) {
+  const out = []
+  for (const a of actions) {
+    if (!a || a.actorKind !== 'CANDIDATE' || a.state !== 'APPLIED') continue
+    if (a.kind === 'MESSAGE' && typeof a.payload?.text === 'string') out.push(a.payload.text)
+    else if (a.kind === 'ARTIFACT') {
+      flattenStrings(a.payload?.updates, out)
+      if (typeof a.payload?.notes === 'string' && a.payload.notes.trim()) out.push(a.payload.notes)
+    }
+  }
+  return out
+}
+
+// Union of the two sources; history and actions may each be absent.
+export function candidateTurnsUnion(history = [], actions = []) {
+  return [...new Set([...candidateTurnsFrom(history || []), ...candidateTurnsFromActions(actions || [])])]
+}
+
 // A unit's dialogue excerpt, only when it is a verbatim part of a stored
 // candidate turn; otherwise null (never an invented quote).
 export function verifiedQuote(unit, turns = []) {

@@ -113,10 +113,27 @@ export function capabilityName(id) {
   return LAYER_1_TRANSFERABLE_CAPABILITIES[id]?.name || CONTEXTUAL[id]?.name || null
 }
 
+// Plain-language family labels for the first screen of a report (P5.2). The
+// precise framework name stays alongside; neither replaces the other.
+export const CAPABILITY_DISPLAY_LABELS = Object.freeze({
+  'CAP-L1-REASONING': 'Making decisions',
+  'CAP-L1-COMMUNICATION': 'Getting your point across',
+  'CAP-L1-COLLABORATION': 'Working with people',
+  'CAP-L1-ADAPTABILITY': 'Responding to change',
+  'CAP-L1-EXECUTION': 'Making things happen',
+})
+
+export function capabilityDisplayLabel(id) {
+  return CAPABILITY_DISPLAY_LABELS[id] || null
+}
+
 export function capabilityInfo(id) {
   const cap = LAYER_1_TRANSFERABLE_CAPABILITIES[id] || CONTEXTUAL[id]
   if (!cap) return null
-  return { id: cap.id, name: cap.name, description: cap.description || '', layer: LAYER_1_TRANSFERABLE_CAPABILITIES[id] ? 'PRIMARY' : 'CONTEXTUAL', anchors: cap.anchors || {} }
+  return {
+    id: cap.id, name: cap.name, displayLabel: CAPABILITY_DISPLAY_LABELS[id] || null, description: cap.description || '',
+    layer: LAYER_1_TRANSFERABLE_CAPABILITIES[id] ? 'PRIMARY' : 'CONTEXTUAL', anchors: cap.anchors || {},
+  }
 }
 
 export const PRIMARY_CAPABILITY_IDS = Object.freeze([...PRIMARY])

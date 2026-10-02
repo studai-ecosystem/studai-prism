@@ -41,40 +41,112 @@ const forbidden = () => jsonResponse(403, { error: { code: 'FORBIDDEN', message:
 const pending = () => new Promise(() => {})
 const noPercent = () => expect(document.body.textContent).not.toMatch(/\d\s*%/)
 
-describe('Student Home (§9)', () => {
-  it('shows the latest owned completed report within one click, using server links and completion dates', async () => {
-    const completed = (id, date, path) => card({ id, title: `Synthetic ${id}`, status: 'COMPLETED', tab: 'COMPLETED', sessionId: id, completedAt: date, cta: { kind: 'VIEW_REPORT', to: path } })
-    render(<HomePage />, { routes: { '/api/v1/me/assessments': { data: {
-      active: [], upcoming: [], completed: [
-        completed('older', '2026-09-01T10:00:00.000Z', '/score?session=older'),
-        completed('latest', '2026-10-01T10:00:00.000Z', '/app/reports/latest'),
-        card({ id: 'expired', status: 'EXPIRED', tab: 'COMPLETED' }),
-      ],
-    } } } })
-    const section = await screen.findByRole('region', { name: 'Recent assessments' })
-    const cards = await within(section).findAllByTestId('assignment-card')
-    expect(cards).toHaveLength(2)
+const historyItem = (overrides = {}) => ({
+  id: 'FORMAL_SESSION:sess-1', sourceType: 'FORMAL_SESSION', sourceId: 'sess-1', mode: 'FORMAL', title: 'Prism Workplace Simulation',
+  startedAt: '2026-09-01T09:00:00.000Z', completedAt: '2026-09-01T10:00:00.000Z', issuedAt: '2026-09-01T10:00:00.000Z', scope: 'PERSONAL', sponsorOrganizationId: null,
+  status: 'COMPLETED', reportFormat: 'V3', permittedAction: { kind: 'VIEW_REPORT', to: '/app/reports/sess-1' }, recoveryState: 'NONE', ...overrides,
+})
+const historyPage = (items) => ({ data: { items, nextCursor: null } })
+
+describe('Student Home (§9, P3.3)', () => {
+  it('recent activity shows the three newest owned records with stored dates and mode labels; the report is one click away', async () => {
+    const items = [
+      historyItem({ id: 'FORMAL_SESSION:older', sourceId: 'older', title: 'Synthetic older', completedAt: '2026-09-01T10:00:00.000Z', issuedAt: '2026-09-01T10:00:00.000Z', permittedAction: { kind: 'VIEW_REPORT', to: '/score?session=older' }, reportFormat: 'LEGACY_V2' }),
+      historyItem({ id: 'PRACTICE_ATTEMPT:p-1', sourceType: 'PRACTICE_ATTEMPT', sourceId: 'p-1', mode: 'PRACTICE', title: 'Separate cause from symptom', completedAt: '2026-09-20T10:00:00.000Z', issuedAt: null, reportFormat: null, permittedAction: { kind: 'NONE', to: null } }),
+      historyItem({ id: 'FORMAL_SESSION:latest', sourceId: 'latest', title: 'Synthetic latest', completedAt: '2026-10-01T10:00:00.000Z', issuedAt: '2026-10-01T10:00:00.000Z', permittedAction: { kind: 'VIEW_REPORT', to: '/app/reports/latest' } }),
+      historyItem({ id: 'FORMAL_SESSION:oldest', sourceId: 'oldest', title: 'Synthetic oldest', completedAt: '2026-08-01T10:00:00.000Z', issuedAt: '2026-08-01T10:00:00.000Z' }),
+    ]
+    render(<HomePage />, { routes: { '/api/v1/me/history': historyPage(items), '/api/v1/me/home': home({ primaryAction: { kind: 'REPORT_READY', assignmentId: 'a-latest', title: 'Synthetic latest', scope: 'PERSONAL', dueAt: null, to: '/app/reports/latest' } }) } })
+    const section = await screen.findByRole('region', { name: 'Recent activity' })
+    const cards = await within(section).findAllByTestId('history-item')
+    expect(cards.map((c) => c.getAttribute('data-mode'))).toEqual(['FORMAL', 'PRACTICE', 'FORMAL'])
+    expect(within(cards[0]).getByRole('heading', { level: 3, name: 'Synthetic latest' })).toBeInTheDocument()
     expect(within(cards[0]).getByRole('link', { name: /^View report\s*:\s*Synthetic latest$/ })).toHaveAttribute('href', '/app/reports/latest')
-    expect(within(cards[1]).getByRole('link', { name: /^View report\s*:\s*Synthetic older$/ })).toHaveAttribute('href', '/score?session=older')
-    expect(within(cards[0]).getByText(/^Completed /, { selector: 'ul > li' })).toBeInTheDocument()
-    expect(within(section).getByRole('link', { name: 'View all assessments' })).toHaveAttribute('href', '/app/assessments')
-    expect(within(section).queryByText('Synthetic expired')).not.toBeInTheDocument()
+    expect(within(cards[0]).getByText(/^Completed /)).toBeInTheDocument()
+    expect(within(cards[1]).getByText('Practice')).toBeInTheDocument()
+    expect(within(cards[1]).getByText(/^Submitted /)).toBeInTheDocument()
+    expect(within(cards[2]).getByRole('link', { name: /^Original report\s*:\s*Synthetic older$/ })).toHaveAttribute('href', '/score?session=older')
+    expect(within(section).queryByText('Synthetic oldest')).not.toBeInTheDocument()
+    expect(within(section).getByRole('link', { name: 'View all history' })).toHaveAttribute('href', '/app/assessments?tab=history')
+    // Report ready: the primary action opens the latest owned report.
+    const next = screen.getByTestId('next-action')
+    expect(next).toHaveAttribute('data-kind', 'REPORT_READY')
+    expect(within(next).getByRole('link', { name: 'Open my report' })).toHaveAttribute('href', '/app/reports/latest')
+    noPercent()
   })
 
-  it('history failures stay explicit without pretending there are no completed assessments', async () => {
-    render(<HomePage />, { routes: { '/api/v1/me/assessments': error500 } })
-    const section = await screen.findByRole('region', { name: 'Recent assessments' })
+  it('history failures stay explicit without pretending there is no activity', async () => {
+    render(<HomePage />, { routes: { '/api/v1/me/history': error500 } })
+    const section = await screen.findByRole('region', { name: 'Recent activity' })
     expect(await within(section).findByText('Reference: req-500', {}, { timeout: 4000 })).toBeInTheDocument()
     expect(within(section).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
-    expect(within(section).queryByText(/No completed assessments/)).not.toBeInTheDocument()
+    expect(within(section).queryByText(/No assessments or practice/)).not.toBeInTheDocument()
   })
 
   it('missing owned history provides support rather than fabricating a report', async () => {
-    render(<HomePage />)
-    const section = await screen.findByRole('region', { name: 'Recent assessments' })
-    expect(await within(section).findByText(/No completed assessments are linked/)).toBeInTheDocument()
+    render(<HomePage />, { routes: { '/api/v1/me/home': home({ primaryAction: { kind: 'CAPABILITY_SUMMARY', to: '/app/capabilities' } }) } })
+    const section = await screen.findByRole('region', { name: 'Recent activity' })
+    expect(await within(section).findByText(/No assessments or practice are linked/)).toBeInTheDocument()
     expect(within(section).getByRole('link', { name: 'contact support' })).toHaveAttribute('href', '/contact')
     expect(within(section).queryByRole('link', { name: /View report/ })).not.toBeInTheDocument()
+  })
+
+  it('a new learner (no history) chooses an intention: Understand, Practise, Prepare (not yet available)', async () => {
+    render(<HomePage />)
+    const chooser = await screen.findByTestId('intent-chooser')
+    expect(screen.queryByTestId('next-action')).not.toBeInTheDocument()
+    expect(within(chooser).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Understand', 'Practise', 'Prepare'])
+    expect(within(chooser).getByRole('link', { name: 'Take the assessment' })).toHaveAttribute('href', '/payment')
+    expect(within(chooser).getByRole('link', { name: 'See practice missions' })).toHaveAttribute('href', '/app/development')
+    expect(within(chooser).getByTestId('intent-practise')).toHaveTextContent('never changes your formal results')
+    expect(within(within(chooser).getByTestId('intent-prepare')).queryByRole('link')).not.toBeInTheDocument()
+    expect(within(chooser).getByTestId('intent-prepare')).toHaveTextContent('Not yet available')
+    noPercent()
+  })
+
+  it('a learner with history but nothing active gets the single get-started action, not the chooser', async () => {
+    render(<HomePage />, { routes: { '/api/v1/me/history': historyPage([historyItem({ status: 'LEGACY', reportFormat: 'LEGACY_V2', permittedAction: { kind: 'VIEW_REPORT', to: '/score?session=sess-1' } })]) } })
+    const next = await screen.findByTestId('next-action')
+    await screen.findAllByTestId('history-item')
+    expect(screen.queryByTestId('intent-chooser')).not.toBeInTheDocument()
+    expect(within(next).getByRole('link', { name: 'Start an assessment' })).toHaveAttribute('href', '/payment')
+  })
+
+  it('an active run resumes the saved assessment on the existing player path, without another assessment', async () => {
+    const data = home({ primaryAction: { kind: 'ASSESSMENT_IN_PROGRESS', assignmentId: 'a-1', title: 'Prism Workplace Simulation', scope: 'PERSONAL', dueAt: null, to: '/app/assessment/sess-live' } })
+    render(<HomePage />, { routes: { '/api/v1/me/home': data } })
+    const next = await screen.findByTestId('next-action')
+    expect(within(next).getByRole('link', { name: 'Resume saved assessment' })).toHaveAttribute('href', '/app/assessment/sess-live')
+    expect(within(next).getAllByRole('link')).toHaveLength(1)
+    expect(next).toHaveTextContent('does not use another assessment')
+  })
+
+  it('processing: the work is saved, review continues, and the only action is to check status', async () => {
+    const data = home({ primaryAction: { kind: 'ASSESSMENT_PROCESSING', sessionId: 'sess-p', title: 'Prism Workplace Simulation', scope: 'PERSONAL', completedAt: '2026-10-01T10:00:00.000Z', to: null } })
+    render(<HomePage />, { routes: { '/api/v1/me/home': data } })
+    const next = await screen.findByTestId('next-action')
+    expect(within(next).getByRole('heading', { name: 'Your work is saved; review is continuing' })).toBeInTheDocument()
+    expect(within(next).getByText(/^Responses received /)).toBeInTheDocument()
+    expect(within(next).getByRole('link', { name: 'Check status' })).toHaveAttribute('href', '/app/assessments?tab=history')
+    expect(within(next).queryByRole('link', { name: /Resume|Start|Buy/ })).not.toBeInTheDocument()
+  })
+
+  it('technical failure: recovery first and support, never buy another assessment', async () => {
+    const data = home({ primaryAction: { kind: 'ASSESSMENT_TECHNICAL_FAILED', sessionId: 'sess-f', title: 'Prism Workplace Simulation', scope: 'PERSONAL', completedAt: '2026-09-20T10:00:00.000Z', to: '/app/assessment/sess-f' } })
+    render(<HomePage />, { routes: { '/api/v1/me/home': data } })
+    const next = await screen.findByTestId('next-action')
+    const links = within(next).getAllByRole('link')
+    expect(links.map((l) => [l.textContent, l.getAttribute('href')])).toEqual([['Open assessment', '/app/assessment/sess-f'], ['Contact support', '/contact']])
+    expect(next).toHaveTextContent('Nothing you did is lost')
+    expect(next).toHaveTextContent('Reference: sess-f')
+    expect(next).not.toHaveTextContent(/buy|payment/i)
+  })
+
+  it('technical failure without a recovery path offers support only', async () => {
+    const data = home({ primaryAction: { kind: 'ASSESSMENT_TECHNICAL_FAILED', sessionId: 'sess-f', title: null, scope: 'SPONSORED', completedAt: null, to: null } })
+    render(<HomePage />, { campus: true, routes: { '/api/v1/me/home': data } })
+    const next = await screen.findByTestId('next-action')
+    expect(within(next).getAllByRole('link').map((l) => l.textContent)).toEqual(['Contact support'])
   })
 
   it('loading keeps the h1 and announces loading', async () => {

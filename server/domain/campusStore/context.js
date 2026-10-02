@@ -74,6 +74,8 @@ export function createCampusContext({
   sendAssignmentEmail,
   appUrl = '',
   missionEvaluator = null,
+  // P2.4 bounded evidence evaluator for draft-segment runs (sliceEvaluator.js).
+  sliceEvaluator = null,
 } = {}) {
   const campusAvailable = () => isEnabled('PRISM_CAMPUS_ENABLED') && campusStoreAvailable()
   const workspaceService = createWorkspaceService({ repos, campusAvailable })
@@ -136,7 +138,7 @@ export function createCampusContext({
     resolver,
     catalog,
     assignments,
-    student: createStudentReadModels({ directory, catalog, assignments, evidence, practice: practiceSource, development: developmentPlans, growth: growthReads, roles, legacy, clock }),
+    student: createStudentReadModels({ directory, catalog, assignments, evidence, practice: practiceSource, development: developmentPlans, growth: growthReads, roles, legacy, clock, repos: storeView }),
     // Authorized history projection (P1.2): formal sessions, legacy reports
     // and practice attempts of the caller in the active workspace.
     history: createStudentHistory({
@@ -146,7 +148,7 @@ export function createCampusContext({
     telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }),
     sessions: engine
       ? createAssessmentSessionService({
-        repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter,
+        repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter, sliceEvaluator,
         onSponsoredCompleted: ({ organizationId, assignmentId }) => admin.checkCompletionThresholds(organizationId, assignmentId),
       })
       : null,

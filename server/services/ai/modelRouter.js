@@ -25,6 +25,9 @@ const TASK_POLICIES = Object.freeze({
   multimodal: { model: 'multimodal', fallback: true, timeoutMs: 30_000 },
   // Development V2 practice feedback (prompt mission_evaluator.v1); never scores.
   mission_evaluator: { model: 'primary', fallback: false, timeoutMs: 20_000 },
+  // P2.4 slice evidence evaluator (prompt evidence_evaluator.v1); structured
+  // units only, validated before any evidence write.
+  evidence_evaluator: { model: 'primary', fallback: false, timeoutMs: 30_000 },
 })
 
 function positiveInt(value, fallback) {

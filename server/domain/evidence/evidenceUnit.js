@@ -87,6 +87,12 @@ export function normalizeEvidenceUnit(input, { now = () => new Date(), idFactory
     status = 'INSUFFICIENT_EVIDENCE'
     rubricLevel = null
     rubricLabel = null
+  } else if (rubricLevel === null && (humanReview === 'REQUIRED' || humanReview === 'IN_REVIEW')) {
+    // An explicitly withheld interpretation (e.g. a quote the evaluator could
+    // not attribute exactly): no level, no label, and a person decides.
+    status = 'HUMAN_REVIEW_REQUIRED'
+    rubricLabel = null
+    reasons.push('HUMAN_REVIEW_PENDING')
   } else if (rubricLevel === null) {
     status = 'INSUFFICIENT_EVIDENCE'
     rubricLabel = null

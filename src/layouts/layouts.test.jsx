@@ -122,14 +122,14 @@ describe('page title and route focus', () => {
       <Routes>
         <Route element={<StudentShell />}>
           <Route path="/app/home" element={<PageHeader title="Home" />} />
-          <Route path="/app/evidence" element={<PageHeader title="Evidence" />} />
+          <Route path="/app/capabilities" element={<PageHeader title="Capabilities" />} />
         </Route>
       </Routes>,
       { route: '/app/home' },
     )
     const nav = await screen.findByRole('navigation', { name: 'Primary' })
-    await userEvent.click(within(nav).getByRole('link', { name: 'Evidence' }))
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Evidence' })).toHaveFocus())
+    await userEvent.click(within(nav).getByRole('link', { name: 'My Prism' }))
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Capabilities' })).toHaveFocus())
     vi.restoreAllMocks()
   })
 })

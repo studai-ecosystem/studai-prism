@@ -1,26 +1,56 @@
-import { Home, ClipboardList, Layers, FileSearch, Sprout, TrendingUp, Compass, Share2, Settings, LifeBuoy, LayoutDashboard, Users, UsersRound, FolderKanban, ClipboardCheck, RefreshCcw, BarChart3, FileText, UserCog, Plug, Receipt, SlidersHorizontal } from 'lucide-react'
+import { Home, ClipboardList, Layers, Sprout, Target, History as HistoryIcon, Compass, Share2, Settings, LifeBuoy, TrendingUp, LayoutDashboard, Users, UsersRound, FolderKanban, ClipboardCheck, RefreshCcw, BarChart3, FileText, UserCog, Plug, Receipt, SlidersHorizontal } from 'lucide-react'
+import { NAV_UNAVAILABLE_NOTE } from '../../lib/copy/student.js'
 
 // Section headings for grouped navigation. An item without `group` sits at
 // the top of the list; consecutive items with the same group form a section.
 export const NAV_GROUP_LABELS = Object.freeze({
-  more: 'Evidence and sharing',
+  more: 'More',
   people: 'People',
   assess: 'Assess and develop',
   insight: 'Insight',
   admin: 'Administration',
 })
 
-// Personal and student navigation: outcomes, not technical architecture.
-// Profile lives in the account menu; Settings in the footer.
+// Matches a nav item to the current location. Items whose `to` carries a
+// query string (History) are current only when that query is present; the
+// plain route (Assessments) is current only when it is absent.
+const hasTab = (search, tab) => new URLSearchParams(search).get('tab') === tab
+const pathOf = (to) => String(to).split('?')[0]
+export function isNavItemActive(item, location) {
+  if (!item.to) return false
+  const path = pathOf(item.to)
+  const onPath = location.pathname === path || location.pathname.startsWith(`${path}/`)
+  if (!onPath) return false
+  if (item.tab) return hasTab(location.search, item.tab)
+  if (item.excludeTab) return !hasTab(location.search, item.excludeTab)
+  return true
+}
+
+// Personal and student navigation (P3.2): Home, Assessments, My Prism,
+// Practice, Prepare, History. Evidence and Growth live as sections under My
+// Prism; History is a view over the assessments projection (`?tab=history`),
+// never a second store. Prepare is announced honestly as not yet available
+// (its route activates after P7). Profile lives in the account menu;
+// Settings in the footer.
 export const STUDENT_NAV = [
   { id: 'home', label: 'Home', to: '/app/home', icon: Home },
-  { id: 'assessments', label: 'Assessments', to: '/app/assessments', icon: ClipboardList },
-  { id: 'capabilities', label: 'Capabilities', to: '/app/capabilities', icon: Layers },
-  { id: 'development', label: 'Development', to: '/app/development', icon: Sprout },
-  { id: 'growth', label: 'Growth', to: '/app/growth', icon: TrendingUp },
-  { id: 'explore', label: 'Explore', to: '/app/explore', icon: Compass },
-  { id: 'evidence', label: 'Evidence', to: '/app/evidence', icon: FileSearch, group: 'more' },
+  { id: 'assessments', label: 'Assessments', to: '/app/assessments', icon: ClipboardList, excludeTab: 'history' },
+  { id: 'capabilities', label: 'My Prism', to: '/app/capabilities', icon: Layers },
+  { id: 'development', label: 'Practice', to: '/app/development', icon: Sprout },
+  { id: 'prepare', label: 'Prepare', to: null, icon: Target, unavailable: NAV_UNAVAILABLE_NOTE },
+  { id: 'history', label: 'History', to: '/app/assessments?tab=history', icon: HistoryIcon, tab: 'history' },
+  { id: 'explore', label: 'Explore', to: '/app/explore', icon: Compass, group: 'more' },
   { id: 'sharing', label: 'Shared reports', to: '/app/sharing', icon: Share2, group: 'more' },
+]
+
+// Campus student workspace (spec §6.3): only the sponsored sections; `to` is
+// the section path StudentShell scopes to the organization. There is no My
+// Prism in a sponsored workspace, so Growth stays a direct link here.
+export const CAMPUS_STUDENT_NAV = [
+  { id: 'home', label: 'Home', to: 'home', icon: Home },
+  { id: 'assessments', label: 'Assessments', to: 'assignments', icon: ClipboardList, excludeTab: 'history' },
+  { id: 'development', label: 'Practice', to: 'development', icon: Sprout },
+  { id: 'growth', label: 'Growth', to: 'growth', icon: TrendingUp },
 ]
 
 export const STUDENT_NAV_FOOTER = [
@@ -29,12 +59,12 @@ export const STUDENT_NAV_FOOTER = [
 ]
 
 // Mobile bottom navigation: the four things a student does most, then More
-// (the rest of the list opens in a drawer).
+// (the rest of the list opens in a drawer). Labels match the sidebar.
 export const STUDENT_BOTTOM_NAV = [
   { id: 'home', label: 'Home', to: '/app/home', icon: Home },
-  { id: 'assessments', label: 'Assess', to: '/app/assessments', icon: ClipboardList },
-  { id: 'capabilities', label: 'Capabilities', to: '/app/capabilities', icon: Layers },
-  { id: 'development', label: 'Develop', to: '/app/development', icon: Sprout },
+  { id: 'assessments', label: 'Assessments', to: '/app/assessments', icon: ClipboardList, excludeTab: 'history' },
+  { id: 'capabilities', label: 'My Prism', to: '/app/capabilities', icon: Layers },
+  { id: 'development', label: 'Practice', to: '/app/development', icon: Sprout },
 ]
 
 // Campus administration navigation. Each item names the server permission

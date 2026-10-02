@@ -39,6 +39,16 @@ export function createDevelopmentRepoMemory(db) {
       }
       return [...latest.values()].map(clone)
     },
+    // Latest DRAFT version per mission that has no published version (P2.8;
+    // reachable only behind PRISM_DRAFT_CONTENT).
+    async listDraftMissions() {
+      const latest = new Map()
+      for (const v of db.missionVersions.values()) {
+        if (v.status !== 'DRAFT' || db.missionDefinitions.get(v.missionId)?.status !== 'ACTIVE') continue
+        if (!latest.has(v.missionId) || latest.get(v.missionId).version < v.version) latest.set(v.missionId, v)
+      }
+      return [...latest.values()].map(clone)
+    },
     async getMissionVersion(missionId, version) {
       return clone(db.missionVersions.get(vkey(missionId, version)) || null)
     },
@@ -50,6 +60,7 @@ export function createDevelopmentRepoMemory(db) {
       const row = {
         id: db.id(), userId: a.userId, missionId: a.missionId, missionVersion: a.missionVersion, organizationId: a.organizationId || null,
         interventionId: a.interventionId || null, status: 'IN_PROGRESS', work: clone(a.work), version: 1, hintsUsed: 0,
+        origin: a.origin ? clone(a.origin) : null,
         idempotencyKey: a.idempotencyKey, evaluation: null, submittedAt: null, createdAt: now(), updatedAt: now(),
       }
       db.missionAttempts.set(row.id, row)

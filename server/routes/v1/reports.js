@@ -1,6 +1,8 @@
 // /api/v1 Student Report V3 + student sharing (spec §14, §36.3; C6.02–C6.04).
 // Dark unless PRISM_APP_SHELL_V3 and PRISM_STUDENT_REPORT_V3 are on.
 //   GET    /assessment-sessions/:sessionId/report   the owner, in the session's workspace
+//   GET    /assessment-sessions/:sessionId/report/versions         owner: version history
+//   POST   /assessment-sessions/:sessionId/report/review-request   owner: ask for a human review
 //   POST   /me/share-grants                          owner creates a link or organization share
 //   DELETE /me/share-grants/:id                      owner revokes (same as POST …/revoke)
 //   GET    /shared/:token                            public, rate-limited, selective disclosure
@@ -13,11 +15,19 @@ import { asyncHandler } from '../../domain/http/asyncHandler.js'
 import { ApiError, ok } from '../../domain/http/errors.js'
 import { requireFlag } from '../../domain/flags/index.js'
 import { studentScoped } from './studentScope.js'
-import { MAX_SHARE_DAYS } from '../../domain/reports/v3/service.js'
+import { MAX_SHARE_DAYS, REVIEW_REASON_MAX, REVIEW_REASON_MIN } from '../../domain/reports/v3/service.js'
+import { REVIEW_CATEGORIES } from '../../domain/reports/v3/repository.js'
 
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const TOKEN = /^[A-Za-z0-9_-]{20,200}$/
+
+const ReviewRequest = z.object({
+  version: z.number().int().min(1).optional(),
+  category: z.enum(REVIEW_CATEGORIES).optional(),
+  momentId: z.string().min(1).max(128).optional().nullable(),
+  reason: z.string().trim().min(REVIEW_REASON_MIN).max(REVIEW_REASON_MAX),
+}).strict()
 
 const CreateShare = z.discriminatedUnion('recipientType', [
   z.object({
@@ -50,6 +60,21 @@ export function createReportsRouter({ requireUser, campus, clock = () => new Dat
   router.get('/assessment-sessions/:sessionId/report', ...scoped, available, asyncHandler(async (req, res) => {
     if (!SESSION_ID.test(req.params.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
     return ok(res, await campus.reports.forOwner({ user: req.user, workspace: req.workspace, sessionId: req.params.sessionId, requestId: req.requestId }))
+  }))
+
+  // P5.1: the owner's version history (no report bodies, nothing rebuilt).
+  router.get('/assessment-sessions/:sessionId/report/versions', ...scoped, available, asyncHandler(async (req, res) => {
+    if (!SESSION_ID.test(req.params.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
+    return ok(res, await campus.reports.listVersions({ user: req.user, workspace: req.workspace, sessionId: req.params.sessionId }))
+  }))
+
+  // P5.7: the owner asks a person to review a published version.
+  router.post('/assessment-sessions/:sessionId/report/review-request', ...scoped, available, asyncHandler(async (req, res) => {
+    if (!SESSION_ID.test(req.params.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
+    const parsed = ReviewRequest.safeParse(req.body || {})
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', 'Describe what you would like reviewed in a few sentences.')
+    const out = await campus.reports.requestReview({ user: req.user, workspace: req.workspace, sessionId: req.params.sessionId, requestId: req.requestId, ...parsed.data })
+    return ok(res, out, 201)
   }))
 
   router.post('/me/share-grants', ...scoped, available, asyncHandler(async (req, res) => {

@@ -21,7 +21,8 @@ import { useAssessmentSession } from '../hooks/useAssessmentSession.js'
 import { useAssessmentClock } from '../hooks/useAssessmentClock.js'
 import { useAssessmentAutosave } from '../hooks/useAssessmentAutosave.js'
 import { createArtifactStore } from '../state/artifactStore.js'
-import { sendSessionMessage, saveSessionArtifact, finishSession } from '../api/assessmentSessionApi.js'
+import { sendSessionMessage, saveSessionArtifact, finishSession, beginSession } from '../api/assessmentSessionApi.js'
+import { ScenarioIntroDialog } from '../components/ScenarioIntroDialog.jsx'
 import { AssessmentHeader } from '../components/AssessmentHeader.jsx'
 import { ConversationPane } from '../components/ConversationPane.jsx'
 import { ResponseComposer } from '../components/ResponseComposer.jsx'
@@ -112,6 +113,24 @@ export default function AssessmentPlayerPage() {
   const [connection, setConnection] = useState('ONLINE')
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine !== false))
   const [briefingOpen, setBriefingOpen] = useState(false)
+  // P3.7: the intro is modal until the server records a timed begin. One key per
+  // mount so a double click or a retry returns the original timestamps.
+  const beginKey = useRef(null)
+  const [begin, setBegin] = useState({ busy: false, error: null })
+  const notBegun = Boolean(contract) && contract.timing?.begun === false && contract.status !== 'COMPLETED'
+  const onBegin = async () => {
+    if (begin.busy) return
+    beginKey.current ||= newIdempotencyKey('begin')
+    setBegin({ busy: true, error: null })
+    try {
+      await beginSession(sessionId, { idempotencyKey: beginKey.current })
+      await session.refetch()
+      setBegin({ busy: false, error: null })
+      track('assessment_begun', { sessionId })
+    } catch (error) {
+      setBegin({ busy: false, error })
+    }
+  }
   const [exit, setExit] = useState({ open: false, submitting: false, error: null, scoring: false })
   const [pane, setPane] = useState('conversation')
   const [smallOk, setSmallOk] = useState(false)
@@ -252,7 +271,7 @@ export default function AssessmentPlayerPage() {
   }
 
   const scopeLabel = contract?.scope === 'SPONSORED' ? `Sponsored by ${contract.sponsorName || 'your institution'}` : 'Personal assessment'
-  const inProgress = contract?.status === 'IN_PROGRESS' && !accessError
+  const inProgress = (contract?.status === 'IN_PROGRESS' || contract?.status === 'ALLOCATED') && !accessError && !notBegun
   const saveState = overallSaveState({ items: artifactState.items, pendingMessage: pending, online: online && connection === 'ONLINE' })
   const header = (
     <AssessmentHeader
@@ -319,7 +338,7 @@ export default function AssessmentPlayerPage() {
         )}
         {contract.status === 'SCORING' && (
           <Callout tone="info" title={PLAYER_COPY.scoringTitle}>
-            <p role="status">{PLAYER_COPY.scoringBody}</p>
+            <p role="status">{contract.processing?.acceptedActions ? PLAYER_COPY.savedReviewContinuing(contract.processing.acceptedActions) : PLAYER_COPY.scoringBody}</p>
             {session.error && (
               <div className="mt-3" role="alert">
                 <InlineNotice tone="blocked">{PLAYER_COPY.statusRefreshFailed}</InlineNotice>
@@ -335,7 +354,7 @@ export default function AssessmentPlayerPage() {
         )}
         {contract.status === 'SCORING_FAILED' && (
           <Callout tone="blocked" title={PLAYER_COPY.scoringFailedTitle}>
-            <p>{PLAYER_COPY.scoringFailedBody}</p>
+            <p>{contract.processing?.state === 'FAILED' ? PLAYER_COPY.technicalFailedBody : PLAYER_COPY.scoringFailedBody}</p>
             {exit.error && (
               <div className="mt-3" role="alert">
                 <InlineNotice tone="blocked">{exit.error.message}</InlineNotice>
@@ -353,7 +372,15 @@ export default function AssessmentPlayerPage() {
     )
   }
 
-  const timeUp = remainingMs === 0
+  const timeUp = remainingMs === 0 && !notBegun
+  if (notBegun) {
+    return frame(
+      <>
+        <div className="p-6" aria-hidden="true"><Skeleton label="Waiting to begin" lines={4} /></div>
+        <ScenarioIntroDialog open contract={contract} onBegin={onBegin} onNotYet={() => navigate(listPath)} notYetTo={listPath} beginning={begin.busy} error={begin.error} />
+      </>,
+    )
+  }
   const interrupted = connection === 'INTERRUPTED' && online
   const hasWork = contract.artifacts.length > 0
   const needsLarge = contract.device.requiresLargeScreen && small && !smallOk
@@ -372,6 +399,15 @@ export default function AssessmentPlayerPage() {
   return frame(
     <>
       <p className="sr-only" role="status" aria-live="polite">{timeNotice}</p>
+      {contract.stages?.length > 0 && (
+        <ol aria-label="Stages of this assessment" className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 border-b border-prism-border bg-prism-surface px-4 py-1.5 text-xs" data-testid="stage-strip">
+          {contract.stages.map((s) => (
+            <li key={s.id} aria-current={s.state === 'CURRENT' ? 'step' : undefined} className={s.state === 'UPCOMING' ? 'text-prism-ink-muted' : 'text-prism-ink'}>
+              {s.label}{s.state === 'CURRENT' ? ' (now)' : s.state === 'DONE' ? ' (done)' : ''}
+            </li>
+          ))}
+        </ol>
+      )}
       {interrupted && (
         <div role="status" aria-live="polite" className="flex shrink-0 items-center gap-2 border-b border-prism-partial-soft bg-prism-partial-soft px-4 py-2 text-sm text-prism-ink" data-testid="reconnect-banner">
           <WifiOff size={16} aria-hidden="true" className="shrink-0 text-prism-partial" />

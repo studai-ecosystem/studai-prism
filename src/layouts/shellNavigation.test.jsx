@@ -18,17 +18,27 @@ function Where() {
 
 beforeEach(() => localStorage.removeItem('prism-sidebar-collapsed'))
 
-describe('personal navigation follows the outcome-based IA', () => {
-  it('primary items, then a labelled More group, then Help and Settings', async () => {
+describe('personal navigation follows the outcome-based IA (P3.2)', () => {
+  it('primary items, an honest disabled Prepare, then a labelled More group, then Help and Settings', async () => {
     signIn()
     mockFetch({ '/api/v1/me': meBody() })
     renderApp(<Routes><Route path="/app/home" element={<StudentShell><p>content</p></StudentShell>} /></Routes>, { route: '/app/home' })
     const nav = await screen.findByRole('navigation', { name: 'Primary' })
-    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(
-      ['Home', 'Assessments', 'Capabilities', 'Development', 'Growth', 'Explore', 'Evidence', 'Shared reports', 'Help', 'Settings'],
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent.replace(/\s*\(.*\)$/, ''))).toEqual(
+      ['Home', 'Assessments', 'My Prism', 'Practice', 'Prepare', 'History', 'Explore', 'Shared reports', 'Help', 'Settings'],
     )
+    const hrefs = within(nav).getAllByRole('link').map((l) => l.getAttribute('href'))
+    expect(hrefs).toEqual(['/app/home', '/app/assessments', '/app/capabilities', '/app/development', null, '/app/assessments?tab=history', '/app/explore', '/app/sharing', '/contact', '/app/settings'])
+    // Evidence and Growth are no longer primary entries: they live under My Prism.
+    expect(within(nav).queryByRole('link', { name: 'Evidence' })).not.toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: 'Growth' })).not.toBeInTheDocument()
+    const prepare = within(nav).getByRole('link', { name: /^Prepare/ })
+    expect(prepare).toHaveAttribute('aria-disabled', 'true')
+    expect(prepare).toHaveTextContent('Not yet available')
+    await userEvent.hover(prepare)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Not yet available')
     const more = within(nav).getByRole('group', { name: NAV_GROUP_LABELS.more })
-    expect(within(more).getAllByRole('link').map((l) => l.textContent)).toEqual(['Evidence', 'Shared reports'])
+    expect(within(more).getAllByRole('link').map((l) => l.textContent)).toEqual(['Explore', 'Shared reports'])
   })
 })
 
@@ -63,7 +73,7 @@ describe('collapsible sidebar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Collapse navigation' }))
     expect(localStorage.getItem('prism-sidebar-collapsed')).toBe('1')
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toHaveAttribute('aria-expanded', 'false')
-    expect(within(nav).getByRole('link', { name: 'Capabilities' })).toHaveAttribute('title', 'Capabilities')
+    expect(within(nav).getByRole('link', { name: 'My Prism' })).toHaveAttribute('title', 'My Prism')
     expect(within(nav).queryByText(NAV_GROUP_LABELS.more)).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Expand navigation' }))
     expect(localStorage.getItem('prism-sidebar-collapsed')).toBe('0')

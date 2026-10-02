@@ -3,7 +3,7 @@
 // Student (active workspace via X-Prism-Workspace; also needs the V3 shell):
 //   GET   /missions                               catalogue for this workspace
 //   GET   /missions/:id                           player view (no rule internals)
-//   POST  /missions/:id/attempts                  Idempotency-Key; resumes the open attempt unless { retry: true }
+//   POST  /missions/:id/attempts                  Idempotency-Key; resumes the open attempt unless { retry: true }; optional { origin }
 //   GET   /mission-attempts/:attemptId
 //   PATCH /mission-attempts/:attemptId            If-Match version
 //   POST  /mission-attempts/:attemptId/hints      If-Match version
@@ -29,7 +29,13 @@ const calendarDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v
 }, 'Not a real date')
 
-const StartAttempt = z.object({ retry: z.boolean().optional() }).strict()
+// `origin` (P2.8): why the practice was started — the learner's own goal or
+// one approved assessment moment, by identifier only.
+const Origin = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('GOAL') }).strict(),
+  z.object({ kind: z.literal('ASSESSMENT_MOMENT'), sessionId: z.string().min(1).max(128), opportunityId: z.string().min(1).max(128) }).strict(),
+])
+const StartAttempt = z.object({ retry: z.boolean().optional(), origin: Origin.optional() }).strict()
 const SaveWork = z.object({ work: z.record(z.string().regex(/^[A-Z0-9][A-Z0-9_-]{1,63}$/), z.record(z.unknown())) }).strict()
 const CreateIntervention = z.object({
   name: z.string().trim().min(1).max(160),
@@ -67,7 +73,7 @@ export function createDevelopmentRouter({ requireUser, campus }) {
     if (!key || key.length > 128) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
     const parsed = StartAttempt.safeParse(req.body || {})
     if (!parsed.success) throw new ApiError('VALIDATION_FAILED', 'Invalid request.')
-    const out = await svc().startAttempt(req.user, req.workspace, req.params.id, { idempotencyKey: key, retry: Boolean(parsed.data.retry) })
+    const out = await svc().startAttempt(req.user, req.workspace, req.params.id, { idempotencyKey: key, retry: Boolean(parsed.data.retry), origin: parsed.data.origin || null })
     return sendAttempt(res, out.attempt, out.resumed ? 200 : 201)
   }))
   router.get('/mission-attempts/:attemptId', ...student, store, attempt, asyncHandler(async (req, res) => sendAttempt(res, await svc().getAttempt(req.user, req.workspace, req.params.attemptId))))

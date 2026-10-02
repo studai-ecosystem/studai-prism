@@ -1,5 +1,121 @@
 # Experience programme - source traceability and execution checkpoints
 
+## Current P5 checkpoint - 2026-10-03
+
+Status: **IMPLEMENTED locally; comprehension study (P5/P9 human) open.**
+
+- CH-23 / P5.1: publication snapshot before reportReady (P2) + `GET /report/versions`;
+  review requests (migration 0045 `report_review_requests`, `POST /report/review-request`,
+  owner-only, OPEN row, audited, no silent rewrite). Builder v3.1.
+- CH-24 / P5.2-P5.3 / T37-T38: `CapabilityMap` — five labelled rows, four-band ordinal track
+  from server bands only, separate evidence-state chip, neutral "Not yet measured" (never
+  red/zero/percent), keyboard rows filter evidence, list equivalent for SR/mobile. Plain
+  display labels (Making decisions, Getting your point across, Working with people,
+  Responding to change, Making things happen) alongside precise ids.
+- CH-25 / CH-26 / T32: `moments` (≤3) only from verified-quote units; action → context
+  (presented stimulus via the 0044 ledger or exchange N) → quote → what it showed → next
+  behaviour → "Practise this"; `plainStatement` null when nothing is supported.
+- CH-27/CH-28: one absence state per capability; stored issue dates only.
+- CH-29: interpretation review dialog → request row; outcome never fabricated.
+- SUMMARY disclosure strips quotes/moments. PDF built from statement + moments + structured data.
+
+Verification: server 712 (687/0/25 skips); frontend 449/0; isolated PG 6/6 (45 migrations);
+browser-p1 (isolated, 4 projects) 124/0 incl. legacy report, account entry, flow entry.
+
+## Current P4 checkpoint - 2026-10-03
+
+Status: **IMPLEMENTED locally (DRAFT content, not approved); P5 next.**
+
+- CH-15 / P4.1-P4.2: `universalForm.js` CORE_TEAMREADY_A v0.1.0-draft — original domain-light
+  "Get the team ready": 6 stages, 6 public + 3 conditional facts with ids, two colleagues,
+  stage-3 world change preserving the board, AI-generated recommendation explicitly labelled.
+- CH-16 / P4.4: 20 draft behaviour ids across 5 families with L1-5 anchors; 10 exemplars/
+  counterexamples incl. concise effective, verbose empty, spoken, non-native, refusal, uncertain,
+  repaired mistake, workable alternative; confound list. Proposed authoring, not validated scores.
+- CH-17 / P4.5 / T22-T23: migration 0044 `assessment_opportunities` ledger (PLANNED→PRESENTED→
+  ACTION_RECEIVED→EVALUATION_PENDING→EVALUATED + side states); 16 opportunities, ≥2 distinct
+  groups per family; dependent board-change+explanation share a group → one independent count;
+  unanswered/unpresented opportunities never produce units.
+- CH-18 / P4.6: deterministic `director.js` (policy 1-5, seeded tie-break, budget stop with
+  partial/review reasons); stage strip exposes task names only (contract `stages`, UI strip).
+- CH-19 / P4.3: board schema task/owner/due/dependency/status/rationale; seeded rows TEMPLATE;
+  `validateBoardPatch` never fills answers.
+- T34 / P4.7: `factBoundary.js` — authored stimulus from permitted facts, render hash,
+  REVIEW_REQUIRED on mismatch, unknown fact stays unknown, already-given → neutral pointer,
+  forbidden mutations (deadline/identity/scope/payment/threshold/fact/version) rejected; tool deny-list.
+- CH-21 / P4.8: evaluator consumes the ledger (only targeted behaviours per answered opportunity);
+  content governance `domain/content/versions.js` DRAFT→REVIEW→APPROVED_FOR_PILOT→
+  APPROVED_FOR_INTENDED_USE→RETIRED with reviewer+reason guard; admin routes under
+  `/content/forms` (audited). Form stays DRAFT; activation is HA-C003/HA-C002 human gate.
+- Sufficiency floors unchanged. Legacy engine/scenario bank/scoring/timing untouched.
+
+Verification: server 708 (683/0/25 skips); isolated PG 6/6 with 44 migrations; player 34/34.
+
+## Current P3 checkpoint - 2026-10-03
+
+Status: **IMPLEMENTED locally; full browser matrix pending; P4 content/Director next.**
+
+- CH-13 / T14-T16 / P3.7-P3.8: migration 0043 `assessment_run_timing`; `timingPolicy.js`
+  (LEGACY_35 preserved byte-for-byte for existing/legacy runs; DRAFT_UNIVERSAL 25+5 min
+  `PROPOSED_PENDING_REVIEW` applied only to draft-segment runs). `POST /begin` is
+  idempotent (same key → same timestamps; concurrent begins → one start time; version
+  mismatch → CONFLICT). Draft runs reject answers before begin (`ASSESSMENT_NOT_BEGUN`)
+  and after server cutoff (`SESSION_TIME_LIMIT`); finish allowed anytime for accepted work.
+  Contract exposes `timing.begun/graceDeadlineAt/policyVersion`, status `ALLOCATED` pre-begin.
+  Frontend `ScenarioIntroDialog`: pinned title/situation/role/participants/materials/time;
+  focus on "Begin timed assessment"; Escape/X/backdrop = "Not yet" (never begins);
+  one idempotency key per mount; clock appears only after server begin.
+- CH-05 / P3.3: Home = one dominant NextActionCard (resume / processing / technical
+  failure → recovery not purchase / report ready / new learner IntentChooser);
+  RecentActivityList from `/me/history` (stored dates, Formal/Practice labels).
+  Server `home()` adds ASSESSMENT_PROCESSING / ASSESSMENT_TECHNICAL_FAILED kinds.
+- P3.2 nav: Home, Assessments, My Prism, Practice, Prepare (honest disabled), History;
+  Evidence/Growth as section links under My Prism; aliases kept; Campus staff nav unchanged.
+- CH-11/CH-12 / T10-T13: fixed frame, independent panes, conversation-only centring
+  and processing/failure states carried from P0/P1 fixes; now shown with real
+  `processing` state copy ("work saved, review continuing").
+- CH-48 / CH-49: no persona picker or proctoring added to the V3 path; legacy funnel untouched.
+- Open: real dialogue renderer for the draft segment (P4), speech review path (P3.9
+  deferred — text path only in V3), T22/T23 coverage (P4), full seven-width browser
+  matrix for the new intro dialog (recorded when the isolated runner completes).
+
+Verification: server 684 (659/0/25 skips); frontend 446/0; build PASS. Browser: see TEST_RESULTS.
+
+## Current P2 checkpoint - 2026-10-03
+
+Status: **IMPLEMENTED locally (Layer A + B); live-model (Layer C) and content approval open.**
+
+- CH-20 / T25-T26: accepted actions persisted before engine (P1), re-verified on real PG.
+- CH-21 / T24/T27/T28/T29/T30: `server/domain/evidence/sliceEvaluator.js` turns
+  APPLIED CANDIDATE actions (never SYSTEM/AI/TEMPLATE) into strict units via the
+  existing normalizer with action/opportunity/rubric/method provenance. Exact-quote
+  check: mismatch → HUMAN_REVIEW_REQUIRED (QUOTE_MISMATCH), sparse → INSUFFICIENT
+  with reason, level 2 → a real developing observation. Sufficiency floors untouched.
+- CH-22 / T31: `assessment_jobs` EVALUATE_RUN with lease/fencing; draft runs no
+  longer call legacy scoring; failure → job FAILED, `processing.state` exposed,
+  finish retry re-queues; player shows "work saved, review continuing" and a
+  technical-failure state distinct from insufficient evidence.
+- CH-23 / T36: migration 0041 adds evidence_set_hash/issued_at/reason/prior_version;
+  report GET serves the stored version unchanged while the hash matches;
+  `REPORT_PROCESSING_FAILED` surfaces as a technical state in the report page.
+  Quote verification now uses candidate turns from history ∪ accepted actions,
+  so it survives the PG history purge (P0 T32 dependency closed for new runs).
+- P2.7 UI: `boundedObservations` — one verified moment (quote, observed behaviour,
+  next behaviour, limitation, "Practise this moment" link) when a capability is
+  below floor; never a level.
+- P2.8 / CH-04 / T41: DRAFT mission `MIS-CORE-HANDOVER-01` (flag `PRISM_DRAFT_CONTENT`),
+  migration 0042 `mission_attempts.origin_json`; attempts carry GOAL|ASSESSMENT_MOMENT
+  origin (ids only); retry = new attempt; practice evidence only; formal report
+  hash unchanged (tested). History links practice ↔ formal as separate record types.
+- P2.1: `DRAFT_CORE_TEAMREADY_A_HANDOVER` versioned snapshot + run pin; exposed in the
+  bank only behind `PRISM_DRAFT_CONTENT`. Legacy stimulus/engine untouched; the real
+  dialogue renderer for the draft segment is P3/P4 (currently exercised via the
+  deterministic test provider and fake engine path).
+
+Verification: server 676 (651 pass / 0 fail / 25 DB skips); frontend 33 files pass;
+isolated PG 6/6 (42 migrations); see TEST_RESULTS. Browser: P1 legacy spec selectors
+being corrected; full four-project run to be recorded.
+
 ## Current P1 checkpoint - 2026-10-02
 
 Status: **IN_PROGRESS - foundation implemented locally; external gates still open.**

@@ -1,5 +1,39 @@
 # P0 - Verification results
 
+## P4-P5 checkpoint - 2026-10-03
+
+| Check | Layer | Result |
+| --- | --- | --- |
+| `npm --prefix server test` | A | 712: 687 pass, 0 fail, 25 DB skips (new: universalForm 7, director 7, factBoundary 4, contentGovernance 3, universalRun 3, reportMoments 4) |
+| `npm run test:unit` | A | 33 files, 449 pass |
+| `run-experience-baseline-tests.mjs database` | B | 6/6, 45 migrations applied |
+| `run-experience-baseline-tests.mjs browser-p1` (chromium/firefox/webkit/mobile) | A UI | 124 passed, 0 failed, 0 flaky (7.2 min) — p1-legacy-report 96, p1-account-entry, flow-entry |
+| `npm run build`, `npm run audit:static` | Build/static | PASS |
+| Live model (Layer C) | C | NOT RUN |
+
+
+## P3 checkpoint - 2026-10-03
+
+| Check | Layer | Result |
+| --- | --- | --- |
+| `npm --prefix server test` | A | 684: 659 pass, 0 fail, 25 DB skips (new runTiming 8) |
+| `npm run test:unit` | A | 33 files, 446 pass (new: intro/begin 2, Home intent states 9, nav updates) |
+| `npm run build` | Build | PASS |
+| Note | - | A test fixture literal `1500000` false-matched the §22 pricing-leak regex; changed to `25 * 60000`. No pricing content involved. |
+
+
+## P2 checkpoint - 2026-10-03
+
+| Check | Layer | Result |
+| --- | --- | --- |
+| `npm --prefix server test` | A | 676 tests: 651 pass, 0 fail, 25 DB skips (new: sliceEvaluator 8, practiceHandover 4, durableActions 9, studentHistory 2, ownershipReconciliation 4) |
+| `npm run test:unit` | A | 33 files pass (new: reports P2.6/P2.7 cases, handoverMission 2, history 6) |
+| `run-experience-baseline-tests.mjs database` | B | 6/6 pass: 42 migrations, read-only probe, real scorer, V2 reader, durable actions immutable, erasure cascade + late write 404 |
+| browser-all (first attempt) | A UI | Invalidated: a concurrent `npm run build` removed `dist/` mid-run → 404s/timeouts. Lesson: never build while the audit server serves `dist/`. |
+| browser-p1 (isolated) | A UI | p1-legacy-report.spec.js locator strict-mode failures (empty toast live region also has role=alert) — spec fix in progress; app behaviour correct per error-context snapshots |
+| Live-model slice (Layer C) | C | NOT RUN — no credentials/budget authorised |
+
+
 ## P1 checkpoint - 2026-10-02 (final)
 
 | Check | Layer | Result |

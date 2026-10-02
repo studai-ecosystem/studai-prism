@@ -17,11 +17,26 @@ export function reportPdfLines(report, { visibility = null, versionNumber = null
   if (versionNumber) lines.push({ text: `Report version ${versionNumber}`, size: 10 })
   if (visibility) lines.push({ text: visibility, size: 10 })
   lines.push({ text: '', size: 10 })
+  if (report.plainStatement) {
+    lines.push({ text: report.plainStatement, size: 11 })
+    lines.push({ text: '', size: 10 })
+  }
   lines.push({ text: 'Capabilities', size: 14, bold: true })
   for (const c of report.summary.capabilities) {
-    lines.push({ text: c.name, size: 12, bold: true })
+    lines.push({ text: c.displayLabel ? `${c.displayLabel} (${c.name})` : c.name, size: 12, bold: true })
     lines.push({ text: c.level ? `Observed level: ${c.level.label} (provisional label)` : 'Not enough evidence to describe', size: 10 })
     lines.push({ text: c.summary.text, size: 10 })
+  }
+  const moments = report.moments || []
+  if (moments.length) {
+    lines.push({ text: '', size: 10 })
+    lines.push({ text: 'Moments that mattered', size: 14, bold: true })
+    for (const m of moments) {
+      lines.push({ text: `${m.capability.displayLabel || m.capability.name}: ${m.observedBehavior}`, size: 10, bold: true })
+      lines.push({ text: `Where: ${m.context}`, size: 10 })
+      lines.push({ text: `Your words: "${m.quote}"`, size: 10 })
+      if (m.nextBehavior) lines.push({ text: `A next behaviour: ${m.nextBehavior}`, size: 10 })
+    }
   }
   if (report.evidence.length) {
     lines.push({ text: '', size: 10 })

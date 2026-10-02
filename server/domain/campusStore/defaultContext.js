@@ -12,6 +12,8 @@ import roleAffinityEngine from '../../lib/roleAffinityEngine.js'
 import { PRE_APPROVED_SCENARIOS } from '../../lib/scenarioBank.js'
 import { createEngineAdapter, createRouterInvoker } from '../assessments/engine.js'
 import { createMissionEvaluator } from '../development/evaluator.js'
+import { createSliceEvaluator } from '../evidence/sliceEvaluator.js'
+import { draftBankScenarios } from '../assessments/draftSegments.js'
 
 // The AI gateway, bound on first use (no provider SDK at module load).
 async function completeViaGateway(params, options) {
@@ -75,11 +77,13 @@ export function createDefaultCampusContext() {
     // the v1 router never imports the engine at module load.
     scenarioSource: async () => {
       const { SCENARIOS } = await import('../../routes/assessment.js')
-      return { generalScenarios: SCENARIOS, bankScenarios: PRE_APPROVED_SCENARIOS }
+      // DRAFT segments join the bank only when PRISM_DRAFT_CONTENT=true (never by default).
+      return { generalScenarios: SCENARIOS, bankScenarios: { ...PRE_APPROVED_SCENARIOS, ...draftBankScenarios() } }
     },
     evidence: { units: (sessionId) => evidenceGraph.getEvidenceUnits(sessionId) },
     roles: { evaluate: ({ capabilityProfile, candidateInterests }) => roleAffinityEngine.computeRoleAffinity(capabilityProfile, candidateInterests) },
     engine: createEngineAdapter({ invoke: invokeEngine }),
     missionEvaluator: createMissionEvaluator({ complete: completeViaGateway }),
+    sliceEvaluator: createSliceEvaluator({ complete: completeViaGateway, recordUnit: (unit) => evidenceGraph.recordEvidenceUnit(unit) }),
   })
 }

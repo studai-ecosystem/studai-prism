@@ -93,4 +93,96 @@ export const MISSION_LIBRARY = Object.freeze([
     estimated_duration: { minutes: 20 },
     accessibility_mode: { keyboard_only: true, screen_reader: true, untimed: true },
   },
+
+  // P2.8 — DRAFT handover mission. Original, domain-light practice content:
+  // hand an unfinished plan to a colleague. DRAFT content is seeded (so it is
+  // governed and immutable like any version) but reachable only when
+  // PRISM_DRAFT_CONTENT is on (test/local); it is never recommended to real
+  // users and, like every mission, writes PRACTICE evidence only.
+  {
+    mission_id: 'MIS-CORE-HANDOVER-01',
+    version: 1,
+    status: 'DRAFT',
+    title: 'Hand over an unfinished plan to a colleague',
+    target_capability_id: 'CAP-L1-COMMUNICATION',
+    target_behavior_ids: ['NAMES_OPEN_WORK', 'SETTLES_OWNERSHIP', 'STATES_FIRST_STEP', 'SETS_CHECKPOINT'],
+    scenario_context: {
+      setting: 'You are leaving for two days and a small event plan is not finished. Two tasks on the board have no owner yet: the vendor quotes and the launch checklist. Your colleague Sam is taking over while you are away and has not seen the plan before.', // campus-allow HARDCODED_SCENARIO: governed practice content (P2.8 draft), not an assessment scenario
+      objective: 'Write the handover so Sam can pick the plan up without asking you: name the two unowned tasks, assign an owner or ask Sam to find one, say what Sam must do first, and give a time when you will check in.',
+    },
+    instructions: [
+      'Fill in the owner column on the board for both unowned tasks. If you cannot assign one, write who should decide.',
+      'Write the handover message to Sam. Name both unowned tasks in it.',
+      'Say what Sam should do first and when you will check in.',
+      'Submit when you are ready. You can try again as many times as you like.',
+    ],
+    artifacts: [
+      {
+        artifact_id: 'BOARD',
+        type: 'TABLE',
+        title: 'Task board',
+        prompt: 'The two tasks that have no owner. Fill in who owns each one now.',
+        columns: [
+          { key: 'task', label: 'Task', kind: 'text', editable: false },
+          { key: 'due', label: 'Due', kind: 'text', editable: false },
+          { key: 'owner', label: 'Owner', kind: 'text', editable: true },
+        ],
+        initial_state: { rows: [{ id: 'quotes', task: 'Vendor quotes', due: 'Thursday', owner: null }, { id: 'checklist', task: 'Launch checklist', due: 'Friday', owner: null }] },
+      },
+      {
+        artifact_id: 'MESSAGE',
+        type: 'TEXT_RESPONSE',
+        title: 'Handover message to Sam',
+        prompt: 'What does Sam need to know to take this over?',
+        initial_state: { text: '' },
+        max_length: 1500,
+      },
+      {
+        artifact_id: 'PLAN',
+        type: 'FIELD_SHEET',
+        title: 'Next steps',
+        prompt: 'Make the first move and the check-in explicit.',
+        fields: [
+          { key: 'first_step', label: 'What should Sam do first?', kind: 'text', max_length: 400 },
+          { key: 'checkpoint', label: 'When will you check in? (give a day and a time)', kind: 'text', max_length: 120 },
+        ],
+        initial_state: { fields: { first_step: '', checkpoint: '' } },
+      },
+    ],
+    constraints: { notes: ['Sam has not seen this plan before.', 'You will be unreachable for two days.'] },
+    deterministic_validation_rules: [
+      { rule_id: 'R-MSG-QUOTES', criterion_id: 'C-NAMES-TASKS', type: 'TEXT_PATTERN', artifact_id: 'MESSAGE', path: 'text', params: { pattern: 'vendor\\s+quotes', flags: 'i' }, description: 'The message names the vendor quotes.' },
+      { rule_id: 'R-MSG-CHECKLIST', criterion_id: 'C-NAMES-TASKS', type: 'TEXT_PATTERN', artifact_id: 'MESSAGE', path: 'text', params: { pattern: 'launch\\s+checklist', flags: 'i' }, description: 'The message names the launch checklist.' },
+      { rule_id: 'R-BOARD-OWNERS', criterion_id: 'C-OWNERSHIP', type: 'REQUIRED_FIELD', artifact_id: 'BOARD', path: 'rows.owner', params: { min_length: 2 }, description: 'Both unowned tasks now have an owner, or a named person who will decide.' },
+      { rule_id: 'R-FIRST-STEP', criterion_id: 'C-FIRST-STEP', type: 'REQUIRED_FIELD', artifact_id: 'PLAN', path: 'fields.first_step', params: { min_length: 8 }, description: 'A first step is written down.' },
+      { rule_id: 'R-CHECKPOINT-TIME', criterion_id: 'C-CHECKPOINT', type: 'TEXT_PATTERN', artifact_id: 'PLAN', path: 'fields.checkpoint', params: { pattern: '(\\b\\d{1,2}(:\\d{2})?\\s*(am|pm)\\b|\\b\\d{1,2}:\\d{2}\\b|\\bnoon\\b|\\bmidday\\b)', flags: 'i' }, description: 'The check-in gives a clock time.' },
+      { rule_id: 'R-CHECKPOINT-DAY', criterion_id: 'C-CHECKPOINT', type: 'TEXT_PATTERN', artifact_id: 'PLAN', path: 'fields.checkpoint', params: { pattern: '\\b(mon|tues?|wed(nes)?|thu(rs)?|fri|sat(ur)?|sun)(day)?\\b|\\btomorrow\\b|\\btoday\\b|\\b\\d{1,2}[/-]\\d{1,2}\\b', flags: 'i' }, description: 'The check-in gives a day.' },
+    ],
+    rubric: {
+      criteria: [
+        { criterion_id: 'C-NAMES-TASKS', behavior_id: 'NAMES_OPEN_WORK', description: 'Names both unowned tasks in the handover message.', check: 'DETERMINISTIC', artifact_ids: ['MESSAGE'] },
+        { criterion_id: 'C-OWNERSHIP', behavior_id: 'SETTLES_OWNERSHIP', description: 'Assigns an owner to each unowned task, or names who will decide.', check: 'DETERMINISTIC', artifact_ids: ['BOARD'] },
+        {
+          criterion_id: 'C-FIRST-STEP', behavior_id: 'STATES_FIRST_STEP', description: 'Tells the receiver what to do first.', check: 'BOTH', artifact_ids: ['PLAN', 'MESSAGE'],
+          evaluator_guidance: 'Observed only if the learner names one concrete action the receiver should take before anything else (for example "call the venue to confirm the quote"). Not observed for a list with no order, or for vague directions such as "get up to speed".',
+        },
+        { criterion_id: 'C-CHECKPOINT', behavior_id: 'SETS_CHECKPOINT', description: 'Gives a day and a clock time for the check-in.', check: 'DETERMINISTIC', artifact_ids: ['PLAN'] },
+      ],
+    },
+    required_evidence: { min_criteria_observed: 1 },
+    scaffolding_policy: {
+      hints: [
+        'Start the message with the two tasks that have no owner, so Sam sees them first.',
+        'If you cannot assign an owner, name the person who should decide instead of leaving it blank.',
+        'A check-in is only useful if Sam can put it in a calendar: give a day and a clock time.',
+      ],
+      reveal: 'ON_REQUEST',
+    },
+    feedback_policy: { mode: 'CRITERION', show_unobserved: true },
+    estimated_duration: { minutes: 15 },
+    accessibility_mode: { keyboard_only: true, screen_reader: true, untimed: true },
+  },
 ])
+
+export const DRAFT_CONTENT_FLAG = 'PRISM_DRAFT_CONTENT'
+export const draftContentEnabled = () => process.env[DRAFT_CONTENT_FLAG] === 'true'

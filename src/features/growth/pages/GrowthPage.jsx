@@ -15,6 +15,7 @@ import { GROWTH_REASON_COPY, GROWTH_COPY } from '../../../lib/copy/student.js'
 import { GrowthDeltaCard } from '../components/GrowthDeltaCard.jsx'
 import { GrowthTimeline } from '../components/GrowthTimeline.jsx'
 import { EvidenceSource } from '../../../components/evidence/EvidenceSource.jsx'
+import { MyPrismSectionNav } from '../../../components/navigation/MyPrismSectionNav.jsx'
 
 function SessionLine({ label, s }) {
   return (
@@ -31,7 +32,12 @@ function SessionLine({ label, s }) {
 export default function GrowthPage() {
   const { active } = useWorkspace()
   const query = useGrowth()
-  const header = <PageHeader title="Growth" description="Change between assessments, shown only when the assessments can be fairly compared." context={active} />
+  const header = (
+    <>
+      <PageHeader title="Growth" description="Change between assessments, shown only when the assessments can be fairly compared." context={active} />
+      {active.type === 'PERSONAL' && <MyPrismSectionNav current="growth" />}
+    </>
+  )
   const state = queryStateView(query, { label: 'Loading growth' })
   if (state) return <div>{header}{state}</div>
   const g = query.data

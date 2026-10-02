@@ -8,6 +8,7 @@ import { Callout } from '../../../components/ui/Notice.jsx'
 import { CapabilityCard } from '../../../components/capability/CapabilityCard.jsx'
 import { EvidenceCoverage } from '../../../components/evidence/EvidenceCoverage.jsx'
 import { EmptyState } from '../../../components/states/index.js'
+import { MyPrismSectionNav } from '../../../components/navigation/MyPrismSectionNav.jsx'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useStudentCapabilities } from '../../student/hooks.js'
 import { queryStateView } from '../../student/QueryState.jsx'
@@ -17,11 +18,14 @@ export default function CapabilitiesPage() {
   const { active } = useWorkspace()
   const query = useStudentCapabilities()
   const header = (
-    <PageHeader
-      title="Capabilities"
-      description="What your completed formal assessments show about how you work. Level names are provisional."
-      context={active}
-    />
+    <>
+      <PageHeader
+        title="Capabilities"
+        description="What your completed formal assessments show about how you work. Level names are provisional."
+        context={active}
+      />
+      <MyPrismSectionNav current="capabilities" />
+    </>
   )
   const state = queryStateView(query, { label: 'Loading your capabilities' })
   if (state) return <div>{header}{state}</div>

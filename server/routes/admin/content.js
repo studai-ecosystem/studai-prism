@@ -24,6 +24,7 @@ import { query } from '../../db/pool.js'
 import { requirePermission } from '../../lib/adminAuth.js'
 import { adminAudit } from '../../lib/adminAudit.js'
 import { seedContentCms, isCmsDbEnabled } from '../../lib/contentCms.js'
+import { contentRegistry, CONTENT_STATES } from '../../domain/content/versions.js'
 
 const router = Router()
 
@@ -377,6 +378,44 @@ router.delete('/applications/:id', requirePermission('content:applications'), as
     res.json({ ok: true })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_application_delete_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ── P4.8 Assessment form governance ───────────────────────────────────────────
+// Authored assessment forms carried by this build and their version states
+// (DRAFT → REVIEW → APPROVED_FOR_PILOT → APPROVED_FOR_INTENDED_USE → RETIRED).
+// Reading needs content:read; a transition needs a reviewer permission
+// (content:publish) AND a reason, and is written to the admin audit log.
+// Nothing is published by default.
+router.get('/forms', requirePermission('content:read'), (req, res) => {
+  res.json({ forms: contentRegistry.listForms(), states: CONTENT_STATES })
+})
+
+router.get('/forms/:id/versions', requirePermission('content:read'), (req, res) => {
+  try {
+    res.json({ contentId: req.params.id, versions: contentRegistry.listVersions(req.params.id) })
+  } catch (err) {
+    if (err?.code === 'NOT_FOUND') return res.status(404).json({ error: 'Form not found.' })
+    logger.captureException(err, { msg: 'admin_form_versions_failed', requestId: req.requestId })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.post('/forms/:formId/transition', requirePermission('content:publish'), async (req, res) => {
+  const { to, reason } = req.body || {}
+  try {
+    const out = contentRegistry.transition({ formId: req.params.formId, to, actor: req.admin, reason })
+    await adminAudit(req, {
+      action: 'assessment_form_state_changed', entityType: 'assessment_form', entityId: req.params.formId,
+      before: { state: out.before }, after: { state: out.state }, reason,
+    })
+    res.json({ formId: out.formId, state: out.state, approvalHistory: out.approvalHistory })
+  } catch (err) {
+    if (err?.code === 'NOT_FOUND') return res.status(404).json({ error: 'Form not found.' })
+    if (err?.code === 'FORBIDDEN') return res.status(403).json({ error: err.message, code: 'FORBIDDEN' })
+    if (err?.code === 'VALIDATION_FAILED') return res.status(400).json({ error: err.message, code: 'VALIDATION_FAILED' })
+    logger.captureException(err, { msg: 'admin_form_transition_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Internal server error' })
   }
 })

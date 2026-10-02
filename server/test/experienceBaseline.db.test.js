@@ -51,7 +51,7 @@ test('P0 integrated diagnostic and real learner-path baseline on a self-owned da
     const result = await inspectDatabase(guarded)
     assert.equal(denied, true)
     assert.equal(result.status, 'AVAILABLE')
-    assert.equal(result.migrations.appliedKnown, 40)
+    assert.equal(result.migrations.appliedKnown, 45)
     assert.deepEqual(await client.query('SELECT COUNT(*) AS n FROM public.v1_users').then((r) => r.rows), before.rows)
     evidence.checks.push({ id: 'CH-41', status: 'PASS', readOnlyWriteRejected: true, migrationsApplied: result.migrations.appliedKnown })
   })

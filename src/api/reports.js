@@ -10,6 +10,7 @@ const ClaimStatus = z.enum(['SUPPORTED', 'PROVISIONAL', 'INSUFFICIENT'])
 const Capability = z.object({
   id: z.string(),
   name: z.string(),
+  displayLabel: z.string().nullable().optional().default(null),
   definition: z.string().nullable(),
   layer: z.string(),
   status: Status,
@@ -53,6 +54,26 @@ const Priority = z.object({
   availability: z.object({ missions: z.string(), reassessment: z.string() }),
 })
 
+const Provenance = z.object({
+  evidenceId: z.string(), source: z.enum(['CONVERSATION', 'WORK_MATERIAL']), turn: z.number().nullable(), artifactId: z.string().nullable(),
+  rubricVersion: z.string().nullable(), reviewedBy: z.enum(['AI', 'AI_AND_HUMAN']), legacy: z.boolean(),
+})
+
+// A moment that mattered (P5.5): a verified unit with the learner's words.
+export const MomentSchema = z.object({
+  id: z.string(),
+  basis: z.enum(['DESCRIBED', 'BOUNDED']),
+  capability: z.object({ id: z.string(), name: z.string(), displayLabel: z.string().nullable() }),
+  observedBehavior: z.string(),
+  quote: z.string(),
+  context: z.string(),
+  source: z.object({ turn: z.number().nullable(), artifactId: z.string().nullable(), opportunityId: z.string().nullable() }),
+  rubricAnchor: z.object({ criteria: z.string() }).nullable(),
+  nextBehavior: z.string().nullable(),
+  evidenceStatus: z.enum(['PROVISIONAL', 'SUFFICIENT']),
+  provenance: Provenance,
+})
+
 export const ReportSchema = z.object({
   builderVersion: z.string(),
   sessionId: z.string(),
@@ -67,7 +88,21 @@ export const ReportSchema = z.object({
     verification: z.object({ identityAssurance: z.string(), credentialId: z.string().nullable() }),
   }),
   summary: z.object({ capabilities: z.array(Capability), describedCount: z.number(), insufficientCount: z.number() }),
+  // Older stored versions predate these fields; absence is an honest empty state.
+  plainStatement: z.string().nullable().optional().default(null),
+  displayLabels: z.array(z.object({ id: z.string(), name: z.string(), displayLabel: z.string().nullable() })).optional().default([]),
+  moments: z.array(MomentSchema).max(3).optional().default([]),
   evidence: z.array(Evidence),
+  boundedObservations: z.array(z.object({
+    id: z.string(),
+    capability: z.object({ id: z.string(), name: z.string() }),
+    observedBehavior: z.string(),
+    quote: z.string(),
+    source: z.object({ turn: z.number().nullable(), artifactId: z.string().nullable(), opportunityId: z.string().nullable() }),
+    rubricAnchor: z.object({ criteria: z.string() }).nullable(),
+    nextBehavior: z.string().nullable(),
+    limitation: z.string(),
+  }).passthrough()).optional().default([]),
   development: z.object({ priorities: z.array(Priority).max(3), maxPriorities: z.number() }).nullable(),
   methodology: z.object({
     builderVersion: z.string(), sufficiencyRulesVersion: z.string(), levelLabelsStatus: z.string(), catalogVersion: z.string(),
@@ -86,6 +121,30 @@ const ReportResponse = z.object({
 })
 
 const CreatedShare = z.object({ id: z.string(), recipientType: z.enum(['LINK', 'ORGANIZATION']), disclosureLevel: z.enum(['SUMMARY', 'FULL']), expiresAt: z.string(), token: z.string().nullable() })
+
+const ReviewRequest = z.object({ id: z.string(), sessionId: z.string(), version: z.number().int(), category: z.string(), momentId: z.string().nullable(), state: z.enum(['OPEN', 'RESOLVED']), createdAt: z.string().nullable() })
+
+const VersionHistory = z.object({
+  sessionId: z.string(),
+  versions: z.array(z.object({ version: z.number().int(), builderVersion: z.string(), createdAt: z.string().nullable(), issuedAt: z.string().nullable(), reason: z.string().nullable(), priorVersion: z.number().int().nullable() })),
+  reviews: z.array(ReviewRequest),
+})
+
+export const REVIEW_CATEGORIES = ['TRANSCRIPTION', 'ATTRIBUTION', 'SCENARIO_FACT', 'INTERPRETATION', 'OTHER']
+
+export async function fetchReportVersions(sessionId) {
+  const { data } = await request(`/api/v1/assessment-sessions/${encodeURIComponent(sessionId)}/report/versions`, {
+    schema: VersionHistory, defaultErrorMessage: 'The version history could not be loaded.',
+  })
+  return data
+}
+
+export async function requestReportReview(sessionId, body) {
+  const { data } = await request(`/api/v1/assessment-sessions/${encodeURIComponent(sessionId)}/report/review-request`, {
+    method: 'POST', body, schema: ReviewRequest, defaultErrorMessage: 'Your review request could not be sent.',
+  })
+  return data
+}
 
 export async function fetchStudentReport(sessionId) {
   const { data } = await request(`/api/v1/assessment-sessions/${encodeURIComponent(sessionId)}/report`, {

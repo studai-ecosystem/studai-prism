@@ -14,6 +14,7 @@ const version = (r) => r && ({
 const attempt = (r) => r && ({
   id: r.id, userId: r.user_id, missionId: r.mission_id, missionVersion: r.mission_version, organizationId: r.organization_id, interventionId: r.intervention_id,
   status: r.status, work: r.work, version: r.version, hintsUsed: r.hints_used, idempotencyKey: r.idempotency_key, evaluation: r.evaluation,
+  origin: r.origin_json || null,
   submittedAt: iso(r.submitted_at), createdAt: iso(r.created_at), updatedAt: iso(r.updated_at),
 })
 const unit = (r) => r && ({
@@ -59,6 +60,13 @@ export function createDevelopmentRepoPg({ query, getPool }) {
         WHERE v.status = 'PUBLISHED' ORDER BY v.mission_id, v.version DESC`)
       return rows.map(version)
     },
+    async listDraftMissions() {
+      const { rows } = await query(`
+        SELECT DISTINCT ON (v.mission_id) v.* FROM mission_versions v
+        JOIN mission_definitions d ON d.id = v.mission_id AND d.status = 'ACTIVE'
+        WHERE v.status = 'DRAFT' ORDER BY v.mission_id, v.version DESC`)
+      return rows.map(version)
+    },
     async getMissionVersion(missionId, v) {
       const { rows } = await query('SELECT * FROM mission_versions WHERE mission_id = $1 AND version = $2', [missionId, v])
       return version(rows[0]) || null
@@ -67,10 +75,10 @@ export function createDevelopmentRepoPg({ query, getPool }) {
     async createAttempt(a) {
       return run(async () => {
         const { rows } = await query(`
-          INSERT INTO mission_attempts (user_id, mission_id, mission_version, organization_id, intervention_id, status, work, version, hints_used, idempotency_key)
-          VALUES ($1, $2, $3, $4, $5, 'IN_PROGRESS', $6::jsonb, 1, 0, $7)
+          INSERT INTO mission_attempts (user_id, mission_id, mission_version, organization_id, intervention_id, status, work, version, hints_used, idempotency_key, origin_json)
+          VALUES ($1, $2, $3, $4, $5, 'IN_PROGRESS', $6::jsonb, 1, 0, $7, $8::jsonb)
           ON CONFLICT (user_id, idempotency_key) DO NOTHING RETURNING *`,
-        [a.userId, a.missionId, a.missionVersion, a.organizationId || null, a.interventionId || null, JSON.stringify(a.work), a.idempotencyKey])
+        [a.userId, a.missionId, a.missionVersion, a.organizationId || null, a.interventionId || null, JSON.stringify(a.work), a.idempotencyKey, a.origin ? JSON.stringify(a.origin) : null])
         if (rows[0]) return { attempt: attempt(rows[0]), replayed: false }
         const { rows: [prior] } = await query('SELECT * FROM mission_attempts WHERE user_id = $1 AND idempotency_key = $2', [a.userId, a.idempotencyKey])
         return { attempt: attempt(prior), replayed: true }

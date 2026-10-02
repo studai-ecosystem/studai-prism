@@ -269,6 +269,22 @@ test('C4.03: home picks the primary action by spec priority and growth is never 
     assert.equal(personal.body.data.focus[0].capabilityId, 'CAP-L1-REASONING')
     assert.equal(personal.body.data.sponsor, null)
 
+    // P3.3: a finished session without a report is never "resume". Within the
+    // grace window it is processing (no link to buy or resume); after it, a
+    // technical failure whose first action is recovery, not a purchase.
+    w.legacyState.sessions['sess-live'].completedAt = NOW.getTime() - 60 * 60 * 1000
+    const processing = await w.call('student', 'GET', '/me/home')
+    assert.equal(processing.body.data.primaryAction.kind, 'ASSESSMENT_PROCESSING')
+    assert.equal(processing.body.data.primaryAction.sessionId, 'sess-live')
+    assert.equal(processing.body.data.primaryAction.to, null)
+    assert.equal(processing.body.data.primaryAction.title, 'Synthetic Bank Simulation')
+    w.legacyState.sessions['sess-live'].completedAt = NOW.getTime() - 2 * day
+    const failed = await w.call('student', 'GET', '/me/home')
+    assert.equal(failed.body.data.primaryAction.kind, 'ASSESSMENT_TECHNICAL_FAILED')
+    assert.equal(failed.body.data.primaryAction.to, '/workspace/sess-live', 'recovery reopens the saved run')
+    assert.notEqual(failed.body.data.primaryAction.to, EMPTY_LEGACY_SOURCES.paths.purchase)
+    delete w.legacyState.sessions['sess-live'].completedAt
+
     await sponsoredAssignment(w, { windowEnd: iso(3 * day) })
     const campus = await w.call('student', 'GET', '/me/home', null, { 'X-Prism-Workspace': w.campusWs.id })
     assert.equal(campus.body.data.primaryAction.kind, 'ASSESSMENT_DUE')

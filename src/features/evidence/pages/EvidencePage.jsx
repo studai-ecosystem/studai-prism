@@ -8,6 +8,7 @@ import { Select, Input } from '../../../components/ui/FormControls.jsx'
 import { Button } from '../../../components/ui/Button.jsx'
 import { EmptyState } from '../../../components/states/index.js'
 import { EvidenceTracePanel } from '../../../components/evidence/EvidenceTracePanel.jsx'
+import { MyPrismSectionNav } from '../../../components/navigation/MyPrismSectionNav.jsx'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useStudentEvidence } from '../../student/hooks.js'
 import { queryStateView, formatDate } from '../../student/QueryState.jsx'
@@ -39,11 +40,14 @@ export default function EvidencePage() {
   }
 
   const header = (
-    <PageHeader
-      title="Evidence"
-      description="Every conclusion Prism draws is traced to something you did. Showing personal evidence only — sponsored evidence stays in your institution workspace."
-      context={active}
-    />
+    <>
+      <PageHeader
+        title="Evidence"
+        description="Every conclusion Prism draws is traced to something you did. Showing personal evidence only — sponsored evidence stays in your institution workspace."
+        context={active}
+      />
+      <MyPrismSectionNav current="evidence" />
+    </>
   )
   const state = queryStateView(query, { label: 'Loading evidence' })
   if (state) return <div>{header}{state}</div>

@@ -15,7 +15,7 @@ export const HISTORY_PAGE_DEFAULT = 20
 export const HISTORY_PAGE_MAX = 50
 // A finished session whose report has not appeared after this long is a
 // technical failure to recover from, not a result still being processed.
-const PROCESSING_GRACE_MS = 24 * 60 * 60 * 1000
+export const PROCESSING_GRACE_MS = 24 * 60 * 60 * 1000
 
 const workspaceV3 = () => isEnabled('PRISM_ASSESSMENT_WORKSPACE_V3')
 const iso = z.string().datetime({ offset: true }).nullable()
@@ -35,6 +35,9 @@ export const HistoryItemSchema = z.object({
   reportFormat: z.enum(['V3', 'LEGACY_V2']).nullable(),
   permittedAction: z.object({ kind: z.enum(['VIEW_REPORT', 'RESUME', 'RECOVER', 'NONE']), to: z.string().nullable() }),
   recoveryState: z.enum(['NONE', 'RESUMABLE', 'AWAITING_REPORT', 'RECOVERABLE', 'SUPPORT_REQUIRED', 'HELD']),
+  // Practice only (P2.8): the formal session this practice was started from,
+  // by id. The two records stay separately typed; this is the link between them.
+  linkedSessionId: z.string().nullable().optional(),
 }).strict()
 
 export const HistoryPageSchema = z.object({ items: z.array(HistoryItemSchema), nextCursor: z.string().nullable() }).strict()
@@ -128,6 +131,7 @@ export function createStudentHistory({ directory, catalog, legacy, practice = { 
       reportFormat: null,
       permittedAction: open ? { kind: 'RESUME', to: missionTo } : { kind: 'NONE', to: null },
       recoveryState: open ? 'RESUMABLE' : 'NONE',
+      linkedSessionId: a.origin?.kind === 'ASSESSMENT_MOMENT' ? a.origin.sessionId : null,
     }
   }
 

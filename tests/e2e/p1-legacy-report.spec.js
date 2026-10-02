@@ -63,9 +63,13 @@ async function assertOriginal(page, report = storedReport()) {
   await expect(page.getByText(`Valid until ${report.validUntil} · ${SESSION_ID}`, { exact: true })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Communication', exact: true }).getByText('72.25', { exact: true })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Critical Thinking', exact: true }).getByText('0', { exact: true })).toBeVisible()
-  await expect(page.getByText('63.5%', { exact: true })).toBeVisible()
-  for (const text of [report.evidence.communication, report.feedback.summary, ...report.highlights, ...report.growthAreas, ...report.interviewQuestions]) {
+  await expect(page.getByText('63.5', { exact: true })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Original score breakdown' }).getByText('63.5%', { exact: true })).toBeVisible()
+  for (const text of [report.evidence.communication, report.feedback.summary, ...report.highlights, ...report.growthAreas]) {
     await expect(page.getByText(text, { exact: true })).toBeVisible()
+  }
+  for (const [index, question] of report.interviewQuestions.entries()) {
+    await expect(page.getByText(question, { exact: false })).toHaveText(`Q${index + 1}${question}`)
   }
   await expect(page.getByText('Synthetic original scenario · Synthetic domain', { exact: true })).toBeVisible()
   await expect(page.getByText(report.feedback.communication, { exact: true })).toHaveCount(0)
@@ -253,7 +257,7 @@ for (const fixture of ERROR_CASES) {
       failing = true
       await page.setViewportSize({ width, height: 900 })
       await page.goto(`${LEGACY_BASE_URL}/score?session=${SESSION_ID}`)
-      await expect(page.getByRole('alert')).toContainText(fixture.title)
+      await expect(page.getByRole('alert').filter({ hasText: /\S/ }).getByRole('heading', { name: fixture.title, exact: true })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Back to history', exact: true })).toBeVisible()
       await expect(page.getByText(/private backend detail|Score not found|expired|complete an assessment first|Insufficient evidence/)).toHaveCount(0)
       await expect(page.getByText('Overall Prism Score', { exact: true })).toHaveCount(0)
@@ -261,7 +265,7 @@ for (const fixture of ERROR_CASES) {
       failing = false
       await page.getByRole('button', { name: 'Try again', exact: true }).click()
       await assertOriginal(page)
-      await expect(page.getByRole('alert')).toHaveCount(0)
+      await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0)
       await expectNoHorizontalOverflow(page)
     }
     expect(reads).toEqual(['GET', 'GET', 'GET', 'GET'])

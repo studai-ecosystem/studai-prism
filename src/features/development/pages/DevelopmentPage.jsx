@@ -12,16 +12,20 @@ import { useDevelopmentPlan, useGrowth } from '../../student/hooks.js'
 import { ReassessmentEntry } from '../../growth/components/ReassessmentEntry.jsx'
 import { queryStateView, formatDate } from '../../student/QueryState.jsx'
 import { DEVELOPMENT_COPY } from '../../../lib/copy/student.js'
+import { useSearchParams } from 'react-router-dom'
 
 export default function DevelopmentPage() {
   const { active } = useWorkspace()
+  const [params] = useSearchParams()
   const query = useDevelopmentPlan()
   const growth = useGrowth()
   const header = <PageHeader title="Development" description="What to work on next, and how to practise it." context={active} />
   const state = queryStateView(query, { label: 'Loading your development plan' })
   if (state) return <div>{header}{state}</div>
   const plan = query.data
-  const missionPath = (id) => (active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/development/missions/${id}` : `/app/development/missions/${id}`)
+  // A moment carried from a report is passed to the mission as its origin (ids only).
+  const origin = params.get('source') ? `?source=${encodeURIComponent(params.get('source'))}${params.get('moment') ? `&moment=${encodeURIComponent(params.get('moment'))}` : ''}` : ''
+  const missionPath = (id) => `${active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/development/missions/${id}` : `/app/development/missions/${id}`}${origin}`
   return (
     <div className="space-y-6">
       {header}

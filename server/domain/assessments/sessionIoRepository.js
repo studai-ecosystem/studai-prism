@@ -26,6 +26,39 @@ function validateAction({ sessionId, clientEventId, kind }) {
 
 const STALE = () => new ApiError('CONFLICT', 'This work item is no longer leased by the caller.')
 const ERASED = () => new ApiError('NOT_FOUND', 'Not found')
+const VERSION_MISMATCH = () => new ApiError('CONFLICT', 'This assessment changed since you opened it. Refresh and try again.')
+
+// P3.8 run timing: validation shared by both adapters.
+function validatePolicy(policy) {
+  if (!policy || typeof policy.version !== 'string' || !policy.version) throw new ApiError('VALIDATION_FAILED', 'Invalid timing policy.')
+  if (!Number.isFinite(policy.durationMs) || policy.durationMs <= 0) throw new ApiError('VALIDATION_FAILED', 'Invalid timing policy.')
+  if (policy.graceMs != null && (!Number.isFinite(policy.graceMs) || policy.graceMs < 0)) throw new ApiError('VALIDATION_FAILED', 'Invalid timing policy.')
+}
+function validateBegin({ idempotencyKey, expectedVersion }) {
+  if (typeof idempotencyKey !== 'string' || !idempotencyKey) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
+  if (expectedVersion != null && !Number.isInteger(expectedVersion)) throw new ApiError('VALIDATION_FAILED', 'Invalid expected version.')
+}
+const toMs = (value) => (value instanceof Date ? value.getTime() : new Date(value).getTime())
+
+// P4.5 opportunity ledger: validation shared by both adapters.
+const OPPORTUNITY_STATES = new Set(['PLANNED', 'PRESENTED', 'ACTION_RECEIVED', 'EVALUATION_PENDING', 'EVALUATED', 'DELIVERY_FAILED', 'NOT_ACCESSIBLE', 'SKIPPED_BY_POLICY', 'EXPIRED', 'REVIEW_REQUIRED'])
+function validateOpportunity({ sessionId, opportunityId, capabilityId, state }) {
+  if (typeof sessionId !== 'string' || !sessionId) throw new ApiError('VALIDATION_FAILED', 'Invalid session.')
+  if (typeof opportunityId !== 'string' || !opportunityId) throw new ApiError('VALIDATION_FAILED', 'Invalid opportunity.')
+  if (typeof capabilityId !== 'string' || !capabilityId) throw new ApiError('VALIDATION_FAILED', 'Invalid capability.')
+  if (!OPPORTUNITY_STATES.has(state)) throw new ApiError('VALIDATION_FAILED', 'Invalid opportunity state.')
+}
+function timedFields(policy, startedAtIso) {
+  const start = toMs(startedAtIso)
+  const answer = start + policy.durationMs
+  // No grace → no grace deadline (legacy policy reports null, not a duplicate).
+  const graceMs = policy.graceMs || 0
+  return {
+    timedStartedAt: new Date(start).toISOString(),
+    answerDeadlineAt: new Date(answer).toISOString(),
+    graceDeadlineAt: graceMs > 0 ? new Date(answer + graceMs).toISOString() : null,
+  }
+}
 
 export function createSessionIoRepoMemory(db) {
   db.clientEvents ||= new Map() // `${sessionId}\u0000${clientEventId}`
@@ -33,11 +66,66 @@ export function createSessionIoRepoMemory(db) {
   db.candidateActions ||= new Map() // `${sessionId}\u0000${clientEventId}`
   db.assessmentJobs ||= new Map() // taskKey
   db.erasureMarkers ||= new Map() // sessionId
+  db.runTiming ||= new Map() // sessionId
+  db.opportunities ||= new Map() // `${sessionId}\u0000${opportunityId}`
   db.fencingCounter ||= 0
   const key = (s, e) => `${s}\u0000${e}`
   const now = () => db.clock().toISOString()
   const actionById = (id) => [...db.candidateActions.values()].find((a) => a.actionId === id) || null
   return {
+    // --- P4.5 opportunity ledger ------------------------------------------------
+    async upsertOpportunity({ sessionId, opportunityId, groupId = null, capabilityId, behaviourIds = [], state = 'PLANNED' }) {
+      validateOpportunity({ sessionId, opportunityId, capabilityId, state })
+      const k = key(sessionId, opportunityId)
+      if (!db.opportunities.has(k)) {
+        db.opportunities.set(k, { sessionId, opportunityId, groupId, capabilityId, behaviourIds: [...behaviourIds], state, presentedAt: null, renderHash: null, stimulus: null, actionIds: [], createdAt: now(), updatedAt: now() })
+      }
+      return clone(db.opportunities.get(k))
+    },
+    async listOpportunities(sessionId) {
+      return [...db.opportunities.values()].filter((o) => o.sessionId === sessionId).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.opportunityId.localeCompare(b.opportunityId)).map(clone)
+    },
+    // Transition + attach presentation facts / action ids. Action ids append.
+    async setOpportunityState(sessionId, opportunityId, state, { presentedAt = null, renderHash = null, stimulus = null, actionId = null } = {}) {
+      validateOpportunity({ sessionId, opportunityId, capabilityId: 'x', state })
+      const row = db.opportunities.get(key(sessionId, opportunityId))
+      if (!row) throw new ApiError('NOT_FOUND', 'Not found')
+      row.state = state
+      if (presentedAt) row.presentedAt = new Date(presentedAt).toISOString()
+      if (renderHash) row.renderHash = renderHash
+      if (stimulus) row.stimulus = clone(stimulus)
+      if (actionId && !row.actionIds.includes(actionId)) row.actionIds.push(actionId)
+      row.updatedAt = now()
+      return clone(row)
+    },
+    // --- P3.8 run timing ---------------------------------------------------------
+    async getRunTiming(sessionId) { return clone(db.runTiming.get(sessionId)) || null },
+    // Insert-if-absent. A legacy run passes its engine start so it is "begun"
+    // at allocation; a draft run is allocated without a timed start.
+    async allocateRunTiming(sessionId, { policy, timedStartedAt = null }) {
+      if (typeof sessionId !== 'string' || !sessionId) throw new ApiError('VALIDATION_FAILED', 'Invalid session.')
+      validatePolicy(policy)
+      if (!db.runTiming.has(sessionId)) {
+        const timed = timedStartedAt ? timedFields(policy, timedStartedAt) : { timedStartedAt: null, answerDeadlineAt: null, graceDeadlineAt: null }
+        db.runTiming.set(sessionId, {
+          sessionId, allocatedAt: now(), ...timed, policyVersion: policy.version,
+          policy: { version: policy.version, status: policy.status || null, durationMs: policy.durationMs, graceMs: policy.graceMs || 0, adjustments: clone(policy.adjustments || []) },
+          beginIdempotencyKey: null, version: 1, updatedAt: now(),
+        })
+      }
+      return clone(db.runTiming.get(sessionId))
+    },
+    // One timed start per run: the first begin writes it, every later begin
+    // (same or different key, concurrent or not) returns the stored timestamps.
+    async beginRun(sessionId, { idempotencyKey, expectedVersion = null, now: at = null }) {
+      validateBegin({ idempotencyKey, expectedVersion })
+      const row = db.runTiming.get(sessionId)
+      if (!row) throw new ApiError('NOT_FOUND', 'Not found')
+      if (row.timedStartedAt) return { ...clone(row), replayed: true }
+      if (expectedVersion != null && expectedVersion !== row.version) throw VERSION_MISMATCH()
+      Object.assign(row, timedFields(row.policy, at || db.clock()), { beginIdempotencyKey: idempotencyKey, version: row.version + 1, updatedAt: now() })
+      return { ...clone(row), replayed: false }
+    },
     // --- P1.5 durable candidate actions -------------------------------------
     async hasErasureMarker(sessionId) { return db.erasureMarkers.has(sessionId) },
     async markErased(sessionId) {
@@ -45,6 +133,10 @@ export function createSessionIoRepoMemory(db) {
       return clone(db.erasureMarkers.get(sessionId))
     },
     async getAction(sessionId, clientEventId) { return clone(db.candidateActions.get(key(sessionId, clientEventId))) || null },
+    // Every accepted candidate action of a session in acceptance order (P2.3).
+    async listActions(sessionId) {
+      return [...db.candidateActions.values()].filter((a) => a.sessionId === sessionId).sort((a, b) => a.sequence - b.sequence).map(clone)
+    },
     async acceptAction({ sessionId, clientEventId, kind, payload }) {
       validateAction({ sessionId, clientEventId, kind })
       if (db.erasureMarkers.has(sessionId)) throw ERASED()
@@ -118,6 +210,13 @@ export function createSessionIoRepoMemory(db) {
       else job.state = 'FAILED'
       return clone(job)
     },
+    // An explicit retry of a FAILED job (P2.6): back to the queue, same key.
+    async retryJob(taskKey) {
+      const job = db.assessmentJobs.get(taskKey)
+      if (!job) return null
+      if (job.state === 'FAILED') { job.state = 'QUEUED'; job.nextAvailableAt = now(); job.updatedAt = now() }
+      return clone(job)
+    },
     // --- 0032 client events + artifact versions --------------------------------
     async getClientEvent(sessionId, clientEventId) {
       return clone(db.clientEvents.get(key(sessionId, clientEventId))) || null
@@ -163,10 +262,92 @@ const job = (r) => r && ({
   leaseExpiresAt: iso(r.lease_expires_at), fencingToken: Number(r.fencing_token), nextAvailableAt: iso(r.next_available_at),
   resultState: r.result_state, createdAt: iso(r.created_at), updatedAt: iso(r.updated_at),
 })
+const timing = (r) => r && ({
+  sessionId: r.session_id, allocatedAt: iso(r.allocated_at), timedStartedAt: iso(r.timed_started_at), answerDeadlineAt: iso(r.answer_deadline_at),
+  graceDeadlineAt: iso(r.grace_deadline_at), policyVersion: r.policy_version, policy: r.policy_json, beginIdempotencyKey: r.begin_idempotency_key,
+  version: r.version, updatedAt: iso(r.updated_at),
+})
+const opportunity = (r) => r && ({
+  sessionId: r.session_id, opportunityId: r.opportunity_id, groupId: r.group_id, capabilityId: r.capability_id, behaviourIds: r.behaviour_ids || [],
+  state: r.state, presentedAt: iso(r.presented_at), renderHash: r.render_hash, stimulus: r.stimulus_json ?? null, actionIds: r.action_ids || [],
+  createdAt: iso(r.created_at), updatedAt: iso(r.updated_at),
+})
 
 export function createSessionIoRepoPg({ query }) {
   const erased = async (sessionId) => (await query('SELECT 1 FROM assessment_erasure_markers WHERE session_id = $1', [sessionId])).rows.length > 0
   return {
+    // --- P4.5 opportunity ledger ------------------------------------------------
+    async upsertOpportunity({ sessionId, opportunityId, groupId = null, capabilityId, behaviourIds = [], state = 'PLANNED' }) {
+      validateOpportunity({ sessionId, opportunityId, capabilityId, state })
+      await query(
+        `INSERT INTO assessment_opportunities (session_id, opportunity_id, group_id, capability_id, behaviour_ids, state)
+         VALUES ($1, $2, $3, $4, $5::text[], $6) ON CONFLICT (session_id, opportunity_id) DO NOTHING`,
+        [sessionId, opportunityId, groupId, capabilityId, behaviourIds, state],
+      )
+      const { rows } = await query('SELECT * FROM assessment_opportunities WHERE session_id = $1 AND opportunity_id = $2', [sessionId, opportunityId])
+      return opportunity(rows[0])
+    },
+    async listOpportunities(sessionId) {
+      const { rows } = await query('SELECT * FROM assessment_opportunities WHERE session_id = $1 ORDER BY created_at ASC, opportunity_id ASC', [sessionId])
+      return rows.map(opportunity)
+    },
+    async setOpportunityState(sessionId, opportunityId, state, { presentedAt = null, renderHash = null, stimulus = null, actionId = null } = {}) {
+      validateOpportunity({ sessionId, opportunityId, capabilityId: 'x', state })
+      const { rows } = await query(
+        `UPDATE assessment_opportunities SET state = $3,
+           presented_at = COALESCE($4::timestamptz, presented_at), render_hash = COALESCE($5, render_hash),
+           stimulus_json = COALESCE($6::jsonb, stimulus_json),
+           action_ids = CASE WHEN $7::text IS NULL OR $7 = ANY(action_ids) THEN action_ids ELSE array_append(action_ids, $7) END,
+           updated_at = now()
+         WHERE session_id = $1 AND opportunity_id = $2 RETURNING *`,
+        [sessionId, opportunityId, state, presentedAt ? new Date(presentedAt).toISOString() : null, renderHash, stimulus ? JSON.stringify(stimulus) : null, actionId],
+      )
+      if (!rows[0]) throw new ApiError('NOT_FOUND', 'Not found')
+      return opportunity(rows[0])
+    },
+    // --- P3.8 run timing ---------------------------------------------------------
+    async getRunTiming(sessionId) {
+      const { rows } = await query('SELECT * FROM assessment_run_timing WHERE session_id = $1', [sessionId])
+      return timing(rows[0]) || null
+    },
+    async allocateRunTiming(sessionId, { policy, timedStartedAt = null }) {
+      if (typeof sessionId !== 'string' || !sessionId) throw new ApiError('VALIDATION_FAILED', 'Invalid session.')
+      validatePolicy(policy)
+      const timed = timedStartedAt ? timedFields(policy, timedStartedAt) : { timedStartedAt: null, answerDeadlineAt: null, graceDeadlineAt: null }
+      const record = { version: policy.version, status: policy.status || null, durationMs: policy.durationMs, graceMs: policy.graceMs || 0, adjustments: policy.adjustments || [] }
+      await query(
+        `INSERT INTO assessment_run_timing (session_id, timed_started_at, answer_deadline_at, grace_deadline_at, policy_version, policy_json)
+         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (session_id) DO NOTHING`,
+        [sessionId, timed.timedStartedAt, timed.answerDeadlineAt, timed.graceDeadlineAt, policy.version, JSON.stringify(record)],
+      )
+      return this.getRunTiming(sessionId)
+    },
+    // The conditional UPDATE lets exactly one concurrent begin write the
+    // timed start; everyone else reads the row it wrote.
+    async beginRun(sessionId, { idempotencyKey, expectedVersion = null, now: at = null }) {
+      validateBegin({ idempotencyKey, expectedVersion })
+      const current = await this.getRunTiming(sessionId)
+      if (!current) throw new ApiError('NOT_FOUND', 'Not found')
+      if (current.timedStartedAt) return { ...current, replayed: true }
+      if (expectedVersion != null && expectedVersion !== current.version) throw VERSION_MISMATCH()
+      const start = at ? new Date(at).toISOString() : null
+      const { rows } = await query(
+        `UPDATE assessment_run_timing SET
+           timed_started_at = COALESCE($2::timestamptz, now()),
+           answer_deadline_at = COALESCE($2::timestamptz, now()) + (((policy_json->>'durationMs')::bigint) * interval '1 millisecond'),
+           grace_deadline_at = CASE WHEN COALESCE((policy_json->>'graceMs')::bigint, 0) > 0
+             THEN COALESCE($2::timestamptz, now()) + (((policy_json->>'durationMs')::bigint + (policy_json->>'graceMs')::bigint) * interval '1 millisecond')
+             ELSE NULL END,
+           begin_idempotency_key = $3, version = version + 1, updated_at = now()
+         WHERE session_id = $1 AND timed_started_at IS NULL
+         RETURNING *`,
+        [sessionId, start, idempotencyKey],
+      )
+      if (rows[0]) return { ...timing(rows[0]), replayed: false }
+      const after = await this.getRunTiming(sessionId)
+      if (!after?.timedStartedAt) throw new ApiError('UPSTREAM_UNAVAILABLE', 'The assessment could not be started.')
+      return { ...after, replayed: true }
+    },
     async hasErasureMarker(sessionId) { return erased(sessionId) },
     async markErased(sessionId) {
       await query('INSERT INTO assessment_erasure_markers (session_id) VALUES ($1) ON CONFLICT (session_id) DO NOTHING', [sessionId])
@@ -176,6 +357,10 @@ export function createSessionIoRepoPg({ query }) {
     async getAction(sessionId, clientEventId) {
       const { rows } = await query('SELECT * FROM assessment_candidate_actions WHERE session_id = $1 AND client_event_id = $2', [sessionId, clientEventId])
       return action(rows[0]) || null
+    },
+    async listActions(sessionId) {
+      const { rows } = await query('SELECT * FROM assessment_candidate_actions WHERE session_id = $1 ORDER BY sequence ASC', [sessionId])
+      return rows.map(action)
     },
     // Insert-if-absent in one statement; the stored row decides replay vs conflict.
     async acceptAction({ sessionId, clientEventId, kind, payload }) {
@@ -264,6 +449,13 @@ export function createSessionIoRepoPg({ query }) {
       )
       if (!rows[0]) throw STALE()
       return job(rows[0])
+    },
+    async retryJob(taskKey) {
+      await query(
+        `UPDATE assessment_jobs SET state = 'QUEUED', next_available_at = now(), updated_at = now() WHERE task_key = $1 AND state = 'FAILED'`,
+        [taskKey],
+      )
+      return this.getJob(taskKey)
     },
     async getClientEvent(sessionId, clientEventId) {
       const { rows } = await query('SELECT * FROM assessment_client_events WHERE session_id = $1 AND client_event_id = $2', [sessionId, clientEventId])
