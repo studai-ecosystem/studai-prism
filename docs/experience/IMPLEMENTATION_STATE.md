@@ -1,0 +1,415 @@
+# Experience programme - source traceability and P0 checkpoint
+
+Date: 2026-10-02. Scope: **approved P0 diagnostic-only documentation**.
+**Programme release: NO-GO. P0 code-safe diagnostic baseline: COMPLETE.**
+Parent phase-close authority and limits: [FINAL_REPORT](FINAL_REPORT.md).
+This ledger is complete as a source mapping, not as an implementation or acceptance
+claim. No application, schema, content, flag, customer record or entitlement was
+changed by this documentation work. No commit, deployment or live-model call was made.
+
+## Authority, boundaries and evidence
+
+- Source requirements: `..\..\..\.github\prompts\document.md`, sections 5, 31,
+  32, 34 and 39. Source phase assignments:
+  `..\..\..\.github\prompts\plan.prompt.md`, each phase's CH/T tables.
+- Execution authority: approved session `plan.md` for session
+  `02dcb662-6d57-42a7-b583-59b4a7c1e3d1`. Its diagnostic-only P0 limit
+  overrides automatic progression and runtime-repair instructions in the attachment.
+  Stop before P1. Missing HTML companion and reference screens were **not inspected**.
+- Source snapshot `609f748277d4462e4c113c9c2e5b66fe05e016bb` is historical.
+  Read-only checkout inspection observed branch `ui/prism-brand-transformation`,
+  HEAD `f40bd1c`. The dirty entry/history/routing, persistence, package-lock and
+  session-lock work is pre-existing, not attributed to this ledger.
+  The deleted repository instruction file, untracked brand pack/zip and `data\`
+  are preserved. The parent owns the immutable dirty snapshot and final diff.
+- [UI A-M state](..\ui\UI_PROGRAM_STATE.md) is a different programme. Its COMPLETE
+  markers and earlier repair test counts do not close experience P0-P10.
+  [Flow repair map](..\ui\FLOW_REPAIR_MAP.md) and
+  [flow readiness](..\ui\FLOW_REPAIR_READINESS.md) retain the end-to-end NO-GO.
+- Fresh parent evidence has been read in [BASELINE](BASELINE.md) and
+  [TEST_RESULTS](TEST_RESULTS.md). The checkpoint below and affected rows now
+  distinguish executed diagnostics from unexecuted full source acceptance.
+  [ROLLOUT](ROLLOUT.md), [CONTENT_REVIEW](CONTENT_REVIEW.md) and
+  [FINAL_REPORT](FINAL_REPORT.md) remain parent-owned handoff records.
+  The final browser runner completed; FINAL_REPORT closes diagnostic-only P0.
+  Product/science/production gates remain FAIL/OPEN, not satisfied by that closure.
+
+### Reading the ledger
+
+There are exactly **52 CH rows and 60 T rows**, one row per source ID. Source
+wording and K/U/A/R/D distinctions are retained. `K/U` and `A/U` are composite
+source decisions, not normalization errors. Retirement means retirement from
+**new creation**, never deletion of old reports, active runs or bought rights.
+
+**Primary phase** is the earliest explicit assignment in the source prompt's
+CH/T tables. **All source phases** preserves every repeated assignment, including
+P9/P10 final verification. Thus T01/T04/T05/T25/T31/T59 have primary P0 **baseline**
+work; P0 cannot close their subsequent repair/acceptance obligations.
+The session plan also requests supplemental P0 baselines for later-phase tests;
+those are identified below without changing their source phase.
+
+Roles are accountable functions, not invented staff appointments:
+
+| Role | Accountability | Named owner |
+| --- | --- | --- |
+| ENG | Engineering lead: architecture, compatibility, diagnostic safety | Awaiting named owner |
+| FE | Frontend engineer: route/player/report implementation | Awaiting named owner |
+| BE | Backend/AI engineer: durable actions, evidence, API/job contracts | Awaiting named owner |
+| UX | Product designer/UX lead: comprehension and interaction quality | Awaiting named owner |
+| QA | QA engineer: reproducible tests and environment-labelled evidence | Awaiting named owner |
+| CONTENT | Learning/assessment specialist: content provenance and review intake | Awaiting named owner |
+| MEASURE | External psychometrician/I-O specialist: interpretation and equivalence | Awaiting named owner |
+| SECURITY | Designated security reviewer: authorization and independent assessment | Awaiting named owner |
+| PRIVACY | Counsel/DPO: retention, consent and scope | Awaiting named owner |
+| OPS | Authorized operator/support: production diagnostics, recovery and rollout | Awaiting named owner |
+| PRODUCT | Product/commercial owner | Paul Jeevanesan A.; finance sign-off remains unassigned |
+
+Code status is separate from external approval:
+
+- `EXISTING/UNVERIFIED`: a relevant path exists; complete source behavior is not proved.
+- `HISTORICAL/PARTIAL`: a prior repair record reports a bounded implementation;
+  fresh evidence is recorded separately where supplied; remaining obligations stay open.
+- `FIXTURE/PARTIAL` / `INTEGRATION/PARTIAL`: fresh A/B evidence supports only
+  the stated slice, not the complete source assertion or later-phase acceptance.
+- `FAIL/OPEN`: a specified product invariant failed in a fresh diagnostic;
+  passing diagnostic assertions do not turn that product failure into a pass.
+- `GAP/OPEN`: an inherited trace identifies an unresolved dependency; no repair here.
+- `MAPPED/FUTURE`: later-phase requirement, inventoried only; not implemented here.
+- `RETIREMENT/MAPPED`: compatibility retirement direction only, no deletion here.
+- `DEFERRED`: deliberate source exclusion; not a completed implementation.
+- `P0/DIAGNOSTIC_VERIFIED`: diagnostic code and scoped safety checks exist and
+  passed; diagnostic-only P0 closure is documented by the parent, while
+  production readiness and complete source acceptance remain separate and open.
+
+Evidence codes:
+
+| Code | Meaning and limit |
+| --- | --- |
+| S | Fresh read-only **path inventory/source mapping only**; not a test or runtime outcome |
+| N | Exact proposed path absent at this ledger's inventory; absence of a filename does not prove absence of all equivalent functionality |
+| H-entry | Historical 2026-10-02 entry/recovery checkpoint in FLOW_REPAIR_MAP and FLOW_REPAIR_READINESS; counts not rerun |
+| H-player | Historical V3 presentation/clock/repeated-absence checkpoint in the same documents; fixture/layout checks do not prove the pipeline |
+| H-runtime | Historical contract/lineage findings in those repair records and the approved session plan; parent must reproduce or explicitly block |
+| NR | Remaining complete source acceptance **NOT RUN/unverified**; partial parent results may be recorded alongside it, never promoted to full acceptance |
+| F-A | Fresh parent deterministic results in TEST_RESULTS; exact executed selector/counts and fixture limits apply |
+| F-B | Fresh parent 3-test isolated PostgreSQL/actual HTTP/scorer run; 39 migrations, external model stub only, no seeded report/evidence; observed product FAILs preserved |
+| F-browser | Initial 92 assertions passed but wrapper exited 1 on EBUSY cleanup; final scoped four-browser rerun: 91 passed + 1 flaky (total 92), 0 final failures, runner exit 0 and bounded cleanup completed |
+| P0-close | Parent FINAL_REPORT closes code-safe diagnostic-only P0; no product repair, later-phase acceptance, human approval or production readiness implied |
+
+NR marks remaining full acceptance, not absence of all testing. Historical counts
+in earlier repair documents remain historical; fresh parent execution is F-A/F-B
+or F-browser below. No application suite was rerun by this document owner.
+Structural ledger validation is not an application test. Exact commands, counts,
+environment, fixture boundary and failures remain authoritative in TEST_RESULTS.
+
+### Fresh parent P0 checkpoint - synchronized 2026-10-02
+
+| Check | Supplied evidence | Limit / disposition |
+| --- | --- | --- |
+| Read-only diagnostic | I30 implemented; final V22 selector 9 pass, 0 fail, 0 skip; B write attempt rejected with SQLSTATE 25006 and unchanged record count | Narrow aggregate projection; no app initialization, mutation or owner transfer. Conflict/unclaimed fixtures are diagnostic evidence, not approved claiming. |
+| Normal HTTP/scorer run | V23: 3 pass, 0 fail, 0 skip; new isolated PostgreSQL cluster, all 39 actual migrations, real HTTP/store/report boundary, external model stub only | No report/evidence preseeded. Successful normal completion does not supply judged dialogue evidence or failure-window recovery. |
+| Frontend/server | Frontend 360 pass, 0 fail; server 649 total, 624 pass, 0 fail, 25 skip | Skipped DB suites remain unverified; separate 3-test B invocation does not close them. |
+| Build/static/flags | Build, static audit and explicitly dark test-process flag consistency PASS | Configuration-only evidence, not effective production flags or release approval. |
+| Browser | Initial 92 assertions passed across four projects; runner exited 1 on EBUSY cleanup. Final cleanup-fix rerun: **91 passed + 1 flaky = total 92**, 0 final failures, runner exit 0 | Firefox materials at 360 initially failed in sign-in setup (`page.goto` load timeout); unchanged automatic retry passed. Bounded cleanup fix validated; not 92 clean passes. |
+| Failed product invariants | T25/T26 A fault injection: 2 engine effects / 1 receipt; T27 B: zero judged strict dialogue units; T32 B: history purged from the source V3 reads; T36 B: report GET appends a version | **FAIL/OPEN** for the measured failure boundary, even though diagnostic tests pass. No runtime repairs here. |
+| Partial B evidence | T05/T47 owned completed synthetic run visible and second owner denied; T59 actual dev timeline row marked synthetic | Not an old customer's report/full audience matrix; full conversion/research exclusion manifest unknown. |
+| C / human gates | No live model, production/customer access, participant contact or new approval | NOT AUTHORIZED / NOT RUN; all later-phase acceptance remains OPEN. |
+
+T32 is a reproduced dependency failure, not evidence that every source copy is
+erased: separate telemetry retention is not the V3 builder's source access.
+T36's observed append-on-GET fails the read/publication boundary; complete
+same-version-content and correction acceptance remains unverified. T25/T26's
+fault reproduction is **Layer A**, not a process-crash or multi-instance B test.
+
+### Verification layers and test references
+
+- **A**: deterministic unit/component/API-fixture contracts. Intercepted browser
+  responses and seeded reports are A, never proof of a working writer.
+- **B**: disposable PostgreSQL, actual HTTP/persistence/evidence/report boundaries;
+  stub only the external model provider. No preseeded completed evidence/report.
+  Missing writer/worker or failed invariant must remain FAIL/BLOCKED, not a pass.
+- **C**: authorized live-model staging and relevant real-session evidence;
+  **not authorized/not run in P0**. Operator budget/access and consent are required.
+- **Human gates** (content, science, counsel, manual accessibility, finance) are
+  separate approvals; neither A/B/C software results nor a drafted ADR replace them.
+
+The verification column specifies **required future evidence**, not current results.
+V codes name existing candidate suites; coverage of the entire source assertion
+must be confirmed by the parent, not inferred from the filename.
+
+| Ref | Existing verification path(s), repository-relative |
+| --- | --- |
+| V01 | `src\pages\publicSite.test.jsx`; `src\app\AppRouter.test.jsx`; `src\app\guards\guards.test.jsx`; `tests\e2e\flow-entry.spec.js` |
+| V02 | `src\features\student\studentPages.test.jsx`; `server\test\campusStudent.test.js`; `server\test\campusStudent.db.test.js` |
+| V03 | `server\test\studentFlowFlags.test.js`; `server\test\campusFlags.test.js` |
+| V04 | `server\test\legacyReportGuard.test.js`; `server\test\campusReports.test.js`; `server\test\v1Http.test.js` |
+| V05 | `server\test\campusIsolation.test.js`; `server\test\identityIsolation.test.js`; `tests\e2e\campus-shell.spec.js` |
+| V06 | `src\features\assessments\player.test.jsx`; `tests\e2e\flow-player-layout.spec.js` |
+| V07 | `src\features\assessments\hooks\useAssessmentClock.test.jsx`; `server\test\campusSessions.test.js`; `tests\e2e\flow-player-layout.spec.js` |
+| V08 | `server\test\sessionLocks.test.js` (pre-existing untracked); `server\test\campusSessions.test.js`; `server\test\evaluateAsync.test.js` |
+| V09 | `server\test\scenarioBank.test.js`; `server\test\anchorProbes.test.js`; `server\test\probeSelector.test.js` |
+| V10 | `server\test\evidenceLedger.test.js`; `server\test\evidenceSufficiency.test.js`; `server\test\failClosed.test.js`; `server\test\evidenceAudit.db.test.js` |
+| V11 | `server\test\reportClaims.test.js`; `server\test\campusReports.test.js`; `src\features\reports\reports.test.jsx` |
+| V12 | `tests\e2e\flow-recovery.spec.js`; `src\phaseK.test.jsx`; `server\test\evaluateAsync.test.js` |
+| V13 | `server\test\campusDevelopment.test.js`; `server\test\campusDevelopment.db.test.js`; `src\features\development\development.test.jsx` |
+| V14 | `server\test\campusGrowth.test.js`; `server\test\campusGrowth.db.test.js`; `src\features\growth\growth.test.jsx` |
+| V15 | `server\test\campusBilling.test.js`; `server\test\campusBilling.db.test.js`; `server\test\campusEntitlements.test.js`; `server\test\paymentDummy.test.js` |
+| V16 | `server\test\security.test.js`; `server\test\promptSecurity.test.js`; `server\test\campusPermissions.test.js` |
+| V17 | `tests\e2e\accessibility.spec.js`; `tests\e2e\campus-a11y-sweep.spec.js`; `tests\e2e\campus-keyboard.spec.js`; `docs\campus\A11Y_MANUAL_CHECKLIST.md` |
+| V18 | `server\test\telemetry.flag.test.js`; `server\test\commercial.test.js`; `server\test\campusClaims.test.js` |
+| V19 | `server\test\validationRatingQueue.test.js`; `server\test\validationRatingQueue.db.test.js`; `docs\studies\HUMAN_LLM_AGREEMENT_PROTOCOL.md` |
+| V20 | `server\test\designSystem.test.js`; `server\test\claimsCeiling.test.js`; `server\test\campusCopyCeiling.test.js` |
+| V21 | `server\test\campusMigrations.db.test.js`; `server\test\storePg.db.test.js`; `docs\campus\ROLLOUT_PLAN.md` |
+| V22 | `server\test\experienceBaseline.test.js` (parent P0 diagnostic selector: 9 pass; product receipt invariant separately FAIL) |
+| V23 | `server\test\experienceBaseline.db.test.js` (parent isolated B selector: 3 pass; product lineage/publication invariants separately FAIL) |
+
+### Implementation path register
+
+I references below are **existing** at inventory time. They identify the extension
+or diagnosis boundary; existence alone neither satisfies nor approves a requirement.
+Paths are relative to `studai-prism\`.
+
+| Ref | Existing path(s) |
+| --- | --- |
+| I01 | `src\design\tokens.js`; `src\design\tokens.css`; `src\components\ui\PrismLogo.jsx` |
+| I02 | `src\app\AppRouter.jsx`; `src\app\routing.jsx`; `src\app\guards\AuthGuard.jsx`; `src\pages\Auth.jsx` |
+| I03 | `src\features\home\pages\HomePage.jsx`; `src\features\assessments\components\AssessmentAssignmentCard.jsx` |
+| I04 | `server\domain\student\sessionDirectory.js`; `server\domain\student\readModels.js`; `server\routes\v1\student.js` |
+| I05 | `server\routes\v1\me.js`; `server\routes\v1\workspaces.js`; `server\routes\v1\studentScope.js`; `server\domain\scopes\` |
+| I06 | `src\features\assessments\pages\AssessmentPlayerPage.jsx`; `src\layouts\AssessmentShell.jsx`; `src\features\assessments\components\` |
+| I07 | `src\pages\Assessment.jsx`; `src\pages\AssessmentWorkspace.jsx`; `src\pages\ScoreReport.jsx`; `src\pages\StudentReportV2.jsx`; `src\pages\EmployeeReportV2.jsx` |
+| I08 | `src\features\assessments\hooks\useAssessmentClock.js`; `src\features\assessments\api\assessmentSessionApi.js`; `server\domain\assessments\sessionContract.js` |
+| I09 | `server\domain\assessments\sessionService.js`; `server\domain\assessments\engine.js`; `server\routes\v1\assessmentSessions.js`; `server\routes\assessment.js` |
+| I10 | `server\domain\assessments\sessionIoRepository.js`; `server\domain\assessments\repository.pg.js`; `server\domain\assessments\sessionLocks.js` (pre-existing untracked) |
+| I11 | `server\lib\scenarioBank.js`; `server\lib\contentCms.js`; `server\domain\assessments\catalog.js`; `server\lib\director.js`; `server\lib\directorV2.js` |
+| I12 | `server\domain\evidence\evidenceUnit.js`; `server\domain\evidence\sufficiency.js`; `server\domain\evidence\sufficiencyRules.js`; `server\lib\evidenceGraph.js` |
+| I13 | `server\domain\reports\v3\build.js`; `server\domain\reports\v3\service.js`; `server\domain\reports\v3\repository.js`; `server\routes\v1\reports.js` |
+| I14 | `src\features\reports\components\ReportView.jsx`; `src\features\reports\components\ReportCapabilityCard.jsx`; `src\features\reports\pages\StudentReportPage.jsx` |
+| I15 | `src\features\capabilities\pages\CapabilitiesPage.jsx`; `src\features\capabilities\pages\CapabilityDetailPage.jsx` |
+| I16 | `server\domain\development\service.js`; `server\domain\development\missionLibrary.js`; `server\domain\development\missionSchema.js`; `server\domain\development\evaluator.js`; `server\routes\v1\development.js` |
+| I17 | `src\features\development\pages\DevelopmentPage.jsx`; `src\features\development\pages\MissionPlayerPage.jsx` |
+| I18 | `server\domain\growth\service.js`; `server\domain\growth\snapshot.js`; `server\routes\v1\growth.js`; `src\features\growth\pages\GrowthPage.jsx` |
+| I19 | `server\lib\legacyReportGuard.js`; `server\domain\sharing\`; `src\features\reports\components\ShareReportDialog.jsx` |
+| I20 | `server\lib\privacyPlanner.js`; `server\lib\retentionEnforcement.js`; `docs\RETENTION_POLICY_v1.md`; `server\lib\storePg.js` |
+| I21 | `server\domain\entitlements\ledger.js`; `server\domain\entitlements\legacyAdapter.js`; `server\domain\billing\service.js`; `server\routes\payment.js` |
+| I22 | `scripts\check-student-flow-flags.mjs`; `server\lib\flagRegistry.js`; `server\domain\flags\`; `server\db\migrations\` |
+| I23 | `server\domain\telemetry\events.js`; `server\routes\v1\telemetry.js`; `server\lib\telemetry.js` |
+| I24 | `server\domain\validation\ratingQueue.js`; `server\domain\validation\service.js`; `docs\studies\`; `docs\FAIRNESS_RESEARCH_FRAMEWORK_v1.md` |
+| I25 | `server\domain\organizations\`; `server\domain\memberships\`; `server\routes\v1\campusAdmin.js`; `docs\campus\CAMPUS_HUMAN_ACTIONS.md` |
+| I26 | `server\lib\promptSecurity.js`; `server\lib\judgePanel.js`; `server\lib\scoreAggregator.js` |
+| I27 | `server\lib\proctorSocket.js`; `docs\ACCOMMODATIONS_POLICY_v1.md`; `docs\IDENTITY_ASSURANCE_SPEC_v1.md` |
+| I28 | `docs\campus\ROLLOUT_PLAN.md`; `docs\DEPLOYMENT_RUNBOOK_v1.md`; `docs\ui\FLOW_REPAIR_READINESS.md` |
+| I29 | `src\pages\LandingPage.jsx` |
+| I30 | `scripts\check-experience-baseline.mjs`; `server\test\experienceBaseline.test.js` (parent P0 diagnostic implementation; F-A/F-B scoped safety evidence) |
+| I31 | `scripts\run-experience-baseline-tests.mjs`; `server\test\experienceBaseline.db.test.js` (parent isolated diagnostic runner and B tests; final browser runner exit 0, 91 passed + 1 flaky) |
+
+I30 was absent in the initial inventory and appeared during parallel parent P0
+work. I30/I31 now have parent-supplied scoped execution/safety evidence, not a
+completed product or production-readiness claim. Their implementation and
+results remain parent-owned; this owner did not rerun those application checks.
+
+N references are **explicit proposed absent paths at inventory**, not a request to
+create them in P0. Names remain non-binding; use existing equivalent domains first.
+
+| Ref | Proposed absent path / missing deliverable boundary |
+| --- | --- |
+| N01 | `server\domain\student\ownershipReconciliation.js`: reviewed claim/reconciliation workflow not evidenced |
+| N02 | `server\domain\assessments\opportunities.js`: approved delivered/answered/judged ledger not evidenced |
+| N03 | `server\domain\assessments\runtime\`: version-pinned governed new-run runtime not evidenced |
+| N04 | `server\domain\jobs\`: durable outbox/worker/lease implementation not evidenced; existing evaluation Maps are not durable-job proof |
+| N05 | `src\features\reports\components\CapabilityMap.jsx`; `src\features\reports\components\MomentCard.jsx`: source-specific map/moment additions proposed |
+| N06 | `server\domain\reports\v3\reviewService.js`: interpretation challenge/correction workflow proposed |
+| N07 | `src\features\assessments\components\PlanBoard.jsx`: reviewed shared board proposed |
+| N08 | `src\features\preparation\`; `server\domain\preparation\`: private preparation domain proposed |
+| N09 | `src\features\growth\components\ApplicationCard.jsx`; `server\domain\growth\applicationCheckins.js`: separate SELF_REPORT check-ins proposed |
+| N10 | `server\domain\development\replayAdapter.js`; `server\domain\development\freshChallenges.js`: source-linked replay/exposure additions proposed |
+| N12 | `docs\experience\content\CORE-TEAMREADY-A.md`; `docs\experience\content\M01-M10.md`: proposed reviewer intake only; content approval absent |
+| N13 | `src\features\preview\`: proposed bounded free-experience integration; Landing is not proof of a real preview |
+| N14 | `server\domain\privacy\erasureManifest.js`: proposed manifest adapter; reuse I20, do not create duplicate privacy authority |
+| N15 | `server\domain\assessments\timingPolicy.js`; `src\features\assessments\components\ScenarioIntroDialog.jsx`: reviewed pre-clock administration additions proposed |
+
+## CH register - exact source change requirements
+
+External refs resolve in [DECISIONS](DECISIONS.md). `Owner pending` means the role
+must be assigned to a human; `C pending` means no authorized live-environment evidence.
+Deps name prerequisites, not work authorized by this P0 ledger.
+
+| ID | Decision | Action and boundary (source) | Release evidence required (source) | Role | Primary | All source phases | Dependencies | Existing / proposed absent path | Verification required | Code status | External-gate status | Evidence now |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CH-01 | K | Approved Prism logo, tokens, typography and accessibility primitives | Same issued assets; no new brand fork | FE | P3 | P3 | Existing brand system; ADR-01 | I01 | A V20; B rendered journeys; manual V17 | EXISTING/UNVERIFIED | HA-C013 OPEN; UX owner pending | S; NR; UI A-M historical |
+| CH-02 | K | Global user identity and scoped Personal/Campus workspaces | Existing users remain one identity | BE | P1 | P1 | P0 scope trace | I05/I25 | A V05; B two-owner HTTP/PG | EXISTING/UNVERIFIED | HA-C005/012 OPEN | S; NR |
+| CH-03 | K/U | Report V3 builder, claims and share service | New UX uses existing report boundary | BE | P5 | P5 | CH-21/23/38; ADR-02 | I13/I19 | A V04/V11; B actual publication/read | EXISTING/UNVERIFIED | HA-C002/005/012 OPEN | S; H-runtime; NR |
+| CH-04 | K | Practice/formal evidence separation | Isolation tests across every read model | BE | P1 | P1 | CH-02; server-set mode/scope | I12/I16/I18 | A V05/V13/V14; B separate attempts | EXISTING/UNVERIFIED | HA-C009/004 OPEN | S; NR |
+| CH-05 | U | Home around next action, latest report and recent assessments | Returning customer finds report in one action | FE | P3 | P3 | CH-06/07; CH-23 | I03/I04 | A V01/V02; B owned history; C comprehension | HISTORICAL/PARTIAL | OPS runtime access and UX owner pending | S; H-entry; NR |
+| CH-06 | U | Login/deep-link/profile/dashboard handling | Merged login fix preserved and regression tested | FE | P1 | P1 | CH-02; P0 auth baseline | I02 | A V01; B auth HTTP; C supported deployment | FIXTURE/PARTIAL; source acceptance OPEN | HA-C001/007 OPEN; deployed build unknown | S; H-entry; F-A; NR |
+| CH-07 | U | History discovery, owned legacy reports and honest states | Reconciled before/after counts | BE | P1 | P1 | CH-02/06/38; CH-08 for unmatched | I04/I19; N01 absent | A V02/V04; B scoped PG; authorized read-only counts | INTEGRATION/PARTIAL; legacy/reconciliation acceptance OPEN | Production ownership proof/access and OPS owner pending | S; N; H-entry; F-B owned synthetic history only; NR |
+| CH-08 | A | Safe support claim workflow for unmatched historical records | No link-possession-only ownership claims | BE | P1 | P1 | CH-02/07; reviewed ownership rules | I04; N01 absent | A conflict fixtures; B owner/non-owner HTTP/PG | GAP/OPEN | SECURITY/PRIVACY review and named support owner pending | S; N; H-runtime; NR |
+| CH-09 | U | One canonical assessment player | New runs converge on V3 | ENG | P3 | P3, P10 | CH-20/23/40; ADR-01/03 | I02/I06/I09/I07 | A V01/V06; B version-aware run; C canary | HISTORICAL/PARTIAL | HA-C001/003/007 OPEN | S; H-runtime; NR |
+| CH-10 | R | Duplicate player logic for new runs | Redirect/adapter plan, no active-run breakage | ENG | P3 | P3, P10 | CH-09; T60 active-run inventory/drain | I02/I07/I09 | A routing; B pinned active/legacy runs; C monitored drain | RETIREMENT/MAPPED | HA-C001/007 OPEN; OPS usage evidence absent | S; NR |
+| CH-11 | U | Fixed-height player and independently scrolling panes | Long transcript and mobile tests | FE | P3 | P3 | CH-09; unchanged stimulus/timing | I06 | A V06; B real run render; manual V17 | HISTORICAL/PARTIAL | HA-C013 OPEN | S; H-player; NR |
+| CH-12 | U | Hide absent work panel, display meaningful materials on demand | Zero-artifact and loading/failure distinctions | FE | P3 | P3 | CH-09/19; pinned material contract | I06/I09 | A V06; B material/no-material/error HTTP | HISTORICAL/PARTIAL | CONTENT/accessibility review pending | S; H-player; NR |
+| CH-13 | A/U | Intro acknowledgement and server-authoritative answer clock | Refresh does not restart time | BE | P3 | P3 | CH-40; reviewed administration; ADR-07 | I08/I09; N15 absent | A V07/V08; B begin/replay/cutoff/race | GAP/OPEN | MEASURE/accessibility/product timing approval pending | S; N; H-player/H-runtime; NR |
+| CH-14 | U | Clear scenario selection separate from calibration | Selected approved form is pinned | FE | P3 | P3 | CH-15; pinned form/version; ADR-03/05 | I06/I09/I11 | A V09; B request/resume selection | MAPPED/FUTURE | HA-C003/008 OPEN | S; NR |
+| CH-15 | A | Domain-light flagship scenario with real decisions | Content reviewed, versioned and testable | CONTENT | P4 | P4 | ADR-05/06/07; independent review | I11; N12 absent | A approved form fixtures; B delivered segment; C reviewed pilot | MAPPED/FUTURE | HA-C003/008 OPEN; intake only in P0 | S; N; NR |
+| CH-16 | U | Five capability rubrics, including assertiveness/help-seeking | Approved rubric revision; no format bias | MEASURE | P4 | P4 | CH-15; ADR-06; diverse exemplars | I12/I26 | A held-out policy fixtures; B linked evidence; C ratings | MAPPED/FUTURE | HA-C002/008 OPEN | S; NR |
+| CH-17 | A | Opportunity ledger with delivered/answered/judged states | Per-run coverage and failure diagnostics | BE | P4 | P4 | CH-15/16/20/40 | I09/I10; N02 absent | A coverage/independence; B delivered stimulus lineage | GAP/OPEN | HA-C003/008 OPEN | S; N; H-runtime; NR |
+| CH-18 | U | Director selects approved events, not arbitrary facts | Deterministic policy and factual-state tests | BE | P4 | P4 | CH-15/17; N03 reviewed runtime | I11/I09; N03 absent | A V09/V16; B event facts; C QA | MAPPED/FUTURE | HA-C003/008 OPEN | S; N; NR |
+| CH-19 | A | Simple shared plan board with meaningful changes | Learner-authored changes attributed correctly | FE | P4 | P4 | CH-15/17/20; attribution contract | I06; N07 absent | A learner/template distinction; B persisted patch evidence | MAPPED/FUTURE | HA-C003/013 OPEN | S; N; NR |
+| CH-20 | U | Durable action capture before model evaluation | Save acknowledgements match durable writes | BE | P2 | P2 | CH-40; P1 action/scope foundation | I09/I10 | A V08; B model-outage/crash HTTP/PG | GAP/OPEN; receipt fault reproduced | Local normal-path B supplied; actual crash/live recovery unverified | F-A T25/T26 FAIL; F-B normal accepted messages/receipts partial; NR |
+| CH-21 | U | Dialogue and artifact evaluation generate strict evidence | Real pipeline integration test | BE | P2 | P2 | CH-20/17/16; approved evaluator | I09/I12/I26; N02 absent | A V10; B actual action-to-evidence-to-report; C QA | FAIL/OPEN; judged dialogue evidence absent | HA-C002/003/008 OPEN | F-B T27 zero judged strict dialogue units; no report/evidence preseeded; NR |
+| CH-22 | A | System-processing status separate from evidence sufficiency | No outage shown as learner weakness | BE | P2 | P2 | CH-20/21/40; job status contract | I09/I13/I14; N04 absent | A V12; B schema/model/write fault injection | HISTORICAL/PARTIAL | OPS/support owner pending; HA-C002 OPEN | S; N; H-entry/H-runtime; NR |
+| CH-23 | U | Versioned publication and stable historical reports | GET cannot silently change issued findings | BE | P2 | P2, P10 | CH-20/21/40; ADR-02/12 | I13/I20 | A V11; B immutable versions/read side effects/races | GAP/OPEN; GET publication side effect reproduced | HA-C005/012 OPEN; source-retention review pending | F-B T36 GET appends version; T32 source dependency FAIL; immutable correction/races NR |
+| CH-24 | A | Capability Map with ordinal labels and accessible list | Five-second comprehension study | UX | P5 | P5 | CH-21/23; ADR-06/10 | I14/I15; N05 absent | A V11/V17; B source-backed render; human study | MAPPED/FUTURE | HA-C002/008/013 OPEN; consent/recruitment pending | S; N; NR |
+| CH-25 | A | Moments that mattered, linked to real actions | Claim-to-source audit | FE | P5 | P5 | CH-21/23; retained authorized source | I13/I14; N05 absent | A V11; B quote/action provenance | MAPPED/FUTURE | HA-C005/008 OPEN; ADR-12 review pending | S; N; NR |
+| CH-26 | U | Meaning -> evidence -> next behaviour -> practice | No generic unsupported weaknesses | UX | P5 | P5 | CH-21/23/30/31 | I14/I16/I17 | A V11/V13; B real relevant mission; C comprehension | EXISTING/UNVERIFIED | HA-C002/009 OPEN | S; NR |
+| CH-27 | R | Duplicate insufficient-evidence badges and technical-first copy | Single state, helpful explanation | FE | P5 | P5 | CH-22/23; preserve evidence meaning | I14 | A V11/V12; B partial/failure report; human comprehension | HISTORICAL/PARTIAL | HA-C002/013 OPEN | S; H-player; NR |
+| CH-28 | R | Hard-coded report narratives and view-date issuance dates | Stored facts only; missing dates stay unknown | FE | P5 | P5 | CH-23; stored version/date facts | I14/I13/I07 | A V11; B stable historical facts | RETIREMENT/MAPPED | MEASURE interpretation review pending | S; NR |
+| CH-29 | A | Report interpretation challenge/review workflow | Versioned correction, no silent overwrite | BE | P5 | P5 | CH-23/38; ADR-02/10/12 | I13/I24; N06 absent | A review authorization; B audited correction/version | MAPPED/FUTURE | MEASURE/counsel/support approval pending | S; N; NR |
+| CH-30 | A | Ten original universal practice missions | Two reviewed missions per capability family | CONTENT | P6 | P6 | CH-16; ADR-08; reviewer intake | I16/I17; N12 absent | A V13; B library/attempts; C content QA | MAPPED/FUTURE | HA-C009 OPEN; M01-M10 DRAFT intake only | S; N; NR |
+| CH-31 | U | Mission evaluator checks meaning, not required phrases alone | Semantic equivalence and empty-work tests | BE | P6 | P6 | CH-30; human-rated practice exemplars | I16 | A V13; B semantic/empty attempts; C held-out QA | EXISTING/UNVERIFIED | HA-C009/008 OPEN | S; NR |
+| CH-32 | A | Try that moment again in a separate practice attempt | Formal snapshot unchanged | BE | P6 | P6 | CH-04/23/25/30 | I16/I17; N10 absent | A V13; B replay origin/formal immutability | MAPPED/FUTURE | HA-C009 OPEN; private source consent pending | S; N; NR |
+| CH-33 | A | Unfamiliar uncoached practice challenges | Training/form exposure tracked | CONTENT | P6 | P6 | CH-30/31; reviewed challenge/exposure rules | I16; N10 absent | A V13; B fresh challenge; C blinded comparison | MAPPED/FUTURE | HA-C009/008 OPEN | S; N; NR |
+| CH-34 | A | Preparation wizard and sanitized user context | Private, non-formal, no unsafe tool execution | BE | P7 | P7 | CH-02/04/39; ADR-09/12 | N08 absent; reuse I06/I16 | A privacy/injection contracts; B owned attempt; C safety | MAPPED/FUTURE | HA-C005/012 OPEN | S; N; NR |
+| CH-35 | A | Application cards and optional check-ins | Clearly self-reported, no automatic growth claim | FE | P7 | P7 | CH-04/34; ADR-09/10 | I18; N09 absent | A mode/attribution; B isolated SELF_REPORT | MAPPED/FUTURE | PRIVACY/MEASURE consent/claims review pending | S; N; NR |
+| CH-36 | U | Growth view separates practice history from formal comparison | Unapproved form pairs remain non-comparable | BE | P7 | P7 | CH-04/23/35; approved equivalence only | I18 | A V14; B non-comparable snapshots | EXISTING/UNVERIFIED | HA-C002/004/008 OPEN | S; NR |
+| CH-37 | U | Campus uses same learner experience but only authorized data | Sponsor cannot view private preparation | BE | P8 | P8 | CH-02/04/34/38/39 | I05/I25/I19; N08 absent | A V05/V16; B sponsor/private negative matrix | EXISTING/UNVERIFIED | HA-C005/010/012 OPEN | S; N; NR |
+| CH-38 | U | Report API authorization including legacy routes | Owner/non-owner/anonymous matrix passes | SECURITY | P1 | P1, P10 | CH-02/07; intentional share boundary | I19/I13/I07 | A V04/V16; B every read/export/version | GAP/OPEN | HA-C005/012 OPEN | S; H-runtime; NR |
+| CH-39 | U | Erasure across evidence, jobs, reviews and derived material | Deletion rehearsal, no job resurrection | BE | P1 | P1, P10 | CH-02/40; ADR-12; erasure manifest | I20; N14/N04 absent | A tombstone/fencing; B worker/derived erasure | GAP/OPEN | HA-C005/012 OPEN; counsel retention decision pending | S; N; H-runtime; NR |
+| CH-40 | A/U | Durable jobs, leases, event versions and idempotency | Crash/race tests and reconciliation | BE | P1 | P1, P10 | CH-02; versioned durable actions; ADR-03 | I09/I10; N04 absent | A V08; B crash/multi-instance/effect-before-receipt | GAP/OPEN; receipt-window invariant FAIL | HA-C012 OPEN; dirty PG locks not distributed proof | F-A T25/T26 2 engine effects/1 receipt; full crash/lease/multi-instance NR |
+| CH-41 | A | Safe production readiness diagnostic | No secrets or unsupported flag activation | ENG | P0 | P0, P10 | P0 trace; allowlisted projections; ADR-13 | I22/I30/I31 (parent P0 additions) | A V22 redaction/error contracts; B V23 write-rejected read-only connection | P0/DIAGNOSTIC_VERIFIED; production acceptance OPEN | HA-C001/007/012 OPEN; real-environment operator access pending | F-A 9 diagnostic tests; F-B SQLSTATE 25006/unchanged count/conflict categories; F-browser; P0-close |
+| CH-42 | U | Pricing as bounded development package | Existing entitlements grandfathered | PRODUCT | P8 | P8 | CH-30/31/40; ADR-08/11 | I21 | A V15; B grandfathered grants/webhooks/usage; human finance | MAPPED/FUTURE | HA-C006 OPEN; Personal offer finance approval pending | S; NR |
+| CH-43 | A | Free experience that provides real value | Cost/rate limits, voluntary conversion | PRODUCT | P8 | P8 | CH-21/31/44; ADR-10/11 | I29/I16; N13 absent | A V18; B actual preview/retry/rate limits; C voluntary cohort | MAPPED/FUTURE | Product/content/finance approval pending | S; N; NR |
+| CH-44 | A | Instrumentation for quality, value and cost | No transcript/PII in product analytics | BE | P9 | P9 | CH-02/04; run/mode/version; consent | I23 | A V18; B redacted lineage/cost events; C measured spend | EXISTING/UNVERIFIED | HA-C005/010 OPEN; OPS budget pending | S; NR |
+| CH-45 | A | Human-validation programme and generic-AI comparison | Predefined study plan and independent ratings | MEASURE | P9 | P9 | CH-15/16/30/44; ADR-04/10 | I24 | A V19; B safe exports; C authorized study; independent ratings | MAPPED/FUTURE | HA-C008/005 OPEN; recruitment/consent/raters pending | S; NR |
+| CH-46 | D | New broad Campus analytics and sales modules | Resume only after learner loop passes | PRODUCT | P0 | P0, P10 | Proven core learner loop; later product approval | I25 (retain existing); no new module here | A/B existing-contract regressions only | DEFERRED | HA-C006/010 remain OPEN; no expansion approval | S; NR; deferred by source |
+| CH-47 | D | Formal standalone creativity/personality/emotion scores | No new construct without evidence | MEASURE | P0 | P0 | Independent construct/intended-use evidence | I12/I24 (existing foundations only) | Human science review; no new construct tests/activation here | DEFERRED | HA-C002/008 OPEN | S; NR; deferred by source |
+| CH-48 | R | Mandatory persona picker before basic value | Optional display preference, never scoring input | UX | P3 | P3 | CH-09/15; attribution/neutrality | I06/I09 | A entry/payload; B unchanged formal method | RETIREMENT/MAPPED | CONTENT/MEASURE review pending | S; NR |
+| CH-49 | U | Proctoring based on purpose and approved policy | No camera/phone gate for ordinary practice | SECURITY | P3 | P3 | CH-04; ADR-07/09; approved integrity policy | I27/I16 | A V16; B mode-specific gates; manual accessibility | MAPPED/FUTURE | HA-C005/012/013 OPEN | S; NR |
+| CH-50 | R | Infinite auto-generated formal scenarios | Draft practice generation only; formal approvals required | CONTENT | P0 | P0 | ADR-05; versioned reviewed formal catalog | I11 (retain old-version behavior) | A catalog/policy; B pinned versions; human content review | RETIREMENT/MAPPED | HA-C003/008/009 OPEN; no formal publication authority | S; NR |
+| CH-51 | D | Subscription as default pricing model | Prove voluntary repeat value first | PRODUCT | P0 | P0 | CH-30/43/44/45; demand/economics evidence | I21 (existing rights retained) | Human demand/finance review; no subscription activation here | DEFERRED | ADR-11 pending commercial approval | S; NR; deferred by source |
+| CH-52 | R | Frontend-only completion and fake progress | Backend publication and real task state | BE | P2 | P2, P10 | CH-20/21/23/40 | I09/I13/I14 | A state contracts; B real publication/task state | GAP/OPEN | HA-C002/003/008 OPEN | S; H-runtime; NR |
+
+## T register - exact source acceptance requirements
+
+No T row is full-source PASS or complete. Fresh parent A/B results support only
+the stated diagnostic/partial slice; required further reproductions and full
+acceptance remain open. Primary P0 rows record a diagnostic baseline, never a
+repaired product invariant. For every row, C execution remains unauthorized.
+
+| ID | Requirement (source) | Expected result (source) | Role | Primary | All source phases | Dependencies | Existing / proposed absent path | Verification required | Code status | External-gate status | Evidence now |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| T01 | Returning login and registration | Returning customer reaches supported Home; new user sees appropriate options, not forced duplicate payment | QA | P0 | P0, P1, P9, P10 | CH-02/05/06/42 | I02/I03/I21 | A V01; B actual auth/entitlement/history | FIXTURE/PARTIAL; P1 commercial/acceptance OPEN | Production runtime/build unknown; PRODUCT offer pending | F-A returning entry; F-browser final 91 + 1 flaky; registration offer NR |
+| T02 | Explicit deep link and expired auth | Login preserves safe owned destination; external redirects rejected | QA | P1 | P1, P9, P10 | CH-06/38 | I02 | A V01; B expired/owned HTTP session | FIXTURE/PARTIAL; source acceptance OPEN | HA-C012 OPEN; deployed config unknown | F-A deep-link fixture; F-browser final 91 + 1 flaky; full B NR |
+| T03 | Dashboard/profile aliases | No homepage bounce or redirect loop | QA | P1 | P1, P9, P10 | CH-05/06 | I02/I03 | A V01; B actual aliases/auth | FIXTURE/PARTIAL; source acceptance OPEN | OPS production build/flags pending | F-A aliases; F-browser final 91 + 1 flaky; full B NR |
+| T04 | Feature flags loading/failure/off | Correct loading/error/supported fallback; no accidental activation | QA | P0 | P0, P1, P9, P10 | CH-06/41; ADR-13 | I02/I22/I30 | A V01/V03; B isolated flag matrix | FIXTURE/PARTIAL; source acceptance OPEN | HA-C001 OPEN; effective production flags unknown | F-A loading/dark/recovery fixtures; dark config PASS only; full acceptance NR |
+| T05 | Legacy owned report | Visible in history and readable in original format | QA | P0 | P0, P1, P9, P10 | CH-07/23/38 | I04/I07/I19 | A V02/V04; B owned original report | INTEGRATION/PARTIAL; old-report/reader acceptance OPEN | Authorized real legacy ownership/source access pending | F-B completed owned synthetic run visible/nonowner denied; not old-customer/original-format proof; NR |
+| T06 | Unclaimed/conflicting ownership | Not exposed or auto-transferred; review workflow available | SECURITY | P1 | P1, P9, P10 | CH-08/38 | I04/I19/I30; N01 absent | A conflict categories; B two-owner/review HTTP | GAP/OPEN; diagnostic categories verified | SECURITY/PRIVACY proof/review rules pending | F-A/F-B conflict/unclaimed fixtures; no owner transfer; claiming/review workflow NR |
+| T07 | Personal/Campus history | No cross-scope rows, credits or cached results | QA | P1 | P1, P7, P8, P9, P10 | CH-02/04/37 | I04/I05/I21 | A V05; B scoped PG/browser sessions | EXISTING/UNVERIFIED | HA-C005/012 OPEN | NR; S; P0 supplemental baseline |
+| T08 | Two users on same browser | Prior user's data cleared during logout/login | QA | P1 | P1, P9, P10 | CH-02/06/37 | I02/I05 | A V05; B actual account/workspace switch | EXISTING/UNVERIFIED | HA-C005/012 OPEN | NR; S; P0 supplemental baseline |
+| T09 | New-run canonical player | Correct version-aware route; no new fourth player | QA | P3 | P3, P9, P10 | CH-09/10/40 | I02/I06/I07/I09 | A V01/V06; B version-pinned new/active/legacy run | GAP/OPEN | HA-C001/003 OPEN | NR; H-runtime |
+| T10 | No work materials | Centered conversation; no empty reserved half-screen | QA | P3 | P3, P9, P10 | CH-11/12 | I06 | A V06; B real no-material form | FIXTURE/PARTIAL; source acceptance OPEN | HA-C013 OPEN | F-A; F-browser seven-width fixtures/final 91 + 1 flaky; real-form B NR |
+| T11 | Required material unavailable | Recovery state; not silently treated as no-material form | QA | P3 | P3, P9, P10 | CH-12/22 | I06/I09 | A V06; B material-fetch fault | EXISTING/UNVERIFIED | CONTENT approved material/access review pending | NR; S; P0 supplemental baseline |
+| T12 | Long transcript | Header/composer remain usable; only intended region scrolls | QA | P3 | P3, P9, P10 | CH-11 | I06 | A V06; B actual long run; manual V17 | FIXTURE/PARTIAL; source acceptance OPEN | HA-C013 OPEN | F-A; F-browser seven-width/compact fixtures; actual long-run/manual NR |
+| T13 | Long artifact and mobile keyboard | Independent scrolling, tabs, no hidden controls | QA | P3 | P3, P9, P10 | CH-11/12/19 | I06; N07 absent | A V06; B saved work/mobile keyboard; manual devices | FIXTURE/PARTIAL; source acceptance OPEN | HA-C013 OPEN | F-A; F-browser pane/composer fixtures; real-artifact/device/manual NR |
+| T14 | Scenario intro | Actual pinned facts/role; accessible; explicit begin | QA | P3 | P3, P9, P10 | CH-13/14/15 | I06/I09; N15 absent | A intro facts; B before-clock acknowledgement | GAP/OPEN; existing start baselined | ADR-07 administration; HA-C003/013 OPEN | F-B existing marketing form/35-minute started clock; separate pre-clock begin NR |
+| T15 | Begin replay/concurrency | One start time and one credit reservation | QA | P3 | P3, P9, P10 | CH-13/40/42 | I09/I10/I21 | A V08; B concurrent/multi-instance begin | GAP/OPEN | HA-C012 OPEN; disposable DB needed | NR; H-runtime; P0 supplemental baseline |
+| T16 | Timer refresh/reconnect | No reset; server deadline remains authoritative | QA | P3 | P3, P9, P10 | CH-13/40 | I08/I09 | A V07; B reconnect/server deadline | FIXTURE/PARTIAL; server/full acceptance OPEN | ADR-07 pending new administration approval | F-A; F-browser deadline-receipt fixtures; full reconnect B NR |
+| T17 | Deadline versus grace | No new late answer accepted through client timestamp spoofing | QA | P3 | P3, P9, P10 | CH-13/20/40 | I08/I09; N15 absent | A cutoff policy; B spoof/late send vs recovery draft | GAP/OPEN | MEASURE/OPS timing review pending | NR; H-runtime; P0 supplemental baseline |
+| T18 | Approved timing adjustment | Correct policy/version; no unfair hidden deadline | QA | P3 | P3, P9, P10 | CH-13/49; ADR-07 | I08/I27; N15 absent | A adjustment version; B approved accommodation | MAPPED/FUTURE | MEASURE/accessibility/product approval pending | NR; N; P0 supplemental baseline |
+| T19 | Requested scenario | Valid approved selection respected; unknown ID fails without substitution | QA | P3 | P3, P4, P9, P10 | CH-14/15/18 | I09/I11 | A V09; B create/request/unknown form | INTEGRATION/PARTIAL; source acceptance OPEN | HA-C003 OPEN | F-B requested existing marketing form agrees; unknown-ID/full-selection NR |
+| T20 | Resume existing session | Same scenario, state, artifact versions and conversation | QA | P3 | P3, P9, P10 | CH-13/14/20/40 | I09/I10/I06 | A V08; B refresh/persisted resume | INTEGRATION/PARTIAL; source acceptance OPEN | HA-C012 OPEN; compatible deployed version unknown | F-B existing form/state baselined; full artifact/resume/crash acceptance NR |
+| T21 | Calibration versus context | Wording and payload reflect separate purposes | QA | P3 | P3, P4, P9, P10 | CH-14/16 | I06/I09/I11 | A copy/payload separation; B selected context/form | MAPPED/FUTURE | HA-C002/003/008 OPEN | NR; S |
+| T22 | Opportunity coverage | Required stages delivered with correct actual stimulus records | QA | P4 | P4, P9, P10 | CH-15/17/18 | I09/I11; N02 absent | A V09; B stimulus/opportunity ledger | GAP/OPEN | HA-C003/008 OPEN | NR; N; H-runtime |
+| T23 | Opportunity independence | Duplicate probes/ratings cannot inflate independent evidence | MEASURE | P4 | P4, P9, P10 | CH-16/17/21 | I12/I24; N02 absent | A duplicate policy; B linked opportunities/ratings | MAPPED/FUTURE | HA-C002/008 OPEN | NR; N |
+| T24 | Candidate attribution | System opening, avatar and template content never counted as learner work | QA | P2 | P2, P3, P4, P9, P10 | CH-19/20/21 | I09/I10/I12; N07 absent | A origin fixtures; B learner patch vs system material | GAP/OPEN | HA-C003/008 OPEN | NR; H-runtime; P0 supplemental baseline |
+| T25 | Save before evaluate | Model failure leaves acknowledged action recoverable | QA | P0 | P0, P1, P2, P9, P10 | CH-20/40 | I09/I10 | A V08/V22; B real HTTP/PG with model failure | FAIL/OPEN; measured receipt-fault boundary | Local disposable B available; actual model-failure/crash recovery unverified; C unauthorized | F-A same-event retry: 2 engine effects/1 receipt; F-B normal messages durable only; full recovery NR |
+| T26 | Duplicate message/artifact request | Same key produces same effect; changed payload conflicts | QA | P1 | P1, P2, P9, P10 | CH-20/40 | I09/I10 | A V08/V22; B duplicates/conflicts/crash receipt window | FAIL/OPEN; same-event duplicate effect | HA-C012 OPEN; process-crash/multi-instance proof absent | F-A one receipt-write fault then retry: 2 engine effects/1 receipt; full B NR |
+| T27 | Dialogue evidence | Actual accepted response produces linked governed evidence where appropriate | QA | P2 | P2, P4, P9, P10 | CH-17/20/21 | I09/I12; N02 absent | A V10; B V23 actual dialogue writer without seeded evidence; C QA | FAIL/OPEN; zero judged strict dialogue units | HA-C002/003/008 OPEN | F-B actual HTTP/scorer completed; 0 judged strict units; no seeded report/evidence |
+| T28 | Artifact evidence | Saved learner patch linked to relevant opportunity and interpretation | QA | P2 | P2, P4, P9, P10 | CH-17/19/20/21 | I09/I10/I12; N02/N07 absent | A V10; B saved patch-to-judged evidence | GAP/OPEN | HA-C002/003/008 OPEN | NR; H-runtime |
+| T29 | Missing/contradictory evidence | Abstention or review, not fabricated consensus | MEASURE | P2 | P2, P4, P5, P9, P10 | CH-16/21/22/29 | I12/I13/I26; N06 absent | A V10/V11; B sparse/conflicting actual run | EXISTING/UNVERIFIED | HA-C002/008 OPEN | NR; S |
+| T30 | Clear developing behaviour | Valid low-level observation, not blanket insufficiency | MEASURE | P2 | P2, P4, P5, P9, P10 | CH-16/21/22 | I12/I13/I26 | A held-out exemplars; B low-level actual run; C ratings | MAPPED/FUTURE | HA-C002/008 OPEN | NR; S |
+| T31 | Evaluator/schema/write outage | Technical state, not learner weakness | QA | P0 | P0, P2, P4, P5, P9, P10 | CH-20/21/22/40 | I09/I13/I14/I30; N04 absent | A V12/V22; B actual evaluation/schema/write faults | GAP/OPEN; diagnostic/UI failure states verified only | Durable processing-state repair/recovery policy pending | F-A probe/schema/read/cleanup errors and visible failed retry; full processing-outage B NR |
+| T32 | Source quote mismatch | Claim withheld/reviewed; no invented quotation | QA | P2 | P2, P4, P5, P9, P10 | CH-21/23/25/29 | I12/I13/I20; N06 absent | A V11; B V23 retained source/quote mismatch after completion | FAIL/OPEN; V3 source-history dependency | HA-C005/008 OPEN; ADR-12 retention review | F-B normal completion purges history V3 reads; not proof all source erased; full mismatch/review NR |
+| T33 | Judge disagreement | Policy-defined review; no unsupported precision | MEASURE | P2 | P2, P4, P5, P9, P10 | CH-16/21/29 | I26/I24; N06 absent | A V10/V19; B disagreement/review; C independent ratings | EXISTING/UNVERIFIED | HA-C002/008 OPEN | NR; S |
+| T34 | Malicious learner prompt | Cannot change facts, score, mode, access, timer or billing | SECURITY | P2 | P2, P4, P9, P10 | CH-02/04/13/18/21/42 | I09/I26/I21 | A V16; B adversarial actual HTTP; C approved QA | EXISTING/UNVERIFIED | HA-C012 OPEN | NR; S |
+| T35 | Publish without legacy report | New-run completion supports V3 directly; no fake legacy result needed | QA | P2 | P2, P5, P9, P10 | CH-21/23/52 | I09/I13/I20 | A V11; B actual V3 publication without legacy result | GAP/OPEN | HA-C002/003/008 OPEN | NR; H-runtime |
+| T36 | Historical snapshot | Same version returns same content; correction creates new version | QA | P2 | P2, P5, P9, P10 | CH-23/29 | I13/I20; N06 absent | A V11; B V23 repeat GET/correction/immutable version | FAIL/OPEN; GET publication side effect | PRIVACY/MEASURE retention/correction approval pending | F-B report GET appends stored version; same-version content/correction acceptance NR |
+| T37 | Report map semantics | Missing is not zero; ordinal labels readable; no overall hidden score | QA | P5 | P5, P9, P10 | CH-16/24/27; ADR-10 | I14/I15; N05 absent | A V11/V20; B governed source-backed map; human study | MAPPED/FUTURE | HA-C002/008/013 OPEN | NR; N |
+| T38 | Duplicate insufficient badges | One clear state and recovery/next step | QA | P5 | P5, P9, P10 | CH-22/27 | I14 | A V11/V12; B real partial/failure state | HISTORICAL/PARTIAL | HA-C002/013 OPEN | NR; H-player; P0 supplemental baseline |
+| T39 | Development recommendation | Reviewed, relevant, reachable mission only; no invented deficit | QA | P5 | P5, P6, P9, P10 | CH-21/26/30/31 | I13/I14/I16/I17 | A V11/V13; B real recommendation/approved mission | EXISTING/UNVERIFIED | HA-C009 OPEN | NR; S |
+| T40 | Mission meaningfulness | Valid paraphrase accepted; keywords alone do not prove behaviour | QA | P6 | P6, P9, P10 | CH-30/31 | I16 | A V13 paraphrase/empty fixtures; B actual attempts; C ratings | EXISTING/UNVERIFIED | HA-C009/008 OPEN | NR; S |
+| T41 | Practice retry | New practice attempt; original formal snapshot unchanged | QA | P6 | P6, P7, P9, P10 | CH-04/23/30/32 | I16/I17; N10 absent | A V13; B retry/formal snapshot comparison | EXISTING/UNVERIFIED; source-linked replay future | HA-C009 OPEN | NR; S; N |
+| T42 | Fresh challenge | No hidden coaching; exposure metadata recorded | QA | P6 | P6, P9, P10 | CH-30/31/33 | I16; N10 absent | A challenge/exposure policy; B unfamiliar attempt | MAPPED/FUTURE | HA-C009/008 OPEN | NR; N |
+| T43 | Preparation privacy | Personal by default; no Campus/raw analytics leakage | SECURITY | P7 | P7, P8, P9, P10 | CH-02/34/37/39/44 | N08 absent; reuse I05/I20/I23 | A negative scope/redaction; B owner/sponsor/private matrix | MAPPED/FUTURE | HA-C005/012 OPEN | NR; N |
+| T44 | Preparation output attribution | Generated suggestions not scored as learner responses | QA | P7 | P7, P9, P10 | CH-04/34; T24 | N08 absent; reuse I12/I16 | A generated/learner origin; B private rehearsal actions | MAPPED/FUTURE | CONTENT/MEASURE review pending | NR; N |
+| T45 | Application check-in | Clearly SELF_REPORT; cannot raise formal capability | QA | P7 | P7, P9, P10 | CH-04/35/36 | I18; N09 absent | A mode/claim boundary; B independent read models | MAPPED/FUTURE | PRIVACY/MEASURE consent/claims review pending | NR; N |
+| T46 | Growth not approved | No comparative claim or delta; separate dated snapshots | QA | P7 | P7, P9, P10 | CH-23/36 | I18 | A V14; B unapproved-pair UI/API | EXISTING/UNVERIFIED | HA-C002/004/008 OPEN | NR; S |
+| T47 | Report and evidence authorization | Owner/sponsor scope/share checked at every read/export | SECURITY | P1 | P1, P5, P7, P8, P9, P10 | CH-02/37/38 | I13/I19/I05 | A V04/V16; B owner/non-owner/sponsor/share/export matrix | INTEGRATION/PARTIAL; full audience/access acceptance OPEN | HA-C005/012 OPEN | F-B owned synthetic session/report visible; second owner 404; every audience/export/source NR |
+| T48 | Revoked/expired share | Hosted access stops; scope preview matches content | SECURITY | P1 | P1, P5, P8, P9, P10 | CH-23/38; ADR-12 | I13/I19 | A V04; B revoke/expiry/preview/export | EXISTING/UNVERIFIED | HA-C005/012 OPEN | NR; S |
+| T49 | Session job crash/lease expiry | Safe retry; no duplicate applied result or permanent scoring state | QA | P1 | P1, P2, P9, P10 | CH-20/40 | I09/I10; N04 absent | A V08; B multi-instance/crash/lease/fencing | GAP/OPEN | HA-C012 OPEN; disposable PG required | NR; H-runtime; P0 supplemental baseline |
+| T50 | Start/send/finish race | State remains coherent; no late overwrite | QA | P1 | P1, P2, P9, P10 | CH-13/20/40 | I09/I10 | A V08; B real engine effects plus durable receipts | GAP/OPEN | HA-C012 OPEN; dirty advisory locks unproven | NR; H-runtime; P0 supplemental baseline |
+| T51 | Report-version race | One consistent publication/version sequence | QA | P2 | P2, P5, P9, P10 | CH-23/40 | I13/I10 | A V11; B concurrent publish/read/correction | GAP/OPEN | MEASURE/counsel publication policy pending | NR; H-runtime |
+| T52 | Deletion with active worker | No resurrection of erased evidence/report/preparation | QA | P1 | P1, P7, P9, P10 | CH-39/40; future CH-34 | I20; N04/N08/N14 absent | A tombstone fixtures; B active worker/stale callback erasure | GAP/OPEN | HA-C005/012 OPEN | NR; H-runtime |
+| T53 | Payment/webhook retries | Exactly one entitlement grant/application, no duplicated consumption | QA | P8 | P8, P9, P10 | CH-40/42 | I21 | A V15; B duplicate/out-of-order payment callback | EXISTING/UNVERIFIED | HA-C006 OPEN; finance/provider approval pending | NR; S |
+| T54 | System failure credit policy | Reissue/refund path consistent and auditable | PRODUCT | P8 | P8, P9, P10 | CH-22/40/42; approved recovery policy | I21/I28 | A V15; B authorized synthetic reissue audit | MAPPED/FUTURE | Finance/support policy pending; no issuance authorized | NR; S |
+| T55 | Package expiry | New activity gated correctly; eligible issued history remains readable | QA | P6 | P6, P8, P9, P10 | CH-07/23/30/42 | I21/I16/I04 | A V13/V15; B expiry vs issued-history rights | EXISTING/UNVERIFIED | Product/finance bounded allowance approval pending | NR; S |
+| T56 | Keyboard/screen reader/zoom | End-to-end usable without pointer or colour-only cues | UX | P3 | P3, P5, P7, P9, P10 | CH-01/11/24/34 | I01/I06/I14; N08 absent | A V17; B complete supported journeys; manual AT/device study | HISTORICAL/PARTIAL; full human audit open | HA-C013 OPEN | NR; H-player; manual NOT RUN |
+| T57 | Existing direct and Campus regression | No change to unrelated entitlements/contracts/visibility | QA | P1 | P1, P6, P8, P9, P10 | CH-02/04/37/42 | I05/I21/I25 | A V05/V15; B existing rights/contracts regression | EXISTING/UNVERIFIED | HA-C005/006/012 OPEN | NR; S |
+| T58 | Cost and trace coverage | Usage attached to mode/run/version with no sensitive analytics payload | QA | P8 | P8, P9, P10 | CH-04/40/44 | I23/I21 | A V18; B run/mode/cost projection; C budgeted spend | EXISTING/UNVERIFIED | OPS budget/PRIVACY approval pending | NR; S |
+| T59 | Synthetic data isolation | Test/example sessions excluded from real research and conversion metrics | QA | P0 | P0, P2, P8, P9, P10 | CH-44/45; disposable store designation | I23/I24/I30/I31 | A isolation fixtures; B actual metric/research exclusion | INTEGRATION/PARTIAL; full exclusion acceptance OPEN | HA-C005/008 OPEN; conversion/research manifest unknown | F-B actual dev timeline row marked synthetic; telemetry enabled only in isolated test; full exclusion NR |
+| T60 | Rollback during active run | Pinned compatible handler or safe drain/reissue; no stranded learner | OPS | P9 | P9, P10 | CH-09/10/23/39/40/41; ADR-13 | I28/I09/I13; N03/N04 absent | A compatible routing; B local crash/drain rehearsal; C authorized canary | GAP/OPEN | HA-C001/007/012 OPEN; active-run inventory/recovery policy absent | NR; H-runtime; P0 supplemental baseline |
+
+## Dependency-aware handoff
+
+1. Parent P0: code-safe diagnostic baseline COMPLETE per FINAL_REPORT. Retain
+   the final browser result (91 passed + 1 flaky, runner exit 0), the initial
+   EBUSY failure and all reproduced product FAILs. Partial fixture/integration
+   evidence does not close later-phase requirements, skipped suites or external gates.
+2. P1, **not authorized here**: prove ownership/scoped history first; durable
+   versioned actions/jobs, authorization and reviewed erasure/source-retention
+   contracts next. Existing PostgreSQL advisory-lock changes must include engine
+   effects and the effect-before-receipt crash window in testing.
+3. P2: real action -> evaluation -> strict evidence -> immutable V3 -> separate
+   practice attempt. Stop at the first missing writer/worker; no seeded report
+   can bridge the gap. Keep outages distinct from genuine insufficiency.
+4. P3/P4: compatible canonical player and reviewed administration/content/
+   opportunities. Existing 35-minute timing is preserved; no cosmetic
+   30-minute clamp, new pre-clock start or stimulus change in P0.
+5. P5-P8: useful source-backed reports, ten reviewed missions, private preparation/
+   SELF_REPORT and bounded commercial/Campus integration, each behind its own gates.
+6. P9/P10: full acceptance, authorized live-model/human studies, preflight,
+   active-run-safe rollout/retirement. Configuration consistency is not release approval.
+
+Support diagnosis must not invoke a report GET that builds/appends versions,
+a session GET that settles entitlements, admin initialization that seeds RBAC,
+or `migrate:store` as a purported read-only dry run. Parent diagnostics use
+narrow repository/SQL projections and write-rejected transactions instead.
+Ownership categories MATCHED/CONFLICTING/UNCLAIMED/DELETED/EXCLUDED require
+authoritative proof; missing rows alone never establish deletion or ownership.
+
+## Structural verification and phase-close condition
+
+**Documentation mapping: COMPLETE (2026-10-02).** A read-only Node comparison
+against both source files verified 52 CH + 60 T = 112 unique row IDs, exact
+source decision/action/requirement/evidence wording, primary phases and all
+phase memberships. It also verified 13 source-matching ADR rows, 13 unique
+HA-C rows and 190 path references (including 20 proposed absent path references),
+with zero mismatches after correcting initial filename assumptions and recording
+the parent's I30/I31 and V22/V23 diagnostic paths. The synchronization recheck
+preserved exact source wording and phase assignments. The editor reported no errors in either
+document. These are structural/document checks, **not application test counts**.
+
+Structural acceptance for these documents: IDs CH-01 through CH-52 and T01
+through T60 occur exactly once as ledger row IDs; all source wording and phase
+memberships match the two source tables; every row has role, primary phase,
+dependencies, path, verification, distinct code/external status and evidence.
+ADR-01 through ADR-13 and HA-C001 through HA-C013 are carried in DECISIONS.
+
+This structural check closes only the **documentation mapping deliverable**.
+The parent separately closes **code-safe diagnostic-only P0** in FINAL_REPORT,
+using the supplied diagnostic/safety evidence and final browser runner exit 0
+with 91 passed + 1 flaky. Neither closure completes a later-phase requirement
+or external gate. The parent owns exact counts, the final report and the
+explicit-path local P0 commit; this document owner makes no commit. Product
+release remains NO-GO while critical ownership, evidence, persistence,
+publication, source-retention, security or active-run recovery gates remain open.

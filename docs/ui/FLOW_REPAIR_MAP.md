@@ -7,6 +7,19 @@ alone are not treated as proof.
 
 Status key: `OPEN` · `PARTIAL` · `DONE` · `VERIFIED-ALREADY-CORRECT`
 
+## Separate P0 diagnostic baseline - 2026-10-02
+
+The approved diagnostic-only experience P0 records fresh
+[baseline/lineage](../experience/BASELINE.md),
+[test evidence](../experience/TEST_RESULTS.md) and
+[recovery handoff](../experience/FINAL_REPORT.md). It does not implement P1.
+The actual isolated PG/HTTP/scorer path completes without judged strict dialogue
+evidence, and removes the session history consumed by V3 source verification.
+A receipt-failure fixture exposes the engine-effect-before-receipt gap.
+These are retained FAIL/OPEN observations, not repaired scientific/backend gates.
+Previously repaired entry/layout/clock/recovery views were rechecked rather than
+rewritten. No protected runtime or production policy changed; release stays NO-GO.
+
 ## Existing-contract recovery and old-account entry - 2026-10-02
 
 Further V3 wiring is implemented without changing backend measurement, access,

@@ -2,6 +2,13 @@
 
 Date: 2026-10-02. **NO-GO for the complete V3 student journey.**
 
+The separate approved [experience P0 diagnostic baseline](../experience/BASELINE.md)
+and [fresh verification](../experience/TEST_RESULTS.md) reproduce the unjudged
+dialogue-evidence/source-history and receipt-write failure boundaries on synthetic
+data. Read-only tooling and recovery/review records are prepared, not runtime
+repairs or approvals. Historical A-M UI gates remain separate. Stop before P1;
+the full learner release and active-run-safe rollback remain unapproved.
+
 Latest recovery/entry checkpoint: existing pending/held report states now have
 read-only rechecks/support/reference controls; failed scoring retries surface
 their errors; workspace-specific recovery and stale-control suppression are

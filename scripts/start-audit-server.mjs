@@ -7,7 +7,7 @@ const { privateKey } = generateKeyPairSync('ed25519')
 
 process.env.NODE_ENV = 'test'
 process.env.PORT = process.env.PORT || '4173'
-process.env.DATA_DIR = process.env.PRISM_AUDIT_DATA_DIR || mkdtempSync(join(tmpdir(), 'prism-audit-'))
+process.env.DATA_DIR = process.env.PRISM_AUDIT_DATA_DIR || mkdtempSync(join(process.env.PRISM_AUDIT_DATA_ROOT || tmpdir(), 'prism-audit-'))
 process.env.JWT_SECRET = 'isolated-prism-audit-secret-never-for-production'
 process.env.PRISM_CREDENTIAL_SIGNING_KEY = privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64')
 process.env.PRISM_GLASS_BOX = 'true'

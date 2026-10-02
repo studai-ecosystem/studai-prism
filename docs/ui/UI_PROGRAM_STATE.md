@@ -22,6 +22,17 @@ UI-STATE:END -->
 
 ## Decisions log
 
+Experience P0 diagnostic checkpoint (2026-10-02): the separate
+[P0 baseline](../experience/BASELINE.md) and
+[verification record](../experience/TEST_RESULTS.md) recheck existing repairs
+without changing runtime. A real isolated PostgreSQL/HTTP/scorer run produces no
+judged strict dialogue evidence; completion removes history used by V3 source
+verification. A receipt-write fault fixture exposes repeated engine effects.
+These remain explicit product failures, not green product acceptance. Standalone
+read-only diagnostics avoid migration/GET initialization and publication side
+effects. The A-M historical completion markers are unchanged; overall learner
+release remains NO-GO. P0 stops before P1 and supplies no human approval.
+
 Existing-contract V3 recovery/entry (2026-10-02): pending/held reports have
 read-only check-again/support/reference actions; failed retry and refresh errors
 are visible; sponsored recovery stays in its workspace; denied cached sessions
