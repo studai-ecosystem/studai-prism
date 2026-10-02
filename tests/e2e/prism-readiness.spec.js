@@ -94,7 +94,7 @@ test('PRISM-E2E-01 @critical new candidate signup -> verification -> login', asy
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill('candidate-pass-1!')
   await page.locator('button[type="submit"]').click()
-  await expect(page).toHaveURL(/\/payment/)
+  await expect(page).toHaveURL(/\/app(\/home)?$/)
 })
 
 test('PRISM-E2E-02 @critical candidate sees assessment catalog', async ({ page }) => {

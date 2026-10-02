@@ -122,6 +122,58 @@ describe('Sign in and registration', () => {
   })
 })
 
+describe('Where sign-in lands', () => {
+  const where = (
+    <Routes>
+      <Route path="/login" element={<Auth />} />
+      <Route path="/register" element={<Auth />} />
+      <Route path="/app" element={<p>app landing</p>} />
+      <Route path="/payment" element={<p>checkout landing</p>} />
+    </Routes>
+  )
+  const authReply = { token: 'test-token', user: { id: 'u-1', name: 'Synthetic Person', email: 'p@test.local', college: 'C', year: '4th Year' } }
+
+  it('a returning user signs in to the app, not to checkout', async () => {
+    mockFetch({ '/api/auth/login': authReply })
+    renderApp(where, { route: '/login' })
+    await userEvent.type(screen.getByLabelText(/Email/), 'p@test.local')
+    await userEvent.type(screen.getByLabelText(/Password/), 'a-long-passphrase-1')
+    await userEvent.click(document.querySelector('button[type="submit"]'))
+    expect(await screen.findByText('app landing')).toBeInTheDocument()
+    expect(screen.queryByText('checkout landing')).not.toBeInTheDocument()
+  })
+
+  it('a new account still continues to checkout', async () => {
+    mockFetch({ '/api/auth/register': authReply })
+    renderApp(where, { route: '/register' })
+    await userEvent.type(screen.getByLabelText(/Full Name/), 'Synthetic Person')
+    await userEvent.type(screen.getByLabelText(/Email/), 'p@test.local')
+    await userEvent.type(screen.getByLabelText(/College/), 'Synthetic College')
+    await userEvent.selectOptions(screen.getByLabelText(/Year of Study/), '4th Year')
+    await userEvent.type(screen.getByLabelText(/Password/), 'a-long-passphrase-1')
+    await userEvent.click(document.querySelector('input[type="checkbox"]'))
+    await userEvent.click(document.querySelector('button[type="submit"]'))
+    expect(await screen.findByText('checkout landing')).toBeInTheDocument()
+  })
+
+  it('an explicit next path still wins for a returning user', async () => {
+    mockFetch({ '/api/auth/login': authReply })
+    renderApp(<Routes><Route path="/login" element={<Auth />} /><Route path="/payment" element={<p>checkout landing</p>} /></Routes>, { route: '/login?next=%2Fpayment' })
+    await userEvent.type(screen.getByLabelText(/Email/), 'p@test.local')
+    await userEvent.type(screen.getByLabelText(/Password/), 'a-long-passphrase-1')
+    await userEvent.click(document.querySelector('button[type="submit"]'))
+    expect(await screen.findByText('checkout landing')).toBeInTheDocument()
+  })
+
+  it('someone already signed in who opens /login goes straight to the app', async () => {
+    localStorage.setItem('prism_token', 'test-token')
+    localStorage.setItem('prism_user', JSON.stringify(authReply.user))
+    mockFetch({ '/api/': notFound })
+    renderApp(where, { route: '/login' })
+    expect(await screen.findByText('app landing')).toBeInTheDocument()
+  })
+})
+
 describe('Assessment invitation', () => {
   it('signed out, offers to create an account or sign in and says one account is enough', async () => {
     mockFetch({ '/api/': notFound })
