@@ -140,6 +140,22 @@ export function draftBankScenarios() {
   }
 }
 
+// Authored dialogue for the (non-universal) handover segment: a question
+// that asks about a conditional fact gets that pinned fact verbatim from the
+// staying colleague; anything else gets no participant turn. No model is ever
+// asked to speak in a draft run, so no generated text can be shown or rated.
+const SEGMENT_QUESTION_CUES = Object.freeze({
+  CANDIDATE_ASKS_ABOUT_AVAILABILITY: /\b(availab\w*|capacity|free|extra task|take on|time this week)\b/i,
+  CANDIDATE_ASKS_ABOUT_HANDOUTS: /\b(handouts?|print\w*)\b/i,
+})
+export function answerSegmentQuestion(snapshot, text) {
+  if (!snapshot || snapshot.universal || !/\?/.test(String(text || ''))) return []
+  const speaker = (snapshot.participants || []).find((p) => /staying/i.test(p.role)) || snapshot.participants?.[0] || null
+  return (snapshot.conditionalFacts || [])
+    .filter((f) => SEGMENT_QUESTION_CUES[f.revealWhen]?.test(text))
+    .map((f) => ({ speaker: speaker?.name || '', role: speaker?.role || null, actorKind: 'AI_PARTICIPANT', content: f.fact, factAnswer: 'AUTHORED' }))
+}
+
 // What a run on the segment is pinned to. Stored at start; read at evaluation
 // and publication so no later edit can change the measurement conditions.
 export function buildRunPin({ formId, engineVersion = 'legacy-engine', scenarioId = DRAFT_SEGMENT_ID }) {

@@ -3,6 +3,17 @@
 // NODE_ENV=test and PRISM_AUDIT_AI=true.
 const dimensions = ['criticalThinking', 'communication', 'collaboration', 'problemSolving', 'aiDigitalFluency']
 
+// Layer B fault injection for the evidence evaluator only. Read ONLY when
+// NODE_ENV=test (this provider itself is unreachable otherwise): 'throw'
+// (provider failure), 'malformed' (unparseable output), 'mismatch' (quote
+// the candidate never wrote), 'evidence-write' (a value the store rejects).
+const AUDIT_FAULTS = new Set(['throw', 'malformed', 'mismatch', 'evidence-write'])
+export function auditFault() {
+  if (process.env.NODE_ENV !== 'test') return null
+  const mode = process.env.PRISM_AUDIT_AI_FAULT
+  return AUDIT_FAULTS.has(mode) ? mode : null
+}
+
 function textFor(task, request) {
   if (task === 'mission_evaluator') {
     const system = (request?.system || []).map((s) => s.text || '').join('\n')
@@ -36,9 +47,12 @@ function textFor(task, request) {
     return JSON.stringify({ criteria: [...new Set(ids)].map((id) => ({ criterion_id: id, observed: false, confidence: 0.9, quote: '' })) })
   }
   if (task === 'evidence_evaluator') {
+    const fault = auditFault()
+    if (fault === 'malformed') return '{"units": [ not json'
     // Deterministic slice evaluator: one unit for the opportunity in the
     // request, quoting the first 40 characters of the chosen candidate
-    // action at anchor level 2; abstains (TOO_SPARSE) under 20 characters.
+    // action (a board patch: its longest changed value) at anchor level 2;
+    // abstains (TOO_SPARSE) under 20 characters.
     const system = (request?.system || []).map((s) => s.text || '').join('\n')
     const opp = (() => { try { return JSON.parse(/OPPORTUNITY \(JSON\)\s*([^\r\n]+)/.exec(system)?.[1] || 'null') } catch { return null } })()
     const actions = (() => { try { return JSON.parse(/<candidate_transcript>\s*([^\r\n]+)/.exec(system)?.[1] || '[]') } catch { return [] } })()
@@ -47,10 +61,17 @@ function textFor(task, request) {
       : /HANDOVER/.test(opp?.id || '') ? messages[messages.length - 1]
         : messages[0] || actions[0]
     const base = { opportunityId: opp?.id || null, capabilityId: opp?.capabilityId || null, behaviourId: opp?.behaviourId || null, contraryEvidence: '', ambiguity: '' }
-    const text = typeof chosen?.text === 'string' ? (chosen.kind === 'ARTIFACT' ? chosen.text.split('\n')[0] : chosen.text) : ''
+    // A board patch is judged on its most substantive changed value (the
+    // store may reorder object keys, so "first line" is not stable).
+    const text = typeof chosen?.text === 'string' ? (chosen.kind === 'ARTIFACT' ? chosen.text.split('\n').reduce((a, b) => (b.length > a.length ? b : a), '') : chosen.text) : ''
     if (!chosen) return JSON.stringify({ units: [{ ...base, sourceActionId: null, excerpt: '', observedBehavior: '', anchorLevel: null, abstainReason: 'NOT_ADDRESSED' }] })
     if (text.length < 20) return JSON.stringify({ units: [{ ...base, sourceActionId: chosen.actionId, excerpt: '', observedBehavior: '', anchorLevel: null, abstainReason: 'TOO_SPARSE' }] })
-    return JSON.stringify({ units: [{ ...base, sourceActionId: chosen.actionId, excerpt: text.slice(0, 40), observedBehavior: 'The candidate addressed the opportunity in their own words.', anchorLevel: 2, abstainReason: '' }] })
+    const unit = { ...base, sourceActionId: chosen.actionId, excerpt: text.slice(0, 40), observedBehavior: 'The candidate addressed the opportunity in their own words.', anchorLevel: 2, abstainReason: '' }
+    // Layer B fault hooks (test-only, see auditFault()): a quotation the
+    // candidate never wrote, or a value the evidence store must reject.
+    if (fault === 'mismatch') unit.excerpt = 'words the candidate never wrote'
+    if (fault === 'evidence-write') unit.observedBehavior = 'Rejected by the store:\u0000'
+    return JSON.stringify({ units: [unit] })
   }
   if (task === 'preparation_participant') {
     // Deterministic rehearsal counterpart: one bounded pushback line.
@@ -90,6 +111,9 @@ function textFor(task, request) {
 }
 
 export async function auditConverse(request) {
+  if (request?.requestMetadata?.task === 'evidence_evaluator' && auditFault() === 'throw') {
+    throw Object.assign(new Error('audit provider unavailable'), { name: 'ServiceUnavailableException', code: 'PROVIDER_DOWN' })
+  }
   const text = textFor(request?.requestMetadata?.task, request)
   return {
     output: { message: { content: [{ text }] } },

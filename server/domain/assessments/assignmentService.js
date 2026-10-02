@@ -11,6 +11,8 @@ import { PERSONAL_SOURCES } from '../entitlements/resolver.js'
 import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../sharing/copyVersions.js'
 import { CORE_DEFINITION_ID, definitionForScenario, capabilityName } from './catalog.js'
 import { isEnabled } from '../flags/index.js'
+import { draftContentEnabled } from './draftSegments.js'
+import { CORE_TEAMREADY_A_ID } from './universalForm.js'
 
 const workspaceV3 = () => isEnabled('PRISM_ASSESSMENT_WORKSPACE_V3')
 // The V3 player URL; sponsored sessions name their workspace so a new tab or
@@ -34,6 +36,17 @@ export function personalAssignmentId(userId, sourceKey) {
 const usableV2 = (e, at) => e.status === 'ACTIVE' && e.quantity - e.consumedQuantity > 0
   && (!e.validFrom || new Date(e.validFrom) <= at) && (!e.validUntil || new Date(e.validUntil) > at)
 
+// Server-side pinning rule for local/test DRAFT runs: with PRISM_DRAFT_CONTENT
+// on (never in production), an unstarted non-production 'dev' session
+// entitlement is offered the universal DRAFT form instead of the
+// server-selected legacy pool. The request body can never pick or swap the
+// form; paid, invite, coupon and dummy entitlements are never affected, and
+// with the flag off the legacy default is unchanged.
+export function draftPersonalDefinition(record) {
+  if (!draftContentEnabled() || process.env.NODE_ENV === 'production') return null
+  return record?.mode === 'dev' ? CORE_TEAMREADY_A_ID : null
+}
+
 export function createAssignmentService({ repos, catalog, directory, legacy, resolver, clock = () => new Date() }) {
   const paths = legacy.paths
 
@@ -50,7 +63,7 @@ export function createAssignmentService({ repos, catalog, directory, legacy, res
       const session = byId.get(e.legacySessionId) || null
       if (!session && e.status !== 'ACTIVE') continue
       covered.add(e.legacySessionId)
-      sources.push({ key: e.id, legacySessionId: e.legacySessionId, session, definitionId: null })
+      sources.push({ key: e.id, legacySessionId: e.legacySessionId, session, definitionId: session ? null : draftPersonalDefinition(record) })
     }
     if (repos?.entitlements) {
       const at = clock()

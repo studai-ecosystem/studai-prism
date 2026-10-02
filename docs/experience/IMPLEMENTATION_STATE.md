@@ -1,5 +1,18 @@
 # Experience programme - source traceability and execution checkpoints
 
+## P2.9 Layer B gap closed - 2026-10-03
+
+- Draft/universal runs (only with `PRISM_DRAFT_CONTENT=true`) no longer call the legacy engine to
+  start, talk or save the board: `sessionService` creates the session through the legacy store
+  (owner, pinned scenario, no model history; timing from `assessment_run_timing`), saves board
+  changes there, and the handover segment answers only from pinned conditional facts
+  (`answerSegmentQuestion`). Finish uses the `EVALUATE_RUN` job only; a DRAFT scenario without a
+  readable pin fails closed. Legacy runs, stimulus, scoring and 35-minute timing are unchanged.
+- Reachability: `draftPersonalDefinition()` pins an unstarted non-production `dev` entitlement to the
+  DRAFT universal form server-side (flag on, never production, never paid/invite/coupon/dummy).
+- `server/test/p2Slice.db.test.js` + runner mode `p2`: 14/14 on real PG (see TEST_RESULTS.md); no PG
+  repository bug found. Layer C live-model run remains the open blocker.
+
 ## Current P9-P10 checkpoint - 2026-10-03
 
 Status: **Code-safe programme COMPLETE locally. Release: NO-GO until human gates close.**

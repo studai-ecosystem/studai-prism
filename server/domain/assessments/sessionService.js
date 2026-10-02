@@ -8,7 +8,7 @@ import { ApiError } from '../http/errors.js'
 import { buildSessionContract, scenarioView } from './sessionContract.js'
 import { reportPath } from './assignmentService.js'
 import { createMemorySessionLocks } from './sessionLocks.js'
-import { draftSegmentFor, buildRunPin, evaluateJobKey, DRAFT_EVALUATE_JOB_KIND, DRAFT_SEGMENT_ID, SLICE_METHOD_VERSION, isUniversalSnapshot } from './draftSegments.js'
+import { draftSegmentFor, buildRunPin, evaluateJobKey, DRAFT_EVALUATE_JOB_KIND, DRAFT_SEGMENT_ID, SLICE_METHOD_VERSION, isUniversalSnapshot, draftContentEnabled, answerSegmentQuestion } from './draftSegments.js'
 import { timingPolicyFor, legacyPolicy, isLegacyPolicy, deadlinesFor } from './timingPolicy.js'
 import { selectNext, stageStrip, parentOpportunityId } from './director.js'
 import { validateBoardPatch, worldStateFor } from './universalForm.js'
@@ -316,6 +316,45 @@ export function createAssessmentSessionService({
     }
   }
 
+  // --- Draft runs never use the legacy engine ---------------------------------
+  // A DRAFT segment/form is not in the engine's scenario bank, and its
+  // stimulus is authored. The session record is created through the legacy
+  // store (directory, history, ownership and authorization keep working) with
+  // the owner, the server-pinned scenario and NO model history; its timing
+  // comes from assessment_run_timing (allocated below, started by Begin).
+  async function createDraftSession({ sessionId, scenarioId, user, scopes, consentVersion }) {
+    if (!draftContentEnabled()) throw new ApiError('SCENARIO_NOT_FOUND', 'This assessment is not available.')
+    if (typeof legacy.createSession !== 'function') throw new ApiError('CAMPUS_STORE_UNAVAILABLE', 'The assessment workspace is temporarily unavailable.')
+    const bank = (await scenarioSource())?.bankScenarios?.[scenarioId]
+    if (!bank) throw new ApiError('SCENARIO_NOT_FOUND', 'This assessment is not available.')
+    await legacy.createSession(sessionId, {
+      scenarioId,
+      userId: user.id,
+      userEmail: user.email || null,
+      exchangeCount: 0,
+      history: [],
+      artifacts: (bank.interactiveArtifacts || []).map((a) => JSON.parse(JSON.stringify(a))),
+      draftRun: true,
+      consentVersion: typeof consentVersion === 'string' ? consentVersion.slice(0, 64) : null,
+      consentScopes: scopes,
+    })
+  }
+  // A draft run's board change is applied to the stored session artifact with
+  // the legacy merge semantics, without the engine (which cannot load a DRAFT
+  // scenario). The authoritative content is the appended artifact version.
+  async function saveDraftArtifact({ sessionId, artifactId, updates }) {
+    const fresh = await legacy.getSession(sessionId)
+    const artifacts = Array.isArray(fresh?.artifacts) ? fresh.artifacts : []
+    const target = artifacts.find((a) => a.artifactId === artifactId)
+    if (!target) throw new ApiError('NOT_FOUND', 'This work material is not part of the session.')
+    if (updates && typeof updates === 'object') {
+      target.data = { ...(target.data || {}), ...updates }
+      target.lastModified = clock().toISOString()
+    }
+    if (typeof legacy.updateSession === 'function') await legacy.updateSession(sessionId, { artifacts })
+    return { artifact: target }
+  }
+
   const service = {
     async start({ user, workspace, assignmentId, idempotencyKey, consent, authorization, client, requestId }) {
       requireStore()
@@ -377,7 +416,8 @@ export function createAssessmentSessionService({
         if (existing && (await legacy.getSession(sessionId))) return { sessionId, resumed: true }
         await engine.recordConsent({ sessionId, scopes, consentVersion: consent?.consentVersion, authorization, client, requestId })
         if (!(await legacy.getSession(sessionId))) {
-          await engine.start({ sessionId, scenarioId, authorization, client, requestId })
+          if (draftSegmentFor(scenarioId)) await createDraftSession({ sessionId, scenarioId, user, scopes, consentVersion: consent?.consentVersion })
+          else await engine.start({ sessionId, scenarioId, authorization, client, requestId })
         }
         // A contract billed on start closes the seat once the engine has
         // started — before the start is recorded, so a failure here is retried
@@ -422,14 +462,14 @@ export function createAssessmentSessionService({
         runTimingOf(sessionId),
       ])
       const processing = processingOf(job)
+      const run = jobs() ? await draftRun(sessionId, session) : null
       // A draft run never asks the legacy engine for a scoring status.
       const engineStatus = report ? 'COMPLETE'
         : processing ? (processing.state === 'DONE' ? 'COMPLETE' : processing.state === 'FAILED' ? 'FAILED' : 'SCORING')
-          : await engine.evaluateStatus({ sessionId, requestId })
+          : run ? 'IDLE' : await engine.evaluateStatus({ sessionId, requestId })
       if (report || processing?.state === 'DONE') await settle(sessionId, user)
       // P4: a universal run shows its recorded authored transcript and the
       // task-only stage strip; the engine's history is never shown.
-      const run = jobs() ? await draftRun(sessionId, session) : null
       let universal = null
       if (isUniversalRun(run)) {
         const ledger = await repos.sessionIo.listOpportunities(sessionId)
@@ -532,8 +572,18 @@ export function createAssessmentSessionService({
           const shown = await presentNext(sessionId, run, { requestId })
           return { ...stored.response, messages: [...stored.response.messages, ...shown], replayed: false }
         }
+        if (run?.snapshot) {
+          // The handover segment: authored replies from pinned facts only.
+          const exchanges = messageActions(await repos.sessionIo.listActions(sessionId)).length + 1
+          const response = { messages: answerSegmentQuestion(run.snapshot, text), exchanges }
+          const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
+          await applied(action, stored.response)
+          if (typeof legacy.updateSession === 'function') await legacy.updateSession(sessionId, { exchangeCount: exchanges }).catch(() => {})
+          return { ...stored.response, replayed: false }
+        }
         let messages
         try {
+          if (draftSegmentFor(session.scenarioId)) throw new ApiError('RUN_VERSION_UNSUPPORTED', 'This assessment cannot continue on this version. Your saved work is preserved; please contact support.')
           ;({ messages } = await engine.message({ sessionId, text, authorization, client, requestId }))
         } catch (err) {
           await failed(action, err)
@@ -604,7 +654,9 @@ export function createAssessmentSessionService({
           }
         }
         try {
-          ;({ artifact } = await engine.saveArtifact({ sessionId, artifactId, updates, notes, authorization, client, requestId }))
+          ;({ artifact } = draftSegmentFor(session.scenarioId)
+            ? await saveDraftArtifact({ sessionId, artifactId, updates })
+            : await engine.saveArtifact({ sessionId, artifactId, updates, notes, authorization, client, requestId }))
         } catch (err) {
           await failed(action, err)
           throw err
@@ -653,7 +705,7 @@ export function createAssessmentSessionService({
         // A universal run counts the learner's own accepted messages; the
         // engine's exchange counter is never consulted for it.
         const universal = isUniversalRun(run)
-        const exchanges = universal ? messageActions(await repos.sessionIo.listActions(sessionId)).length : legacyExchanges
+        const exchanges = messageActions(await repos.sessionIo.listActions(sessionId)).length
         if (!existing && exchanges < required && !early) {
           throw new ApiError('FINISH_CONFIRMATION_REQUIRED', 'You have not reached every part of this assessment yet.', { details: { exchanges, requiredExchanges: required } })
         }
@@ -689,6 +741,8 @@ export function createAssessmentSessionService({
       if (exchanges < required && !early) {
         throw new ApiError('FINISH_CONFIRMATION_REQUIRED', 'You have not reached every part of this assessment yet.', { details: { exchanges, requiredExchanges: required } })
       }
+      // A DRAFT scenario without a readable pin is never scored by the engine.
+      if (draftSegmentFor(session.scenarioId)) throw new ApiError('RUN_VERSION_UNSUPPORTED', 'This assessment cannot be submitted on this version. Your saved work is preserved; please contact support.')
       const { state } = await engine.evaluate({ sessionId, authorization, client, requestId })
       audit('assessment.finish_requested', sessionId, { sessionId, early: exchanges < required, exchanges, requiredExchanges: required, requestId })
       if (state === 'COMPLETE') await settle(sessionId, user)

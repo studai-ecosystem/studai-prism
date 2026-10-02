@@ -13,6 +13,7 @@ import { createMemoryDb } from '../domain/campusStore/memoryDb.js'
 import { createSessionIoRepoMemory } from '../domain/assessments/sessionIoRepository.js'
 import { createAssessmentSessionService, REQUIRED_CONSENT_SCOPES } from '../domain/assessments/sessionService.js'
 import { DRAFT_SEGMENT_ID } from '../domain/assessments/draftSegments.js'
+process.env.PRISM_DRAFT_CONTENT = 'true'
 
 const ALL_READY = { player: true, durableWriter: true, migrationsApplied: ['0040_candidate_actions_jobs', '0049_preview_attempts'], evaluator: true, publication: true, contentState: 'APPROVED_FOR_INTENDED_USE', worker: true }
 const ALL_FLAGS = Object.fromEntries(['PRISM_APP_SHELL_V3', 'PRISM_ASSESSMENT_WORKSPACE_V3', 'PRISM_STUDENT_REPORT_V3', 'PRISM_EVIDENCE_FAIL_CLOSED', 'PRISM_DEVELOPMENT_V2'].map((k) => [k, 'true']))
@@ -88,7 +89,7 @@ test('P10.2: a throwing or missing probe is UNVERIFIED, never READY', async () =
 function startWorld({ allocatable }) {
   const db = createMemoryDb()
   const io = createSessionIoRepoMemory(db)
-  const calls = { reserve: 0, engineStart: 0, createEntitlement: 0 }
+  const calls = { reserve: 0, engineStart: 0, createEntitlement: 0, draftSession: 0 }
   const gate = createReleaseGate({ env: {}, stage: 'LOCAL', probes: allocatable
     ? { player: () => true, durableWriter: () => true, migrationsApplied: () => ['0040_x'], evaluator: () => true, publication: () => true, contentState: () => 'DRAFT' }
     : { player: () => true, durableWriter: () => true, migrationsApplied: () => ['0040_x'], evaluator: () => false, publication: () => true, contentState: () => 'DRAFT' } })
@@ -97,11 +98,12 @@ function startWorld({ allocatable }) {
     repos: { kind: 'memory', sessionIo: io, assessments: { updateStudent: async () => {} } },
     assignments: { resolveItem: async () => ({ item: { definition: { id: 'def-1', formPolicy: 'FIXED_FORM' }, assignment: { formId: 'form-1' } }, card: { status: 'OPEN', scope: 'SPONSORED', acknowledged: true, sessionId: null } }) },
     catalog: { getCatalog: async () => ({ forms: [{ id: 'form-1', definitionId: 'def-1', status: 'FROZEN', scenarioId: DRAFT_SEGMENT_ID }] }) },
-    scenarioSource: async () => [],
+    scenarioSource: async () => ({ generalScenarios: [], bankScenarios: { [DRAFT_SEGMENT_ID]: { title: 'Synthetic', interactiveArtifacts: [] } } }),
     resolver: { resolveEntitlement: async () => ({ kind: 'SPONSORED' }) },
     ledger: { reserve: async ({ sessionId }) => { calls.reserve += 1; return { consumption: { sessionId, entitlementId: 'ent-1' } } }, finalizeOn: async () => ({}) },
     sessionScopes: { recordSponsoredStart: async () => {} },
-    legacy: { getSession: async () => session, getReport: async () => null, getEntitlement: async () => null, createEntitlement: async () => { calls.createEntitlement += 1 } },
+    legacy: { getSession: async () => session, getReport: async () => null, getEntitlement: async () => null, createEntitlement: async () => { calls.createEntitlement += 1 },
+      createSession: async (sessionId, rec) => { calls.draftSession += 1; session = { sessionId, ...rec } } },
     engine: { recordConsent: async () => {}, start: async ({ sessionId }) => { calls.engineStart += 1; session = { sessionId, userId: 'u1', scenarioId: DRAFT_SEGMENT_ID } } },
     sliceEvaluator: {},
     releaseGate: gate,
@@ -113,7 +115,7 @@ const startArgs = { user: { id: 'u1' }, workspace: { type: 'CAMPUS_STUDENT', org
 test('P10.2: a NEW draft/universal run is refused with RUN_NOT_ALLOCATABLE before any reservation, entitlement or engine start', async () => {
   const { svc, calls } = startWorld({ allocatable: false })
   await assert.rejects(svc.start(startArgs), (e) => e.code === 'RUN_NOT_ALLOCATABLE' && e.status === 503 && e.details.checks.EVALUATOR === 'NOT_READY')
-  assert.deepEqual(calls, { reserve: 0, engineStart: 0, createEntitlement: 0 })
+  assert.deepEqual(calls, { reserve: 0, engineStart: 0, createEntitlement: 0, draftSession: 0 })
 })
 
 test('P10.2: the same start proceeds when readiness is READY (gate is a pre-check, not a behaviour change)', async () => {
@@ -121,7 +123,8 @@ test('P10.2: the same start proceeds when readiness is READY (gate is a pre-chec
   const out = await svc.start(startArgs)
   assert.equal(out.resumed, false)
   assert.equal(calls.reserve, 1)
-  assert.equal(calls.engineStart, 1)
+  assert.equal(calls.engineStart, 0, 'a draft run is never started by the legacy engine')
+  assert.equal(calls.draftSession, 1)
   const start = await io.getClientEvent(out.sessionId, 'start')
   assert.ok(start.response.runPin.methodVersion, 'run is pinned to its method')
 })

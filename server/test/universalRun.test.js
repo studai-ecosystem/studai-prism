@@ -94,6 +94,9 @@ async function world() {
     getReport: async () => null,
     getEntitlement: async (sid) => state.payments.find((p) => p.sessionId === sid) || null,
     createEntitlement: async (rec) => { state.payments.push({ ...rec, consumed: false, createdAt: NOW.toISOString() }); return rec },
+    // Draft runs are created through the legacy store, never the engine.
+    createSession: async (sid, rec) => { state.sessions[sid] = { sessionId: sid, ...structuredClone(rec), startedAt: NOW.getTime() - 60000, completedAt: null } },
+    updateSession: async (sid, patch) => { Object.assign(state.sessions[sid], structuredClone(patch)); return structuredClone(state.sessions[sid]) },
   }
   const engine = fakeEngine(state)
   const audits = []
@@ -233,9 +236,10 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     assert.match(sawWorldChange.messages[0].content, /What changed: Sam is unavailable/)
     assert.match(sawWorldChange.messages[0].content, /board is unchanged/)
     const boardAfterChange = await w.repos.sessionIo.latestArtifactVersion(sid, BOARD_ARTIFACT_ID)
-    assert.deepEqual(boardAfterChange.content.data.patches[0], BOARD_PATCHES['OPP-EXEC-BOARD-OWNERS'], 'the learner\'s earlier board work survives the scene change')
+    assert.equal(boardAfterChange.content.data['R2.owner'], BOARD_PATCHES['OPP-EXEC-BOARD-OWNERS']['R2.owner'], 'the learner\'s earlier board work survives the scene change')
     assert.equal(w.engine.calls.message, 0, 'no engine dialogue for a universal run')
-    assert.equal(w.engine.calls.artifact, 2)
+    assert.equal(w.engine.calls.artifact, 0, 'board changes of a draft run never go through the engine')
+    assert.equal(w.engine.calls.start, 0, 'a draft run is never started by the legacy engine')
 
     c = await w.call('GET', `/assessment-sessions/${sid}`)
     assert.equal(c.body.data.stages.at(-1).state, 'CURRENT')

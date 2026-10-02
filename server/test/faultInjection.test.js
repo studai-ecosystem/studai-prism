@@ -86,6 +86,9 @@ async function world() {
     getReport: async () => null,
     getEntitlement: async (sid) => state.payments.find((p) => p.sessionId === sid) || null,
     createEntitlement: async (rec) => { state.payments.push({ ...rec, consumed: false, createdAt: clock().toISOString() }); return rec },
+    // Draft runs are created through the legacy store, never the engine.
+    createSession: async (sid, rec) => { state.sessions[sid] = { sessionId: sid, ...structuredClone(rec), startedAt: clock().getTime() - 60000, completedAt: null } },
+    updateSession: async (sid, patch) => { Object.assign(state.sessions[sid], structuredClone(patch)); return structuredClone(state.sessions[sid]) },
   }
   const engine = fakeEngine(state, clock)
   const audits = []

@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
+if (!['database', 'p2', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -82,7 +82,9 @@ try {
   if (mode === 'browser-sync') browserArgs.splice(2, browserArgs.length, 'campus-journey-a.spec.js', 'campus-shell.spec.js', 'ui-matrix.spec.js', 'flow-recovery.spec.js')
   if (mode === 'browser-smoke') browserArgs.push('--grep', 'returning login|pending report')
   exitCode = await run(mode === 'database'
-    ? ['--test', 'server/test/experienceBaseline.db.test.js'] : browserArgs, env)
+    ? ['--test', 'server/test/experienceBaseline.db.test.js']
+    // P2.9 Layer B: action → evidence → report → practice chain on this cluster.
+    : mode === 'p2' ? ['--test', '--test-concurrency=1', 'server/test/p2Slice.db.test.js'] : browserArgs, env)
 } catch (error) {
   console.error(JSON.stringify({
     error: 'P0_ISOLATED_TEST_FAILED', stage,

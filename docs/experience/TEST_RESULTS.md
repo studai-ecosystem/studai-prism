@@ -1,5 +1,51 @@
 # P0 - Verification results
 
+## P2.9 Layer B checkpoint - 2026-10-03
+
+Real disposable PostgreSQL (embedded cluster, 49 migrations), `buildApp()` HTTP, PG campus + legacy
+store (`PRISM_PG_STORE=true`), `PRISM_DRAFT_CONTENT=true`, in-process evaluation worker, strict
+evidence writer, V3 publication. Only the external provider is stubbed (`NODE_ENV=test` +
+`PRISM_AUDIT_AI=true` → `services/ai/auditConverse.js`; faults via test-only `PRISM_AUDIT_AI_FAULT`).
+No evidence/report/job row is inserted by the test.
+
+| Check | Layer | Result |
+| --- | --- | --- |
+| `node scripts/run-experience-baseline-tests.mjs p2` (`server/test/p2Slice.db.test.js`) | B | **14/14 pass** (1 parent + 13 sub-tests), 9 fresh runs |
+| `node scripts/run-experience-baseline-tests.mjs database` | B | 6/6 pass, 49 migrations (no migration added) |
+| `npm --prefix server test` | A | 811: 785 pass, 0 fail, 26 DB skips (p2Slice skips outside the runner) |
+| `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | A | 35 files, 474 pass |
+| `npm run audit:static` | Static | PASS |
+
+Chain proven on PG: register → dev entitlement → personal assignment server-pinned to the DRAFT
+universal form → `POST /api/v1/assessment-assignments/:id/start` (session created through the legacy
+store, no model history, request body cannot swap the form) → Begin twice (idempotent, same timestamps)
+→ authored stimulus + meaningful messages + learner board patch (`R2.owner`) → finish → `EVALUATE_RUN`
+job DONE → strict units with `actionId/opportunityId/rubricRef/methodVersion/snapshotHash`, excerpts
+only from accepted CANDIDATE actions, never stimulus/TEMPLATE text (T24/T27/T28), no `v1_reports` row
+(T35) → `v1_sessions.data.history` purged → report GET twice: same stored version + `evidence_set_hash`,
+bounded observation/moment quotes verified learner words (T32/T36); versions list + review request
+leave the version unchanged → replay + handover mission with ASSESSMENT_MOMENT origin, criterion
+feedback, retry = new attempt, formal version/hash unchanged, `/me/history` FORMAL vs PRACTICE typed
+and linked (P2.8).
+
+Faults verified (fresh runs): provider failure after save (actions APPLIED, job FAILED
+TECHNICAL_FAILURE, `SCORING_FAILED`, report 409, retry → attempt 2, no learner-deficit unit);
+malformed output (technical, 0 units); quote mismatch (HUMAN_REVIEW_REQUIRED, no excerpt, no
+replacement quote); evidence-write failure (PG rejects a NUL byte from the stub output → technical,
+0 units); worker crash (claim with 50 ms lease, reclaim, stale fencing token rejected, one applied
+result); repeated client key (replay 200, changed payload 409); concurrent report GETs (6 → one
+version); erasure while LEASED (completion rejected, no resurrection, late write 404); sparse input
+(INSUFFICIENT_EVIDENCE TOO_SPARSE/NOT_ADDRESSED, job DONE, no quote).
+
+Root cause fixed: draft/universal `start()` called the legacy engine, which cannot load a DRAFT
+scenario (and board saves went through the engine's `loadSession`). Draft runs now create their
+session through the legacy store and save board changes there; the handover segment answers only
+from pinned conditional facts. PG repository bugs found: none (job claim/fencing, run timing,
+opportunity ledger, `listActions`, report `listVersions`/reviews all behaved on PG). Observed PG
+difference: JSONB reorders board-patch keys, so the stub now judges the longest changed value
+instead of the "first line" (test provider only). Remaining blocker: Layer C live-model run
+(authorization/credentials/budget) — unchanged, not fabricated.
+
 ## P9-P10 checkpoint - 2026-10-03
 
 | Check | Layer | Result |

@@ -4,7 +4,7 @@
 import { isDbConfigured, query, getPool, getSessionLockPool } from '../../db/pool.js'
 import { createPgCampusRepos } from './index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from './context.js'
-import { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport, getEntitlement, createEntitlement } from '../../lib/store.js'
+import { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport, getEntitlement, createEntitlement, createSession, updateSession } from '../../lib/store.js'
 import { isMailEnabled, sendOrgInviteEmail, sendCampusAssignmentEmail } from '../../lib/mailer.js'
 import { findUserById, findUserByEmail } from '../../lib/db.js'
 import evidenceGraph from '../../lib/evidenceGraph.js'
@@ -64,6 +64,10 @@ export function createDefaultCampusContext() {
       getReport: (sessionId) => getReport(sessionId),
       getEntitlement: (sessionId) => getEntitlement(sessionId),
       createEntitlement: (record) => createEntitlement(record),
+      // Draft runs (PRISM_DRAFT_CONTENT only): the session record is created
+      // and its board persisted through the legacy store, never the engine.
+      createSession: (sessionId, record) => createSession(sessionId, record),
+      updateSession: (sessionId, patch) => updateSession(sessionId, patch),
       // Admin hold/invalidation (0012). Without a DB no such record can exist;
       // with one, a failed read is an error (never treated as "not held").
       adminState: async (sessionId) => {
