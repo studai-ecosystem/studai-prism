@@ -7,6 +7,44 @@ alone are not treated as proof.
 
 Status key: `OPEN` · `PARTIAL` · `DONE` · `VERIFIED-ALREADY-CORRECT`
 
+## Existing-contract recovery and old-account entry - 2026-10-02
+
+Further V3 wiring is implemented without changing backend measurement, access,
+eligibility or retention rules:
+
+- `REPORT_NOT_READY` / `REPORT_UNDER_REVIEW`: read-only Check again, current
+  workspace Back to assessments, support and request reference. No report
+  cards, sharing or export are fabricated while the server withholds a report.
+- `SCORING_FAILED`: a failed retry now displays its real error/reference instead
+  of keeping it only in a closed exit dialog. Review status can be refreshed
+  with GET; refresh failures are explicit. Recovery links retain sponsored scope.
+- A server-denied refresh suppresses cached active/review controls as UX only;
+  backend authorization remains unchanged.
+- Profile now displays the existing server age-declaration status and wires the
+  existing authenticated `/api/auth/confirm-age` endpoint. Only affirmative input
+  is sent; only a literal confirmed server receipt is reported as recorded.
+  Unknown state is not defaulted. Existing declaration text and eligibility
+  rules are unchanged; no birth date is collected.
+- Account recovery uses the existing workspace-scoped assignment CTA for its
+  pending session, or opens the appropriate Assessments list without guessing.
+  It no longer hardcodes a session-less legacy briefing link. Malformed licence
+  responses and lookup failures are explicit.
+- Review copy no longer asserts an active human reviewer, automatic release or
+  that no scoring whatsoever occurred when only an unfinished review is known.
+
+Gates: frontend 360 passed/0 failed; server 607 passed/0 failed/24 DB skips;
+build/static PASS; scoped browser 96 passed/0 failed across four projects.
+One old copy assertion was updated to the new non-overpromising wording, keeping
+its report-state assertions. The WebKit clock check now waits for the render
+after virtual-time advance; the original countdown threshold is unchanged.
+Screenshots for recovery/Profile at 390 were inspected.
+
+Browser report/session states and older-account display are labelled fixtures.
+The existing authenticated declaration endpoint was exercised with a synthetic
+account. These checks do not prove ownership backfill, a governed formal
+evaluator, source retention, distributed jobs/locks, erasure, raw-report security
+or the whole production journey. Those work packets remain OPEN and rollout NO-GO.
+
 ## Independent V3 presentation repairs - 2026-10-02
 
 Implemented against the current server contract, without changing assessment

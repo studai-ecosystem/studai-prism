@@ -22,6 +22,20 @@ UI-STATE:END -->
 
 ## Decisions log
 
+Existing-contract V3 recovery/entry (2026-10-02): pending/held reports have
+read-only check-again/support/reference actions; failed retry and refresh errors
+are visible; sponsored recovery stays in its workspace; denied cached sessions
+lose stale interaction controls as UX only. Profile restores the existing adult
+declaration workflow from the existing me flag, shared text and authenticated
+endpoint; API confirmation must be literal true, unknown state is not defaulted,
+and eligibility policy is unchanged. Account resume uses a scoped assignment CTA
+or Assessments, not a hardcoded legacy briefing URL. Recovery copy makes no
+unsupported active-human/automatic-release/no-scoring assertions. Gates: build
+PASS, frontend 360/0, server 607/0 plus 24 DB skips, static PASS, scoped four-project
+browser 96/0. Copy assertion/render synchronization fixes preserve the test
+requirements. This does not close the full backend/science/security repair or
+authorize deployment/flag activation.
+
 Independent V3 presentation repair (2026-10-02): active assessment has one
 100dvh frame at all seven widths, independent focusable scroll surfaces, no
 empty workspace and a composer outside pane switching. Network timing snapshots

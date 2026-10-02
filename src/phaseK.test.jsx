@@ -7,7 +7,8 @@ import { screen, within, render as rtlRender } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { renderApp, mockFetch, meBody, signIn, jsonResponse } from './test/utils.jsx'
-import { studentRoutes } from './test/studentFixtures.js'
+import { studentRoutes, card } from './test/studentFixtures.js'
+import { AGE_DECLARATION_TEXT } from '../server/lib/sharedConstants.js'
 import SettingsPage from './features/settings/pages/SettingsPage.jsx'
 import { PrivacyPolicy, TermsOfService } from './pages/legal/LegalPages.jsx'
 import ValidityStudy from './pages/research/ValidityStudy.jsx'
@@ -20,17 +21,98 @@ const CAMPUS_WS = { id: 'ws-cs', type: 'CAMPUS_STUDENT', name: 'Synthetic Univer
 
 afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); sessionStorage.clear() })
 
-function renderSettings(extra = {}) {
+function renderSettings(extra = {}, { ageConfirmed, meHandler } = {}) {
   signIn({ name: 'Synthetic Student', email: 'synthetic@test.local', college: 'Synthetic College', year: '3rd Year' })
+  const me = meBody({ flags: { PRISM_APP_SHELL_V3: true }, workspaces: [PERSONAL_WS, CAMPUS_WS] })
+  if (typeof ageConfirmed === 'boolean') me.data.user.ageConfirmed = ageConfirmed
   const spy = mockFetch({
     ...studentRoutes({ '/api/payment/licence': { pendingSessionId: null }, ...extra }),
-    '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true }, workspaces: [PERSONAL_WS, CAMPUS_WS] }),
+    '/api/v1/me': meHandler || me,
   })
   renderApp(<Routes><Route path="/app/settings" element={<SettingsPage />} /></Routes>, { route: '/app/settings' })
   return spy
 }
 
 describe('Settings', () => {
+  it('an older account records the existing adult declaration only after affirmative confirmation', async () => {
+    let confirmed = false
+    const me = () => {
+      const body = meBody({ flags: { PRISM_APP_SHELL_V3: true }, workspaces: [PERSONAL_WS, CAMPUS_WS] })
+      body.data.user.ageConfirmed = confirmed
+      return jsonResponse(200, body)
+    }
+    const spy = renderSettings({
+      '/api/auth/confirm-age': () => {
+        confirmed = true
+        return jsonResponse(200, { ok: true, user: { ageConfirmed: true } })
+      },
+    }, { meHandler: me })
+    const button = await screen.findByRole('button', { name: 'Record declaration' })
+    expect(button).toBeDisabled()
+    expect(spy.mock.calls.some(([url]) => String(url).endsWith('/confirm-age'))).toBe(false)
+    await userEvent.click(screen.getByLabelText(AGE_DECLARATION_TEXT))
+    await userEvent.click(button)
+    expect(await screen.findByText('Age declaration recorded.')).toBeInTheDocument()
+    const call = spy.mock.calls.find(([url]) => String(url).endsWith('/confirm-age'))
+    expect(call[1].method).toBe('POST')
+    expect(JSON.parse(call[1].body)).toEqual({ ageConfirmed: true })
+    expect(screen.queryByRole('button', { name: 'Record declaration' })).not.toBeInTheDocument()
+  })
+
+  it('unknown declaration status is not silently treated as confirmed or as an unconfirmed account', async () => {
+    const spy = renderSettings()
+    expect(await screen.findByText('Age declaration status is unavailable')).toBeInTheDocument()
+    expect(screen.queryByLabelText(AGE_DECLARATION_TEXT)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Check declaration status' })).toBeInTheDocument()
+    expect(spy.mock.calls.some(([url]) => String(url).endsWith('/confirm-age'))).toBe(false)
+  })
+
+  it('a declaration failure remains an error and never shows success', async () => {
+    renderSettings({
+      '/api/auth/confirm-age': () => jsonResponse(422, { error: 'Synthetic declaration failure' }),
+    }, { ageConfirmed: false })
+    await userEvent.click(await screen.findByLabelText(AGE_DECLARATION_TEXT))
+    await userEvent.click(screen.getByRole('button', { name: 'Record declaration' }))
+    expect(await screen.findByText('Synthetic declaration failure')).toBeInTheDocument()
+    expect(screen.queryByText('Age declaration recorded.')).not.toBeInTheDocument()
+  })
+
+  it('a success-shaped response without an actual confirmed declaration is rejected', async () => {
+    renderSettings({
+      '/api/auth/confirm-age': { ok: true, user: { ageConfirmed: false } },
+    }, { ageConfirmed: false })
+    await userEvent.click(await screen.findByLabelText(AGE_DECLARATION_TEXT))
+    await userEvent.click(screen.getByRole('button', { name: 'Record declaration' }))
+    expect(await within(document.getElementById('profile')).findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByText('Age declaration recorded.')).not.toBeInTheDocument()
+  })
+
+  it('account recovery uses the governed assignment resume path, not legacy briefing', async () => {
+    renderSettings({
+      '/api/payment/licence': { pendingSessionId: 'sess-resume-ui' },
+      '/api/v1/me/assessments': { data: {
+        active: [card({ status: 'IN_PROGRESS', sessionId: 'sess-resume-ui', cta: { kind: 'RESUME', to: '/app/assessment/sess-resume-ui' } })],
+        completed: [], upcoming: [],
+      } },
+    }, { ageConfirmed: true })
+    const resume = await screen.findByRole('link', { name: 'Resume', exact: true })
+    expect(resume).toHaveAttribute('href', '/app/assessment/sess-resume-ui')
+    expect(screen.queryByRole('link', { name: 'Resume', exact: true })).not.toHaveAttribute('href', '/briefing')
+  })
+
+  it('an unmatched account session opens assessments without guessing a scenario or session route', async () => {
+    renderSettings({ '/api/payment/licence': { pendingSessionId: 'sess-unmatched-ui' } }, { ageConfirmed: true })
+    expect(await screen.findByRole('link', { name: 'Open assessments' })).toHaveAttribute('href', '/app/assessments')
+    expect(screen.queryByRole('link', { name: 'Resume', exact: true })).not.toBeInTheDocument()
+  })
+
+  it('a malformed licence response is an explicit error, not an apparently empty account status', async () => {
+    renderSettings({ '/api/payment/licence': {} }, { ageConfirmed: true })
+    expect(await screen.findByText('Assessment status could not be checked')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry assessment status' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Resume', exact: true })).not.toBeInTheDocument()
+  })
+
   it('has one section for each part of the account, each reachable from the index', async () => {
     renderSettings()
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()

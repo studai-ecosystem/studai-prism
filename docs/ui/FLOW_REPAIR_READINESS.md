@@ -2,6 +2,15 @@
 
 Date: 2026-10-02. **NO-GO for the complete V3 student journey.**
 
+Latest recovery/entry checkpoint: existing pending/held report states now have
+read-only rechecks/support/reference controls; failed scoring retries surface
+their errors; workspace-specific recovery and stale-control suppression are
+tested. Profile records the existing adult declaration via the existing
+authenticated endpoint, with unchanged consent text/eligibility and strict
+receipt validation. Account resume uses scoped assignment data instead of
+hardcoded legacy briefing. No new backend report/job states, age/authorization
+rules or retention behavior were introduced.
+
 Latest independent UI repair: the V3 active frame/panes/composer, server-clock
 receipt stability and repeated no-evidence card copy are now repaired and tested.
 The existing server start/duration and protected backend policies are unchanged.
@@ -73,6 +82,8 @@ repeat the NO_EVIDENCE explanation alongside a server-provided absence summary.
 - [AssessmentHeader](../../src/features/assessments/components/AssessmentHeader.jsx), [ConversationPane](../../src/features/assessments/components/ConversationPane.jsx), [ResponseComposer](../../src/features/assessments/components/ResponseComposer.jsx) and [ArtifactPane](../../src/features/assessments/components/ArtifactPane.jsx)
 - [Assessment clock hook](../../src/features/assessments/hooks/useAssessmentClock.js) and [clock tests](../../src/features/assessments/hooks/useAssessmentClock.test.jsx)
 - [ReportCapabilityCard](../../src/features/reports/components/ReportCapabilityCard.jsx), [report UI tests](../../src/features/reports/reports.test.jsx) and [active-player browser tests](../../tests/e2e/flow-player-layout.spec.js)
+- [StudentReportPage](../../src/features/reports/pages/StudentReportPage.jsx), [SettingsPage](../../src/features/settings/pages/SettingsPage.jsx), [account API](../../src/api/account.js), [me schema](../../src/api/me.js) and [Settings tests](../../src/phaseK.test.jsx)
+- [Player copy](../../src/lib/copy/player.js), [report copy](../../src/lib/copy/report.js) and [recovery browser tests](../../tests/e2e/flow-recovery.spec.js)
 
 Unrelated worktree files were left unchanged. Build/audit/browser output is
 git-ignored and is not production data or a committed fixture.
@@ -219,7 +230,7 @@ come from the authenticated UI, not guessing or another student's URL.
 ## Validation checkpoint
 
 - Entry targeted tests: 48 passed after correcting test selectors.
-- Frontend latest full suite: 345 passed, 0 failed. Initial
+- Frontend latest full suite: 360 passed, 0 failed. Initial
   simultaneous build/server/unit run had selector and load-related failures;
   no tests were skipped or weakened to obtain the passing rerun.
 - Server latest suite: 631 total, 607 passed, 0 failed, 24 database-gated skips.
@@ -227,7 +238,7 @@ come from the authenticated UI, not guessing or another student's URL.
   Flag checker: passed all-dark configuration; eight checker unit tests passed in
   the server suite. Final targeted entry/history/state suite before the two
   additional report-availability tests: 99 passed, 0 failed.
-- Latest scoped browser verification: 84 passed, 0 failed across Chromium, Firefox, WebKit and
+- Latest scoped browser verification: 96 passed, 0 failed across Chromium, Firefox, WebKit and
   mobile Chromium. Entry/history presentation was checked at 1440, 1280, 1024,
   768, 430, 390 and 360 with no horizontal overflow. Axe found no serious or
   critical issues on the tested entry/history/player surfaces. Player checks now
@@ -241,8 +252,18 @@ come from the authenticated UI, not guessing or another student's URL.
   Other unmocked DB-backed requests returned honest 503 states.
   Screenshots at 1440/390 were inspected under `audit-results/ui/flow-repair/`
   and `audit-results/ui/flow-player/`.
+- Recovery and old-account UI contract checks pass at 390, with screenshots
+  inspected under `audit-results/ui/flow-recovery/`. The existing authenticated
+  declaration endpoint was exercised on a synthetic account; report/session
+  failure and older-account display states use labelled UI fixtures.
+  Pending-state rechecks never call scoring. No new backend failure/job state
+  was invented from a report's missing evidence.
 - One existing Campus overview test failed in the first latest frontend run,
   passed unchanged in isolation, and the entire 345-test suite passed with
   `--maxWorkers=2 --minWorkers=1`. No test was disabled or weakened.
+- The subsequent recovery suite initially caught one stale wording assertion
+  and a WebKit clock-render timing assumption. Updated the exact review wording
+  assertion and awaited the clock render with the same measured threshold;
+  final results are 360 frontend / 96 scoped browser passes, no failures.
 - Full browser suite, database-gated suites and real returning-student
   end-to-end completion are not certified by these numbers.

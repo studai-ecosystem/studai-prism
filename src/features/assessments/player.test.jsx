@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { render as rtlRender, screen, waitFor, within } from '@testing-library/react'
+import { act, render as rtlRender, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Routes, Route } from 'react-router-dom'
 import { renderApp, mockFetch, meBody, signIn, jsonResponse } from '../../test/utils.jsx'
@@ -44,9 +44,10 @@ const setWide = (wide) => {
 const original = window.matchMedia
 afterEach(() => { window.matchMedia = original; vi.restoreAllMocks() })
 
-function renderPlayer(routes, { route = '/app/assessment/sess-v3-0001' } = {}) {
+function renderPlayer(routes, { route = '/app/assessment/sess-v3-0001', workspaces, activeWorkspace } = {}) {
   signIn()
-  const spy = mockFetch({ ...routes, '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true, PRISM_ASSESSMENT_WORKSPACE_V3: true } }) })
+  if (activeWorkspace) sessionStorage.setItem('prismActiveWorkspace', activeWorkspace)
+  const spy = mockFetch({ ...routes, '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true, PRISM_ASSESSMENT_WORKSPACE_V3: true }, workspaces }) })
   const out = renderApp(<Routes><Route path="/app/assessment/:sessionId" element={<AssessmentPlayerPage />} /></Routes>, { route })
   return { ...out, spy }
 }
@@ -359,6 +360,79 @@ describe('Assessment Workspace V3 player (§12)', () => {
     expect(await screen.findByText('Review did not finish')).toBeInTheDocument()
     expect(screen.getByTestId('submission-progress')).toHaveTextContent('Review (did not finish)')
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+  })
+
+  it('a failed review retry surfaces its error and support reference instead of silently leaving the closed dialog', async () => {
+    renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001/finish': () => jsonResponse(503, { error: { code: 'UPSTREAM_UNAVAILABLE', message: 'Synthetic review service unavailable', requestId: 'req-retry-failed' } }),
+      '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ status: 'SCORING_FAILED' }) },
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('Synthetic review service unavailable', {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(screen.getByText('Reference: req-retry-failed')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Contact support' })).toHaveAttribute('href', '/contact')
+    expect(screen.getByRole('link', { name: 'Back to assessments' })).toHaveAttribute('href', '/app/assessments')
+    expect(screen.queryByRole('link', { name: 'Open your report' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Your answer')).not.toBeInTheDocument()
+  })
+
+  it('a review status recheck is read-only and surfaces a failed refresh', async () => {
+    let fail = false
+    const { spy } = renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001': () => fail
+        ? jsonResponse(422, { error: { code: 'VALIDATION_FAILED', message: 'Synthetic status unavailable', requestId: 'req-status' } })
+        : jsonResponse(200, { data: contract({ status: 'SCORING' }) }),
+    })
+    await screen.findByText('Your answers are being reviewed')
+    fail = true
+    await userEvent.click(screen.getByRole('button', { name: 'Check status' }))
+    expect(await screen.findByText('We could not refresh the review status. The last saved status is shown.')).toBeInTheDocument()
+    expect(screen.getByText('Reference: req-status')).toBeInTheDocument()
+    expect(spy.mock.calls.some(([url]) => String(url).endsWith('/finish'))).toBe(false)
+  })
+
+  it('a denied status recheck hides the cached review instead of presenting it as currently available', async () => {
+    let denied = false
+    renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001': () => denied
+        ? jsonResponse(404, { error: { code: 'NOT_FOUND', message: 'Not found', requestId: 'req-denied' } })
+        : jsonResponse(200, { data: contract({ status: 'SCORING' }) }),
+    })
+    await screen.findByText('Your answers are being reviewed')
+    denied = true
+    await userEvent.click(screen.getByRole('button', { name: 'Check status' }))
+    expect(await screen.findByText('This assessment is not available')).toBeInTheDocument()
+    expect(screen.queryByText('Your answers are being reviewed')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Check status' })).not.toBeInTheDocument()
+  })
+
+  it('a denied active-session refresh removes stale interaction controls', async () => {
+    let denied = false
+    const { queryClient } = renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001': () => denied
+        ? jsonResponse(404, { error: { code: 'NOT_FOUND', message: 'Not found', requestId: 'req-denied-active' } })
+        : jsonResponse(200, { data: contract() }),
+    })
+    await screen.findByLabelText('Your answer')
+    denied = true
+    await act(() => queryClient.invalidateQueries({ queryKey: ['ws', 'personal', 'assessment-session', 'sess-v3-0001'] }))
+    expect(await screen.findByText('This assessment is not available')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Your answer')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Finish assessment' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Briefing' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument()
+  })
+
+  it('sponsored session recovery returns to the matching institution assignments', async () => {
+    const campus = { id: '11111111-1111-4111-8111-111111111111', type: 'CAMPUS_STUDENT', name: 'Synthetic University', organizationId: '22222222-2222-4222-8222-222222222222', organizationName: 'Synthetic University', visibilityPolicy: 'OWNER_AND_SPONSOR' }
+    renderPlayer({
+      '/api/v1/assessment-sessions/sess-v3-0001': { data: contract({ status: 'SCORING_FAILED', scope: 'SPONSORED', sponsorName: campus.name }) },
+    }, {
+      workspaces: [meBody().data.workspaces[0], campus], activeWorkspace: campus.id,
+      route: `/app/assessment/sess-v3-0001?ws=${campus.id}`,
+    })
+    await screen.findByText('Review did not finish')
+    expect(screen.getByRole('link', { name: 'Back to assessments' })).toHaveAttribute('href', `/app/campus/${campus.organizationId}/assignments`)
   })
 
   it('an unknown session is not available; an unknown scenario is never substituted', async () => {

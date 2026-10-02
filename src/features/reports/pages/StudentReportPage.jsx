@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
+import { DocumentTitle } from '../../../components/ui/DocumentTitle.jsx'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
 import { Card } from '../../../components/ui/Card.jsx'
 import { Callout } from '../../../components/ui/Notice.jsx'
@@ -105,7 +106,7 @@ export default function StudentReportPage() {
   }, [query.data, sessionId])
 
   const listPath = active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/assignments` : '/app/assessments'
-  const header = <PageHeader title={REPORT_COPY.title} context={active} breadcrumbs={[{ label: 'Assessments', to: listPath }, { label: 'Report' }]} />
+  const header = <><DocumentTitle title={REPORT_COPY.title} /><PageHeader title={REPORT_COPY.title} context={active} breadcrumbs={[{ label: 'Assessments', to: listPath }, { label: 'Report' }]} /></>
 
   if (wsParam && !meLoading && !target) return <div>{header}<UnauthorizedState title={REPORT_COPY.notAvailable} homeTo={listPath} /></div>
   const err = query.error
@@ -116,7 +117,12 @@ export default function StudentReportPage() {
         {header}
         <Callout tone={ready ? 'info' : 'partial'} title={ready ? REPORT_COPY.notReadyTitle : REPORT_COPY.underReviewTitle}>
           <p>{ready ? REPORT_COPY.notReadyBody : REPORT_COPY.underReviewBody}</p>
-          <LinkButton className="mt-3" to={listPath} variant="secondary">Back to assessments</LinkButton>
+          {err.requestId && <p className="mt-2 text-xs">Reference: {err.requestId}</p>}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => query.refetch()} loading={query.isFetching} loadingLabel="Checking...">Check again</Button>
+            <LinkButton to={listPath} variant="secondary">Back to assessments</LinkButton>
+            <LinkButton to="/contact" variant="ghost">Contact support</LinkButton>
+          </div>
         </Callout>
       </div>
     )

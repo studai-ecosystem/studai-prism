@@ -12,7 +12,7 @@ import { useFeatureFlags } from '../../../app/providers/FeatureFlagProvider.jsx'
 import { newIdempotencyKey } from '../../../api/client.js'
 import { Skeleton } from '../../../components/ui/Skeleton.jsx'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
-import { Callout } from '../../../components/ui/Notice.jsx'
+import { Callout, InlineNotice } from '../../../components/ui/Notice.jsx'
 import { SegmentedControl } from '../../../components/ui/SegmentedControl.jsx'
 import { DocumentTitle } from '../../../components/ui/DocumentTitle.jsx'
 import { ErrorState, UnauthorizedState } from '../../../components/states/index.js'
@@ -30,6 +30,7 @@ import { AssessmentExitDialog } from '../components/AssessmentExitDialog.jsx'
 import { SubmissionProgress } from '../components/SubmissionProgress.jsx'
 import { overallSaveState } from '../components/SessionSaveStatus.jsx'
 import { PLAYER_COPY } from '../../../lib/copy/player.js'
+import { assignmentsListPath } from './BriefingPage.jsx'
 
 const RECONNECT_MS = 3000
 // Announced once each, politely, as the server clock passes them.
@@ -77,6 +78,7 @@ export default function AssessmentPlayerPage() {
   const navigate = useNavigate()
   const wsParam = params.get('ws')
   const { workspaces, active, switchTo } = useWorkspace()
+  const listPath = assignmentsListPath(active)
   const { loading: meLoading } = useFeatureFlags()
   const target = wsParam ? workspaces.find((w) => w.id === wsParam && w.type === 'CAMPUS_STUDENT') : null
   useEffect(() => {
@@ -87,6 +89,7 @@ export default function AssessmentPlayerPage() {
   const session = useAssessmentSession(sessionId, { enabled: aligned && !meLoading })
   const contract = session.data
   const remainingMs = useAssessmentClock(contract?.timing, contract?.clockReceivedAt)
+  const accessError = session.error && (session.error.status === 404 || ['FORBIDDEN', 'ENTITLEMENT_REQUIRED', 'ENTITLEMENT_EXPIRED'].includes(session.error.code))
 
   const store = useMemo(() => createArtifactStore({ save: (artifactId, args) => saveSessionArtifact(sessionId, artifactId, args) }), [sessionId])
   useEffect(() => { if (contract) store.load(contract.artifacts) }, [contract, store])
@@ -164,7 +167,7 @@ export default function AssessmentPlayerPage() {
     })
   }, [pending, setDraft, setPending])
 
-  const timeUpNow = contract?.status === 'IN_PROGRESS' && remainingMs === 0
+  const timeUpNow = contract?.status === 'IN_PROGRESS' && !accessError && remainingMs === 0
   useEffect(() => {
     if (!timeUpNow) return
     setTimeNotice(`${PLAYER_COPY.timeUpTitle}. ${PLAYER_COPY.timeUp}`)
@@ -172,7 +175,7 @@ export default function AssessmentPlayerPage() {
   }, [timeUpNow])
 
   // Screen-reader time warnings (the visible timer is a role="timer").
-  const remainingForWarnings = contract?.status === 'IN_PROGRESS' ? remainingMs : null
+  const remainingForWarnings = contract?.status === 'IN_PROGRESS' && !accessError ? remainingMs : null
   useEffect(() => {
     if (remainingForWarnings == null) return
     const due = TIME_WARNINGS.filter((w) => remainingForWarnings <= w.ms && remainingForWarnings > 0 && !warned.current.has(w.ms))
@@ -244,12 +247,12 @@ export default function AssessmentPlayerPage() {
       setExit({ open: false, submitting: false, error: null, scoring: true })
       await session.refresh()
     } catch (err) {
-      setExit((e) => ({ ...e, submitting: false, error: { message: err?.message || PLAYER_COPY.notSubmitted } }))
+      setExit((e) => ({ ...e, submitting: false, error: { message: err?.message || PLAYER_COPY.notSubmitted, requestId: err?.requestId || null } }))
     }
   }
 
   const scopeLabel = contract?.scope === 'SPONSORED' ? `Sponsored by ${contract.sponsorName || 'your institution'}` : 'Personal assessment'
-  const inProgress = contract?.status === 'IN_PROGRESS'
+  const inProgress = contract?.status === 'IN_PROGRESS' && !accessError
   const saveState = overallSaveState({ items: artifactState.items, pendingMessage: pending, online: online && connection === 'ONLINE' })
   const header = (
     <AssessmentHeader
@@ -266,12 +269,12 @@ export default function AssessmentPlayerPage() {
   )
   const frame = (body, { fill = false } = {}) => <AssessmentShell header={header} fill={fill}><DocumentTitle title={contract?.scenario.title || 'Assessment'} />{body}</AssessmentShell>
 
-  if (wsParam && !meLoading && !target) return frame(<div className="p-6"><UnauthorizedState title={PLAYER_COPY.notAvailable} homeTo="/app/assessments" homeLabel="Back to assessments" /></div>)
+  if (wsParam && !meLoading && !target) return frame(<div className="p-6"><UnauthorizedState title={PLAYER_COPY.notAvailable} homeTo={listPath} homeLabel="Back to assessments" /></div>)
   if (!aligned || session.isPending) {
     if (session.fetchStatus === 'paused') return frame(<div className="p-6"><ErrorState title={PLAYER_COPY.offlineTitle} description={PLAYER_COPY.offlineBody} onRetry={() => session.refetch()} /></div>)
     return frame(<div className="p-6"><Skeleton label="Loading your assessment" lines={5} /></div>)
   }
-  if (session.error && !contract) {
+  if (session.error && (!contract || accessError)) {
     const e = session.error
     // A legacy entry link (/workspace/:id?assessment=…) for a session that was
     // never started: start it from the V3 briefing instead of guessing.
@@ -280,20 +283,20 @@ export default function AssessmentPlayerPage() {
         <div className="mx-auto max-w-xl p-6">
           <Callout tone="info" title={PLAYER_COPY.notStartedTitle}>
             <p>{PLAYER_COPY.notStartedBody}</p>
-            <LinkButton className="mt-3" to="/app/assessments" variant="primary">Go to your assessments</LinkButton>
+            <LinkButton className="mt-3" to={listPath} variant="primary">Go to your assessments</LinkButton>
           </Callout>
         </div>,
       )
     }
-    if (e.status === 404 || e.code === 'FORBIDDEN') return frame(<div className="p-6"><UnauthorizedState title={PLAYER_COPY.notAvailable} homeTo="/app/assessments" homeLabel="Back to assessments" /></div>)
-    if (e.code === 'ENTITLEMENT_REQUIRED' || e.code === 'ENTITLEMENT_EXPIRED') return frame(<div className="p-6"><UnauthorizedState title={PLAYER_COPY.accessEnded} homeTo="/app/assessments" homeLabel="Back to assessments" /></div>)
+    if (e.status === 404 || e.code === 'FORBIDDEN') return frame(<div className="p-6"><UnauthorizedState title={PLAYER_COPY.notAvailable} homeTo={listPath} homeLabel="Back to assessments" /></div>)
+    if (e.code === 'ENTITLEMENT_REQUIRED' || e.code === 'ENTITLEMENT_EXPIRED') return frame(<div className="p-6"><UnauthorizedState title={PLAYER_COPY.accessEnded} homeTo={listPath} homeLabel="Back to assessments" /></div>)
     if (e.code === 'SCENARIO_NOT_FOUND') {
       return frame(
         <div className="mx-auto max-w-xl p-6">
           <Callout tone="blocked" title={PLAYER_COPY.notAvailable}>
             <p>{PLAYER_COPY.scenarioMissing}</p>
             {e.requestId && <p className="mt-1 text-xs">Reference: {e.requestId}</p>}
-            <LinkButton className="mt-3" to="/app/assessments" variant="secondary">Back to assessments</LinkButton>
+            <LinkButton className="mt-3" to={listPath} variant="secondary">Back to assessments</LinkButton>
           </Callout>
         </div>,
       )
@@ -311,14 +314,39 @@ export default function AssessmentPlayerPage() {
             <p>{PLAYER_COPY.completeBody}</p>
             {contract.reportPath
               ? <LinkButton className="mt-3" to={contract.reportPath} variant="primary">Open your report</LinkButton>
-              : <><p className="mt-1">{PLAYER_COPY.reportPending}</p><LinkButton className="mt-3" to="/app/assessments" variant="secondary">Back to assessments</LinkButton></>}
+              : <><p className="mt-1">{PLAYER_COPY.reportPending}</p><LinkButton className="mt-3" to={listPath} variant="secondary">Back to assessments</LinkButton></>}
           </Callout>
         )}
-        {contract.status === 'SCORING' && <Callout tone="info" title={PLAYER_COPY.scoringTitle}><p role="status">{PLAYER_COPY.scoringBody}</p></Callout>}
+        {contract.status === 'SCORING' && (
+          <Callout tone="info" title={PLAYER_COPY.scoringTitle}>
+            <p role="status">{PLAYER_COPY.scoringBody}</p>
+            {session.error && (
+              <div className="mt-3" role="alert">
+                <InlineNotice tone="blocked">{PLAYER_COPY.statusRefreshFailed}</InlineNotice>
+                {session.error.requestId && <p className="mt-2 text-xs">Reference: {session.error.requestId}</p>}
+              </div>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => session.refetch()} loading={session.isFetching} loadingLabel="Checking...">Check status</Button>
+              <LinkButton to={listPath} variant="secondary">Back to assessments</LinkButton>
+              <LinkButton to="/contact" variant="ghost">Contact support</LinkButton>
+            </div>
+          </Callout>
+        )}
         {contract.status === 'SCORING_FAILED' && (
           <Callout tone="blocked" title={PLAYER_COPY.scoringFailedTitle}>
             <p>{PLAYER_COPY.scoringFailedBody}</p>
-            <Button className="mt-3" onClick={() => finish({ early: true })} loading={exit.submitting}>Try again</Button>
+            {exit.error && (
+              <div className="mt-3" role="alert">
+                <InlineNotice tone="blocked">{exit.error.message}</InlineNotice>
+                {exit.error.requestId && <p className="mt-2 text-xs">Reference: {exit.error.requestId}</p>}
+              </div>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button onClick={() => finish({ early: true })} loading={exit.submitting}>Try again</Button>
+              <LinkButton to={listPath} variant="secondary">Back to assessments</LinkButton>
+              <LinkButton to="/contact" variant="ghost">Contact support</LinkButton>
+            </div>
           </Callout>
         )}
       </div>,

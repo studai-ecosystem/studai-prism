@@ -15,7 +15,7 @@ export const WorkspaceSchema = z.object({
 }).passthrough()
 
 export const MeSchema = z.object({
-  user: z.object({ id: z.string(), email: z.string(), name: z.string().nullable().optional() }).passthrough(),
+  user: z.object({ id: z.string(), email: z.string(), name: z.string().nullable().optional(), ageConfirmed: z.boolean().optional() }).passthrough(),
   flags: z.record(z.boolean()),
   permissions: z.object({ global: z.array(z.string()) }).passthrough(),
   workspaces: z.array(WorkspaceSchema),

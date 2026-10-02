@@ -7,19 +7,22 @@ import { useQuery } from '@tanstack/react-query'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { Panel } from '../../../components/ui/Card.jsx'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
-import { Input, Select, Switch } from '../../../components/ui/FormControls.jsx'
+import { Input, Select, Switch, Checkbox } from '../../../components/ui/FormControls.jsx'
 import { Badge } from '../../../components/ui/Badge.jsx'
 import { Callout, InlineNotice } from '../../../components/ui/Notice.jsx'
 import { Skeleton } from '../../../components/ui/Skeleton.jsx'
 import { Modal } from '../../../components/ui/Modal.jsx'
 import { useAuth } from '../../../app/providers/AuthProvider.jsx'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
-import { usePreferences, useSavePreferences } from '../../student/hooks.js'
+import { useFeatureFlags } from '../../../app/providers/FeatureFlagProvider.jsx'
+import { usePreferences, useSavePreferences, useStudentAssessments } from '../../student/hooks.js'
 import { updateProfile, setToken, clearUser } from '../../../lib/session.js'
-import { fetchLicence, changePassword, deleteCandidateData } from '../../../api/account.js'
+import { fetchLicence, changePassword, deleteCandidateData, confirmAccountAge } from '../../../api/account.js'
 import { homePathFor, workspaceLabel, scopeText } from '../../workspaces/workspacePaths.js'
 import { CAMPUS_CAN_SEE, CAMPUS_CANNOT_SEE, PERSONAL_PRIVACY_NOTE } from '../../../lib/copy/privacy.js'
 import { BRIEFING_COPY } from '../../../lib/copy/student.js'
+import { assignmentsListPath } from '../../assessments/pages/BriefingPage.jsx'
+import { AGE_DECLARATION_TEXT } from '../../../../server/lib/sharedConstants.js'
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional'].map((y) => ({ value: y, label: y }))
 
@@ -40,6 +43,49 @@ function Row({ label, children }) {
       <dt className="text-xs font-medium uppercase tracking-wide text-prism-ink-subtle">{label}</dt>
       <dd className="text-sm text-prism-ink">{children}</dd>
     </div>
+  )
+}
+
+function AgeDeclaration() {
+  const { me, loading, error: readError, refetch } = useFeatureFlags()
+  const [checked, setChecked] = useState(false)
+  const [state, setState] = useState({ busy: false, recorded: false, error: null })
+  const confirm = async () => {
+    if (!checked || state.busy) return
+    setState({ busy: true, recorded: false, error: null })
+    try {
+      await confirmAccountAge()
+      setState({ busy: false, recorded: true, error: null })
+      await refetch()
+    } catch (error) {
+      setState({ busy: false, recorded: false, error })
+    }
+  }
+  if (loading) return <p role="status" className="mt-4 text-sm text-prism-ink-muted">Loading age declaration...</p>
+  if (state.recorded) return (
+    <div className="mt-4">
+      <p role="status" className="text-sm text-prism-ink-muted">Age declaration recorded.</p>
+      {readError && <InlineNotice tone="partial" className="mt-2">The declaration was recorded, but the account status could not be refreshed.</InlineNotice>}
+    </div>
+  )
+  if (readError || typeof me?.user.ageConfirmed !== 'boolean') {
+    return (
+      <Callout tone="info" title="Age declaration status is unavailable" className="mt-4">
+        <p>Check again before starting an assessment. No declaration is assumed.</p>
+        <Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Check declaration status</Button>
+      </Callout>
+    )
+  }
+  if (me.user.ageConfirmed) return <p role="status" className="mt-4 text-sm text-prism-ink-muted">Age declaration recorded.</p>
+  return (
+    <Callout tone="info" title="Age declaration before assessment" className="mt-4">
+      <p>Prism is currently available to adult candidates. No date of birth is collected.</p>
+      <div className="mt-3">
+        <Checkbox label={AGE_DECLARATION_TEXT} checked={checked} onChange={(e) => setChecked(e.target.checked)} disabled={state.busy} />
+      </div>
+      {state.error && <div className="mt-3" role="alert"><InlineNotice tone="blocked">{state.error.message || 'Your age declaration could not be recorded.'}</InlineNotice></div>}
+      <Button className="mt-3" size="sm" onClick={confirm} disabled={!checked} loading={state.busy} loadingLabel="Recording...">Record declaration</Button>
+    </Callout>
   )
 }
 
@@ -87,20 +133,32 @@ function ProfileSection({ user }) {
           {saved && <p role="status" className="mt-3 text-xs text-prism-ink-subtle">Profile saved.</p>}
         </>
       )}
+      <AgeDeclaration key={user?.email} />
     </Panel>
   )
 }
 
 function AccountSection({ user }) {
   const licence = useQuery({ queryKey: ['licence'], queryFn: fetchLicence, retry: false })
+  const assessments = useStudentAssessments()
+  const { active } = useWorkspace()
+  const pending = licence.data?.pendingSessionId
+  const current = assessments.data?.active.find((a) => a.sessionId === pending)
+  const resume = current?.cta.kind === 'RESUME' && current.cta.to
   return (
     <Panel id="account" title="Account" description="The email you sign in with.">
       <dl className="grid gap-3 sm:grid-cols-2">
         <Row label="Email">{user?.email || 'Not provided'}</Row>
       </dl>
-      {licence.data?.pendingSessionId && (
-        <Callout tone="info" title="You have an assessment in progress" className="mt-4" action={<LinkButton to="/briefing" variant="primary" size="sm">Resume</LinkButton>}>
-          Your licence is still valid. Pick up where you left off.
+      {licence.error && (
+        <Callout tone="blocked" title="Assessment status could not be checked" className="mt-4">
+          <Button variant="secondary" size="sm" onClick={() => licence.refetch()} loading={licence.isFetching}>Retry assessment status</Button>
+        </Callout>
+      )}
+      {pending && (
+        <Callout tone="info" title="You have an assessment to return to" className="mt-4" action={<LinkButton to={resume || assignmentsListPath(active)} variant="primary" size="sm">{resume ? 'Resume' : 'Open assessments'}</LinkButton>}>
+          Find its current status in Assessments. Personal and sponsored assessments stay in their own workspaces.
+          {assessments.error && <div className="mt-3" role="alert"><InlineNotice tone="blocked">The matching assessment could not be loaded. Open Assessments to retry or choose the matching workspace.</InlineNotice></div>}
         </Callout>
       )}
     </Panel>

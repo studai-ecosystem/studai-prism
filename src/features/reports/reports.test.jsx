@@ -66,6 +66,40 @@ function renderReport(routes, { campus = false, route = '/app/reports/sess-repor
 }
 
 describe('Student Report V3 page', () => {
+  it.each([
+    ['REPORT_NOT_READY', 'Your report is not ready yet'],
+    ['REPORT_UNDER_REVIEW', 'This report is under review'],
+  ])('%s offers a read-only recheck and support, never fabricated capability cards', async (code, title) => {
+    let pending = true
+    const { spy } = renderReport({
+      '/api/v1/assessment-sessions/sess-report-0001/report': () => pending
+        ? jsonResponse(409, { error: { code, message: 'Synthetic pending state', requestId: 'req-report-recovery' } })
+        : jsonResponse(200, ownerBody()),
+    })
+    expect(await screen.findByText(title)).toBeInTheDocument()
+    expect(document.title).toBe('Your report · Prism')
+    expect(screen.getByText('Reference: req-report-recovery')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Contact support' })).toHaveAttribute('href', '/contact')
+    expect(screen.getByRole('link', { name: 'Back to assessments' })).toHaveAttribute('href', '/app/assessments')
+    expect(screen.queryByTestId('report-capability')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Download PDF' })).not.toBeInTheDocument()
+    pending = false
+    await userEvent.click(screen.getByRole('button', { name: 'Check again' }))
+    expect(await screen.findByTestId('report-header')).toBeInTheDocument()
+    const reportCalls = spy.mock.calls.filter(([url]) => String(url).endsWith('/report'))
+    expect(reportCalls.length).toBeGreaterThanOrEqual(2)
+    expect(reportCalls.every(([, options]) => !options.method || options.method === 'GET')).toBe(true)
+  })
+
+  it('sponsored report recovery stays in its institution workspace', async () => {
+    renderReport({
+      '/api/v1/assessment-sessions/sess-report-0001/report': () => jsonResponse(409, { error: { code: 'REPORT_UNDER_REVIEW', message: 'Held', requestId: 'req-held' } }),
+    }, { campus: true })
+    await screen.findByText('This report is under review')
+    expect(screen.getByRole('link', { name: 'Back to assessments' })).toHaveAttribute('href', `/app/campus/${CAMPUS_WS.organizationId}/assignments`)
+  })
+
   it('a capability with no evidence shows one absence explanation and no empty level badge', () => {
     const cap = { ...reportFixture().summary.capabilities[1], statusReasons: ['NO_EVIDENCE'], summary: {
       claimId: null, text: 'No evidence for this was recorded in the synthetic assessment, so it is not described.', status: 'INSUFFICIENT', evidenceIds: [],
@@ -143,7 +177,7 @@ describe('Student Report V3 page', () => {
     expect(await screen.findByText('Your report is not ready yet')).toBeInTheDocument()
     a.unmount()
     const b = renderReport({ '/api/v1/assessment-sessions/sess-report-0001/report': () => jsonResponse(409, { error: { code: 'REPORT_UNDER_REVIEW', message: 'x', requestId: 'r' } }) })
-    expect(await screen.findByText('This report is being reviewed')).toBeInTheDocument()
+    expect(await screen.findByText('This report is under review')).toBeInTheDocument()
     b.unmount()
     renderReport({ '/api/v1/assessment-sessions/sess-report-0001/report': () => jsonResponse(404, { error: { code: 'NOT_FOUND', message: 'x', requestId: 'r' } }) })
     expect(await screen.findByRole('heading', { name: /not available|do not have access|can.t see/i })).toBeInTheDocument()

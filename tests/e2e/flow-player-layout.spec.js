@@ -155,6 +155,7 @@ test('PLAYER-UI an accepted message and refreshed snapshot do not restart the co
   } } }))
   const initial = await readTimerSeconds(page)
   await page.clock.fastForward(60000)
+  await expect.poll(() => readTimerSeconds(page)).toBeLessThanOrEqual(initial - 59)
   const beforeSend = await readTimerSeconds(page)
   expect(beforeSend).toBeLessThanOrEqual(initial - 59)
   await page.getByLabel('Your answer').fill('Synthetic clock regression response')
