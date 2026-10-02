@@ -4,13 +4,14 @@ import { Button } from '../ui/Button.jsx'
 
 // Recoverable error. Shows the request id so support can trace it; never
 // shows internal error details or substitutes invented content.
-export function ErrorState({ title = 'Something went wrong', description = 'Please try again. If this keeps happening, contact support.', requestId, onRetry, action }) {
+export function ErrorState({ title = 'Something went wrong', description = 'Please try again. If this keeps happening, contact support.', requestId, onRetry, action, headingLevel = 2 }) {
   return (
     <StateBlock
       role="alert"
       tone="blocked"
       icon={AlertTriangle}
       title={title}
+      headingLevel={headingLevel}
       description={description}
       action={action || (onRetry ? <Button variant="secondary" onClick={() => onRetry()}>Try again</Button> : null)}
     >

@@ -36,6 +36,26 @@ const AssessmentsSchema = z.object({
   upcoming: z.array(AssignmentCardSchema),
 })
 
+// Authorized history projection (P1.2). Dates are stored facts or null.
+export const HistoryItemSchema = z.object({
+  id: z.string(),
+  sourceType: z.enum(['FORMAL_SESSION', 'LEGACY_REPORT', 'PRACTICE_ATTEMPT']),
+  sourceId: z.string(),
+  mode: z.enum(['FORMAL', 'PRACTICE']),
+  title: z.string().nullable(),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  issuedAt: z.string().nullable(),
+  scope: z.enum(['PERSONAL', 'SPONSORED']),
+  sponsorOrganizationId: z.string().nullable(),
+  status: z.enum(['ACTIVE', 'COMPLETED', 'PROCESSING', 'TECHNICAL_FAILED', 'UNDER_REVIEW', 'LEGACY']),
+  reportFormat: z.enum(['V3', 'LEGACY_V2']).nullable(),
+  permittedAction: z.object({ kind: z.enum(['VIEW_REPORT', 'RESUME', 'RECOVER', 'NONE']), to: z.string().nullable() }),
+  recoveryState: z.enum(['NONE', 'RESUMABLE', 'AWAITING_REPORT', 'RECOVERABLE', 'SUPPORT_REQUIRED', 'HELD']),
+}).passthrough()
+
+const HistorySchema = z.object({ items: z.array(HistoryItemSchema), nextCursor: z.string().nullable() })
+
 const Summary = z.object({ text: z.string(), status: z.enum(['SUPPORTED', 'PROVISIONAL', 'INSUFFICIENT']), evidenceIds: z.array(z.string()) }).passthrough()
 
 export const CapabilitySchema = z.object({
@@ -211,6 +231,7 @@ const get = async (path, schema, query) => (await request(path, { schema, query,
 
 export const fetchStudentHome = () => get('/api/v1/me/home', HomeSchema)
 export const fetchStudentAssessments = () => get('/api/v1/me/assessments', AssessmentsSchema)
+export const fetchHistory = ({ cursor = null, limit } = {}) => get('/api/v1/me/history', HistorySchema, { ...(cursor ? { cursor } : {}), ...(limit ? { limit } : {}) })
 export const fetchStudentCapabilities = () => get('/api/v1/me/capabilities', CapabilitiesSchema)
 export const fetchStudentEvidence = (filters = {}) => get('/api/v1/me/evidence', EvidenceSchema, filters)
 export const fetchDevelopmentPlan = () => get('/api/v1/me/development-plan', PlanSchema)

@@ -42,6 +42,41 @@ const pending = () => new Promise(() => {})
 const noPercent = () => expect(document.body.textContent).not.toMatch(/\d\s*%/)
 
 describe('Student Home (§9)', () => {
+  it('shows the latest owned completed report within one click, using server links and completion dates', async () => {
+    const completed = (id, date, path) => card({ id, title: `Synthetic ${id}`, status: 'COMPLETED', tab: 'COMPLETED', sessionId: id, completedAt: date, cta: { kind: 'VIEW_REPORT', to: path } })
+    render(<HomePage />, { routes: { '/api/v1/me/assessments': { data: {
+      active: [], upcoming: [], completed: [
+        completed('older', '2026-09-01T10:00:00.000Z', '/score?session=older'),
+        completed('latest', '2026-10-01T10:00:00.000Z', '/app/reports/latest'),
+        card({ id: 'expired', status: 'EXPIRED', tab: 'COMPLETED' }),
+      ],
+    } } } })
+    const section = await screen.findByRole('region', { name: 'Recent assessments' })
+    const cards = await within(section).findAllByTestId('assignment-card')
+    expect(cards).toHaveLength(2)
+    expect(within(cards[0]).getByRole('link', { name: /^View report\s*:\s*Synthetic latest$/ })).toHaveAttribute('href', '/app/reports/latest')
+    expect(within(cards[1]).getByRole('link', { name: /^View report\s*:\s*Synthetic older$/ })).toHaveAttribute('href', '/score?session=older')
+    expect(within(cards[0]).getByText(/^Completed /, { selector: 'ul > li' })).toBeInTheDocument()
+    expect(within(section).getByRole('link', { name: 'View all assessments' })).toHaveAttribute('href', '/app/assessments')
+    expect(within(section).queryByText('Synthetic expired')).not.toBeInTheDocument()
+  })
+
+  it('history failures stay explicit without pretending there are no completed assessments', async () => {
+    render(<HomePage />, { routes: { '/api/v1/me/assessments': error500 } })
+    const section = await screen.findByRole('region', { name: 'Recent assessments' })
+    expect(await within(section).findByText('Reference: req-500', {}, { timeout: 4000 })).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(within(section).queryByText(/No completed assessments/)).not.toBeInTheDocument()
+  })
+
+  it('missing owned history provides support rather than fabricating a report', async () => {
+    render(<HomePage />)
+    const section = await screen.findByRole('region', { name: 'Recent assessments' })
+    expect(await within(section).findByText(/No completed assessments are linked/)).toBeInTheDocument()
+    expect(within(section).getByRole('link', { name: 'contact support' })).toHaveAttribute('href', '/contact')
+    expect(within(section).queryByRole('link', { name: /View report/ })).not.toBeInTheDocument()
+  })
+
   it('loading keeps the h1 and announces loading', async () => {
     render(<HomePage />, { routes: { '/api/v1/me/home': pending } })
     expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
@@ -98,6 +133,28 @@ describe('Student Home (§9)', () => {
 })
 
 describe('Assessments list (§10)', () => {
+  it('a completed assessment without a report provides support, never a broken report button', async () => {
+    render(<AssessmentsPage />, { routes: { '/api/v1/me/assessments': { data: {
+      active: [], upcoming: [], completed: [card({ status: 'COMPLETED', tab: 'COMPLETED', completedAt: '2026-10-01T10:00:00.000Z', cta: { kind: 'NONE', to: null } })],
+    } } } })
+    await userEvent.click(await screen.findByRole('tab', { name: 'Completed (1)' }))
+    const assignment = await screen.findByTestId('assignment-card')
+    expect(within(assignment).getByText(/Report not available yet/)).toBeInTheDocument()
+    expect(within(assignment).getByRole('link', { name: 'Contact support' })).toHaveAttribute('href', '/contact')
+    expect(within(assignment).queryByRole('link', { name: /View report/ })).not.toBeInTheDocument()
+  })
+
+  it('under-review history does not pretend that a missing report is available', async () => {
+    render(<AssessmentsPage />, { routes: { '/api/v1/me/assessments': { data: {
+      active: [], upcoming: [], completed: [card({ status: 'COMPLETED', tab: 'COMPLETED', underReview: true, cta: { kind: 'NONE', to: null } })],
+    } } } })
+    await userEvent.click(await screen.findByRole('tab', { name: 'Completed (1)' }))
+    const assignment = await screen.findByTestId('assignment-card')
+    expect(within(assignment).getByText(/This result is under review/)).toBeInTheDocument()
+    expect(within(assignment).queryByText('Report available')).not.toBeInTheDocument()
+    expect(within(assignment).queryByRole('link', { name: /View report/ })).not.toBeInTheDocument()
+  })
+
   it('always shows the scope; empty tabs explain themselves', async () => {
     const data = { data: {
       active: [card(), card({ id: 'a-s', scope: 'SPONSORED', sponsor: { organizationId: 'o', name: 'Synthetic University' }, dueAt: '2026-10-04T10:00:00.000Z', acknowledgementRequired: true, cta: { kind: 'START', to: '/x' } })],

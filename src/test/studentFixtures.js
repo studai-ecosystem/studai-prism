@@ -95,6 +95,7 @@ export function studentRoutes(extra = {}) {
   const defaults = {
     '/api/v1/me/home': home(),
     '/api/v1/me/assessments': emptyAssessments(),
+    '/api/v1/me/history': { data: { items: [], nextCursor: null } },
     '/api/v1/me/capabilities': emptyCapabilities(),
     '/api/v1/me/evidence': emptyEvidence(),
     '/api/v1/me/development-plan': emptyPlan(),

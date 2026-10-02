@@ -25,6 +25,31 @@ beforeAll(async () => {
 })
 
 describe('AppRouter — flags off (default)', () => {
+  it.each(['/payment?source=assessment', '/briefing?session=owned-session#consent'])('keeps the explicit legacy action %s through registration', async (route) => {
+    mockFetch({})
+    renderApp(app, { route })
+    expect(await screen.findByRole('heading', { name: 'Create your account' })).toBeInTheDocument()
+    expect(screen.getByTestId('where')).toHaveTextContent('/register')
+    for (const link of screen.getAllByRole('link', { name: 'Login', exact: true })) expect(link).toHaveAttribute('href', `/login?next=${encodeURIComponent(route)}`)
+  })
+  it.each(['/dashboard', '/profile'])('%s preserves a signed-out compatibility destination', async (route) => {
+    mockFetch({ '/api/': () => new Promise(() => {}) })
+    renderApp(app, { route })
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+    expect(screen.getByTestId('where')).toHaveTextContent('/login')
+    for (const link of screen.getAllByRole('link', { name: 'Register' })) expect(link).toHaveAttribute('href', `/register?next=${encodeURIComponent(route)}`)
+  })
+
+  it.each([
+    ['/dashboard', '/app/home'],
+    ['/profile', '/app/settings'],
+  ])('%s does not bounce an authenticated student to the public homepage when dark', async (route, destination) => {
+    signIn()
+    mockFetch({ '/api/v1/me': meBody() })
+    renderApp(app, { route })
+    expect(await screen.findByRole('heading', { name: 'The student portal is not available yet' })).toBeInTheDocument()
+    expect(screen.getByTestId('where')).toHaveTextContent(destination)
+  })
   it('/app renders the legacy launcher unchanged', async () => {
     signIn()
     mockFetch({ '/api/v1/me': meBody(), '/api/payment/licence': licence })
@@ -32,11 +57,14 @@ describe('AppRouter — flags off (default)', () => {
     expect(await screen.findByRole('heading', { name: 'Prism Assessment' })).toBeInTheDocument()
     expect(await screen.findByText('Ready — start when you are')).toBeInTheDocument()
   })
-  it('/app/home behaves like any unknown legacy URL (→ /)', async () => {
+  it('/app/home explains a disabled portal without sending a returning student to marketing or checkout', async () => {
     signIn()
     mockFetch({ '/api/v1/me': meBody(), '/api/': () => new Promise(() => {}) })
     renderApp(app, { route: '/app/home' })
-    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/'), { timeout: 4000 })
+    expect(await screen.findByRole('heading', { name: 'The student portal is not available yet' })).toBeInTheDocument()
+    expect(screen.getByTestId('where')).toHaveTextContent('/app/home')
+    expect(screen.getByRole('link', { name: 'Open assessment launcher' })).toHaveAttribute('href', '/app')
+    expect(screen.getByRole('link', { name: 'Contact support' })).toHaveAttribute('href', '/contact')
   })
   it('V3 detail URLs resolve to the legacy pages, preserving params', async () => {
     signIn()
@@ -49,6 +77,20 @@ describe('AppRouter — flags off (default)', () => {
     mockFetch({ '/api/v1/me': meBody(), '/api/': () => new Promise(() => {}) })
     renderApp(app, { route: '/campus/org-1/overview' })
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/'), { timeout: 4000 })
+  })
+})
+
+describe('Student compatibility aliases with the portal enabled', () => {
+  it.each([
+    ['/dashboard', '/app/home', 'Good'],
+    ['/profile', '/app/settings', 'Settings'],
+  ])('%s reaches its authenticated application page', async (route, destination, title) => {
+    signIn()
+    mockFetch({ ...studentRoutes(), '/api/v1/me': meBody({ flags: { PRISM_APP_SHELL_V3: true } }), '/api/payment/licence': licence })
+    renderApp(app, { route })
+    expect(await screen.findByRole('heading', { level: 1, name: new RegExp(title) })).toBeInTheDocument()
+    expect(screen.getByTestId('where')).toHaveTextContent(destination)
+    if (route === '/profile') expect(document.getElementById('profile')).toBeInTheDocument()
   })
 })
 
@@ -193,10 +235,11 @@ describe('AppRouter — PRISM_APP_SHELL_V3 on', () => {
       unmount()
     }
   })
-  it('anonymous users on a shell URL behave like any unknown legacy URL', async () => {
+  it('anonymous users on a shell URL reach login with their destination preserved even when flags are dark', async () => {
     mockFetch({ '/api/': () => new Promise(() => {}) })
     renderApp(app, { route: '/app/capabilities' })
-    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/'), { timeout: 4000 })
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/login'), { timeout: 4000 })
+    for (const link of screen.getAllByRole('link', { name: 'Register' })) expect(link).toHaveAttribute('href', '/register?next=%2Fapp%2Fcapabilities')
   })
   it('legacy /explore stays legacy while PRISM_ROLE_EXPLORATION_V2 is off', async () => {
     signIn()

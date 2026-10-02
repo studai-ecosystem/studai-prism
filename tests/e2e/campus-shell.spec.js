@@ -101,8 +101,10 @@ test('CAMPUS-SHELL-04 @critical @campus flags off: legacy /app launcher is uncha
   await expect(page.getByRole('heading', { name: 'Prism Assessment' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Start an assessment/ })).toBeVisible()
   await page.goto(`${LEGACY_BASE_URL}/app/home`)
-  // Dark shell URLs behave exactly like any unknown legacy URL (→ landing).
-  await expect(page).toHaveURL(`${LEGACY_BASE_URL}/`)
+  await expect(page).toHaveURL(`${LEGACY_BASE_URL}/app/home`)
+  await expect(page.getByRole('heading', { name: 'The student portal is not available yet' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open assessment launcher' })).toHaveAttribute('href', '/app')
+  await expect(page.getByRole('link', { name: 'Contact support' })).toHaveAttribute('href', '/contact')
 })
 
 test('CAMPUS-SHELL-05 @critical @campus legacy links alias to V3 and ?legacy=1 keeps the legacy page reachable (no loop)', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { request, api, ApiError, configureClient, newIdempotencyKey } from './client.js'
+import { request, api, ApiError, configureClient, newIdempotencyKey, cancelScopedRequests } from './client.js'
 import { z } from 'zod'
 
 function jsonResponse(status, body, headers = {}) {
@@ -15,6 +15,48 @@ beforeEach(() => {
 })
 
 describe('api client', () => {
+  it('an old 401 cannot sign out a replacement account', async () => {
+    let finish
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    const pending = api.get('/api/v1/me')
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    localStorage.setItem('prism_token', 'replacement-token')
+    finish(jsonResponse(401, { error: { code: 'UNAUTHENTICATED' } }))
+    await rejected
+    expect(onUnauthenticated).not.toHaveBeenCalled()
+    expect(localStorage.getItem('prism_token')).toBe('replacement-token')
+  })
+
+  it('scope cancellation aborts network work and discards even an uncancellable stale result', async () => {
+    let finish
+    const mock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    const pending = api.get('/api/v1/private')
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    cancelScopedRequests('ws-1')
+    expect(mock.mock.calls[0][1].signal.aborted).toBe(true)
+    finish(jsonResponse(200, { data: 'old-account-private-data' }))
+    await rejected
+    expect(mock).toHaveBeenCalledTimes(1)
+  })
+
+  it('a workspace switch cannot return another workspace response or retry with stale scope', async () => {
+    const mock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      configureClient({ getWorkspaceId: () => 'ws-2' })
+      return jsonResponse(503, { error: 'unavailable' })
+    })
+    await expect(api.get('/api/v1/private')).rejects.toMatchObject({ name: 'AbortError' })
+    expect(mock).toHaveBeenCalledTimes(1)
+    expect(onUnauthenticated).not.toHaveBeenCalled()
+  })
+
+  it('caller cancellation is respected before sending a request', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const mock = vi.spyOn(globalThis, 'fetch')
+    await expect(api.get('/api/v1/private', { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(mock).not.toHaveBeenCalled()
+  })
+
   it('injects auth, workspace and request-id headers and unwraps the envelope', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(200, { data: { a: 1 }, meta: { limit: 25 } }))
     const out = await api.get('/api/v1/me', { query: { limit: 25, empty: '' } })

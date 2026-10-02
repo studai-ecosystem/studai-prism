@@ -18,6 +18,7 @@ export class ApiError extends Error {
 
 const SAFE_METHODS = new Set(['GET', 'HEAD'])
 const RETRYABLE_STATUS = new Set([429, 502, 503, 504])
+const pendingRequests = new Set()
 
 const config = {
   baseUrl: '',
@@ -30,13 +31,19 @@ const config = {
 function defaultOnUnauthenticated() {
   clearUser()
   if (typeof window === 'undefined') return
-  const here = `${window.location.pathname}${window.location.search}`
+  const here = `${window.location.pathname}${window.location.search}${window.location.hash}`
   if (window.location.pathname.startsWith('/login')) return
   window.location.assign(`/login?next=${encodeURIComponent(here)}`)
 }
 
 export function configureClient(next) {
   Object.assign(config, next)
+}
+
+export function cancelScopedRequests(workspaceId) {
+  for (const pending of pendingRequests) {
+    if (pending.scoped && (workspaceId === undefined || pending.workspaceId === workspaceId)) pending.controller.abort()
+  }
 }
 
 export function newRequestId() {
@@ -120,53 +127,74 @@ export async function request(path, {
   const retryable = SAFE_METHODS.has(verb) || Boolean(idempotencyKey)
   const url = buildUrl(path, query)
   let attempt = 0
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  if (signal?.aborted) abort()
+  else signal?.addEventListener('abort', abort, { once: true })
+  const pending = { controller, workspaceId, scoped: auth || workspace }
+  pendingRequests.add(pending)
+  const requireCurrentScope = () => {
+    if (controller.signal.aborted || (auth && token !== getToken()) || (workspace && (workspaceId || 'personal') !== (config.getWorkspaceId() || 'personal'))) {
+      controller.abort()
+      throw new DOMException('The account or workspace changed, so this request was cancelled.', 'AbortError')
+    }
+  }
 
-  for (;;) {
-    let res
-    try {
-      res = await fetch(url, { method: verb, headers, body: body === undefined ? undefined : JSON.stringify(body), signal })
-    } catch (err) {
-      if (err?.name === 'AbortError') throw err
-      if (retryable && attempt < config.maxRetries) {
+  try {
+    for (;;) {
+      requireCurrentScope()
+      let res
+      try {
+        res = await fetch(url, { method: verb, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal })
+      } catch (err) {
+        requireCurrentScope()
+        if (err?.name === 'AbortError') throw err
+        if (retryable && attempt < config.maxRetries) {
+          attempt += 1
+          await config.sleep(150 * 2 ** (attempt - 1))
+          continue
+        }
+        throw new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'You appear to be offline. Check your connection and try again.', requestId })
+      }
+      requireCurrentScope()
+
+      if (retryable && RETRYABLE_STATUS.has(res.status) && attempt < config.maxRetries) {
         attempt += 1
         await config.sleep(150 * 2 ** (attempt - 1))
         continue
       }
-      throw new ApiError({ status: 0, code: 'NETWORK_ERROR', message: 'You appear to be offline. Check your connection and try again.', requestId })
-    }
 
-    if (retryable && RETRYABLE_STATUS.has(res.status) && attempt < config.maxRetries) {
-      attempt += 1
-      await config.sleep(150 * 2 ** (attempt - 1))
-      continue
-    }
-
-    const parsed = await parseBody(res)
-    if (!res.ok) {
-      const error = errorFrom(res, parsed, requestId, defaultErrorMessage)
-      if (res.status === 401 && auth && on401 === 'redirect') config.onUnauthenticated(error)
-      throw error
-    }
-
-    let data
-    let meta
-    if (legacy) {
-      data = parsed
-    } else {
-      if (!parsed || !('data' in parsed)) {
-        throw new ApiError({ status: res.status, code: 'SCHEMA_MISMATCH', message: 'The server sent an unexpected response.', requestId })
+      const parsed = await parseBody(res)
+      requireCurrentScope()
+      if (!res.ok) {
+        const error = errorFrom(res, parsed, requestId, defaultErrorMessage)
+        if (res.status === 401 && auth && on401 === 'redirect') config.onUnauthenticated(error)
+        throw error
       }
-      data = parsed.data
-      meta = parsed.meta
-    }
-    if (schema) {
-      const result = schema.safeParse(data)
-      if (!result.success) {
-        throw new ApiError({ status: res.status, code: 'SCHEMA_MISMATCH', message: 'The server sent an unexpected response.', requestId, details: result.error.flatten() })
+
+      let data
+      let meta
+      if (legacy) {
+        data = parsed
+      } else {
+        if (!parsed || !('data' in parsed)) {
+          throw new ApiError({ status: res.status, code: 'SCHEMA_MISMATCH', message: 'The server sent an unexpected response.', requestId })
+        }
+        data = parsed.data
+        meta = parsed.meta
       }
-      data = result.data
+      if (schema) {
+        const result = schema.safeParse(data)
+        if (!result.success) {
+          throw new ApiError({ status: res.status, code: 'SCHEMA_MISMATCH', message: 'The server sent an unexpected response.', requestId, details: result.error.flatten() })
+        }
+        data = result.data
+      }
+      return { data, meta, status: res.status }
     }
-    return { data, meta, status: res.status }
+  } finally {
+    pendingRequests.delete(pending)
+    signal?.removeEventListener('abort', abort)
   }
 }
 

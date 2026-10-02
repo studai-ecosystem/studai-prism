@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { configureClient } from '../../api/client.js'
+import { configureClient, cancelScopedRequests } from '../../api/client.js'
 import { useFeatureFlags } from './FeatureFlagProvider.jsx'
 
 const WorkspaceContext = createContext(null)
@@ -29,16 +29,31 @@ export function WorkspaceProvider({ children }) {
   const [activeId, setActiveId] = useState(() => sessionStorage.getItem(STORAGE_KEY) || PERSONAL_FALLBACK.id)
   const active = workspaces.find((w) => w.id === activeId) || workspaces[0]
   const activeRef = useRef(active.id)
+  const scopeRef = useRef(active.id)
   activeRef.current = active.id
 
   useEffect(() => {
     configureClient({ getWorkspaceId: () => activeRef.current })
+    return () => {
+      cancelScopedRequests(activeRef.current)
+      configureClient({ getWorkspaceId: () => null })
+    }
   }, [])
+
+  useEffect(() => {
+    const previous = scopeRef.current
+    if (previous !== active.id) {
+      cancelScopedRequests(previous)
+      queryClient.removeQueries({ queryKey: ['ws', previous] })
+      scopeRef.current = active.id
+    }
+  }, [active.id, queryClient])
 
   const switchTo = useCallback((nextId) => {
     const next = workspaces.find((w) => w.id === nextId)
     if (!next || next.id === activeRef.current) return next || null
     const previous = activeRef.current
+    cancelScopedRequests(previous)
     queryClient.removeQueries({ queryKey: ['ws', previous] })
     activeRef.current = next.id
     sessionStorage.setItem(STORAGE_KEY, next.id)
@@ -48,6 +63,11 @@ export function WorkspaceProvider({ children }) {
 
   const value = useMemo(() => ({ workspaces, active, switchTo }), [workspaces, active, switchTo])
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
+}
+
+export function WorkspaceContent({ children }) {
+  const { active } = useWorkspace()
+  return <Fragment key={active.id}>{children}</Fragment>
 }
 
 export function useWorkspace() {

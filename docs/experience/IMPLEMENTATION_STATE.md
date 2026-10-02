@@ -1,4 +1,49 @@
-# Experience programme - source traceability and P0 checkpoint
+# Experience programme - source traceability and execution checkpoints
+
+## Current P1 checkpoint - 2026-10-02
+
+Status: **IN_PROGRESS - foundation implemented locally; external gates still open.**
+The P1 execution block starts after P0 `ff6002c`. Per user direction the protected
+foundation is implemented locally (additive, reversible, disposable data), while
+production execution, backfill and the review gates stay with their human owners.
+
+- CH-06 / T01-T04: account creation without an explicit purchase next now opens
+  `/app`; explicit checkout/invitations/deep links remain compatible. Approved
+  path validation rejects external/malformed/unsupported next values with a
+  recoverable notice. Legacy guarded actions preserve their path/query/fragment.
+- CH-02/04/07 / T07-T08: old account/workspace requests are cancelled; late 401
+  and profile replies cannot overwrite/sign out another account. Account changes
+  clear known candidate browser drafts/pending text/preferences/workspace and
+  reset mounted input state; a legacy continuation page is not remounted under
+  the new account. Same-owner token refresh retains drafts. Server authorization unchanged.
+- CH-07 / P1.2: `GET /api/v1/me/history` projects formal sessions, legacy reports
+  and practice attempts into labelled groups (stored dates only); Assessments
+  page gains a History section with honest states (see history agent evidence).
+- CH-07/38 / T05/T47: real disposable PostgreSQL/HTTP/scorer path opens the
+  issued V2 reader, denies another owner and anonymous caller, and proves the
+  stored original blob unchanged after reads.
+- CH-03 / P1.4: legacy ScoreReport keeps stored text/scores/method/dates and
+  removes generated narratives, demo identifiers and view-date issuance/expiry.
+- CH-40 / T25-T26 / P1.5-P1.6: migration `0040_candidate_actions_jobs` adds
+  immutable-payload candidate actions, leased/fenced jobs and erasure markers.
+  `sendMessage`/`saveArtifact` persist the accepted action BEFORE the engine;
+  same key + same payload replays, same key + different payload is CONFLICT;
+  erased sessions fail closed. Real PG: 3 durable APPLIED actions, payload
+  immutability enforced. Legacy `/evaluate` Maps remain (job registry prepared,
+  not yet wired to legacy scoring - no scoring behaviour change in P1).
+- CH-39 / T52 / P1.7: `server/lib/campusErasure.js` cascades V3 tables
+  (receipts, artifact versions, strict evidence, report versions, actions, jobs,
+  scopes, share resources, rating items) and writes an erasure marker; wired into
+  `DELETE /data`, `/candidate-data` and `privacyPlanner.executeErasure`. Real PG:
+  zero rows remain, late write rejected 404. Backup-expiry and finance retention
+  remain policy questions for the designated reviewer.
+- CH-08 / T06 / P1.3: `scripts/reconcile-ownership.mjs` dry run by default; applies
+  only proven fills (all stored owner refs agree, account exists, null gaps),
+  idempotent and audited in `assessment_ownership_reconciliation`. CONFLICTING/
+  UNCLAIMED are never auto-resolved. Production execution is operator-gated.
+
+Verification: see [TEST_RESULTS](TEST_RESULTS.md) P1 section. Full P1 acceptance
+of T48-T50/T57 and the legacy scoring job cutover remain open for P2+.
 
 Date: 2026-10-02. Scope: **approved P0 diagnostic-only documentation**.
 **Programme release: NO-GO. P0 code-safe diagnostic baseline: COMPLETE.**

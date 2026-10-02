@@ -1,5 +1,33 @@
 # P0 diagnostic-only handoff
 
+## Current P1 handoff checkpoint - 2026-10-02
+
+**P1 IN_PROGRESS / BLOCKED, not COMPLETE.** This later checkpoint follows P0
+`ff6002c`; the P0-only report below remains its historical phase-close record.
+
+Implemented: safe account-default/explicit-intent navigation, approved next-path
+validation and visible invalid-link recovery; legacy guarded destination
+preservation; account/workspace request cancellation and stale-response guards;
+known browser-draft cleanup and scoped page-state resets preserving same-owner
+refresh and workspace-switcher focus/confirmation; honest issued legacy-report
+presentation/read errors.
+
+Verified so far: frontend 427 passed; server 624 passed/0 failed/25 skips;
+real self-owned PostgreSQL/HTTP 4 passed, including the issued V2 reader and
+unchanged original stored blob; build/static PASS. Full browser results are
+pending in [TEST_RESULTS](./TEST_RESULTS.md).
+
+Not delivered: reviewed historical-ownership/support-write integration, access
+policy changes, durable pre-model acceptance/jobs/fencing/versioned lifecycle,
+source-retention/erasure/stale-worker implementation, or billing/recovery changes.
+Exact missing owners/contracts are in [ROLLOUT](./ROLLOUT.md). The phase prompt
+does not supply those pending implementation/review references. No P2 progression
+or completed-P1 commit is claimed. Protected runtime/production behavior stays
+unchanged; independent UI and reader verification cannot close the foundation.
+
+Current changes are persistent working-tree files; overlapping pre-existing
+entry/router work is preserved and not swept into a phase-close commit.
+
 Scope: approved P0 baseline/recovery preparation only. **No P1 execution.**
 **P0 code-safe diagnostic baseline: COMPLETE.** Exact verification and preserved
 failures are in [TEST_RESULTS](./TEST_RESULTS.md).

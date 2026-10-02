@@ -1,5 +1,54 @@
 # P0 - Verification results
 
+## P1 checkpoint - 2026-10-02 (final)
+
+| Check | Layer | Result |
+| --- | --- | --- |
+| Complete frontend `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | A | 434 tests: 433 passed, 1 failed under load (Campus overview); same test 10/10 in isolation (known load-sensitive case, see P0) |
+| Complete server `npm --prefix server test` | A | 664 tests: 639 passed, 0 failed, 25 DB skips |
+| `node scripts\run-experience-baseline-tests.mjs database` | B | 6 passed, 0 skipped: 40 migrations, read-only probe, real scorer/report, V2 owner read + denials, durable APPLIED actions with immutable payload, erasure cascade zero rows + late write 404 |
+| `npm run build`, `npm run audit:static`, `git diff --check` | Build/static | PASS |
+| Full four-project `browser-all` | A UI + isolated journeys | Running in background at commit time; first interrupted run reached 377 passes with no failures; result appended below when complete |
+
+New P1 tests: `durableActions.test.js` (9), `studentHistory.test.js` (2), `ownershipReconciliation.test.js` (4), `experienceBaseline.test.js` T25/T26 now PASS invariant, `history.test.jsx` (6), `legacyReport.test.jsx` (24), `authDestination.test.js` (27), `session.test.js` (5), `p1-account-entry.spec.js`, `p1-legacy-report.spec.js`.
+Known noise: with telemetry enabled in the isolated DB test the legacy engine logs `item_responses` FK errors (unseeded item bank); non-fatal, pre-existing, unrelated to P1 changes.
+
+
+Starting code checkpoint `ff6002c`, including the preserved dirty work described
+in BASELINE. The historical P0 results below remain historical. P1 is not a
+completed durable-acceptance/ownership/erasure phase.
+
+| Current check | Layer | Fresh P1 result |
+| --- | --- | --- |
+| Targeted auth destinations/session/client/providers/public entry/player | A | 114 passed |
+| Legacy presentation + existing V3 report unit tests | A | 24 + 15 passed (included in full suite) |
+| Legacy copy/report-policy checks | A | 30 passed (included in server regression) |
+| Complete frontend `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | A | 427 passed, 31 files; 0 failed |
+| Complete server `npm --prefix server test` | A + unavailable DB suites | 624 passed, 0 failed, 25 skips; skips remain UNVERIFIED |
+| `node scripts\run-experience-baseline-tests.mjs database` | B | 4 passed, no skips; real normal scorer/report storage, issued V2 owner read, non-owner/anonymous denial, original blob unchanged |
+| `npm run build` and `npm run audit:static` | Build/static | PASS |
+| Full four-project `node scripts\run-experience-baseline-tests.mjs browser-all` | A UI + existing isolated journeys | PENDING |
+
+Intentional contract changes: bare registration assertion now requires supported
+`/app`, not mandatory checkout. Existing paid browser journeys now explicitly
+request `next=/payment`; their checkout/consent/start assertions remain strict.
+No copy-ceiling/scientific/authorization test was relaxed.
+
+Development regression fixed before checkpoint: initial full frontend run had
+9 failures from a stale workspace accessor at root initialization and over-broad
+workspace remounting that discarded confirmation/focus. Cleanup resets the
+accessor; missing workspace maps to the existing personal default; page-content
+scope resets preserve shell/switcher/toast state. The affected 117 tests and then
+the complete 427-test suite passed unchanged except new requirement tests.
+
+The PG check does not backfill old customer ownership, pre-save before the model,
+implement durable jobs or prove erasure/restart safety. T25/T26/T27/T32/T36
+diagnostic failures from P0 remain explicit, not fixed by these passing UI/read
+checks. No live model, real customer, migration of production data or human
+approval occurred. Logs: TEMP `prism-p1-target-ui.log`, `prism-p1-scope-regressions.log`,
+`prism-p1-ui-final.log`, `prism-p1-server-final.log`, `prism-p1-build-final.log`,
+`prism-p1-static.log`, `prism-p1-database.log`.
+
 Environment: local checkout starting at `f40bd1c`, Node v24.12.0, npm 11.6.2,
 including preserved pre-existing dirty work. All results below are fresh P0
 execution results, not inherited historical counts.

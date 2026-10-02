@@ -3,12 +3,13 @@ import { screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Routes, Route } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { renderApp, mockFetch, meBody, signIn, jsonResponse } from '../../test/utils.jsx'
 import { useAuth } from './AuthProvider.jsx'
 import { useFlag, useFeatureFlags } from './FeatureFlagProvider.jsx'
-import { useWorkspace, wsKey } from './WorkspaceProvider.jsx'
+import { useWorkspace, wsKey, WorkspaceContent } from './WorkspaceProvider.jsx'
 import { api } from '../../api/client.js'
-import { clearUser } from '../../lib/session.js'
+import { clearUser, setToken } from '../../lib/session.js'
 
 function AuthProbe() {
   const { status, user } = useAuth()
@@ -21,6 +22,71 @@ function FlagProbe({ flag }) {
 }
 
 describe('AuthProvider', () => {
+  it('an account change on a legacy continuation cannot remount and automatically restart that old action', () => {
+    const originalPath = window.location.href
+    try {
+      window.history.replaceState({}, '', '/assessment?session=synthetic-old-session')
+      signIn({ name: 'Account A', email: 'a@test.local' })
+      mockFetch({ '/api/v1/me': meBody() })
+      const starts = vi.fn()
+      function LegacyActionProbe() {
+        useEffect(() => { starts() }, [])
+        return <p>Synthetic old continuation</p>
+      }
+      renderApp(<LegacyActionProbe />)
+      expect(starts).toHaveBeenCalledTimes(1)
+      act(() => {
+        signIn({ name: 'Account B', email: 'b@test.local' })
+        window.dispatchEvent(new Event('prism-session-change'))
+      })
+      expect(starts).toHaveBeenCalledTimes(1)
+      expect(screen.queryByText('Synthetic old continuation')).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Your account changed' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Open current account' })).toBeInTheDocument()
+    } finally {
+      window.history.replaceState({}, '', originalPath)
+    }
+  })
+
+  it('changing account resets in-memory drafts and known browser artifacts, but preserves an explicit invitation', async () => {
+    signIn({ name: 'Account A', email: 'a@test.local' })
+    mockFetch({ '/api/v1/me': meBody() })
+    function DraftProbe() {
+      const [text, setText] = useState('')
+      return <input aria-label="Synthetic private draft" value={text} onChange={(event) => setText(event.target.value)} />
+    }
+    renderApp(<WorkspaceContent><DraftProbe /></WorkspaceContent>)
+    await userEvent.type(screen.getByLabelText('Synthetic private draft'), 'Synthetic private text')
+    sessionStorage.setItem('prism.draft.synthetic-session', 'Synthetic stored draft')
+    sessionStorage.setItem('prism.pending.synthetic-session', 'Synthetic pending response')
+    sessionStorage.setItem('prismActiveWorkspace', 'old-campus')
+    sessionStorage.setItem('prismInviteToken', 'explicit-invite')
+    act(() => {
+      signIn({ name: 'Account B', email: 'b@test.local' })
+      window.dispatchEvent(new Event('prism-session-change'))
+    })
+    expect(screen.getByLabelText('Synthetic private draft')).toHaveValue('')
+    expect(sessionStorage.getItem('prism.draft.synthetic-session')).toBeNull()
+    expect(sessionStorage.getItem('prism.pending.synthetic-session')).toBeNull()
+    expect(sessionStorage.getItem('prismActiveWorkspace')).toBeNull()
+    expect(sessionStorage.getItem('prismInviteToken')).toBe('explicit-invite')
+  })
+
+  it('same-account token renewal does not clear an unsent local draft', async () => {
+    signIn()
+    mockFetch({ '/api/v1/me': meBody() })
+    function DraftProbe() {
+      const [text, setText] = useState('')
+      return <input aria-label="Synthetic same-account draft" value={text} onChange={(event) => setText(event.target.value)} />
+    }
+    renderApp(<WorkspaceContent><DraftProbe /></WorkspaceContent>)
+    await userEvent.type(screen.getByLabelText('Synthetic same-account draft'), 'Synthetic retained text')
+    sessionStorage.setItem('prism.draft.synthetic-session', 'Synthetic retained text')
+    act(() => setToken('synthetic-renewed-token'))
+    expect(screen.getByLabelText('Synthetic same-account draft')).toHaveValue('Synthetic retained text')
+    expect(sessionStorage.getItem('prism.draft.synthetic-session')).toBe('Synthetic retained text')
+  })
+
   it('reports anonymous without a session and follows session changes', async () => {
     renderApp(<AuthProbe />)
     expect(screen.getByText(/status:anonymous/)).toBeInTheDocument()
@@ -118,6 +184,21 @@ describe('FeatureFlagProvider', () => {
 
 describe('WorkspaceProvider', () => {
   const campus = { id: 'ws-campus', type: 'CAMPUS_STUDENT', name: 'Synthetic University', organizationId: 'org-1', organizationName: 'Synthetic University' }
+
+  it('switching workspace resets in-memory input state rather than reusing the previous workspace draft', async () => {
+    signIn()
+    mockFetch({ '/api/v1/me': meBody({ workspaces: [meBody().data.workspaces[0], campus] }) })
+    function DraftProbe() {
+      const { switchTo, workspaces } = useWorkspace()
+      const [text, setText] = useState('')
+      return <><p>count:{workspaces.length}</p><input aria-label="Synthetic workspace draft" value={text} onChange={(event) => setText(event.target.value)} /><button onClick={() => switchTo('ws-campus')}>switch</button></>
+    }
+    renderApp(<WorkspaceContent><DraftProbe /></WorkspaceContent>)
+    await screen.findByText('count:2')
+    await userEvent.type(screen.getByLabelText('Synthetic workspace draft'), 'Synthetic private input')
+    await userEvent.click(screen.getByRole('button', { name: 'switch' }))
+    expect(screen.getByLabelText('Synthetic workspace draft')).toHaveValue('')
+  })
 
   it('defaults to the personal workspace and sends it as X-Prism-Workspace', async () => {
     signIn()

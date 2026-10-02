@@ -1,5 +1,5 @@
 // /app/assessments and /app/campus/:organizationId/assignments (spec §10).
-// Active / Completed / Upcoming; every card states personal or sponsored.
+// Active / Completed / Upcoming / History; every card states personal or sponsored.
 import { useState } from 'react'
 import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { Tabs } from '../../../components/ui/Tabs.jsx'
@@ -9,6 +9,7 @@ import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useStudentAssessments } from '../../student/hooks.js'
 import { queryStateView } from '../../student/QueryState.jsx'
 import { AssessmentAssignmentCard } from '../components/AssessmentAssignmentCard.jsx'
+import { HistoryList } from '../components/HistoryList.jsx'
 import { ASSESSMENT_TABS_EMPTY } from '../../../lib/copy/student.js'
 import { START_ASSESSMENT_PATH } from '../../../lib/copy/emptyStates.js'
 
@@ -47,6 +48,7 @@ export default function AssessmentsPage() {
           { id: 'active', label: `Active (${current.length})`, content: <List items={current} empty={ASSESSMENT_TABS_EMPTY.ACTIVE} action={startAction} /> },
           { id: 'completed', label: `Completed (${completed.length})`, content: <List items={completed} empty={ASSESSMENT_TABS_EMPTY.COMPLETED} /> },
           { id: 'upcoming', label: `Upcoming (${upcoming.length})`, content: <List items={upcoming} empty={ASSESSMENT_TABS_EMPTY.UPCOMING} /> },
+          { id: 'history', label: 'History', content: <HistoryList headingLevel={2} /> },
         ]}
       />
     </div>

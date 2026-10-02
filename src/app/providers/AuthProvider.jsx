@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { getToken, getUser, clearUser, login, SESSION_EVENT } from '../../api/auth.js'
-import { configureClient } from '../../api/client.js'
+import { getToken, getUser, clearUser, clearSessionArtifacts, sessionOwnerKey, login, SESSION_EVENT } from '../../api/auth.js'
+import { configureClient, cancelScopedRequests } from '../../api/client.js'
+import { ErrorState } from '../../components/states/ErrorState.jsx'
+import { Button } from '../../components/ui/Button.jsx'
 
 const AuthContext = createContext(null)
 
@@ -19,12 +21,23 @@ export function AuthProvider({ children }) {
   const queryClient = useQueryClient()
   const [state, setState] = useState(snapshot)
   const tokenRef = useRef(state.token)
+  const ownerRef = useRef(sessionOwnerKey(state.user))
+  const legacyRecovery = useRef(false)
 
   const sync = useCallback(() => {
     const next = snapshot()
     if (next.token !== tokenRef.current) {
       tokenRef.current = next.token
+      cancelScopedRequests()
       queryClient.clear()
+    }
+    const owner = sessionOwnerKey(next.user)
+    if (owner !== ownerRef.current) {
+      if (ownerRef.current && /^\/(?:assessment|briefing|verify-identity|link-phone|room-scan|score|workspace|report|missions)(?:\/|$)/.test(window.location.pathname)) {
+        legacyRecovery.current = true
+      }
+      ownerRef.current = owner
+      clearSessionArtifacts()
     }
     setState(next)
   }, [queryClient])
@@ -33,6 +46,7 @@ export function AuthProvider({ children }) {
     window.addEventListener(SESSION_EVENT, sync)
     window.addEventListener('storage', sync)
     return () => {
+      cancelScopedRequests()
       window.removeEventListener(SESSION_EVENT, sync)
       window.removeEventListener('storage', sync)
     }
@@ -53,14 +67,23 @@ export function AuthProvider({ children }) {
     configureClient({
       onUnauthenticated: () => {
         signOut()
-        const here = `${window.location.pathname}${window.location.search}`
+        const here = `${window.location.pathname}${window.location.search}${window.location.hash}`
         if (!window.location.pathname.startsWith('/login')) window.location.assign(`/login?next=${encodeURIComponent(here)}`)
       },
     })
   }, [signOut])
 
   const value = useMemo(() => ({ ...state, signIn, signOut }), [state, signIn, signOut])
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider key={sessionOwnerKey(state.user) || state.status} value={value}>
+      {legacyRecovery.current ? (
+        <main id="main" className="prism-app min-h-screen bg-prism-canvas px-4 py-10">
+          <ErrorState headingLevel={1} title="Your account changed" description="Open your current account before returning to an assessment or report."
+            action={<Button onClick={() => window.location.assign('/app')}>Open current account</Button>} />
+        </main>
+      ) : children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

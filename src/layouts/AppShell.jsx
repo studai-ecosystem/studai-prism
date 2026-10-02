@@ -7,6 +7,7 @@ import { BottomNav } from '../components/navigation/BottomNav.jsx'
 import { TopBar } from '../components/navigation/TopBar.jsx'
 import { Drawer } from '../components/ui/Drawer.jsx'
 import { OfflineReconnectBanner } from '../components/states/OfflineReconnectBanner.jsx'
+import { WorkspaceContent } from '../app/providers/WorkspaceProvider.jsx'
 
 // After client-side navigation, move focus to the new page's <h1> so screen
 // readers announce the page change (the heading renders after lazy loading).
@@ -88,7 +89,7 @@ export function AppShell({ navLabel, items, footerItems = [], bottomItems, child
         </aside>
         <main id="main" tabIndex={-1} className={`min-w-0 flex-1 focus:outline-none ${bottomItems ? 'pb-20 md:pb-0' : ''}`}>
           <div className="mx-auto w-full max-w-[var(--layout-content-max)] px-4 py-6 md:px-8">
-            {children || <Outlet />}
+            <WorkspaceContent>{children || <Outlet />}</WorkspaceContent>
           </div>
         </main>
       </div>

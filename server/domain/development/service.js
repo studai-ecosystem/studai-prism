@@ -277,6 +277,26 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       return out
     },
 
+    // Every attempt of this user in this workspace for the history projection
+    // (P1.2): stored dates only; the title comes from the attempted version.
+    async listAttemptHistory(user, workspace) {
+      if (!store()) return []
+      const attempts = await store().listAttempts({ userId: user.id, organizationId: orgOf(workspace) })
+      const out = []
+      for (const a of attempts) {
+        const v = await store().getMissionVersion(a.missionId, a.missionVersion)
+        out.push({
+          id: a.id,
+          missionId: a.missionId,
+          title: v?.content?.title || null,
+          status: a.status,
+          startedAt: a.createdAt || null,
+          submittedAt: a.submittedAt || null,
+        })
+      }
+      return out
+    },
+
     // Plan from the formal priorities (same rule as Report V3: ≤ 3 capabilities
     // in the Early/Developing bands), persisted once per source report.
     async planFor(user, workspace, priorities) {

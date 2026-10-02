@@ -2,7 +2,7 @@
 // Every read is scoped to the active workspace (X-Prism-Workspace): PERSONAL
 // sees personal data only, CAMPUS_STUDENT sees its organization's sponsored
 // data only. Dark while PRISM_APP_SHELL_V3 is off.
-//   GET  /me/home | /me/capabilities | /me/evidence | /me/assessments | /me/development-plan | /me/growth
+//   GET  /me/home | /me/capabilities | /me/evidence | /me/assessments | /me/history | /me/development-plan | /me/growth
 //   POST /me/role-exploration                    (PRISM_ROLE_EXPLORATION_V2)
 //   GET  /assessment-assignments/:id             briefing read model
 //   POST /assessment-assignments/:id/acknowledge sponsored disclosure (consent_records)
@@ -31,6 +31,10 @@ const EvidenceQuery = z.object({
 const Acknowledge = z.object({ copyVersion: z.string().min(1).max(80), acknowledged: z.literal(true) }).strict()
 const Preferences = z.object({ reducedMotion: z.boolean(), largerText: z.boolean() }).strict()
 const Interests = z.object({ interests: z.record(z.number().min(0).max(1)).nullable() }).strict()
+const HistoryQuery = z.object({
+  cursor: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+}).strict()
 
 function grantView(g, at) {
   const status = g.revokedAt ? 'REVOKED' : new Date(g.expiresAt) <= at ? 'EXPIRED' : 'ACTIVE'
@@ -56,6 +60,11 @@ export function createStudentRouter({ requireUser, campus, clock = () => new Dat
   router.get('/me/home', ...scoped, asyncHandler(async (req, res) => ok(res, await campus.student.home(req.user, req.workspace))))
   router.get('/me/capabilities', ...scoped, asyncHandler(async (req, res) => ok(res, await campus.student.capabilities(req.user, req.workspace))))
   router.get('/me/assessments', ...scoped, asyncHandler(async (req, res) => ok(res, await campus.assignments.listForWorkspace(req.user, req.workspace))))
+  router.get('/me/history', ...scoped, asyncHandler(async (req, res) => {
+    const parsed = HistoryQuery.safeParse(req.query || {})
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', 'That page reference is not valid.')
+    return ok(res, await campus.history.list(req.user, req.workspace, parsed.data))
+  }))
   router.get('/me/development-plan', ...scoped, asyncHandler(async (req, res) => ok(res, await campus.student.developmentPlan(req.user, req.workspace))))
   router.get('/me/growth', ...scoped, asyncHandler(async (req, res) => ok(res, await campus.student.growth(req.user, req.workspace))))
 

@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'browser', 'browser-smoke'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, browser or browser-smoke mode; connection strings are never arguments.')
+if (!['database', 'browser', 'browser-smoke', 'browser-all'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, browser, browser-smoke or browser-all mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -76,6 +76,7 @@ try {
   stage = 'RUN_ISOLATED_TESTS'
   const browserArgs = ['node_modules/@playwright/test/cli.js', 'test',
     'flow-entry.spec.js', 'flow-player-layout.spec.js', 'flow-recovery.spec.js']
+  if (mode === 'browser-all') browserArgs.splice(2)
   if (mode === 'browser-smoke') browserArgs.push('--grep', 'returning login|pending report')
   exitCode = await run(mode === 'database'
     ? ['--test', 'server/test/experienceBaseline.db.test.js'] : browserArgs, env)

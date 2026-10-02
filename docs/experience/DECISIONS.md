@@ -1,5 +1,31 @@
 # Experience programme - decision and external-gate register
 
+## P1 execution decisions - 2026-10-02
+
+The supplied P1 block authorizes continuing independent implementation after
+P0, not self-approving the domain decisions below.
+
+1. Bare account creation uses `/app`; explicit paid assessment entry keeps its
+   purchase destination. The registration assertion and paid browser tests
+   intentionally distinguish these requirements. No prices, free grant, credit,
+   allowance or checkout handler changed.
+2. Same-origin next paths use the actual application route family; unsafe/
+   malformed/unsupported targets show a recoverable notice without echoing them.
+   Legacy guarded actions preserve their real destination through registration.
+3. Browser account changes clear only known candidate drafts/pending input/
+   personalization/workspace keys, not unrelated storage or a pending invitation.
+   Account-bound component state resets; token renewal by the same owner retains
+   drafts. Workspace resets apply to page content, not shell navigation/focus.
+   Client cancellation is not proof that a server action was cancelled or saved.
+4. Original issued reports keep stored findings and dates; absence stays absent.
+   Rendering/retry fixes do not approve reanalysis or alter the original blob.
+5. No safe assumption resolves CH-08/38/39/40: reviewed ownership write/access
+   decisions, pinned formal-run/async acceptance and the source-retention/erasure
+   contract remain missing. HA-C002/005/008/012/013 and related operational gates
+   remain open. Existing rights, authorization, timing, erasure and retention are
+   preserved. No unused parallel history/job framework or synthetic success
+   pipeline is created to disguise that integration blocker.
+
 Date: 2026-10-02. Scope: approved **P0 diagnostic-only preparation**.
 Source: `..\..\..\.github\prompts\document.md` section 39 and
 `..\..\..\.github\prompts\plan.prompt.md` P0.7.

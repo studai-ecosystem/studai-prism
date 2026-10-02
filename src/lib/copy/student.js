@@ -36,6 +36,21 @@ export const ASSESSMENT_STATUS_COPY = {
 
 export const CTA_COPY = { START: 'Open briefing', VIEW_BRIEFING: 'View briefing', RESUME: 'Resume', VIEW_REPORT: 'View report' }
 
+// History projection (P1.2): every status is a stored fact, never a verdict.
+export const HISTORY_STATUS_COPY = {
+  ACTIVE: { label: 'In progress', tone: 'partial' },
+  COMPLETED: { label: 'Completed', tone: 'positive' },
+  PROCESSING: { label: 'Processing', tone: 'neutral', note: 'Your responses were received. The report is being prepared.' },
+  TECHNICAL_FAILED: { label: 'Review did not finish', tone: 'insufficient', note: 'A technical problem stopped this before a report could be written. Nothing you did is lost.' },
+  UNDER_REVIEW: { label: 'Under review', tone: 'neutral', note: 'A person is reviewing this result. It is not included in your capabilities until the review is finished.' },
+  LEGACY: { label: 'Legacy report', tone: 'neutral', note: 'This report was issued by an earlier version of Prism and is shown as it was originally written.' },
+}
+export const HISTORY_ACTION_COPY = { VIEW_REPORT: 'View report', RESUME: 'Resume', RECOVER: 'Recover' }
+export const HISTORY_LEGACY_ACTION = 'Original report'
+export const HISTORY_MODE_LABEL = { FORMAL: 'Formal assessment', PRACTICE: 'Practice' }
+export const HISTORY_DATE_UNKNOWN = 'Date not recorded'
+export const HISTORY_EMPTY = { title: 'No history yet', description: 'Completed assessments, reports and practice attempts appear here once they exist. Nothing has been removed.' }
+
 export const ASSESSMENT_TABS_EMPTY = {
   ACTIVE: { title: 'Nothing to take right now', description: 'Assessments you can start or resume appear here.' },
   COMPLETED: { title: 'No completed assessments yet', description: 'Finished assessments and their reports appear here.' },

@@ -6,7 +6,7 @@ export function AuthGuard({ children }) {
   const { status } = useAuth()
   const location = useLocation()
   if (status !== 'authenticated') {
-    const next = `${location.pathname}${location.search}`
+    const next = `${location.pathname}${location.search}${location.hash}`
     return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />
   }
   return children

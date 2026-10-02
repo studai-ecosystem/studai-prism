@@ -143,9 +143,23 @@ describe('Where sign-in lands', () => {
     expect(screen.queryByText('checkout landing')).not.toBeInTheDocument()
   })
 
-  it('a new account still continues to checkout', async () => {
+  it('a new account without an explicit purchase destination opens the supported account launcher', async () => {
     mockFetch({ '/api/auth/register': authReply })
     renderApp(where, { route: '/register' })
+    await userEvent.type(screen.getByLabelText(/Full Name/), 'Synthetic Person')
+    await userEvent.type(screen.getByLabelText(/Email/), 'p@test.local')
+    await userEvent.type(screen.getByLabelText(/College/), 'Synthetic College')
+    await userEvent.selectOptions(screen.getByLabelText(/Year of Study/), '4th Year')
+    await userEvent.type(screen.getByLabelText(/Password/), 'a-long-passphrase-1')
+    await userEvent.click(document.querySelector('input[type="checkbox"]'))
+    await userEvent.click(document.querySelector('button[type="submit"]'))
+    expect(await screen.findByText('app landing')).toBeInTheDocument()
+    expect(screen.queryByText('checkout landing')).not.toBeInTheDocument()
+  })
+
+  it('an explicit purchase destination remains compatible with registration', async () => {
+    mockFetch({ '/api/auth/register': authReply })
+    renderApp(where, { route: '/register?next=%2Fpayment' })
     await userEvent.type(screen.getByLabelText(/Full Name/), 'Synthetic Person')
     await userEvent.type(screen.getByLabelText(/Email/), 'p@test.local')
     await userEvent.type(screen.getByLabelText(/College/), 'Synthetic College')
@@ -156,6 +170,14 @@ describe('Where sign-in lands', () => {
     expect(await screen.findByText('checkout landing')).toBeInTheDocument()
   })
 
+  it('a malformed invitation destination shows a recoverable warning instead of throwing or fetching it', () => {
+    const spy = mockFetch({})
+    renderApp(where, { route: '/login?next=%2Fapp%2Fcampus-invite%2F%25' })
+    expect(screen.getByText('This sign-in destination is unavailable')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign in', exact: true })).toBeInTheDocument()
+    expect(spy).not.toHaveBeenCalled()
+  })
+
   it('an explicit next path still wins for a returning user', async () => {
     mockFetch({ '/api/auth/login': authReply })
     renderApp(<Routes><Route path="/login" element={<Auth />} /><Route path="/payment" element={<p>checkout landing</p>} /></Routes>, { route: '/login?next=%2Fpayment' })
@@ -163,6 +185,33 @@ describe('Where sign-in lands', () => {
     await userEvent.type(screen.getByLabelText(/Password/), 'a-long-passphrase-1')
     await userEvent.click(document.querySelector('button[type="submit"]'))
     expect(await screen.findByText('checkout landing')).toBeInTheDocument()
+  })
+
+  it('an explicit invitation next wins over an older pending assessment invitation', async () => {
+    sessionStorage.setItem('prismInviteToken', 'older-synthetic-invite')
+    mockFetch({ '/api/auth/login': authReply, [`/api/v1/org-invites/${TOKEN}`]: { data: invite } })
+    renderApp(
+      <Routes><Route path="/login" element={<Auth />} /><Route path="/app/campus-invite/:token" element={<p>invitation landing</p>} /><Route path="/invite/:token" element={<p>older invitation landing</p>} /></Routes>,
+      { route: `/login?next=${encodeURIComponent(`/app/campus-invite/${TOKEN}`)}` },
+    )
+    await userEvent.type(screen.getByLabelText(/Email/), 'p@test.local')
+    await userEvent.type(screen.getByLabelText(/Password/), 'a-long-passphrase-1')
+    await userEvent.click(document.querySelector('button[type="submit"]'))
+    expect(await screen.findByText('invitation landing')).toBeInTheDocument()
+    expect(screen.queryByText('older invitation landing')).not.toBeInTheDocument()
+  })
+
+  it('an already signed-in user keeps a deep-link fragment instead of an older invitation', async () => {
+    localStorage.setItem('prism_token', 'test-token')
+    localStorage.setItem('prism_user', JSON.stringify(authReply.user))
+    sessionStorage.setItem('prismInviteToken', 'older-synthetic-invite')
+    mockFetch({ '/api/v1/me': { data: { user: authReply.user, flags: {}, permissions: { global: [] }, workspaces: [] } } })
+    renderApp(
+      <Routes><Route path="/login" element={<Auth />} /><Route path="/app/settings" element={<p>profile landing</p>} /><Route path="/invite/:token" element={<p>older invitation landing</p>} /></Routes>,
+      { route: '/login?next=%2Fapp%2Fsettings%23profile' },
+    )
+    expect(await screen.findByText('profile landing')).toBeInTheDocument()
+    expect(screen.queryByText('older invitation landing')).not.toBeInTheDocument()
   })
 
   it('someone already signed in who opens /login goes straight to the app', async () => {

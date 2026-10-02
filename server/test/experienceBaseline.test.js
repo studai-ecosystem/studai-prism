@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { baselineReport, inspectDatabase, runDiagnostic } from '../../scripts/check-experience-baseline.mjs'
 import { createAssessmentSessionService } from '../domain/assessments/sessionService.js'
+import { createSessionIoRepoMemory } from '../domain/assessments/sessionIoRepository.js'
+import { createMemoryDb } from '../domain/campusStore/memoryDb.js'
 
 function client({ missing = false, failure = false, rollbackFailure = false } = {}) {
   const calls = []
@@ -113,22 +115,22 @@ test('P0/CH41 output schema rejects arbitrary fields and invalid counts', () => 
   ]) assert.throws(() => baselineReport({}, database))
 })
 
-test('P0/T25/T26 captures the engine-effect-before-receipt failure window (Layer A)', async (t) => {
+test('P0/T25/T26 durable acceptance survives the engine-effect-before-receipt failure window (Layer A)', async (t) => {
   const user = { id: 'synthetic-owner' }
   const session = { userId: user.id, exchangeCount: 0 }
-  const events = new Map()
+  const db = createMemoryDb()
+  const io = createSessionIoRepoMemory(db)
   let rejectReceipt = true
   const repos = {
     kind: 'memory',
     sessionIo: {
-      async getClientEvent(_sessionId, eventId) { return events.get(eventId) || null },
+      ...io,
       async putClientEvent(event) {
         if (rejectReceipt) {
           rejectReceipt = false
           throw new Error('SYNTHETIC_RECEIPT_WRITE_FAILURE')
         }
-        events.set(event.clientEventId, event)
-        return event
+        return io.putClientEvent(event)
       },
     },
   }
@@ -139,12 +141,31 @@ test('P0/T25/T26 captures the engine-effect-before-receipt failure window (Layer
   })
   const args = { user, workspace: { type: 'PERSONAL' }, sessionId: 'synthetic-session', clientEventId: 'synthetic-event', text: 'Synthetic test input' }
   await assert.rejects(service.sendMessage(args), /SYNTHETIC_RECEIPT_WRITE_FAILURE/)
+  // The action was accepted durably before the engine ran, so the retry is a
+  // re-drive of the same accepted action (engine may run again), not a new one.
+  const afterFailure = await io.getAction(args.sessionId, args.clientEventId)
+  assert.equal(afterFailure.state, 'ACCEPTED')
   const receipt = await service.sendMessage(args)
   assert.equal(receipt.replayed, false)
-  assert.ok(events.has(args.clientEventId))
+  assert.ok(db.clientEvents.has(`${args.sessionId}\u0000${args.clientEventId}`))
+  const appliedAction = await io.getAction(args.sessionId, args.clientEventId)
+  assert.equal(appliedAction.state, 'APPLIED')
+  assert.equal(appliedAction.actionId, afterFailure.actionId)
+  // Exactly one accepted action and one applied result for the key…
+  const actions = [...db.candidateActions.values()].filter((a) => a.sessionId === args.sessionId)
+  assert.equal(actions.length, 1)
+  assert.equal(db.clientEvents.size, 1)
+  // …and a replay returns the applied response without a third engine effect.
+  const replay = await service.sendMessage(args)
+  assert.equal(replay.replayed, true)
+  // Same key, changed payload → CONFLICT (never silently applied).
+  await assert.rejects(service.sendMessage({ ...args, text: 'Changed synthetic input' }), (err) => err.code === 'CONFLICT')
+  const engineEffects = session.exchangeCount
+  assert.ok(engineEffects === 1 || engineEffects === 2, 'at most one re-drive of the accepted action')
+  const status = actions.length === 1 && appliedAction.state === 'APPLIED' && db.clientEvents.size === 1 && engineEffects <= 2 ? 'PASS' : 'FAIL'
+  assert.equal(status, 'PASS')
   t.diagnostic(JSON.stringify({
-    id: 'T25/T26', layer: 'A', invariant: 'one engine effect per event after receipt failure',
-    status: session.exchangeCount === 1 ? 'PASS' : 'FAIL', engineEffects: session.exchangeCount,
-    durableReceipts: events.size, productionCrashTest: false,
+    id: 'T25/T26', layer: 'A', invariant: 'one accepted action and one applied result per client event; re-drive idempotent; changed payload conflicts',
+    status, engineEffects, acceptedActions: actions.length, durableReceipts: db.clientEvents.size, productionCrashTest: false,
   }))
 })

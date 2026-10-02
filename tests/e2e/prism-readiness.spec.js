@@ -78,7 +78,7 @@ async function completeSession(page, label = 'complete') {
 
 test('PRISM-E2E-01 @critical new candidate signup -> verification -> login', async ({ page }) => {
   const email = `ui-${Date.now()}@test.local`
-  await page.goto('/register')
+  await page.goto('/register?next=%2Fpayment')
   await page.getByLabel('Full Name').fill('Browser Audit Candidate')
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('College').fill('Audit College')

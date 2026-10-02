@@ -11,6 +11,10 @@ import { FlagRoute, LegacyAlias, V3Route, ParamRedirect } from './routing.jsx'
 import { RouteErrorBoundary, lazyWithRetry } from './RouteErrorBoundary.jsx'
 import { StudentShell } from '../layouts/StudentShell.jsx'
 import { CampusShell } from '../layouts/CampusShell.jsx'
+import { LinkButton } from '../components/ui/Button.jsx'
+import { DocumentTitle } from '../components/ui/DocumentTitle.jsx'
+import { ErrorState } from '../components/states/ErrorState.jsx'
+import { WorkspaceContent } from './providers/WorkspaceProvider.jsx'
 
 const lazy = lazyWithRetry
 const named = (loader, name) => lazyWithRetry(() => loader().then((m) => ({ default: m[name] })))
@@ -126,10 +130,11 @@ const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusI
 const StudentReportPage = lazy(() => import('../features/reports/pages/StudentReportPage.jsx'))
 const SharedReportPage = lazy(() => import('../features/reports/pages/SharedReportPage.jsx'))
 
-// Legacy guard — behaviour preserved exactly (redirects to /register).
+// Preserve the explicit legacy funnel destination through account creation.
 function RequireAuth({ children }) {
   const { status } = useAuth()
-  return status === 'authenticated' ? children : <Navigate to="/register" replace />
+  const { pathname, search, hash } = useLocation()
+  return status === 'authenticated' ? children : <Navigate to={`/register?next=${encodeURIComponent(`${pathname}${search}${hash}`)}`} replace />
 }
 
 function ScrollToTop() {
@@ -140,11 +145,23 @@ function ScrollToTop() {
   return null
 }
 
-// New shell routes exist only while PRISM_APP_SHELL_V3 is on; otherwise they
-// behave exactly like any unknown legacy URL (→ '/'), so a dark route cannot
-// be told apart from a missing one.
-function ShellGate({ children }) {
-  return <FlagRoute flag="PRISM_APP_SHELL_V3" onError="error" on={children} off={<Navigate to="/" replace />} />
+// Student entry routes explain a dark portal; Campus routes stay dark.
+function ShellGate({ children, off = <Navigate to="/" replace /> }) {
+  return <FlagRoute flag="PRISM_APP_SHELL_V3" onError="error" on={children} off={off} />
+}
+
+function StudentPortalUnavailable() {
+  return (
+    <main id="main" className="prism-app min-h-screen bg-prism-canvas px-4 py-10">
+      <DocumentTitle title="Student portal unavailable" />
+      <ErrorState
+        headingLevel={1}
+        title="The student portal is not available yet"
+        description="Your account and assessment history have not been removed. You can use the assessment launcher while the portal is unavailable. Contact support if you need help finding an earlier report."
+        action={<div className="flex flex-wrap gap-3"><LinkButton to="/app" variant="primary">Open assessment launcher</LinkButton><LinkButton to="/contact" variant="secondary">Contact support</LinkButton></div>}
+      />
+    </main>
+  )
 }
 
 function CampusGate({ children }) {
@@ -152,7 +169,7 @@ function CampusGate({ children }) {
 }
 
 const studentShell = (
-  <ShellGate><AuthGuard><StudentShell /></AuthGuard></ShellGate>
+  <AuthGuard><ShellGate off={<StudentPortalUnavailable />}><StudentShell /></ShellGate></AuthGuard>
 )
 
 // V3 shell pages: the shell flag is part of V3Route's predicate (requiresShell).
@@ -241,13 +258,13 @@ export default function AppRouter() {
             <Route path="/app/sharing" element={<SharingPage />} />
             <Route path="/app/settings" element={<SettingsPage />} />
           </Route>
-          <Route path="/app/assessment/:sessionId" element={<V3Route flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell legacyPath="/workspace/:sessionId" page={<AuthGuard><AssessmentPlayerPage /></AuthGuard>} />} />
+          <Route path="/app/assessment/:sessionId" element={<V3Route flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell legacyPath="/workspace/:sessionId" page={<AuthGuard><WorkspaceContent><AssessmentPlayerPage /></WorkspaceContent></AuthGuard>} />} />
           <Route path="/app/reports/:sessionId" element={<V3Route flag="PRISM_STUDENT_REPORT_V3" requiresShell legacyPath="/report/:sessionId/v2" page={inShell(<StudentReportPage />)} />} />
           <Route path="/app/development/missions/:missionId" element={<V3Route flag="PRISM_DEVELOPMENT_V2" requiresShell legacyPath="/missions/:missionId" page={inShell(<MissionPlayerPage />)} />} />
           {/* Short mission URL: an alias; the development path stays canonical. */}
           <Route path="/app/missions/:missionId" element={<ShellGate><ParamRedirect to="/app/development/missions/:missionId" /></ShellGate>} />
           <Route path="/app/explore" element={<V3Route flag="PRISM_ROLE_EXPLORATION_V2" requiresShell legacyPath="/explore" page={inShell(<ExplorePage />)} />} />
-          <Route path="/app/*" element={<ShellGate><Navigate to="/app/home" replace /></ShellGate>} />
+          <Route path="/app/*" element={<AuthGuard><ShellGate off={<StudentPortalUnavailable />}><Navigate to="/app/home" replace /></ShellGate></AuthGuard>} />
 
           {/* Campus invitation (spec §37.2): sign-in first, so a signed-out
               invitee reaches /login?next= (K25 flip precondition). */}
@@ -324,7 +341,8 @@ export default function AppRouter() {
           <Route path="/verify/:id" element={<Verify />} />
           <Route path="/rater" element={<RaterWorkbench />} />
           <Route path="/rater/evidence" element={<EvidenceRatingPage />} />
-          <Route path="/profile" element={<Navigate to="/app/settings#profile" replace />} />
+          <Route path="/dashboard" element={<AuthGuard><Navigate to="/app/home" replace /></AuthGuard>} />
+          <Route path="/profile" element={<AuthGuard><Navigate to="/app/settings#profile" replace /></AuthGuard>} />
           {/* Legacy URLs (spec §6.5): move to V3 only when its flag is on. */}
           <Route path="/explore" element={<LegacyAlias flag="PRISM_ROLE_EXPLORATION_V2" requiresShell v3Path="/app/explore" legacy={<ExploreMode />} />} />
           <Route path="/workspace/:sessionId" element={<LegacyAlias flag="PRISM_ASSESSMENT_WORKSPACE_V3" requiresShell v3Path="/app/assessment/:sessionId" legacy={<AssessmentWorkspace />} />} />

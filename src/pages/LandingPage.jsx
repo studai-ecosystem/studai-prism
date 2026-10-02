@@ -36,7 +36,7 @@ export default function LandingPage() {
   const enterFunnel = useCallback(() => {
     // Enter the funnel: account → payment → briefing → assessment.
     // Already signed in? Skip straight to checkout — never back to login.
-    navigate(isAuthenticated() ? '/payment' : '/register')
+    navigate(isAuthenticated() ? '/payment' : '/register?next=%2Fpayment')
   }, [navigate])
 
   // On Windows browsers, taking the test first offers the dedicated exam app

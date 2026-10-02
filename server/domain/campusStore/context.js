@@ -15,6 +15,7 @@ import { createCatalogService } from '../assessments/catalogService.js'
 import { createAssignmentService } from '../assessments/assignmentService.js'
 import { createSessionDirectory } from '../student/sessionDirectory.js'
 import { createStudentReadModels } from '../student/readModels.js'
+import { createStudentHistory } from '../student/history.js'
 import { createAssessmentSessionService } from '../assessments/sessionService.js'
 import { createReportService } from '../reports/v3/service.js'
 import { createTelemetryService } from '../telemetry/events.js'
@@ -136,6 +137,12 @@ export function createCampusContext({
     catalog,
     assignments,
     student: createStudentReadModels({ directory, catalog, assignments, evidence, practice: practiceSource, development: developmentPlans, growth: growthReads, roles, legacy, clock }),
+    // Authorized history projection (P1.2): formal sessions, legacy reports
+    // and practice attempts of the caller in the active workspace.
+    history: createStudentHistory({
+      directory, catalog, legacy, clock,
+      practice: { listAttemptHistory: async (user, workspace) => (developmentOn() ? development.listAttemptHistory(user, workspace) : []) },
+    }),
     telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }),
     sessions: engine
       ? createAssessmentSessionService({

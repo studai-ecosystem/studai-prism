@@ -48,6 +48,7 @@ import { decideDirectorV2 } from '../lib/directorV2.js'
 import { buildPanelPlan } from '../lib/judgePanel.js'
 import { aggregateSamples } from '../lib/scoreAggregator.js'
 import { auditLog, recordItemResponse, recordAbilityEstimate, getResponseIdsBySession, recordTimelineEntry, activeFlagSnapshot, eraseTelemetry, recordSessionTranscript, summarizeSessionBehavior, recordBehavioralFeatures, isDbConfigured as telemetryDbConfigured } from '../lib/telemetry.js'
+import { eraseCampusSessionData } from '../lib/campusErasure.js'
 import { DIMENSION_KEYS, DIMENSION_WEIGHTS, SCORE_VALIDITY_MONTHS, SCALE_VERSION, REAL_ENTITLEMENT_MODES, ALTERNATE_ADMINISTRATION_DISCLOSURE } from '../lib/sharedConstants.js'
 import { getJwtSecret } from '../lib/security.js'
 import { findUserById } from '../lib/db.js'
@@ -2361,7 +2362,8 @@ router.delete('/data/:sessionId', async (req, res) => {
     if (await sessions.has(sessionId)) await sessions.delete(sessionId)
     const removed = await eraseSession(sessionId)
     const telemetryRemoved = await eraseTelemetry(sessionId)
-    res.json({ ok: true, removed, telemetryRemoved })
+    const campusRemoved = await eraseCampusSessionData(sessionId)
+    res.json({ ok: true, removed, telemetryRemoved, campusRemoved })
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_data_delete_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to erase data' })
@@ -2382,7 +2384,8 @@ router.delete('/candidate-data', async (req, res) => {
       if (await sessions.has(sid)) await sessions.delete(sid)
       const removed = await eraseSession(sid)
       const telemetryRemoved = await eraseTelemetry(sid)
-      results.push({ sessionId: sid, removed, telemetryRemoved })
+      const campusRemoved = await eraseCampusSessionData(sid)
+      results.push({ sessionId: sid, removed, telemetryRemoved, campusRemoved })
     }
     auditLog('candidate_erasure', null, { sessions: sessionIds.length })
     res.json({ ok: true, erasedSessions: sessionIds.length, results })

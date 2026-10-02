@@ -43,6 +43,10 @@ export function createSessionDirectory({ repos, legacy }) {
           startedAt: toIso(session?.startedAt),
           completedAt: report ? toIso(report.issuedAt) || toIso(session?.completedAt) : null,
           hasReport: Boolean(report),
+          // History projection (P1.2): stored facts only, never derived dates.
+          hasSession: Boolean(session),
+          sessionCompletedAt: toIso(session?.completedAt),
+          reportIssuedAt: report ? toIso(report.issuedAt) : null,
           history: Array.isArray(session?.history) ? session.history : [],
         })
       }

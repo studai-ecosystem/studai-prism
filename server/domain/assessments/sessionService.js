@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { ApiError } from '../http/errors.js'
 import { buildSessionContract, scenarioView } from './sessionContract.js'
 import { reportPath } from './assignmentService.js'
+import { createMemorySessionLocks } from './sessionLocks.js'
 
 const START_EVENT = 'start'
 const CANDIDATE = 'CANDIDATE'
@@ -19,36 +20,44 @@ export const REQUIRED_CONSENT_SCOPES = Object.freeze([
 ])
 const requiredConsentScopes = REQUIRED_CONSENT_SCOPES
 
-// Serialises engine calls per session inside this process, so a double-click
-// can never produce two engine turns or interleave an artifact save.
-function createSessionLocks() {
-  const tails = new Map()
-  return async function withLock(sessionId, fn) {
-    const prev = tails.get(sessionId) || Promise.resolve()
-    let release
-    const next = new Promise((r) => { release = r })
-    const tail = prev.then(() => next)
-    tails.set(sessionId, tail)
-    await prev
-    try {
-      return await fn()
-    } finally {
-      release()
-      if (tails.get(sessionId) === tail) tails.delete(sessionId)
-    }
-  }
-}
-
 export function createAssessmentSessionService({
   repos, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes,
   clock = () => new Date(), limitMs, audit = () => {},
   // Called once a sponsored roster row turns COMPLETED (completion notifications).
   onSponsoredCompleted = async () => {},
 }) {
-  const withLock = createSessionLocks()
+  const localLocks = createMemorySessionLocks()
+  const withLock = (resource, work) => {
+    if (repos?.sessionLocks) return repos.sessionLocks.withLock(resource, work)
+    if (repos?.kind === 'pg' || process.env.NODE_ENV === 'production') {
+      throw new ApiError('CAMPUS_STORE_UNAVAILABLE', 'Distributed assessment locking is unavailable.')
+    }
+    return localLocks.withLock(resource, work)
+  }
 
   function requireStore() {
     if (!repos?.sessionIo) throw new ApiError('CAMPUS_STORE_UNAVAILABLE', 'The assessment workspace is temporarily unavailable.')
+  }
+
+  // P1.5 durable acceptance: the candidate action is persisted BEFORE the
+  // engine runs. Same key + same payload → the stored row (replay / re-drive);
+  // same key + different payload → CONFLICT; erased session → NOT_FOUND. The
+  // engine may therefore run more than once after a failure, but there is
+  // exactly one accepted action and one applied result per client event id.
+  const durable = () => (typeof repos.sessionIo.acceptAction === 'function' ? repos.sessionIo : null)
+  async function rejectErased(sessionId) {
+    const io = durable()
+    if (io && await io.hasErasureMarker(sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
+  }
+  async function accept(args) {
+    const io = durable()
+    return io ? io.acceptAction(args) : null
+  }
+  async function applied(action, result) {
+    if (action) await repos.sessionIo.applyAction(action.actionId, result)
+  }
+  async function failed(action, err) {
+    if (action) await repos.sessionIo.failAction(action.actionId, err?.code || 'ENGINE_FAILED').catch(() => {})
   }
 
   // The session, if and only if the caller owns it in this workspace.
@@ -95,7 +104,7 @@ export function createAssessmentSessionService({
     }
   }
 
-  return {
+  const service = {
     async start({ user, workspace, assignmentId, idempotencyKey, consent, authorization, client, requestId }) {
       requireStore()
       if (!idempotencyKey) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
@@ -200,16 +209,29 @@ export function createAssessmentSessionService({
     async sendMessage({ user, workspace, sessionId, clientEventId, text, authorization, client, requestId }) {
       requireStore()
       await authorize(user, workspace, sessionId)
+      await rejectErased(sessionId)
+      const action = await accept({ sessionId, clientEventId, kind: 'MESSAGE', payload: { text } })
       const replay = await repos.sessionIo.getClientEvent(sessionId, clientEventId)
       if (replay) return { ...replay.response, replayed: true }
       return withLock(sessionId, async () => {
         const again = await repos.sessionIo.getClientEvent(sessionId, clientEventId)
         if (again) return { ...again.response, replayed: true }
-        if (await legacy.getReport(sessionId)) throw new ApiError('ASSESSMENT_COMPLETED', 'This assessment has already been completed.')
-        const { messages } = await engine.message({ sessionId, text, authorization, client, requestId })
+        if (await legacy.getReport(sessionId)) {
+          const err = new ApiError('ASSESSMENT_COMPLETED', 'This assessment has already been completed.')
+          await failed(action, err)
+          throw err
+        }
+        let messages
+        try {
+          ;({ messages } = await engine.message({ sessionId, text, authorization, client, requestId }))
+        } catch (err) {
+          await failed(action, err)
+          throw err
+        }
         const after = await legacy.getSession(sessionId)
         const response = { messages, exchanges: Number(after?.exchangeCount) || 0 }
         const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
+        await applied(action, stored.response)
         return { ...stored.response, replayed: false }
       })
     },
@@ -217,32 +239,57 @@ export function createAssessmentSessionService({
     async saveArtifact({ user, workspace, sessionId, artifactId, ifMatch, clientEventId = null, updates, notes, authorization, client, requestId }) {
       requireStore()
       const { session } = await authorize(user, workspace, sessionId)
+      await rejectErased(sessionId)
       if (!Number.isInteger(ifMatch) || ifMatch < 0) throw new ApiError('IF_MATCH_REQUIRED', 'Send the version you are changing (If-Match).')
+      const action = clientEventId
+        ? await accept({ sessionId, clientEventId, kind: 'ARTIFACT', payload: { artifactId, ifMatch, updates: updates ?? null, notes: notes ?? null } })
+        : null
       if (clientEventId) {
         const replay = await repos.sessionIo.getClientEvent(sessionId, clientEventId)
         if (replay) return { ...replay.response, replayed: true }
       }
       if (!(session.artifacts || []).some((a) => a.artifactId === artifactId)) throw new ApiError('NOT_FOUND', 'This work material is not part of the session.')
       return withLock(sessionId, async () => {
-        if (await legacy.getReport(sessionId)) throw new ApiError('ASSESSMENT_COMPLETED', 'This assessment has already been completed.')
+        if (clientEventId) {
+          const replay = await repos.sessionIo.getClientEvent(sessionId, clientEventId)
+          if (replay) return { ...replay.response, replayed: true }
+        }
+        if (await legacy.getReport(sessionId)) {
+          const err = new ApiError('ASSESSMENT_COMPLETED', 'This assessment has already been completed.')
+          await failed(action, err)
+          throw err
+        }
         const current = await repos.sessionIo.latestArtifactVersion(sessionId, artifactId)
         const currentVersion = current?.version || 0
         const currentNotes = typeof current?.content?.notes === 'string' ? current.content.notes : ''
         if (ifMatch !== currentVersion) {
           const fresh = await legacy.getSession(sessionId)
           const snapshot = (fresh?.artifacts || []).find((a) => a.artifactId === artifactId) || null
-          throw new ApiError('CONFLICT', 'This work material changed since you opened it.', {
+          const err = new ApiError('CONFLICT', 'This work material changed since you opened it.', {
             details: { version: currentVersion, artifact: snapshot ? { artifactId, type: snapshot.type, title: snapshot.title || null, data: snapshot.data ?? null, notes: currentNotes } : null },
           })
+          await failed(action, err)
+          throw err
         }
-        const { artifact } = await engine.saveArtifact({ sessionId, artifactId, updates, notes, authorization, client, requestId })
-        if (!artifact) throw new ApiError('UPSTREAM_UNAVAILABLE', 'Your work was not saved.')
+        let artifact
+        try {
+          ;({ artifact } = await engine.saveArtifact({ sessionId, artifactId, updates, notes, authorization, client, requestId }))
+        } catch (err) {
+          await failed(action, err)
+          throw err
+        }
+        if (!artifact) {
+          const err = new ApiError('UPSTREAM_UNAVAILABLE', 'Your work was not saved.')
+          await failed(action, err)
+          throw err
+        }
         // The candidate's reasoning is kept with the version so a refresh
         // shows it again (the engine keeps it only inside evidence).
         const savedNotes = typeof notes === 'string' ? notes : currentNotes
         const written = await repos.sessionIo.appendArtifactVersion({ sessionId, artifactId, version: currentVersion + 1, content: { data: artifact.data ?? null, notes: savedNotes }, savedBy: CANDIDATE })
         const response = { artifactId, version: written.version, data: artifact.data ?? null, notes: savedNotes }
         if (clientEventId) await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'ARTIFACT', response })
+        await applied(action, response)
         return { ...response, replayed: false }
       })
     },
@@ -264,6 +311,17 @@ export function createAssessmentSessionService({
       audit('assessment.finish_requested', sessionId, { sessionId, early: exchanges < required, exchanges, requiredExchanges: required, requestId })
       if (state === 'COMPLETE') await settle(sessionId, user)
       return { state }
+    },
+  }
+  return {
+    ...service,
+    start(args) {
+      requireStore()
+      return withLock(`assignment:${args.assignmentId}:${args.user.id}`, () => service.start(args))
+    },
+    finish(args) {
+      requireStore()
+      return withLock(args.sessionId, () => service.finish(args))
     },
   }
 }

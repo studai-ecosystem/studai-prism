@@ -1,11 +1,11 @@
 // React Query hooks for the student application. Keys start with
 // ['ws', workspaceId] so switching workspace drops the previous context's data.
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkspace, wsKey } from '../../app/providers/WorkspaceProvider.jsx'
 import {
   fetchStudentHome, fetchStudentAssessments, fetchStudentCapabilities, fetchStudentEvidence, fetchDevelopmentPlan,
   fetchGrowth, fetchAssignmentBriefing, acknowledgeAssignment, exploreRolesV2, fetchPreferences, savePreferences,
-  fetchShareGrants, revokeShareGrant,
+  fetchShareGrants, revokeShareGrant, fetchHistory,
 } from '../../api/student.js'
 
 // The API client already retries network failures; React Query adds one more
@@ -19,6 +19,18 @@ function useScopedQuery(name, fn, extra = [], options = {}) {
 
 export const useStudentHome = () => useScopedQuery('home', fetchStudentHome)
 export const useStudentAssessments = () => useScopedQuery('assessments', fetchStudentAssessments)
+// Paginated history projection (P1.2); pages accumulate until the server
+// returns no cursor. Scoped like every other read so workspaces never mix.
+export function useStudentHistory() {
+  const { active } = useWorkspace()
+  return useInfiniteQuery({
+    queryKey: wsKey(active.id, 'history'),
+    queryFn: ({ pageParam }) => fetchHistory({ cursor: pageParam }),
+    initialPageParam: null,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    retry: noRetryOn(['FORBIDDEN', 'NOT_FOUND', 'VALIDATION_FAILED']),
+  })
+}
 export const useStudentCapabilities = () => useScopedQuery('capabilities', fetchStudentCapabilities)
 export const useDevelopmentPlan = () => useScopedQuery('development-plan', fetchDevelopmentPlan)
 export const useGrowth = () => useScopedQuery('growth', fetchGrowth)

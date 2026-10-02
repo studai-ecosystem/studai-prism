@@ -1,5 +1,19 @@
 # P0 diagnostic recovery and operator handoff
 
+## P1 protected integration gates - 2026-10-02
+
+The foundation is implemented locally and verified on disposable PostgreSQL;
+the remaining items are production/approval actions, not missing code.
+
+| Action | Owner / evidence needed | Status |
+| --- | --- | --- |
+| Production ownership reconciliation run (`scripts/reconcile-ownership.mjs --apply`) | Operator + security; dry-run report reviewed, backup taken, CONFLICTING/UNCLAIMED samples inspected | Script ready; execution operator-gated |
+| Support decision workflow for CONFLICTING/UNCLAIMED | Support + security; approved evidence protocol | Read-only categories + audited apply path exist; UI workflow deferred to P8 admin |
+| Migration 0040 on production | Operator; applied after backup, reversible via `.down.sql` | Additive, tested on disposable PG |
+| Legacy `/evaluate` job registry cutover to `assessment_jobs` | Engineering; restart/lease tests on PG | Job repo + fencing tested; wiring is P2 |
+| Retention basis for `assessment_candidate_actions` payloads and backup expiry | Privacy/counsel | Open policy question |
+| Recovery reissue/refund/credit effects | Paul/finance/support | Proposed only |
+
 Prepared: 2026-10-02. **PROCEDURE PREPARED; execution approvals pending.**
 Complete learner journey: **NO-GO**. Active-run-safe rollback: **NOT PROVEN**.
 

@@ -1,7 +1,7 @@
 // Production wiring for the campus context: Postgres repositories (only when
 // DATABASE_URL is set), the legacy v1 store for personal entitlements, and
 // the mailer for invites.
-import { isDbConfigured, query, getPool } from '../../db/pool.js'
+import { isDbConfigured, query, getPool, getSessionLockPool } from '../../db/pool.js'
 import { createPgCampusRepos } from './index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from './context.js'
 import { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport, getEntitlement, createEntitlement } from '../../lib/store.js'
@@ -41,7 +41,7 @@ const legacyPaths = {
 export function createDefaultCampusContext() {
   const base = (process.env.PUBLIC_APP_URL || '').replace(/\/$/, '')
   return createCampusContext({
-    repos: isDbConfigured() ? createPgCampusRepos({ query, getPool }) : null,
+    repos: isDbConfigured() ? createPgCampusRepos({ query, getPool, getLockPool: getSessionLockPool }) : null,
     campusStoreAvailable: () => isDbConfigured(),
     legacyLookup: (user) => listEntitlementsByUser(user.id),
     // Without a configured public URL there is no safe absolute link to send.

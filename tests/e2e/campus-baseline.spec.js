@@ -8,7 +8,7 @@ const PASSWORD = 'candidate-pass-1!'
 test('CAMPUS-BASELINE-01 @critical @campus-baseline register (age confirm) → login → /app → start path reachable', async ({ page }) => {
   const email = `campus-baseline-${Date.now()}@test.local`
 
-  await page.goto('/register')
+  await page.goto('/register?next=%2Fpayment')
   await page.getByLabel('Full Name').fill('Campus Baseline Candidate')
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('College').fill('Synthetic College')

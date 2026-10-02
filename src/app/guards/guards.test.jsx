@@ -19,10 +19,10 @@ describe('AuthGuard', () => {
         <Route path="/app/home" element={<AuthGuard><p>secret</p></AuthGuard>} />
         <Route path="/login" element={<Where />} />
       </Routes>,
-      { route: '/app/home?tab=x' },
+      { route: '/app/home?tab=x#profile' },
     )
     expect(screen.queryByText('secret')).not.toBeInTheDocument()
-    expect(screen.getByText(`at:/login?next=${encodeURIComponent('/app/home?tab=x')}`)).toBeInTheDocument()
+    expect(screen.getByText(`at:/login?next=${encodeURIComponent('/app/home?tab=x#profile')}`)).toBeInTheDocument()
   })
   it('renders children when signed in', () => {
     signIn()

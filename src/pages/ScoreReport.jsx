@@ -9,7 +9,7 @@ import {
 import { getUser, getToken } from '../lib/session.js'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
 import {
-  DIMENSION_WEIGHTS, DIMENSION_LABELS, DIMENSION_PUBLIC_DEFINITIONS, SCORE_VALIDITY_MONTHS,
+  DIMENSION_WEIGHTS, DIMENSION_LABELS, DIMENSION_PUBLIC_DEFINITIONS,
   REASSESSMENT_DAYS, PILOT_NOTICE, NOT_SOLE_BASIS_POLICY, INSUFFICIENT_EVIDENCE_LABEL,
   ASSURANCE_LEVELS, INTEGRITY_SCORING_NOTE,
 } from '../../server/lib/sharedConstants.js'
@@ -30,7 +30,6 @@ const DIMENSIONS = [
     Icon: MessageSquare,
     ringBg: ACCENT_SOFT,
     iconBg: ACCENT_SOFTER,
-    evidence: '"When Avatar 3 said it didn\'t follow your reasoning, you didn\'t repeat yourself — you restructured entirely. Your second explanation used an analogy, a data point, and a direct consequence. That\'s adaptive communication under pressure. Rare."',
   },
   {
     key: 'criticalThinking',
@@ -40,7 +39,6 @@ const DIMENSIONS = [
     Icon: Brain,
     ringBg: ACCENT_SOFT,
     iconBg: ACCENT_SOFTER,
-    evidence: '"Before choosing the dashboard, you asked what the teacher adoption rate was for the previous version — information the scenario hadn\'t provided. Identifying the missing variable before acting is the defining behavior of structured critical thinking."',
   },
   {
     key: 'problemSolving',
@@ -50,7 +48,6 @@ const DIMENSIONS = [
     Icon: Puzzle,
     ringBg: ACCENT_SOFT,
     iconBg: ACCENT_SOFTER,
-    evidence: '"When Avatar 1 added the constraint — only 3 engineers available — you immediately dropped your original plan and proposed the FAQ bot middle ground. You named what you were giving up and what you were preserving. That\'s trade-off articulation, not just compromise."',
   },
   {
     key: 'collaboration',
@@ -60,7 +57,6 @@ const DIMENSIONS = [
     Icon: Users,
     ringBg: ACCENT_SOFT,
     iconBg: ACCENT_SOFTER,
-    evidence: '"You acknowledged the opposing concern before countering. You held your position but demonstrated genuine engagement with the opposing view. One missed moment: you didn\'t credit Avatar 1\'s suggestion before adopting it."',
   },
   {
     key: 'aiDigitalFluency',
@@ -70,7 +66,6 @@ const DIMENSIONS = [
     Icon: Bot,
     ringBg: ACCENT_SOFT,
     iconBg: ACCENT_SOFTER,
-    evidence: '"When offered an AI content tool, you specified what to prompt and what to verify manually — showing you understand AI as a tool, not an answer machine. Improvement area: raising whether AI-generated output should be reviewed by an expert before publishing."',
   },
 ]
 
@@ -89,6 +84,14 @@ const BANDS = [
 ]
 function getBand(score) {
   return BANDS.find((b) => score >= b.min) || BANDS[BANDS.length - 1]
+}
+
+function storedText(value) {
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
+function storedValue(value) {
+  return storedText(value) ?? (Number.isFinite(value) ? value : null)
 }
 
 // English ordinal suffix: 1 → "st", 2 → "nd", 3 → "rd", 61 → "st", 11 → "th".
@@ -204,7 +207,9 @@ export default function ScoreReport() {
   // No sample/demo report: every score shown here comes from an issued report
   // (Prism Campus K6/K41 — no invented scores or named sample candidates).
   const [report, setReport] = useState(location.state?.report || null)
-  const [loadingReport, setLoadingReport] = useState(false)
+  const [loadingReport, setLoadingReport] = useState(Boolean(sessionId && !location.state?.report))
+  const [reportError, setReportError] = useState(null)
+  const [readAttempt, setReadAttempt] = useState(0)
 
   // Refresh-safe: if the page is reloaded or opened directly with a session id,
   // fetch the durable report from the server.
@@ -212,18 +217,28 @@ export default function ScoreReport() {
     if (report || !sessionId) return
     let cancelled = false
     setLoadingReport(true)
+    setReportError(null)
     fetch(`/api/assessment/report/${sessionId}`, {
       headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
     })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled && d) setReport(d) })
-      .catch(() => {})
+      .then((r) => {
+        if (!r.ok) throw Object.assign(new Error('Report read failed'), { status: r.status })
+        return r.json()
+      })
+      .then((d) => {
+        if (!d || typeof d !== 'object' || Array.isArray(d)) throw new Error('Invalid report response')
+        if (!cancelled) setReport(d)
+      })
+      .catch((err) => {
+        if (!cancelled) setReportError([401, 403, 404].includes(err.status) ? 'unavailable' : 'failed')
+      })
       .finally(() => { if (!cancelled) setLoadingReport(false) })
     return () => { cancelled = true }
-  }, [report, sessionId])
+  }, [report, sessionId, readAttempt])
 
   const reportRef = useRef(null)
   const [downloading, setDownloading] = useState(false)
+  const [notice, setNotice] = useState(null)
 
   // Email-report modal state.
   const [emailOpen, setEmailOpen] = useState(false)
@@ -290,30 +305,42 @@ export default function ScoreReport() {
   if (!report) {
     if (loadingReport) {
       return (
-        <div className="min-h-screen bg-prism-surface flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <div role="status" className="min-h-screen bg-prism-surface flex flex-col items-center justify-center gap-4 p-6 text-center">
           <div className="w-10 h-10 rounded-full border-2 border-[var(--prism-signal)] border-t-transparent animate-spin" />
           <p className="font-sans text-[var(--prism-ink-muted)]">Loading your report…</p>
         </div>
       )
     }
     return (
-      <div className="min-h-screen bg-prism-surface flex flex-col items-center justify-center gap-6 p-6 text-center">
+      <div role={reportError ? 'alert' : undefined} className="min-h-screen bg-prism-surface flex flex-col items-center justify-center gap-6 p-6 text-center">
         <AlertTriangle size={40} className="text-[var(--status-blocked-ink)]" />
-        <h1 className="font-serif text-3xl text-[var(--prism-ink)]">Score not found</h1>
+        <h1 className="font-serif text-3xl text-[var(--prism-ink)]">
+          {reportError === 'unavailable' ? 'Report unavailable' : reportError ? 'Unable to load report' : 'Report not selected'}
+        </h1>
         <p className="font-sans text-[var(--prism-ink-muted)] max-w-sm">
-          This report link has expired or was accessed directly. Please complete an assessment first.
+          {reportError === 'unavailable'
+            ? 'This report is unavailable for this request. Return to your history or try again.'
+            : reportError
+              ? 'We could not load this report. Try again or return to your history.'
+              : 'Select a stored report from your history to view it.'}
         </p>
-        <button onClick={() => navigate('/')} className="font-sans text-sm text-[var(--prism-signal)] underline">
-          Back to home
+        {sessionId && (
+          <button onClick={() => setReadAttempt((attempt) => attempt + 1)} className="font-sans text-sm text-[var(--prism-signal)] underline">
+            Try again
+          </button>
+        )}
+        <button onClick={() => navigate('/app')} className="font-sans text-sm text-[var(--prism-signal)] underline">
+          Back to history
         </button>
       </div>
     )
   }
 
-  const { scores, feedback, highlights, growthAreas } = report
+  const { feedback, highlights, growthAreas } = report
+  const scores = report.scores || {}
   // Charter §6 — profile-first: reports issued under the new policy carry NO
   // composite; legacy reports (scores.overall present) render as issued.
-  const hasComposite = typeof scores.overall === 'number'
+  const hasComposite = Number.isFinite(scores.overall)
   const band = hasComposite ? getBand(scores.overall) : null
   // Charter §7.2/§8 — dimensions without their evidence floor are null and
   // render as `Insufficient evidence`, never a number.
@@ -327,7 +354,7 @@ export default function ScoreReport() {
     high: 'High AI panel consistency',
     moderate: 'Moderate AI panel consistency',
     low: 'Low AI panel agreement — eligible for human review',
-  }[report.reliability?.label] || 'Provisional result'
+  }[report.reliability?.label] || storedText(report.reliability?.label) || 'Panel consistency not recorded'
 
   // Track 4.1: non-English sessions are provisional until the multilingual
   // DIF study calibrates them — the report must say so, always.
@@ -335,22 +362,22 @@ export default function ScoreReport() {
     ? report.scoring.language
     : null
 
-  const validityMonths = report.validityMonths || SCORE_VALIDITY_MONTHS
-  const now = new Date()
-  const issuedDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  const validUntilDate = new Date(now)
-  validUntilDate.setMonth(validUntilDate.getMonth() + validityMonths)
-  const validUntil = validUntilDate
-    .toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  const testDateTime = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) +
-    ' · ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-  const verifyId = sessionId || 'PSRM-DEMO'
+  // The frozen blob is the date/method source; viewing it never renews issuance.
+  const validityMonths = Number.isFinite(report.validityMonths) ? report.validityMonths : null
+  const issuedDate = storedValue(report.issuedAt)
+  const validUntil = storedValue(report.validUntil)
+  const testDateTime = storedValue(report.completedAt)
+  const verifyId = sessionId || storedText(report.sessionId)
   const displayName = userName || getUser()?.name || 'Prism Candidate'
+  const methodText = storedText(report.method)
+  const methodEntries = report.method && typeof report.method === 'object' && !Array.isArray(report.method)
+    ? Object.entries(report.method).filter(([, value]) => storedValue(value) != null)
+    : []
 
   const dims = DIMENSIONS.map((d) => ({
     ...d,
-    score: typeof scores[d.key] === 'number' ? scores[d.key] : null,
-    insufficient: insufficientDims.includes(d.key) || typeof scores[d.key] !== 'number',
+    score: Number.isFinite(scores[d.key]) ? scores[d.key] : null,
+    insufficient: insufficientDims.includes(d.key) || !Number.isFinite(scores[d.key]),
   }))
   // The radar plots only scored dimensions — an unscored dimension is absent,
   // never drawn at zero (that would fabricate a value).
@@ -376,37 +403,18 @@ export default function ScoreReport() {
   const scenarioText =
     (report.scenario && typeof report.scenario === 'object'
       ? [report.scenario.title, report.scenario.domain].filter(Boolean).join(' · ')
-      : report.scenario) ||
-    '"You are a Product Manager at a growing EdTech startup. Two weeks before launch, engineering says they can ship only one of two features. You have to make the call — and defend it."'
+      : storedText(report.scenario)) || 'Scenario not recorded in this report.'
 
-  const strengths = (highlights && highlights.length)
-    ? highlights
-    : [
-        'Asks for missing information before deciding — signature critical thinking behaviour',
-        'Adapts communication style when not understood — did not repeat, restructured',
-        'Articulates trade-offs explicitly, not just makes choices',
-        'Holds positions under weak pushback, updates under strong evidence',
-      ]
-  const growth = (growthAreas && growthAreas.length)
-    ? growthAreas
-    : [
-        "Credit others' ideas before building on them — acknowledge before adopt",
-        'Raise ethical/quality flags on AI outputs proactively, not reactively',
-        'Quantify your own reasoning more explicitly',
-      ]
+  const strengths = Array.isArray(highlights) ? highlights.filter(storedText) : []
+  const growth = Array.isArray(growthAreas) ? growthAreas.filter(storedText) : []
+  const interviewQs = Array.isArray(report.interviewQuestions) ? report.interviewQuestions.filter(storedText) : []
 
-  const interviewQs = report.interviewQuestions || [
-    'Tell me about a time you had to make a decision with incomplete information. What did you specifically look for before deciding?',
-    'Walk me through a situation where someone disagreed with your recommendation. How did you handle the conversation?',
-    'Describe a decision where you had to explicitly trade something off. How did you communicate what you were giving up?',
-    'When have you used an AI tool in your work? What did you give it, what did you verify yourself, and why?',
-  ]
-
-  const shareUrl = `${window.location.origin}/verify/${verifyId}`
+  const shareUrl = verifyId ? `${window.location.origin}/verify/${verifyId}` : null
   // Charter §6: the share line never carries the composite.
   const shareText = 'I completed the Prism workplace-readiness assessment by StudAI One — my evidence profile is verifiable at the link.'
 
   const handleLinkedInShare = () => {
+    if (!shareUrl) return
     const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}&summary=${encodeURIComponent(shareText)}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
@@ -787,7 +795,7 @@ export default function ScoreReport() {
           <button className="hbtn hbtn-g" onClick={handleDownloadPdf} disabled={downloading}>
             <Download size={15} />{downloading ? 'Preparing…' : 'Download PDF'}
           </button>
-          <button className="hbtn hbtn-outline" onClick={handleLinkedInShare}><Share2 size={15} />Share</button>
+          <button className="hbtn hbtn-outline" onClick={handleLinkedInShare} disabled={!verifyId}><Share2 size={15} />Share</button>
           <button className="hbtn hbtn-fill" onClick={() => navigate('/')}><Briefcase size={15} />Find jobs with this score</button>
         </div>
       </header>
@@ -807,8 +815,11 @@ export default function ScoreReport() {
             <div className="cert-overline">
               <div className="cert-overline-badge">
                 <div className="cert-overline-dot"><Award size={12} /></div>
-                <span className="cert-overline-txt">Prism Verified · Issued {issuedDate}</span>
+                <span className="cert-overline-txt">Prism Verified · {issuedDate != null ? `Issued ${issuedDate}` : 'Issue date not recorded'}</span>
               </div>
+            </div>
+            <div className="cert-overline-txt" style={{ marginBottom: 12 }}>
+              {hasComposite || !storedText(report.reportPolicy) ? 'Original report · Legacy method' : 'Original report · Stored method'}
             </div>
             <div className="cert-name">{displayName}</div>
             <div className="cert-meta">
@@ -835,7 +846,7 @@ export default function ScoreReport() {
                 <div className="cert-score-hero">
                   <div className="cert-score-lbl">Evidence Profile</div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.95)', maxWidth: 360, lineHeight: 1.5, marginTop: 6 }}>
-                    Five dimensions, each scored from observed behaviour in your session — no single composite number.
+                    Stored dimension scores are shown where available. No overall score is recorded in this report.
                   </div>
                   <div className="cert-score-tier"><Star size={14} fill="white" color="white" />{reliabilityText}</div>
                   {provisionalLanguage && (
@@ -859,7 +870,10 @@ export default function ScoreReport() {
                     )}
                   </div>
                 )}
-                <div className="cert-validity" style={{ textAlign: 'right' }}>Valid until {validUntil} · {verifyId}</div>
+                <div className="cert-validity" style={{ textAlign: 'right' }}>
+                  {validUntil != null ? `Valid until ${validUntil}` : 'Validity end date not recorded'}
+                  {verifyId && <> · {verifyId}</>}
+                </div>
               </div>
             </div>
           </div>
@@ -868,18 +882,31 @@ export default function ScoreReport() {
             <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
               <div className="cert-id-block">
                 <div className="cert-id-lbl">Verification ID</div>
-                <div className="cert-id-val">{verifyId}</div>
+                <div className="cert-id-val">{verifyId || 'Verification ID not recorded'}</div>
               </div>
               <div className="cert-id-block">
                 <div className="cert-id-lbl">Test Date</div>
-                <div className="cert-id-val">{testDateTime}</div>
+                <div className="cert-id-val">{testDateTime ?? 'Assessment date not recorded'}</div>
               </div>
               <div className="cert-id-block">
                 <div className="cert-id-lbl">Status</div>
                 <div style={{ marginTop: 3 }}><span className="verified-badge"><CheckCircle2 size={13} />Verified</span></div>
               </div>
             </div>
-            <a className="cert-verify" href={`/verify/${verifyId}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Verify this credential</a>
+            {verifyId && <a className="cert-verify" href={`/verify/${verifyId}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Verify this credential</a>}
+          </div>
+
+          <div style={{ background: 'var(--s0)', border: '1px solid var(--bd)', borderRadius: 12, padding: '14px 18px', margin: '16px 0', fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
+            <div className="section-title">Original method</div>
+            <p>Stored historical results are shown without re-analysis or conversion to a newer method.</p>
+            {methodText && <p>{methodText}</p>}
+            <dl>
+              {methodEntries.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}
+              {storedText(report.reportPolicy) && <div><dt>Report policy</dt><dd>{report.reportPolicy}</dd></div>}
+              {storedText(report.scoring?.language) && <div><dt>Scoring language</dt><dd>{report.scoring.language}</dd></div>}
+              {storedText(report.scoring?.status) && <div><dt>Scoring status</dt><dd>{report.scoring.status}</dd></div>}
+            </dl>
+            {!methodText && !methodEntries.length && !storedText(report.reportPolicy) && <p>Method details not recorded</p>}
           </div>
 
           <div className="cert-scenario">
@@ -960,25 +987,27 @@ export default function ScoreReport() {
               )}
               {!hasComposite && (
                 <div style={{ fontSize: 13, color: 'var(--t3)', lineHeight: 1.7 }}>
-                  This report is profile-first: each dimension is scored separately from observed
-                  behaviour in your session, and no overall composite or ranking is issued.
-                  A dimension without enough evidence says “{INSUFFICIENT_EVIDENCE_LABEL}” —
-                  it is never guessed.
+                  No overall score is recorded in this report. Stored dimension scores and narratives
+                  are shown where available; missing values remain unrecorded.
+                  Where the original report marks a dimension “{INSUFFICIENT_EVIDENCE_LABEL}”,
+                  that status is preserved.
                 </div>
               )}
               <div style={{ background: 'var(--s1)', border: '1px solid var(--bd)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--t3)', lineHeight: 1.6 }}>
                 {ci ? (
                   <>
                     <span style={{ fontWeight: 600, color: 'var(--t2)' }}>AI panel variation interval:</span> {ci.low}–{ci.high} points (90% coverage target{ci.provisional ? ', provisional until first calibration study' : ''}).
-                    {' '}Score is valid for {validityMonths} months from the date of assessment.
+                    {validityMonths != null && <> Score is valid for {validityMonths} months from the date of assessment.</>}
                   </>
                 ) : (
                   <>
                     <span style={{ fontWeight: 600, color: 'var(--t2)' }}>AI panel consistency:</span> {reliabilityText}
                     {typeof report.reliability?.agreement === 'number' && <> · judge-panel agreement {Math.round(report.reliability.agreement * 100)}%</>}
-                    . Provisional — calibrated variation intervals will be published after our first calibration study. Results are valid for {validityMonths} months from the date of assessment.
+                    . Provisional — calibrated variation intervals will be published after our first calibration study.
+                    {validityMonths != null && <> Results are valid for {validityMonths} months from the date of assessment.</>}
                   </>
                 )}
+                {validityMonths == null && <> Validity period not recorded in this report.</>}
               </div>
             </div>
           </div>
@@ -987,7 +1016,7 @@ export default function ScoreReport() {
         {/* HOW THE OVERALL SCORE WAS CALCULATED — legacy reports only (charter
             §6: new reports are profile-first and issue no composite). */}
         {hasComposite && (
-        <div className="dims-section" style={{ marginBottom: 20 }}>
+        <div role="group" aria-label="Original score breakdown" className="dims-section" style={{ marginBottom: 20 }}>
           <div style={{ marginBottom: 12 }}>
             <div className="section-title" style={{ fontSize: 16 }}>How your overall score is calculated</div>
             <div style={{ fontSize: 13, color: 'var(--t3)', marginTop: 2 }}>
@@ -997,7 +1026,7 @@ export default function ScoreReport() {
           <div style={{ background: 'var(--s0)', border: '1px solid var(--bd)', borderRadius: 16, padding: '20px 24px' }}>
             {dims.map((d) => {
               const weight = DIMENSION_WEIGHTS[d.key] ?? 0
-              const contribution = d.score * weight
+              const contribution = d.insufficient ? null : d.score * weight
               return (
                 <div
                   key={d.key}
@@ -1009,12 +1038,12 @@ export default function ScoreReport() {
                   </div>
                   <div style={{ flex: 1, minWidth: 60 }}>
                     <div className="dim-bar-track" style={{ margin: 0 }}>
-                      <div className="dim-bar-fill" style={{ width: `${d.score}%`, background: d.color }} />
+                      {!d.insufficient && <div className="dim-bar-fill" style={{ width: `${d.score}%`, background: d.color }} />}
                     </div>
                   </div>
-                  <div style={{ flex: '0 0 44px', textAlign: 'right', fontFamily: 'var(--fm)', fontSize: 14, fontWeight: 500, color: 'var(--t1)' }}>{d.score}</div>
+                  <div style={{ flex: '0 0 44px', textAlign: 'right', fontFamily: 'var(--fm)', fontSize: 14, fontWeight: 500, color: 'var(--t1)' }}>{d.insufficient ? 'Not recorded' : d.score}</div>
                   <div style={{ flex: '0 0 48px', textAlign: 'right', fontSize: 12, color: 'var(--t3)' }}>× {Math.round(weight * 100)}%</div>
-                  <div style={{ flex: '0 0 56px', textAlign: 'right', fontFamily: 'var(--fm)', fontSize: 14, fontWeight: 600, color: d.color }}>{contribution.toFixed(1)}</div>
+                  <div style={{ flex: '0 0 56px', textAlign: 'right', fontFamily: 'var(--fm)', fontSize: 14, fontWeight: 600, color: contribution == null ? 'var(--t3)' : d.color }}>{contribution == null ? 'Not recorded' : contribution.toFixed(1)}</div>
                 </div>
               )
             })}
@@ -1034,12 +1063,12 @@ export default function ScoreReport() {
           </div>
           <div className="dims-grid">
             {dims.map((d) => {
-              const evidence = report.evidence?.[d.key] || feedback?.[d.key] || d.evidence
+              const evidence = storedText(report.evidence?.[d.key]) || storedText(feedback?.[d.key])
               // Charter §7.2/§8: an unscored dimension is a first-class result
               // — "Insufficient evidence", never a fabricated number or a zero.
               if (d.insufficient) {
                 return (
-                  <div className="dim-card" key={d.key}>
+                  <div role="group" aria-label={d.label} className="dim-card" key={d.key}>
                     <div className="dim-ring" style={{ background: 'var(--s1)', borderColor: 'var(--bd)', color: 'var(--t3)' }}>
                       <div className="dim-ring-num" style={{ fontSize: 18 }}>—</div>
                     </div>
@@ -1052,18 +1081,15 @@ export default function ScoreReport() {
                         <div className="dim-icon" style={{ background: d.iconBg }}><d.Icon size={14} color={d.color} /></div>
                       </div>
                       <div className="dim-evidence">
-                        <div className="dim-evidence-label">{INSUFFICIENT_EVIDENCE_LABEL}</div>
-                        <div className="dim-evidence-text">
-                          This session did not include enough standardized evidence opportunities to
-                          score this dimension, so no score is reported — a number is never guessed.
-                        </div>
+                        <div className="dim-evidence-label">{insufficientDims.includes(d.key) ? INSUFFICIENT_EVIDENCE_LABEL : 'Score not recorded'}</div>
+                        <div className="dim-evidence-text">{evidence || 'Narrative not recorded in this report.'}</div>
                       </div>
                     </div>
                   </div>
                 )
               }
               return (
-                <div className="dim-card" key={d.key}>
+                <div role="group" aria-label={d.label} className="dim-card" key={d.key}>
                   <div className="dim-ring" style={{ background: d.ringBg, borderColor: d.color, color: d.color }}>
                     <div className="dim-ring-num">{d.score}</div>
                     <div className="dim-ring-max">/100</div>
@@ -1078,8 +1104,8 @@ export default function ScoreReport() {
                     </div>
                     <div className="dim-bar-track"><div className="dim-bar-fill" style={{ width: `${d.score}%`, background: d.color }} /></div>
                     <div className="dim-evidence">
-                      <div className="dim-evidence-label">Behavioral evidence from your session</div>
-                      <div className="dim-evidence-text">{evidence}</div>
+                      <div className="dim-evidence-label">{evidence ? 'Stored narrative from your session' : 'Narrative unavailable'}</div>
+                      <div className="dim-evidence-text">{evidence || 'Narrative not recorded in this report.'}</div>
                     </div>
                   </div>
                 </div>
@@ -1094,10 +1120,10 @@ export default function ScoreReport() {
             <div className="ai-summary-icon"><Sparkles size={18} /></div>
             <div>
               <div className="ai-summary-title">Orin™ Performance Summary</div>
-              <div className="ai-summary-sub">AI-generated · Based on scored exchanges in your 30-minute session</div>
+              <div className="ai-summary-sub">Stored narrative from the original report</div>
             </div>
           </div>
-          {feedback?.summary && <div className="ai-summary-text">{feedback.summary}</div>}
+          <div className="ai-summary-text">{storedText(feedback?.summary) || 'Summary not recorded in this report.'}</div>
           <div className="sw-grid">
             <div>
               <div className="sw-col-lbl" style={{ color: 'var(--ok)' }}>✓ Strengths identified</div>
@@ -1106,6 +1132,7 @@ export default function ScoreReport() {
                   <li key={i}><ArrowUpRight className="sw-icon" size={14} color="var(--status-positive-ink)" />{s}</li>
                 ))}
               </ul>
+              {!strengths.length && <p>Strengths not recorded in this report.</p>}
             </div>
             <div>
               <div className="sw-col-lbl" style={{ color: 'var(--am)' }}>↑ Growth areas</div>
@@ -1114,6 +1141,7 @@ export default function ScoreReport() {
                   <li key={i}><ArrowRight className="sw-icon" size={14} color="var(--status-partial-ink)" />{g}</li>
                 ))}
               </ul>
+              {!growth.length && <p>Growth areas not recorded in this report.</p>}
             </div>
           </div>
         </div>
@@ -1124,18 +1152,19 @@ export default function ScoreReport() {
             <div className="employer-icon"><Building2 size={18} /></div>
             <div>
               <div className="employer-title">For the Employer — What to Probe in the Interview</div>
-              <div className="employer-sub">Suggested interview questions based on this Prism profile · Generated by Orin™</div>
+              <div className="employer-sub">Interview questions stored in the original report</div>
             </div>
           </div>
           <div className="interview-qs">
             {interviewQs.map((q, i) => (
               <div className="iq" key={i}><span className="iq-num">Q{i + 1}</span>{q}</div>
             ))}
+            {!interviewQs.length && <p>Interview questions not recorded in this report.</p>}
           </div>
         </div>
 
         {/* SHARE SECTION */}
-        <div className="share-card no-print">
+        {verifyId && <div className="share-card no-print">
           <div className="share-hdr">
             <div>
               <div className="share-title">Share your Prism report</div>
@@ -1165,7 +1194,7 @@ export default function ScoreReport() {
               }}
             >Copy link</button>
           </div>
-        </div>
+        </div>}
 
         {/* DATA RIGHTS — human review + erasure */}
         <div className="share-card no-print" style={{ borderColor: 'var(--prism-border)' }}>
@@ -1478,12 +1507,13 @@ export default function ScoreReport() {
         <div className="rpt-footer">
           <div className="footer-left">
             © 2026 StudAI One · Studai Edutech Pvt. Ltd. · CIN U85500TN2024PTC168744<br />
-            Score valid for {SCORE_VALIDITY_MONTHS} months · Reassessment available after {REASSESSMENT_DAYS} days
+            {validityMonths != null ? <>Recorded validity period: {validityMonths} months</> : 'Validity period not recorded'}
+            {' '}· Reassessment available after {REASSESSMENT_DAYS} days
           </div>
           <div className="footer-right">
             <a>Privacy policy</a>
             <a>Assessment methodology</a>
-            <a href={`/verify/${verifyId}`} target="_blank" rel="noopener noreferrer">Verify this score</a>
+            {verifyId && <a href={`/verify/${verifyId}`} target="_blank" rel="noopener noreferrer">Verify this score</a>}
             <span className="verified-badge"><ShieldCheck size={13} />DPDP Compliant</span>
           </div>
         </div>

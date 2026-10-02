@@ -6,15 +6,9 @@ import PrismLogo from '../components/ui/PrismLogo.jsx'
 import { Button, Input, Select, Checkbox, Callout, InlineNotice } from '../components/ui/index.js'
 import { fetchOrgInvite } from '../api/campus.js'
 import { ROLE_LABELS } from '../lib/copy/privacy.js'
+import { parseAuthDestination, accountDestination } from '../lib/authDestination.js'
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional'].map((y) => ({ value: y, label: y }))
-
-// Only same-origin in-app paths are honoured (no open redirect).
-function safeNext(search) {
-  const raw = new URLSearchParams(search).get('next')
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return null
-  return raw
-}
 
 // A campus invitation arrives here as /login?next=/app/campus-invite/<token>.
 // The token is only ever used to ask the server who is inviting; it is never
@@ -56,7 +50,7 @@ export default function Auth() {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
   const isRegister = pathname !== '/login'
-  const next = safeNext(search)
+  const { next, invalid: invalidDestination } = parseAuthDestination(search)
   const inviteToken = campusInviteToken(next)
 
   const [form, setForm] = useState({ name: '', email: '', college: '', year: '', password: '' })
@@ -72,7 +66,7 @@ export default function Auth() {
   useEffect(() => {
     if (isAuthenticated()) {
       const invite = sessionStorage.getItem('prismInviteToken')
-      navigate(invite ? `/invite/${invite}` : next || '/app', { replace: true })
+      navigate(accountDestination(next, invite), { replace: true })
     }
   }, [navigate, next])
 
@@ -110,10 +104,8 @@ export default function Auth() {
 
     action
       .then(() => {
-        // An in-flight assessment invite returns the candidate to their seat;
-        // otherwise continue to where they were going; a new account goes to checkout, a returning one to the app.
         const invite = sessionStorage.getItem('prismInviteToken')
-        navigate(invite ? `/invite/${invite}` : next || (isRegister ? '/payment' : '/app'))
+        navigate(accountDestination(next, invite))
       })
       .catch((err) => setError(err.message || 'Something went wrong. Please try again.'))
       .finally(() => setSubmitting(false))
@@ -137,8 +129,13 @@ export default function Auth() {
 
             <h1 className="mb-1 text-2xl font-bold tracking-tight">{isRegister ? 'Create your account' : 'Welcome back'}</h1>
             <p className="mb-6 text-sm text-prism-ink-muted">
-              {isRegister ? 'Start your Prism assessment' : 'Sign in to continue'}
+              {isRegister ? 'Create your account, then choose your next step' : 'Sign in to continue'}
             </p>
+            {invalidDestination && (
+              <Callout tone="partial" title="This sign-in destination is unavailable" className="mb-6">
+                Sign in to open your account. You can choose an assessment or open an existing report there.
+              </Callout>
+            )}
 
             <div className="mb-6 flex rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-subtle p-1">
               <Link to={{ pathname: '/login', search }} aria-current={!isRegister ? 'page' : undefined} className={tab(!isRegister)}>Login</Link>

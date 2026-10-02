@@ -10,7 +10,9 @@ import { CapabilitySnapshotCard } from '../../../components/capability/Capabilit
 import { CapabilityLevelBadge } from '../../../components/capability/CapabilityLevelBadge.jsx'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { Link } from 'react-router-dom'
-import { useStudentHome, useDevelopmentPlan, useGrowth } from '../../student/hooks.js'
+import { useStudentHome, useStudentAssessments, useDevelopmentPlan, useGrowth } from '../../student/hooks.js'
+import { AssessmentAssignmentCard } from '../../assessments/components/AssessmentAssignmentCard.jsx'
+import { assignmentsListPath } from '../../assessments/pages/BriefingPage.jsx'
 import { queryStateView, formatDate } from '../../student/QueryState.jsx'
 import { PRIMARY_ACTION_COPY, SCOPE_LABEL } from '../../../lib/copy/student.js'
 import { PERSONAL_PRIVACY_NOTE, SPONSORED_PRIVACY_NOTE } from '../../../lib/copy/privacy.js'
@@ -45,6 +47,7 @@ function PrimaryAction({ action, sponsorName }) {
 export default function HomePage() {
   const { active } = useWorkspace()
   const home = useStudentHome()
+  const assessments = useStudentAssessments()
   const plan = useDevelopmentPlan()
   const growth = useGrowth()
   const campus = active.type === 'CAMPUS_STUDENT'
@@ -64,6 +67,12 @@ export default function HomePage() {
   const strengths = data.capabilitySnapshot.filter((c) => c.level && (c.level.band === 'DEMONSTRATED' || c.level.band === 'STRONG')).slice(0, 3)
   const mission = !campus && plan.data && plan.data.missionsAvailable ? plan.data.missions[0] : null
   const comparable = Boolean(growth.data && growth.data.comparable)
+  const historyState = queryStateView(assessments, { label: 'Loading recent assessments', homeTo: assignmentsListPath(active) })
+  const recent = assessments.data?.completed
+    .filter((a) => a.status === 'COMPLETED')
+    .slice()
+    .sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''))
+    .slice(0, 3)
   return (
     <div className="space-y-8">
       <PageHeader
@@ -73,6 +82,20 @@ export default function HomePage() {
       />
       <DocumentTitle title="Home" />
       <PrimaryAction action={data.primaryAction} sponsorName={campus ? org : null} />
+
+      <section aria-labelledby="recent-assessments-title" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="recent-assessments-title" className="text-lg font-semibold text-prism-ink">Recent assessments</h2>
+          <LinkButton to={assignmentsListPath(active)} variant="secondary" size="sm">View all assessments</LinkButton>
+        </div>
+        {historyState || (recent.length > 0 ? (
+          <ul className="grid gap-4 lg:grid-cols-3">
+            {recent.map((a) => <li key={a.id}><AssessmentAssignmentCard assignment={a} /></li>)}
+          </ul>
+        ) : (
+          <p className="text-sm text-prism-ink-muted">No completed assessments are linked to this workspace yet. If you have an earlier report that is missing, <Link to="/contact" className="font-medium text-prism-accent-strong underline">contact support</Link>.</p>
+        ))}
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="strengths-title" className="space-y-3">

@@ -34,5 +34,8 @@
   "optionalDependencies": {
     "@sentry/node": "10.66.0",
     "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "embedded-postgres": "17.10.0-beta.17"
   }
 }

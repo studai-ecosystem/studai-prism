@@ -1,5 +1,25 @@
 # P0 - Actual learner-path baseline
 
+## P1 delta - current safe implementation checkpoint
+
+P1 starts from local P0 commit `ff6002c` with the same preserved dirty backend/
+entry work. The historical P0 matrices below are not rewritten as new production
+facts. Current navigation no longer sends every bare registration to checkout:
+`/app` is the supported default; explicit purchase CTA/guard links carry
+`next=/payment` or their actual legacy action. Payment/entitlement handlers,
+prices, scientific/scoring/timing/access/retention behavior remain unchanged.
+
+Account/workspace browser state and late-request isolation are implemented in
+the existing session/client/providers; scoped page content remounts without
+resetting shell navigation or workspace confirmation/focus. Cached identity is
+a frontend reset key only. Same-owner refresh preserves draft recovery.
+Legacy report presentation uses issued source fields, not fallback findings or
+today's date. A real self-owned PG/HTTP test opens the issued V2 reader and
+confirms the source blob stays unchanged; this is not ownership reconciliation.
+See [current phase status](./IMPLEMENTATION_STATE.md) and [results](./TEST_RESULTS.md).
+No new migration or durable action/job pipeline is delivered. Existing reviewed
+domain/retention/erasure/access gates remain open; full P1 is not complete.
+
 Scope: approved **diagnostic-only P0**. Stop before P1. Local source inspection
 and synthetic test evidence do not establish production configuration or readiness.
 Overall learner release remains **NO-GO**. See [results](./TEST_RESULTS.md),

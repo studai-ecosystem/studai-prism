@@ -30,6 +30,7 @@ import { createGrowthRepoPg } from '../growth/repository.pg.js'
 import { createAnalyticsRepoMemory, createAnalyticsRepoPg } from '../analytics/repository.js'
 import { createBillingRepoMemory, createBillingRepoPg } from '../billing/repository.js'
 import { createValidationRepoMemory, createValidationRepoPg } from '../validation/repository.js'
+import { createMemorySessionLocks, createPgSessionLocks } from '../assessments/sessionLocks.js'
 
 export function createMemoryCampusRepos(options = {}) {
   const db = options.db || createMemoryDb(options)
@@ -47,6 +48,7 @@ export function createMemoryCampusRepos(options = {}) {
     preferences: createPreferencesRepoMemory(db),
     productEvents: createProductEventsRepoMemory(db),
     sessionIo: createSessionIoRepoMemory(db),
+    sessionLocks: createMemorySessionLocks(),
     reportVersions: createReportVersionsRepoMemory(db),
     campusAdmin: createCampusAdminRepoMemory(db),
     development: createDevelopmentRepoMemory(db),
@@ -57,7 +59,7 @@ export function createMemoryCampusRepos(options = {}) {
   }
 }
 
-export function createPgCampusRepos({ query, getPool }) {
+export function createPgCampusRepos({ query, getPool, getLockPool }) {
   const deps = { query, getPool }
   return {
     kind: 'pg',
@@ -72,6 +74,9 @@ export function createPgCampusRepos({ query, getPool }) {
     preferences: createPreferencesRepoPg(deps),
     productEvents: createProductEventsRepoPg(deps),
     sessionIo: createSessionIoRepoPg(deps),
+    sessionLocks: createPgSessionLocks({ getPool: getLockPool || (() => {
+      throw new Error('A dedicated assessment lock pool is required.')
+    }) }),
     reportVersions: createReportVersionsRepoPg(deps),
     campusAdmin: createCampusAdminRepoPg(deps),
     development: createDevelopmentRepoPg(deps),

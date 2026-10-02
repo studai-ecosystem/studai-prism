@@ -18,6 +18,7 @@ export function AssessmentAssignmentCard({ assignment, headingLevel = 3 }) {
   const scope = assignment.scope === 'SPONSORED' ? SCOPE_LABEL.SPONSORED(assignment.sponsor?.name) : SCOPE_LABEL.PERSONAL
   const due = formatDate(assignment.dueAt)
   const opens = formatDate(assignment.opensAt)
+  const completed = formatDate(assignment.completedAt)
   const cta = assignment.cta.to && CTA_COPY[assignment.cta.kind]
   return (
     <Card as="article" className="space-y-3 p-5" data-testid="assignment-card" data-scope={assignment.scope}>
@@ -35,10 +36,14 @@ export function AssessmentAssignmentCard({ assignment, headingLevel = 3 }) {
         <li className="flex items-center gap-1"><ShieldCheck size={14} aria-hidden="true" /> {INTEGRITY_COPY[assignment.integrityMode]?.label || 'Standard'} integrity</li>
         {due && <li>Due {due}</li>}
         {assignment.status === 'UPCOMING' && opens && <li>Opens {opens}</li>}
+        {assignment.status === 'COMPLETED' && completed && <li>Completed {completed}</li>}
       </ul>
       <AssessmentStatusTimeline assignment={assignment} />
       {assignment.underReview && (
         <p className="text-sm text-prism-ink-muted">This result is under review and is not included in your capabilities until the review is finished.</p>
+      )}
+      {assignment.status === 'COMPLETED' && !assignment.underReview && (
+        <p className="text-sm text-prism-ink-muted">{assignment.cta.kind === 'VIEW_REPORT' && assignment.cta.to ? 'Report available' : <>Report not available yet. <Link to="/contact" className="font-medium text-prism-accent-strong underline">Contact support</Link> if you need help.</>}</p>
       )}
       {cta && (
         <LinkButton to={assignment.cta.to} variant={assignment.cta.kind === 'VIEW_REPORT' ? 'secondary' : 'primary'}>

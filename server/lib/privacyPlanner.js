@@ -21,6 +21,7 @@ import {
 } from './store.js'
 import { findUserByEmail, findUserById, deleteUser, publicUser } from './db.js'
 import { eraseTelemetry } from './telemetry.js'
+import { eraseCampusSessionData } from './campusErasure.js'
 
 // Telemetry tables the cascade touches, with their session column — mirrors
 // lib/telemetry.js eraseTelemetry exactly (kept in lockstep by the Phase 6 test).
@@ -175,6 +176,7 @@ export async function executeErasure(request) {
   }
   for (const sid of sessionIds) {
     const storeRemoved = await eraseSession(sid)
+    const campus = await eraseCampusSessionData(sid)
     // Shared cascade first (keeps behavior identical to the candidate
     // self-service right), then the unconditional sweep for flag-off gaps.
     const viaFlag = await eraseTelemetry(sid)
@@ -183,7 +185,7 @@ export async function executeErasure(request) {
     for (const k of new Set([...Object.keys(viaFlag), ...Object.keys(swept)])) {
       telemetry[k] = (viaFlag[k] || 0) + (swept[k] || 0)
     }
-    receipt.sessions.push({ sessionId: sid, storeRemoved, telemetry })
+    receipt.sessions.push({ sessionId: sid, storeRemoved, campus, telemetry })
   }
   if (request.scope === 'candidate' && user) {
     // Charter §15: re-identifiable demographic records go through the same
