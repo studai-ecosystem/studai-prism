@@ -4,8 +4,9 @@ import { AppShell } from './AppShell.jsx'
 import { SponsoredByCard } from '../components/campus/SponsoredByCard.jsx'
 import { PreferencesEffect } from '../features/settings/PreferencesEffect.jsx'
 import { Skeleton } from '../components/ui/Skeleton.jsx'
-import { STUDENT_NAV, STUDENT_NAV_FOOTER, STUDENT_BOTTOM_NAV, CAMPUS_STUDENT_NAV } from '../components/navigation/navConfig.js'
+import { STUDENT_NAV_FOOTER, STUDENT_BOTTOM_NAV, CAMPUS_STUDENT_NAV, studentNavFor } from '../components/navigation/navConfig.js'
 import { useWorkspace, PERSONAL_FALLBACK } from '../app/providers/WorkspaceProvider.jsx'
+import { useFeatureFlags } from '../app/providers/FeatureFlagProvider.jsx'
 
 // Personal + campus-student application shell. Inside a campus student
 // workspace only the sponsored sections (spec §6.3) are offered, scoped to the
@@ -14,6 +15,7 @@ import { useWorkspace, PERSONAL_FALLBACK } from '../app/providers/WorkspaceProvi
 export function StudentShell({ children }) {
   const { organizationId } = useParams()
   const { active, switchTo } = useWorkspace()
+  const { flags } = useFeatureFlags()
 
   useEffect(() => {
     if (!organizationId && active.type !== 'PERSONAL') switchTo(PERSONAL_FALLBACK.id)
@@ -21,7 +23,7 @@ export function StudentShell({ children }) {
 
   const campusScope = (items) => items.map((i) => ({ ...i, to: `/app/campus/${organizationId}/${i.to}` }))
 
-  const items = organizationId ? campusScope(CAMPUS_STUDENT_NAV) : STUDENT_NAV
+  const items = organizationId ? campusScope(CAMPUS_STUDENT_NAV) : studentNavFor(flags)
   const bottom = organizationId ? campusScope(CAMPUS_STUDENT_NAV) : STUDENT_BOTTOM_NAV
   const footer = organizationId ? STUDENT_NAV_FOOTER.filter((i) => i.id === 'help') : STUDENT_NAV_FOOTER
   // Never render a personal page while another workspace is still active:

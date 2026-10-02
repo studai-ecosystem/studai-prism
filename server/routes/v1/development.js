@@ -8,6 +8,8 @@
 //   PATCH /mission-attempts/:attemptId            If-Match version
 //   POST  /mission-attempts/:attemptId/hints      If-Match version
 //   POST  /mission-attempts/:attemptId/submit     runs the §16.3 pipeline once
+//   POST  /development/replay                     Idempotency-Key; { sessionId, opportunityId } → PRACTICE attempt from a moment (P6.6)
+//   POST  /development/challenge                  Idempotency-Key; { capabilityId } → uncoached attempt in an unexposed setting (P6.7)
 // Campus (organization permissions):
 //   GET|POST /organizations/:orgId/interventions, GET /organizations/:orgId/interventions/:id,
 //   POST /organizations/:orgId/interventions/:id/status, GET /organizations/:orgId/practice-missions
@@ -36,6 +38,9 @@ const Origin = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ASSESSMENT_MOMENT'), sessionId: z.string().min(1).max(128), opportunityId: z.string().min(1).max(128) }).strict(),
 ])
 const StartAttempt = z.object({ retry: z.boolean().optional(), origin: Origin.optional() }).strict()
+// P6.6 / P6.7
+const Replay = z.object({ sessionId: z.string().min(1).max(128), opportunityId: z.string().min(1).max(128) }).strict()
+const Challenge = z.object({ capabilityId: z.string().regex(/^CAP-[A-Z0-9-]+$/) }).strict()
 const SaveWork = z.object({ work: z.record(z.string().regex(/^[A-Z0-9][A-Z0-9_-]{1,63}$/), z.record(z.unknown())) }).strict()
 const CreateIntervention = z.object({
   name: z.string().trim().min(1).max(160),
@@ -89,6 +94,30 @@ export function createDevelopmentRouter({ requireUser, campus }) {
   router.post('/mission-attempts/:attemptId/submit', ...student, store, attempt, asyncHandler(async (req, res) => {
     const out = await svc().submit(req.user, req.workspace, req.params.attemptId)
     return sendAttempt(res, out.attempt, out.replayed ? 200 : 201)
+  }))
+  // P6.6 "Try that moment again" — a separate PRACTICE attempt from one
+  // authorized assessment moment (Idempotency-Key). P6.7 fresh challenge —
+  // an unexposed mission for a capability, hints off (Idempotency-Key).
+  const keyOf = (req) => {
+    const key = req.get('idempotency-key')
+    if (!key || key.length > 128) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
+    return key
+  }
+  router.post('/development/replay', ...student, store, asyncHandler(async (req, res) => {
+    const key = keyOf(req)
+    const parsed = Replay.safeParse(req.body || {})
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', 'The practice origin needs a session and a moment.')
+    const out = await svc().replayMoment(req.user, req.workspace, { ...parsed.data, idempotencyKey: key })
+    res.setHeader('ETag', `"${out.attempt.version}"`)
+    return ok(res, { attempt: out.attempt, missionId: out.missionId }, out.resumed ? 200 : 201)
+  }))
+  router.post('/development/challenge', ...student, store, asyncHandler(async (req, res) => {
+    const key = keyOf(req)
+    const parsed = Challenge.safeParse(req.body || {})
+    if (!parsed.success) throw new ApiError('VALIDATION_FAILED', 'Choose a capability from the framework.')
+    const out = await svc().startChallenge(req.user, req.workspace, { ...parsed.data, idempotencyKey: key })
+    res.setHeader('ETag', `"${out.attempt.version}"`)
+    return ok(res, { attempt: out.attempt, missionId: out.missionId }, out.resumed ? 200 : 201)
   }))
 
   // ── Campus interventions ──────────────────────────────────────────────

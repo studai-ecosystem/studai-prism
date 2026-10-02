@@ -5,8 +5,9 @@
 // kept, and the objective's hypothesis and budget-allocation steps become
 // checkable criteria. No job-family fallback exists: a mission is found by id
 // or not at all. New missions need governance review (HA-C009).
-export const MISSION_LIBRARY = Object.freeze([
-  {
+import { P6_MISSIONS, handoverRevision } from './missionLibrary.p6.js'
+
+const MKT_EXPERIMENT_V1 = {
     mission_id: 'MIS-MKT-EXP-01',
     version: 1,
     status: 'PUBLISHED',
@@ -92,14 +93,14 @@ export const MISSION_LIBRARY = Object.freeze([
     feedback_policy: { mode: 'CRITERION', show_unobserved: true },
     estimated_duration: { minutes: 20 },
     accessibility_mode: { keyboard_only: true, screen_reader: true, untimed: true },
-  },
+}
 
   // P2.8 — DRAFT handover mission. Original, domain-light practice content:
   // hand an unfinished plan to a colleague. DRAFT content is seeded (so it is
   // governed and immutable like any version) but reachable only when
   // PRISM_DRAFT_CONTENT is on (test/local); it is never recommended to real
   // users and, like every mission, writes PRACTICE evidence only.
-  {
+const HANDOVER_V1 = {
     mission_id: 'MIS-CORE-HANDOVER-01',
     version: 1,
     status: 'DRAFT',
@@ -181,8 +182,19 @@ export const MISSION_LIBRARY = Object.freeze([
     feedback_policy: { mode: 'CRITERION', show_unobserved: true },
     estimated_duration: { minutes: 15 },
     accessibility_mode: { keyboard_only: true, screen_reader: true, untimed: true },
-  },
+}
+
+// Library order: published legacy mission, handover v1 (frozen), handover v2
+// (M04 metadata revision), then the P6 originals M01–M03 and M05–M10.
+export const MISSION_LIBRARY = Object.freeze([
+  MKT_EXPERIMENT_V1,
+  HANDOVER_V1,
+  handoverRevision(HANDOVER_V1),
+  ...P6_MISSIONS,
 ])
+
+// The ten P6 starter missions (latest version per id, with display codes).
+export const P6_LIBRARY = Object.freeze(MISSION_LIBRARY.filter((m) => m.display_code).sort((a, b) => a.display_code.localeCompare(b.display_code)))
 
 export const DRAFT_CONTENT_FLAG = 'PRISM_DRAFT_CONTENT'
 export const draftContentEnabled = () => process.env[DRAFT_CONTENT_FLAG] === 'true'

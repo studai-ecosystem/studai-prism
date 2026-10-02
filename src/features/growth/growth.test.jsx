@@ -101,6 +101,52 @@ describe('Growth page (V2)', () => {
     expect(await screen.findByText('Not enough evidence to show a change yet')).toBeInTheDocument()
     expect(screen.queryByTestId('growth-change')).not.toBeInTheDocument()
     expect(screen.getByText('What is compared')).toBeInTheDocument()
+    expect(screen.queryByTestId('growth-practice-history')).not.toBeInTheDocument()
+  })
+
+  // P7 (CH-36): practice and self-reported notes are separate sections with
+  // no deltas; the formal comparison keeps its unchanged gate.
+  it('with preparation on, practice history and self-reported notes sit apart from the (still gated) formal comparison', async () => {
+    const user = userEvent.setup()
+    signIn()
+    const historyItem = (over) => ({ sourceId: over.id.split(':')[1], startedAt: null, issuedAt: null, scope: 'PERSONAL', sponsorOrganizationId: null, status: 'COMPLETED', reportFormat: null, permittedAction: { kind: 'NONE', to: null }, recoveryState: 'NONE', ...over })
+    const calls = routeFetch({
+      '/api/v1/me/growth': growthBody({ comparable: false, reason: 'FORMS_NOT_VALIDATED_FOR_COMPARISON', comparison: null, changes: [] }),
+      '/api/v1/me/history': { data: { items: [
+        historyItem({ id: 'FORMAL_SESSION:s1', sourceType: 'FORMAL_SESSION', mode: 'FORMAL', title: 'Prism Workplace Simulation', completedAt: '2026-10-11T10:00:00.000Z' }),
+        historyItem({ id: 'PRACTICE_ATTEMPT:p1', sourceType: 'PRACTICE_ATTEMPT', mode: 'PRACTICE', title: 'Separate cause from symptom', completedAt: '2026-10-20T10:00:00.000Z' }),
+        historyItem({ id: 'PREPARATION_ATTEMPT:q1', sourceType: 'PREPARATION_ATTEMPT', mode: 'PREPARATION', title: 'Negotiate a deadline', completedAt: '2026-10-22T10:00:00.000Z', permittedAction: { kind: 'VIEW', to: '/app/prepare/q1' } }),
+        historyItem({ id: 'SELF_REPORT:c1', sourceType: 'SELF_REPORT', mode: 'SELF_REPORT', title: 'Your own note', completedAt: '2026-10-23T10:00:00.000Z' }),
+      ], nextCursor: null } },
+      'GET /api/v1/checkins': { data: { items: [{ id: 'c1', mode: 'SELF_REPORT', scope: 'PERSONAL', sourceType: 'PREPARATION', sourceId: 'q1', whatTried: 'Named the constraint first.', outcome: 'We agreed a date.', createdAt: '2026-10-23T10:00:00.000Z' }] } },
+      'POST /api/v1/checkins': (u, init) => jsonResponse(201, { data: { id: 'c2', mode: 'SELF_REPORT', scope: 'PERSONAL', sourceId: null, ...JSON.parse(init.body), createdAt: null } }),
+      '/api/v1/me': meBody({ flags: { ...flags, PRISM_PREPARATION_V1: true } }),
+    })
+    renderApp(<Routes><Route path="/app/growth" element={<GrowthPage />} /></Routes>, { route: '/app/growth' })
+    expect(await screen.findByText('A later assessment exists, but these forms are not yet validated for direct growth comparison.')).toBeInTheDocument()
+    expect(screen.queryByTestId('growth-change')).not.toBeInTheDocument()
+
+    const practice = await screen.findByTestId('growth-practice-history')
+    expect(within(practice).getByRole('heading', { name: 'Practice history' })).toBeInTheDocument()
+    const rows = within(practice).getAllByRole('listitem')
+    expect(rows.map((r) => r.getAttribute('data-mode'))).toEqual(['PRACTICE', 'PREPARATION'])
+    expect(practice).toHaveTextContent('Separate cause from symptom')
+    expect(practice).toHaveTextContent('Negotiate a deadline')
+    expect(practice).not.toHaveTextContent('Prism Workplace Simulation')
+
+    const notes = screen.getByTestId('growth-self-report')
+    expect(within(notes).getByRole('heading', { name: 'Your own notes (self-reported)' })).toBeInTheDocument()
+    expect(await within(notes).findByTestId('self-report-item')).toHaveTextContent('Named the constraint first.')
+    expect(notes).toHaveTextContent(/cannot change a formal result/)
+    await user.click(within(notes).getByRole('button', { name: 'Add a note' }))
+    expect(within(notes).getByText('What did you try? What happened?')).toBeInTheDocument()
+    await user.type(within(notes).getByLabelText('What did you try?'), 'Asked who owns the next step.')
+    await user.type(within(notes).getByLabelText('What happened?'), 'It was agreed.')
+    await user.click(within(notes).getByRole('button', { name: 'Save check-in' }))
+    expect(await within(notes).findByTestId('checkin-saved')).toBeInTheDocument()
+    const post = calls.find((c) => c.method === 'POST' && c.url.endsWith('/api/v1/checkins'))
+    expect(post.body).toEqual({ sourceType: 'REPORT', whatTried: 'Asked who owns the next step.', outcome: 'It was agreed.' })
+    expect(document.body.textContent).not.toMatch(/\d+\s*%|score|points|±|higher level|lower level/i)
   })
 
   it('campus: an open reassessment links to campus assignments and says when it cannot show a change', async () => {

@@ -12,6 +12,7 @@ export const CAMPUS_FLAGS = Object.freeze([
   'PRISM_DEVELOPMENT_V2',
   'PRISM_GROWTH_ENABLED',
   'PRISM_ROLE_EXPLORATION_V2',
+  'PRISM_PREPARATION_V1',
 ])
 
 export function isEnabled(key) {

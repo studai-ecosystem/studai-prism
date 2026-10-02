@@ -10,8 +10,9 @@
 //   BOTH           both of the above; disagreement is UNCERTAIN, not a claim
 import { runDeterministicChecks, candidateTextFor, VALIDATORS_VERSION } from './validators.js'
 import { MISSION_SCHEMA_VERSION } from './missionSchema.js'
+import { meaningWorkTooShort } from './evaluator.js'
 
-export const PIPELINE_VERSION = 'mission-pipeline.v1'
+export const PIPELINE_VERSION = 'mission-pipeline.v2'
 export const CONFIDENCE_THRESHOLD = 0.7
 const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 
@@ -28,20 +29,40 @@ function quoteVerified(quote, texts) {
 export async function evaluateMissionWork({ mission, work, evaluator, candidateName = null }) {
   const det = runDeterministicChecks(mission, work)
   const needEvaluator = mission.rubric.criteria.filter((c) => c.check === 'EVALUATOR' || (c.check === 'BOTH' && det.get(c.criterion_id).observed))
+  const needMeaning = mission.rubric.criteria.filter((c) => c.check === 'MEANING')
   const texts = new Map(mission.rubric.criteria.map((c) => [c.criterion_id, candidateTextFor(mission, work, c.artifact_ids)]))
   const allTexts = [...new Set([...texts.values()].flat())]
   const ev = needEvaluator.length && evaluator
     ? await evaluator.evaluate({ mission, criteria: needEvaluator, workTexts: allTexts, candidateName })
     : { available: needEvaluator.length === 0, results: [], reason: needEvaluator.length ? 'EVALUATOR_NOT_CONFIGURED' : null }
+  // P6.4 — meaning (paraphrase) checks. Short work is decided locally as
+  // "not met, EMPTY_WORK" even when no evaluator is configured.
+  const meaningTexts = [...new Set(needMeaning.flatMap((c) => texts.get(c.criterion_id)))]
+  const mv = !needMeaning.length ? { available: true, results: [] }
+    : meaningWorkTooShort(meaningTexts) ? { available: true, results: needMeaning.map((c) => ({ criterionId: c.criterion_id, met: false, quote: '', reason: 'EMPTY_WORK' })) }
+      : evaluator && typeof evaluator.evaluateMeaning === 'function'
+        ? await evaluator.evaluateMeaning({ mission, criteria: needMeaning, workTexts: meaningTexts, candidateName })
+        : { available: false, results: [], reason: 'EVALUATOR_NOT_CONFIGURED' }
   // Only answers for criteria we asked about count; anything else is ignored.
   const asked = new Set(needEvaluator.map((c) => c.criterion_id))
   const answers = new Map()
   for (const r of ev.results || []) if (asked.has(r.criterionId) && !answers.has(r.criterionId)) answers.set(r.criterionId, r)
+  const askedMeaning = new Set(needMeaning.map((c) => c.criterion_id))
+  const meanings = new Map()
+  for (const r of mv.results || []) if (askedMeaning.has(r.criterionId) && !meanings.has(r.criterionId)) meanings.set(r.criterionId, r)
 
   const criteria = mission.rubric.criteria.map((c) => {
     const d = det.get(c.criterion_id)
     const base = { criterionId: c.criterion_id, behaviorId: c.behavior_id, description: c.description, check: c.check, rules: d.rules, quote: null }
     if (c.check === 'DETERMINISTIC') return { ...base, result: d.observed ? 'OBSERVED' : 'NOT_OBSERVED', reason: d.observed ? 'RULES_PASSED' : 'RULES_NOT_MET' }
+    if (c.check === 'MEANING') {
+      if (!mv.available) return { ...base, result: 'UNCERTAIN', reason: 'EVALUATION_UNAVAILABLE' }
+      const m = meanings.get(c.criterion_id)
+      if (!m) return { ...base, result: 'UNCERTAIN', reason: 'NO_EVALUATOR_DECISION' }
+      if (!m.met) return { ...base, result: 'NOT_OBSERVED', reason: m.reason === 'EMPTY_WORK' ? 'EMPTY_WORK' : `MEANING_${m.reason}` }
+      if (!quoteVerified(m.quote, texts.get(c.criterion_id))) return { ...base, result: 'UNCERTAIN', reason: 'QUOTE_NOT_VERIFIED' }
+      return { ...base, result: 'OBSERVED', reason: 'MEANING_EXPRESSED', quote: m.quote.trim() }
+    }
     if (c.check === 'BOTH' && !d.observed) return { ...base, result: 'NOT_OBSERVED', reason: 'RULES_NOT_MET' }
     if (!ev.available) return { ...base, result: 'UNCERTAIN', reason: 'EVALUATION_UNAVAILABLE' }
     const a = answers.get(c.criterion_id)
@@ -62,7 +83,7 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
   })
   const demonstrated = behaviors.filter((b) => b.result === 'DEMONSTRATED').length
   const uncertain = behaviors.filter((b) => b.result === 'UNCERTAIN').length
-  const status = ev.available ? 'EVALUATED' : 'EVALUATION_UNAVAILABLE'
+  const status = ev.available && mv.available ? 'EVALUATED' : 'EVALUATION_UNAVAILABLE'
   const verified = status === 'EVALUATED' && uncertain === 0
   const total = behaviors.length
   const noun = (n) => (n === 1 ? 'behaviour' : 'behaviours')
@@ -77,7 +98,11 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
     criteria,
     behaviors,
     counts: { demonstrated, uncertain, total },
-    evaluator: { used: needEvaluator.length > 0, available: ev.available, reason: ev.available ? null : ev.reason, promptVersion: evaluator?.promptVersion || null, model: ev.model || null },
+    evaluator: {
+      used: needEvaluator.length > 0 || needMeaning.length > 0, available: ev.available && mv.available,
+      reason: ev.available ? (mv.available ? null : mv.reason) : ev.reason,
+      promptVersion: evaluator?.promptVersion || null, meaningPromptVersion: needMeaning.length ? (evaluator?.meaningPromptVersion || null) : null, model: ev.model || mv.model || null,
+    },
     versions: { pipeline: PIPELINE_VERSION, validators: VALIDATORS_VERSION, schema: MISSION_SCHEMA_VERSION, confidenceThreshold: CONFIDENCE_THRESHOLD },
   }
 }
@@ -96,6 +121,6 @@ export function practiceUnitsFrom({ evaluation, mission, attempt }) {
     sourceType: 'MISSION_PRACTICE',
     checkType: c.check,
     excerpt: c.quote,
-    provenance: { ...evaluation.versions, reason: c.reason, evaluatorPrompt: c.check === 'DETERMINISTIC' ? null : evaluation.evaluator.promptVersion, model: c.check === 'DETERMINISTIC' ? null : evaluation.evaluator.model },
+    provenance: { ...evaluation.versions, reason: c.reason, evaluatorPrompt: c.check === 'DETERMINISTIC' ? null : c.check === 'MEANING' ? (evaluation.evaluator.meaningPromptVersion || null) : evaluation.evaluator.promptVersion, model: c.check === 'DETERMINISTIC' ? null : evaluation.evaluator.model },
   }))
 }

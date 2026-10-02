@@ -34,6 +34,9 @@ export const ERROR_STATUS = Object.freeze({
   // P2.6/P2.7: the evaluation run failed technically (retry / support), which
   // is never shown as missing evidence.
   REPORT_PROCESSING_FAILED: 409,
+  // P6 practice: a bounded allowance is used up / no unfamiliar setting left.
+  ALLOWANCE_EXHAUSTED: 409,
+  NO_FRESH_CHALLENGE: 409,
   NOT_IMPLEMENTED: 501,
   INTERNAL: 500,
 })

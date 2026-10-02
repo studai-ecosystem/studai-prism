@@ -85,5 +85,6 @@ export function createDefaultCampusContext() {
     engine: createEngineAdapter({ invoke: invokeEngine }),
     missionEvaluator: createMissionEvaluator({ complete: completeViaGateway }),
     sliceEvaluator: createSliceEvaluator({ complete: completeViaGateway, recordUnit: (unit) => evidenceGraph.recordEvidenceUnit(unit) }),
+    preparationComplete: completeViaGateway,
   })
 }

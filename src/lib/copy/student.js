@@ -80,12 +80,40 @@ export const HISTORY_STATUS_COPY = {
   TECHNICAL_FAILED: { label: 'Review did not finish', tone: 'insufficient', note: 'A technical problem stopped this before a report could be written. Nothing you did is lost.' },
   UNDER_REVIEW: { label: 'Under review', tone: 'neutral', note: 'A person is reviewing this result. It is not included in your capabilities until the review is finished.' },
   LEGACY: { label: 'Legacy report', tone: 'neutral', note: 'This report was issued by an earlier version of Prism and is shown as it was originally written.' },
+  ABANDONED: { label: 'Not finished', tone: 'neutral' },
 }
-export const HISTORY_ACTION_COPY = { VIEW_REPORT: 'View report', RESUME: 'Resume', RECOVER: 'Recover' }
+export const HISTORY_ACTION_COPY = { VIEW_REPORT: 'View report', RESUME: 'Resume', RECOVER: 'Recover', VIEW: 'Open' }
 export const HISTORY_LEGACY_ACTION = 'Original report'
-export const HISTORY_MODE_LABEL = { FORMAL: 'Formal assessment', PRACTICE: 'Practice' }
+// P7: preparation and self-reported notes are their own modes, never mixed
+// with formal items and never evidence of capability.
+export const HISTORY_MODE_LABEL = { FORMAL: 'Formal assessment', PRACTICE: 'Practice', PREPARATION: 'Private preparation', SELF_REPORT: 'Your own note (self-reported)' }
 export const HISTORY_DATE_UNKNOWN = 'Date not recorded'
-export const HISTORY_EMPTY = { title: 'No history yet', description: 'Completed assessments, reports and practice attempts appear here once they exist. Nothing has been removed.' }
+export const HISTORY_EMPTY = { title: 'No history yet', description: 'Completed assessments, reports, practice attempts and private preparation appear here once they exist. Nothing has been removed.' }
+
+// P7 private preparation copy (CH-34, CH-35).
+export const PREPARATION_COPY = {
+  privateLabel: 'Private preparation — not a formal assessment',
+  privateNote: 'Private to you. This stays in your personal workspace and never changes a formal result or appears in a campus report.',
+  omitNote: 'Leave out names, private employer or customer information, credentials and sensitive details about other people. We remove emails, phone numbers and links, but that is help, not a guarantee.',
+  assistanceLabel: 'AI assistance',
+  cardIntro: 'A short plan to use before the real conversation. Suggestions are AI assistance based on what you wrote; saving a plan is not a measure of how the conversation will go.',
+  selfReportLabel: 'Self-reported',
+  selfReportNote: 'Your own account. It is kept separately from assessments and cannot change a formal result.',
+  checkinPrompt: 'What did you try? What happened?',
+  cardError: {
+    NO_LEARNER_TURNS: 'No card was written because the rehearsal had nothing from you yet.',
+    CARD_NOT_CONFIGURED: 'The card writer is not available right now, so no card was written.',
+    UNPARSEABLE_OUTPUT: 'The card could not be written in a usable form, so nothing was saved. Your rehearsal is kept.',
+    TIMEOUT: 'Writing the card took too long, so nothing was saved. Your rehearsal is kept.',
+    PROVIDER_ERROR: 'The card could not be written because of a technical problem. Your rehearsal is kept.',
+  },
+  replyError: {
+    PARTICIPANT_NOT_CONFIGURED: 'The practice counterpart is not available right now. What you wrote is saved.',
+    EMPTY_REPLY: 'The counterpart did not reply this time. What you wrote is saved.',
+    TIMEOUT: 'The counterpart took too long to reply. What you wrote is saved.',
+    PROVIDER_ERROR: 'The counterpart could not reply because of a technical problem. What you wrote is saved.',
+  },
+}
 
 export const ASSESSMENT_TABS_EMPTY = {
   ACTIVE: { title: 'Nothing to take right now', description: 'Assessments you can start or resume appear here.' },
@@ -218,6 +246,18 @@ export const DEVELOPMENT_COPY = {
     completedTitle: 'Your practice attempts',
     practiceNote: 'Practice feedback checks specific behaviours in your work. It is not a formal assessment and never changes your formal results.',
     campusPrivacy: (institution) => `${institution} sees only whether you started and finished each assigned mission — never your answers or feedback.`,
+    draftLabel: 'Draft content',
+    draftNote: 'Draft content is still under review. It is available here for practice only and is never recommended automatically.',
+    guided: 'Guided',
+    freshChallenge: 'Fresh challenge',
+    freshChallengeAction: (family) => `Fresh challenge for ${family}`,
+    freshChallengeHelp: 'An unfamiliar setting for the same capability, with hints off. Feedback follows once you submit.',
+    allowanceRemaining: (remaining, total) => `${remaining} of ${total} practice attempts remaining`,
+    allowanceNone: 'Your practice allowance is used up. Finished attempts stay readable.',
+    replayTitle: 'Try that moment again',
+    replayHelp: 'Starts a separate practice attempt from the moment you came from. Your assessment and its report stay unchanged.',
+    replayAction: 'Try that moment again',
+    ungrouped: 'Other capabilities',
   },
   player: {
     practiceLabel: 'Practice mission',
@@ -228,6 +268,14 @@ export const DEVELOPMENT_COPY = {
     retry: 'Try again',
     backToHistory: 'Back to history',
     originNote: 'Started from a moment in one of your assessments. This practice is recorded separately and does not change that assessment or its report.',
+    uncoachedNote: 'Fresh challenge: hints are off for this attempt so the feedback shows what you do without coaching. It is still practice.',
+    stimulusTitle: 'What you were shown',
+    stimulusNote: 'Copied from the moment you came from, so you can try another approach. Your earlier answer is not shown or compared.',
+    whyItMatters: 'Why it matters',
+    reflect: 'Take a moment',
+    observedTitle: 'What was observed',
+    nextTitle: 'Next',
+    freshChallengeNext: 'Try a fresh challenge for this capability',
     results: { OBSERVED: 'Shown', NOT_OBSERVED: 'Not shown yet', UNCERTAIN: 'Could not be checked' },
     unavailable: 'Part of the feedback could not be produced right now. Nothing was guessed: those behaviours are not counted either way.',
   },

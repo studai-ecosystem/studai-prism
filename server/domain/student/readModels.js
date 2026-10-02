@@ -257,6 +257,7 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
         priorities,
         missions: v2 ? v2.recommended : [],
         catalogue: v2 ? v2.catalogue : [],
+        allowance: v2?.allowance || { kind: 'UNLIMITED' },
         completedMissions: v2 ? v2.completed : [],
         missionsAvailable: Boolean(v2 && v2.catalogue.length),
         missionsEnabled: Boolean(v2),

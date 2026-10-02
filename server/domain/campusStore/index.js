@@ -30,6 +30,7 @@ import { createGrowthRepoPg } from '../growth/repository.pg.js'
 import { createAnalyticsRepoMemory, createAnalyticsRepoPg } from '../analytics/repository.js'
 import { createBillingRepoMemory, createBillingRepoPg } from '../billing/repository.js'
 import { createValidationRepoMemory, createValidationRepoPg } from '../validation/repository.js'
+import { createPreparationRepoMemory, createPreparationRepoPg } from '../preparation/repository.js'
 import { createMemorySessionLocks, createPgSessionLocks } from '../assessments/sessionLocks.js'
 
 export function createMemoryCampusRepos(options = {}) {
@@ -57,6 +58,7 @@ export function createMemoryCampusRepos(options = {}) {
     analytics: createAnalyticsRepoMemory(db),
     billing: createBillingRepoMemory(db),
     validation: createValidationRepoMemory(db),
+    preparation: createPreparationRepoMemory(db),
   }
 }
 
@@ -86,5 +88,6 @@ export function createPgCampusRepos({ query, getPool, getLockPool }) {
     analytics: createAnalyticsRepoPg(deps),
     billing: createBillingRepoPg(deps),
     validation: createValidationRepoPg(deps),
+    preparation: createPreparationRepoPg(deps),
   }
 }

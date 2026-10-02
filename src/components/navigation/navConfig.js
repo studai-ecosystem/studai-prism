@@ -43,6 +43,14 @@ export const STUDENT_NAV = [
   { id: 'sharing', label: 'Shared reports', to: '/app/sharing', icon: Share2, group: 'more' },
 ]
 
+// Prepare activates only when its APIs are actually available
+// (PRISM_PREPARATION_V1 from GET /api/v1/me); otherwise the honest disabled
+// item stays.
+export function studentNavFor(flags = {}) {
+  if (flags.PRISM_PREPARATION_V1 !== true) return STUDENT_NAV
+  return STUDENT_NAV.map((i) => (i.id === 'prepare' ? { id: i.id, label: i.label, icon: i.icon, to: '/app/prepare' } : i))
+}
+
 // Campus student workspace (spec §6.3): only the sponsored sections; `to` is
 // the section path StudentShell scopes to the organization. There is no My
 // Prism in a sponsored workspace, so Growth stays a direct link here.

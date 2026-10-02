@@ -15,7 +15,13 @@ const attempt = (r) => r && ({
   id: r.id, userId: r.user_id, missionId: r.mission_id, missionVersion: r.mission_version, organizationId: r.organization_id, interventionId: r.intervention_id,
   status: r.status, work: r.work, version: r.version, hintsUsed: r.hints_used, idempotencyKey: r.idempotency_key, evaluation: r.evaluation,
   origin: r.origin_json || null,
+  assistance: r.assistance_json || null,
+  stimulus: r.stimulus_json || null,
   submittedAt: iso(r.submitted_at), createdAt: iso(r.created_at), updatedAt: iso(r.updated_at),
+})
+const allowance = (r) => r && ({
+  id: r.id, userId: r.user_id, organizationId: r.organization_id, kind: r.kind, total: r.total, used: r.used,
+  validUntil: iso(r.valid_until), source: r.source, createdAt: iso(r.created_at), updatedAt: iso(r.updated_at),
 })
 const unit = (r) => r && ({
   id: r.id, attemptId: r.attempt_id, userId: r.user_id, organizationId: r.organization_id, missionId: r.mission_id, missionVersion: r.mission_version,
@@ -75,10 +81,11 @@ export function createDevelopmentRepoPg({ query, getPool }) {
     async createAttempt(a) {
       return run(async () => {
         const { rows } = await query(`
-          INSERT INTO mission_attempts (user_id, mission_id, mission_version, organization_id, intervention_id, status, work, version, hints_used, idempotency_key, origin_json)
-          VALUES ($1, $2, $3, $4, $5, 'IN_PROGRESS', $6::jsonb, 1, 0, $7, $8::jsonb)
+          INSERT INTO mission_attempts (user_id, mission_id, mission_version, organization_id, intervention_id, status, work, version, hints_used, idempotency_key, origin_json, assistance_json, stimulus_json)
+          VALUES ($1, $2, $3, $4, $5, 'IN_PROGRESS', $6::jsonb, 1, 0, $7, $8::jsonb, $9::jsonb, $10::jsonb)
           ON CONFLICT (user_id, idempotency_key) DO NOTHING RETURNING *`,
-        [a.userId, a.missionId, a.missionVersion, a.organizationId || null, a.interventionId || null, JSON.stringify(a.work), a.idempotencyKey, a.origin ? JSON.stringify(a.origin) : null])
+        [a.userId, a.missionId, a.missionVersion, a.organizationId || null, a.interventionId || null, JSON.stringify(a.work), a.idempotencyKey,
+          a.origin ? JSON.stringify(a.origin) : null, a.assistance ? JSON.stringify(a.assistance) : null, a.stimulus ? JSON.stringify(a.stimulus) : null])
         if (rows[0]) return { attempt: attempt(rows[0]), replayed: false }
         const { rows: [prior] } = await query('SELECT * FROM mission_attempts WHERE user_id = $1 AND idempotency_key = $2', [a.userId, a.idempotencyKey])
         return { attempt: attempt(prior), replayed: true }
@@ -201,6 +208,27 @@ export function createDevelopmentRepoPg({ query, getPool }) {
         SELECT i.* FROM interventions i JOIN intervention_memberships m ON m.intervention_id = i.id
         WHERE m.user_id = $1 AND i.organization_id = $2`, [userId, organizationId])
       return rows.map(intervention)
+    },
+
+    // ── P6 practice allowance (0046) ─────────────────────────────────────
+    async getPracticeAllowance({ userId, organizationId = null }) {
+      const { rows } = await query('SELECT * FROM practice_allowances WHERE user_id = $1 AND organization_id IS NOT DISTINCT FROM $2 ORDER BY created_at DESC LIMIT 1', [userId, organizationId])
+      return allowance(rows[0]) || null
+    },
+    async setPracticeAllowance({ userId, organizationId = null, kind = 'BOUNDED', total, used = 0, validUntil = null, source }) {
+      return run(async () => {
+        const existing = await this.getPracticeAllowance({ userId, organizationId })
+        if (existing) {
+          const { rows } = await query('UPDATE practice_allowances SET kind = $2, total = $3, used = $4, valid_until = $5, source = $6, updated_at = now() WHERE id = $1 RETURNING *', [existing.id, kind, total, used, validUntil, source])
+          return allowance(rows[0])
+        }
+        const { rows } = await query('INSERT INTO practice_allowances (user_id, organization_id, kind, total, used, valid_until, source) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *', [userId, organizationId, kind, total, used, validUntil, source])
+        return allowance(rows[0])
+      })
+    },
+    async consumePracticeAllowance(id) {
+      const { rows } = await query('UPDATE practice_allowances SET used = used + 1, updated_at = now() WHERE id = $1 RETURNING *', [id])
+      return allowance(rows[0]) || null
     },
   }
 }

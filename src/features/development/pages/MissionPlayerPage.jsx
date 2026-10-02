@@ -42,7 +42,10 @@ export default function MissionPlayerPage() {
   const assessmentsPath = active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/assignments` : '/app/assessments'
   const historyPath = `${assessmentsPath}?tab=history`
   const missionQuery = useMission(missionId)
-  const [attemptId, setAttemptId] = useState(null)
+  // `?attempt=<id>` opens an attempt that was just created elsewhere (replay
+  // or fresh challenge); otherwise the mission's open attempt is resumed.
+  const requestedAttempt = searchParams.get('attempt') && ORIGIN_ID.test(searchParams.get('attempt')) ? searchParams.get('attempt') : null
+  const [attemptId, setAttemptId] = useState(requestedAttempt)
   const attemptQuery = useMissionAttempt(attemptId)
   const actions = useMissionActions(missionId)
   const [work, setWork] = useState(null)
@@ -153,17 +156,22 @@ export default function MissionPlayerPage() {
   const { mission, intervention } = missionQuery.data
   const pastAttempts = missionQuery.data.pastAttempts.filter((p) => p.id !== attempt?.id)
   const inProgress = attempt?.status === 'IN_PROGRESS' && saveState !== 'closed'
+  const uncoached = attempt?.assistance?.mode === 'UNCOACHED'
   const saveText = { idle: dirty ? 'Unsaved changes' : '', saving: 'Saving…', saved: 'All changes saved', error: 'Not saved — check your connection. Your work is kept on this page.', conflict: '', closed: '' }[saveState]
   const campusName = active.type === 'CAMPUS_STUDENT' ? (active.organizationName || 'Your institution') : null
+  const originKind = origin?.kind || attempt?.origin?.kind || null
 
   return (
     <div className="space-y-6">
       {header}
       <PracticeLabel variant="band" />
-      {origin?.kind === 'ASSESSMENT_MOMENT' && (
+      {originKind === 'ASSESSMENT_MOMENT' && (
         <p className="text-sm text-prism-ink-muted" data-testid="practice-origin">
           {copy.originNote} <Link to={historyPath} className="font-semibold underline">{copy.backToHistory}</Link>
         </p>
+      )}
+      {uncoached && (
+        <div data-testid="uncoached-note"><InlineNotice tone="neutral">{copy.uncoachedNote}</InlineNotice></div>
       )}
       <div className="flex flex-wrap items-center gap-2">
         {mission.targetCapability.name && <span className="text-sm text-prism-ink-muted">Focus: {mission.targetCapability.name}</span>}
@@ -173,8 +181,21 @@ export default function MissionPlayerPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <Panel title="The situation">
           <p className="text-sm text-prism-ink">{mission.scenario.setting}</p>
+          {attempt?.stimulus?.source === 'ASSESSMENT_MOMENT' && (
+            <div className="mt-4 rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-subtle p-3" data-testid="replay-stimulus">
+              <h3 className="text-sm font-semibold text-prism-ink">{copy.stimulusTitle}</h3>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-prism-ink">{attempt.stimulus.text}</p>
+              <p className="mt-2 text-xs text-prism-ink-subtle">{copy.stimulusNote}</p>
+            </div>
+          )}
           <h3 className="mt-4 text-sm font-semibold text-prism-ink">Your task</h3>
           <p className="mt-1 text-sm text-prism-ink">{mission.scenario.objective}</p>
+          {mission.whyItMatters && (
+            <>
+              <h3 className="mt-4 text-sm font-semibold text-prism-ink">{copy.whyItMatters}</h3>
+              <p className="mt-1 text-sm text-prism-ink-muted">{mission.whyItMatters}</p>
+            </>
+          )}
           <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-prism-ink-muted">{mission.instructions.map((i) => <li key={i}>{i}</li>)}</ol>
           {mission.constraints.length > 0 && (
             <>
@@ -215,7 +236,7 @@ export default function MissionPlayerPage() {
               {inProgress && (
                 <div className="flex flex-wrap items-center gap-3">
                   <Button onClick={() => setConfirmOpen(true)} disabled={actions.submit.isPending}>Submit for feedback</Button>
-                  {mission.hintCount > 0 && <Button variant="secondary" onClick={() => setHintsOpen(true)}>Hints ({attempt.hints.length} of {mission.hintCount} shown)</Button>}
+                  {mission.hintCount > 0 && !uncoached && <Button variant="secondary" onClick={() => setHintsOpen(true)}>Hints ({attempt.hints.length} of {mission.hintCount} shown)</Button>}
                 </div>
               )}
               <div role="alert">
@@ -230,6 +251,10 @@ export default function MissionPlayerPage() {
                     missionId={missionId}
                     missionPath={(id) => `${devPath}/missions/${id}`}
                     assessmentsPath={assessmentsPath}
+                    reflectionPrompt={mission.reflectionPrompt || null}
+                    capability={mission.targetCapability}
+                    uncoached={uncoached}
+                    devPath={devPath}
                   />
                   {actions.start.error && <div role="alert" className="mt-3"><InlineNotice tone="blocked">{actions.start.error.message}</InlineNotice></div>}
                   <div className="mt-4 flex flex-wrap gap-2">

@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkspace, wsKey } from '../../app/providers/WorkspaceProvider.jsx'
 import {
-  fetchV2Mission, fetchMissionAttempt, startMissionAttempt, saveMissionWork, revealMissionHint, submitMissionAttempt,
+  fetchV2Mission, fetchMissionAttempt, startMissionAttempt, saveMissionWork, revealMissionHint, submitMissionAttempt, replayMoment, startChallenge,
 } from '../../api/development.js'
 
 const noRetry = (count, err) => !['FORBIDDEN', 'NOT_FOUND', 'VALIDATION_FAILED', 'CONFLICT'].includes(err?.code) && err?.status !== 404 && count < 1
@@ -31,5 +31,21 @@ export function useMissionActions(missionId) {
     save: useMutation({ mutationFn: ({ attemptId, version, work }) => saveMissionWork(attemptId, version, work), onSuccess: put }),
     hint: useMutation({ mutationFn: ({ attemptId, version }) => revealMissionHint(attemptId, version), onSuccess: put }),
     submit: useMutation({ mutationFn: (attemptId) => submitMissionAttempt(attemptId), onSuccess: (a) => { put(a); refresh() } }),
+  }
+}
+
+// P6.6 / P6.7 — start practice from a report moment or as a fresh challenge.
+// Both answer { attempt, missionId }; the attempt is primed into the cache so
+// the player opens on it without a second fetch.
+export function usePracticeStarters() {
+  const { active } = useWorkspace()
+  const queryClient = useQueryClient()
+  const prime = ({ attempt }) => {
+    queryClient.setQueryData(wsKey(active.id, 'mission-attempt', attempt.id), attempt)
+    queryClient.invalidateQueries({ queryKey: wsKey(active.id, 'development-plan') })
+  }
+  return {
+    replay: useMutation({ mutationFn: (opts) => replayMoment(opts), onSuccess: prime }),
+    challenge: useMutation({ mutationFn: (opts) => startChallenge(opts), onSuccess: prime }),
   }
 }

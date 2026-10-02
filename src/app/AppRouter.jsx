@@ -99,6 +99,8 @@ const AssessmentDetailPage = lazy(() => import('../features/assessments/pages/As
 const EvidencePage = lazy(() => import('../features/evidence/pages/EvidencePage.jsx'))
 const DevelopmentPage = lazy(() => import('../features/development/pages/DevelopmentPage.jsx'))
 const GrowthPage = lazy(() => import('../features/growth/pages/GrowthPage.jsx'))
+const PreparePage = lazy(() => import('../features/preparation/pages/PreparePage.jsx'))
+const PreparationAttemptPage = lazy(() => import('../features/preparation/pages/PreparationAttemptPage.jsx'))
 const SharingPage = lazy(() => import('../features/sharing/pages/SharingPage.jsx'))
 const SettingsPage = lazy(() => import('../features/settings/pages/SettingsPage.jsx'))
 const CampusOverviewPage = lazy(() => import('../features/campus/pages/CampusOverviewPage.jsx'))
@@ -255,6 +257,9 @@ export default function AppRouter() {
             <Route path="/app/evidence" element={<EvidencePage />} />
             <Route path="/app/development" element={<DevelopmentPage />} />
             <Route path="/app/growth" element={<GrowthPage />} />
+            {/* P7 private preparation: dark unless PRISM_PREPARATION_V1 (Not yet available otherwise). */}
+            <Route path="/app/prepare" element={<FlagRoute flag="PRISM_PREPARATION_V1" onError="error" on={<PreparePage />} off={<Navigate to="/app/home" replace />} />} />
+            <Route path="/app/prepare/:attemptId" element={<FlagRoute flag="PRISM_PREPARATION_V1" onError="error" on={<PreparationAttemptPage />} off={<Navigate to="/app/home" replace />} />} />
             <Route path="/app/sharing" element={<SharingPage />} />
             <Route path="/app/settings" element={<SettingsPage />} />
           </Route>

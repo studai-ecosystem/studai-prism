@@ -4,7 +4,9 @@
 // stored here — the projection is rebuilt from the session directory (owner
 // + workspace scoped) and the development ledger. Dates are stored facts
 // only; an unknown date stays null (never the clock). Practice is a separate
-// mode and never changes a formal record.
+// mode and never changes a formal record. P7 adds the learner's private
+// PREPARATION attempts and SELF_REPORT check-ins (PERSONAL workspace only),
+// each its own sourceType and mode, never grouped with formal items.
 import { z } from 'zod'
 import { ApiError } from '../http/errors.js'
 import { isEnabled } from '../flags/index.js'
@@ -22,18 +24,18 @@ const iso = z.string().datetime({ offset: true }).nullable()
 
 export const HistoryItemSchema = z.object({
   id: z.string().min(1),
-  sourceType: z.enum(['FORMAL_SESSION', 'LEGACY_REPORT', 'PRACTICE_ATTEMPT']),
+  sourceType: z.enum(['FORMAL_SESSION', 'LEGACY_REPORT', 'PRACTICE_ATTEMPT', 'PREPARATION_ATTEMPT', 'SELF_REPORT']),
   sourceId: z.string().min(1),
-  mode: z.enum(['FORMAL', 'PRACTICE']),
+  mode: z.enum(['FORMAL', 'PRACTICE', 'PREPARATION', 'SELF_REPORT']),
   title: z.string().nullable(),
   startedAt: iso,
   completedAt: iso,
   issuedAt: iso,
   scope: z.enum(['PERSONAL', 'SPONSORED']),
   sponsorOrganizationId: z.string().nullable(),
-  status: z.enum(['ACTIVE', 'COMPLETED', 'PROCESSING', 'TECHNICAL_FAILED', 'UNDER_REVIEW', 'LEGACY']),
+  status: z.enum(['ACTIVE', 'COMPLETED', 'PROCESSING', 'TECHNICAL_FAILED', 'UNDER_REVIEW', 'LEGACY', 'ABANDONED']),
   reportFormat: z.enum(['V3', 'LEGACY_V2']).nullable(),
-  permittedAction: z.object({ kind: z.enum(['VIEW_REPORT', 'RESUME', 'RECOVER', 'NONE']), to: z.string().nullable() }),
+  permittedAction: z.object({ kind: z.enum(['VIEW_REPORT', 'RESUME', 'RECOVER', 'VIEW', 'NONE']), to: z.string().nullable() }),
   recoveryState: z.enum(['NONE', 'RESUMABLE', 'AWAITING_REPORT', 'RECOVERABLE', 'SUPPORT_REQUIRED', 'HELD']),
   // Practice only (P2.8): the formal session this practice was started from,
   // by id. The two records stay separately typed; this is the link between them.
@@ -52,7 +54,9 @@ function decodeCursor(cursor) {
 
 const sortKey = (i) => i.completedAt || i.issuedAt || i.startedAt || ''
 
-export function createStudentHistory({ directory, catalog, legacy, practice = { listAttemptHistory: async () => [] }, clock = () => new Date() }) {
+const EMPTY_PREPARATION = { listAttemptHistory: async () => [], listCheckinHistory: async () => [] }
+
+export function createStudentHistory({ directory, catalog, legacy, practice = { listAttemptHistory: async () => [] }, preparation = EMPTY_PREPARATION, clock = () => new Date() }) {
   const paths = legacy.paths
 
   function formalItem(s, workspace, cat, at) {
@@ -135,19 +139,68 @@ export function createStudentHistory({ directory, catalog, legacy, practice = { 
     }
   }
 
+  // P7: private preparation and the learner's own SELF_REPORT check-ins.
+  // Both are PERSONAL-only, separately typed and never part of a formal group.
+  function preparationItem(a) {
+    const open = a.state === 'DRAFT' || a.state === 'REHEARSING'
+    const to = `/app/prepare/${encodeURIComponent(a.id)}`
+    return {
+      id: `PREPARATION_ATTEMPT:${a.id}`,
+      sourceType: 'PREPARATION_ATTEMPT',
+      sourceId: a.id,
+      mode: 'PREPARATION',
+      title: a.title || null,
+      startedAt: a.createdAt || null,
+      completedAt: a.completedAt || null,
+      issuedAt: null,
+      scope: 'PERSONAL',
+      sponsorOrganizationId: null,
+      status: open ? 'ACTIVE' : a.state === 'ABANDONED' ? 'ABANDONED' : 'COMPLETED',
+      reportFormat: null,
+      permittedAction: { kind: open ? 'RESUME' : 'VIEW', to },
+      recoveryState: open ? 'RESUMABLE' : 'NONE',
+    }
+  }
+
+  function checkinItem(c) {
+    return {
+      id: `SELF_REPORT:${c.id}`,
+      sourceType: 'SELF_REPORT',
+      sourceId: c.id,
+      mode: 'SELF_REPORT',
+      title: 'Your own note',
+      startedAt: null,
+      completedAt: c.createdAt || null,
+      issuedAt: null,
+      scope: 'PERSONAL',
+      sponsorOrganizationId: null,
+      status: 'COMPLETED',
+      reportFormat: null,
+      permittedAction: c.sourceType === 'PREPARATION' && c.sourceId
+        ? { kind: 'VIEW', to: `/app/prepare/${encodeURIComponent(c.sourceId)}` }
+        : { kind: 'NONE', to: null },
+      recoveryState: 'NONE',
+    }
+  }
+
   return {
     async list(user, workspace, { cursor = null, limit = HISTORY_PAGE_DEFAULT } = {}) {
       const offset = decodeCursor(cursor)
       const size = Math.min(Math.max(1, Number(limit) || HISTORY_PAGE_DEFAULT), HISTORY_PAGE_MAX)
       const at = clock()
-      const [cat, sessions, attempts] = await Promise.all([
+      const personal = workspace.type === 'PERSONAL'
+      const [cat, sessions, attempts, preparations, checkins] = await Promise.all([
         catalog.getCatalog(),
         directory.listSessions(user, workspace),
         practice.listAttemptHistory(user, workspace),
+        personal ? preparation.listAttemptHistory(user, workspace) : [],
+        personal ? preparation.listCheckinHistory(user, workspace) : [],
       ])
       const all = [
         ...sessions.map((s) => formalItem(s, workspace, cat, at)),
         ...attempts.map((a) => practiceItem(a, workspace)),
+        ...preparations.map(preparationItem),
+        ...checkins.map(checkinItem),
       ].sort((a, b) => sortKey(b).localeCompare(sortKey(a)) || a.id.localeCompare(b.id))
       const page = all.slice(offset, offset + size)
       const nextCursor = offset + size < all.length ? encodeCursor(offset + size) : null

@@ -26,6 +26,7 @@ import { createSessionEntryLoader } from '../growth/entries.js'
 import { createAnalyticsService } from '../analytics/service.js'
 import { createBillingService } from '../billing/service.js'
 import { createValidationService } from '../validation/service.js'
+import { createPreparationService } from '../preparation/service.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 // Account directory (read-only) for admin views: `{ id, name, email }` or null.
@@ -76,6 +77,9 @@ export function createCampusContext({
   missionEvaluator = null,
   // P2.4 bounded evidence evaluator for draft-segment runs (sliceEvaluator.js).
   sliceEvaluator = null,
+  // P7 private preparation: the AI gateway `complete` function (null → the
+  // participant and card report themselves unavailable; nothing is guessed).
+  preparationComplete = null,
 } = {}) {
   const campusAvailable = () => isEnabled('PRISM_CAMPUS_ENABLED') && campusStoreAvailable()
   const workspaceService = createWorkspaceService({ repos, campusAvailable })
@@ -90,7 +94,7 @@ export function createCampusContext({
   const sessionScopes = createSessionScopeService({ repos, clock, ...(sessionOwner ? { sessionOwner } : {}) })
   const auditWriter = audit || auditLog
   const dataAccess = createDataAccessAudit({ repos })
-  const development = createDevelopmentService({ repos: storeView, evaluator: missionEvaluator, clock, audit: auditWriter })
+  const development = createDevelopmentService({ repos: storeView, evaluator: missionEvaluator, clock, audit: auditWriter, sourceSession: async (sessionId) => (legacy.getSession ? legacy.getSession(sessionId) : null) })
   const developmentOn = () => isEnabled('PRISM_DEVELOPMENT_V2') && Boolean(liveRepos())
   // Practice evidence reaches the student read models only while Development V2 is on.
   const practiceSource = practice || { list: async (user, workspace) => (developmentOn() ? development.listPractice(user, workspace) : []) }
@@ -106,6 +110,11 @@ export function createCampusContext({
     onRosterSync: (organizationId, cohortId, userId) => development.syncCohortMember(organizationId, cohortId, userId),
   })
   const growth = createGrowthService({ repos: storeView, catalog, clock, audit: auditWriter, entryFor: createSessionEntryLoader({ catalog, evidence, legacy }) })
+  // P7: private preparation and SELF_REPORT check-ins (PERSONAL only). Its
+  // repository is separate from development/evidence and never read by
+  // analytics or reports.
+  const preparation = createPreparationService({ repos: storeView, complete: preparationComplete, clock, audit: auditWriter })
+  const preparationOn = () => isEnabled('PRISM_PREPARATION_V1') && Boolean(liveRepos())
   const growthOn = () => isEnabled('PRISM_GROWTH_ENABLED') && Boolean(liveRepos())
   const analytics = createAnalyticsService({ repos: storeView, entryFor: createSessionEntryLoader({ catalog, evidence, legacy }), growth })
   // Overview cards that later phases fill (counts only; null while dark).
@@ -144,6 +153,10 @@ export function createCampusContext({
     history: createStudentHistory({
       directory, catalog, legacy, clock,
       practice: { listAttemptHistory: async (user, workspace) => (developmentOn() ? development.listAttemptHistory(user, workspace) : []) },
+      preparation: {
+        listAttemptHistory: async (user, workspace) => (preparationOn() ? preparation.listAttemptHistory(user, workspace) : []),
+        listCheckinHistory: async (user, workspace) => (preparationOn() ? preparation.listCheckinHistory(user, workspace) : []),
+      },
     }),
     telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }),
     sessions: engine
@@ -160,6 +173,7 @@ export function createCampusContext({
     admin,
     development,
     growth,
+    preparation,
     analytics,
     billing: createBillingService({ repos: storeView, clock }),
     // Blinded human double-rating of V3 evidence (identity tokenised).

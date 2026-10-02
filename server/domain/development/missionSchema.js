@@ -31,14 +31,25 @@ const Rule = z.object({
   description: Text(300),
 }).strict()
 
+// P6.4 MEANING check: the intent a learner must express in their own words.
+// `synonyms` are common phrasings handed to the evaluator as examples only —
+// a keyword match never proves the behaviour; a valid paraphrase can.
+const Meaning = z.object({
+  intent: Text(400),
+  synonyms: z.array(Text(80)).min(1).max(12),
+}).strict()
+
 const Criterion = z.object({
   criterion_id: Id,
   behavior_id: Id,
   description: Text(300),
   // DETERMINISTIC: rules decide; EVALUATOR: the structured evaluator decides
-  // (with a verbatim quote); BOTH: both must agree or the result is uncertain.
-  check: z.enum(['DETERMINISTIC', 'EVALUATOR', 'BOTH']),
+  // (with a verbatim quote); BOTH: both must agree or the result is uncertain;
+  // MEANING: semantic equivalence decided by the evaluator ({met, quote,
+  // reason}) — empty or very short work is "not met", never guessed.
+  check: z.enum(['DETERMINISTIC', 'EVALUATOR', 'BOTH', 'MEANING']),
   evaluator_guidance: Text(600).optional(),
+  meaning: Meaning.optional(),
   artifact_ids: z.array(Id).min(1).max(4),
 }).strict()
 
@@ -46,6 +57,16 @@ export const MissionContentSchema = z.object({
   mission_id: Id,
   version: z.number().int().min(1),
   status: z.enum(['DRAFT', 'PUBLISHED', 'RETIRED']),
+  // P6 authoring metadata (optional so earlier versions stay byte-identical).
+  display_code: z.string().regex(/^M\d{2}$/).optional(),
+  source: z.enum(['ORIGINAL', 'LEGACY']).optional(),
+  form_behaviour_ids: z.array(Id).min(1).max(2).optional(),
+  why_it_matters: Text(600).optional(),
+  reflection_prompt: Text(400).optional(),
+  retry_variation: Text(400).optional(),
+  // Which universal-form opportunities this mission resembles — exposure
+  // tracking so a fresh challenge never reuses a familiar setting.
+  exposure_tags: z.array(Id).max(8).optional(),
   title: Text(160),
   target_capability_id: z.string().regex(/^CAP-[A-Z0-9-]+$/),
   target_behavior_ids: z.array(Id).min(1).max(8),
@@ -68,8 +89,10 @@ export const MissionContentSchema = z.object({
     if (!behaviors.has(c.behavior_id)) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} targets an unlisted behaviour` })
     for (const a of c.artifact_ids) if (!artifacts.has(a)) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} reads unknown artifact ${a}` })
     const rules = m.deterministic_validation_rules.filter((r) => r.criterion_id === c.criterion_id)
-    if (c.check !== 'EVALUATOR' && rules.length === 0) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} needs a deterministic rule` })
+    if (c.check !== 'EVALUATOR' && c.check !== 'MEANING' && rules.length === 0) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} needs a deterministic rule` })
     if (c.check !== 'DETERMINISTIC' && !c.evaluator_guidance) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} needs evaluator guidance` })
+    if (c.check === 'MEANING' && !c.meaning) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} needs a meaning (intent + phrasings)` })
+    if (c.check !== 'MEANING' && c.meaning) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} carries a meaning but is not a MEANING check` })
   }
   for (const r of m.deterministic_validation_rules) {
     if (!criteria.has(r.criterion_id)) ctx.addIssue({ code: 'custom', message: `rule ${r.rule_id} references unknown criterion` })

@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { renderApp, meBody, signIn, jsonResponse } from '../../test/utils.jsx'
 import { WorkspaceGuard } from '../../app/guards/WorkspaceGuard.jsx'
 import DevelopmentPage from './pages/DevelopmentPage.jsx'
@@ -181,6 +181,165 @@ describe('Mission player', () => {
     })
     expect(await screen.findByText('Mission not available')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to development' })).toHaveAttribute('href', '/app/development')
+  })
+})
+
+// ── P6: library grouping, draft label, replay, fresh challenge, uncoached player, completion flow ──
+const ATT_R = '88888888-8888-4888-8888-888888888888'
+const ATT_C = '99999999-9999-4999-8999-999999999999'
+const draftCard = (id, code, title, capId, capName) => ({ ...card, id, title, displayCode: code, status: 'DRAFT', modes: ['GUIDED'], targetCapabilityId: capId, targetCapabilityName: capName })
+const M01 = draftCard('MIS-CORE-MISSING-FACT-01', 'M01', 'Find the missing fact', 'CAP-L1-REASONING', 'Making decisions')
+const M02 = draftCard('MIS-CORE-CHECK-RECOMMENDATION-01', 'M02', 'Check the confident recommendation', 'CAP-L1-REASONING', 'Making decisions')
+const M04 = draftCard('MIS-CORE-HANDOVER-01', 'M04', 'Hand over an unfinished plan to a colleague', 'CAP-L1-COMMUNICATION', 'Getting your point across')
+const published = { ...card, status: 'PUBLISHED', modes: ['GUIDED'], targetCapabilityName: 'Experimentation' }
+const planWith = (over = {}) => ({ data: { status: 'NO_PLAN', priorities: [], missions: [], catalogue: [published, M01, M04, M02], missionsAvailable: true, missionsEnabled: true, upcomingReassessment: null, practiceEvidence: [], completedMissions: [], allowance: { kind: 'UNLIMITED' }, ...over } })
+const growthNone = { data: { comparable: false, reason: 'NEEDS_COMPARABLE_REASSESSMENT', assessments: [], comparison: null, changes: [], reassessments: [], interventions: [], growthEnabled: true } }
+
+// P6 pages navigate after a replay/challenge; MemoryRouter has no window
+// location, so a probe route records where the app went.
+function LocationProbe() {
+  const { pathname, search } = useLocation()
+  return <p data-testid="location-probe">{pathname}{search}</p>
+}
+function renderWithProbe(path, element, routes, opts) {
+  signIn()
+  const calls = routeFetch({ ...routes, '/api/v1/me': meBody({ flags }) })
+  const out = renderApp(
+    <Routes>
+      <Route path={path} element={element} />
+      <Route path="/app/development/missions/:missionId" element={<LocationProbe />} />
+    </Routes>,
+    { route: opts?.route || path },
+  )
+  return { ...out, calls }
+}
+const landedOn = async (expected) => expect(await screen.findByTestId('location-probe')).toHaveTextContent(expected)
+
+describe('P6 practice library (Development page)', () => {
+  it('groups the catalogue by family, labels draft content and the guided mode, and shows the allowance only when bounded', async () => {
+    const { unmount } = renderStudent('/app/development', <DevelopmentPage />, { '/api/v1/me/development-plan': planWith(), '/api/v1/me/growth': growthNone })
+    const groups = await screen.findAllByTestId('family-group')
+    expect(groups.map((g) => within(g).getByRole('heading', { level: 4 }).textContent)).toEqual(['Experimentation', 'Making decisions', 'Getting your point across'])
+    const reasoning = groups[1]
+    expect(within(reasoning).getAllByRole('article')).toHaveLength(2)
+    expect(within(reasoning).getByRole('heading', { level: 5, name: /M01.*Find the missing fact/ })).toBeInTheDocument()
+    expect(within(reasoning).getAllByTestId('draft-label').map((d) => d.textContent)).toEqual(['Draft content', 'Draft content'])
+    expect(within(groups[0]).queryByTestId('draft-label')).not.toBeInTheDocument()
+    expect(screen.getAllByTestId('mode-badge')[0]).toHaveTextContent('Guided')
+    expect(screen.getByTestId('draft-note')).toHaveTextContent('never recommended automatically')
+    expect(within(reasoning).getByRole('button', { name: 'Fresh challenge for Making decisions' })).toBeInTheDocument()
+    expect(screen.queryByTestId('practice-allowance')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('replay-moment')).not.toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/\d+\s*%|readiness|!/i)
+    unmount()
+    vi.restoreAllMocks()
+    renderStudent('/app/development', <DevelopmentPage />, { '/api/v1/me/development-plan': planWith({ allowance: { kind: 'BOUNDED', total: 4, used: 1, remaining: 3, validUntil: null } }), '/api/v1/me/growth': growthNone })
+    expect(await screen.findByTestId('practice-allowance')).toHaveTextContent('3 of 4 practice attempts remaining')
+  })
+
+  it('offers "Try that moment again" for a report moment and opens the replayed attempt; a fresh challenge opens an uncoached attempt', async () => {
+    const replayed = attempt({ id: ATT_R, missionId: M04.id, origin: { kind: 'ASSESSMENT_MOMENT', sessionId: 'sess-1', opportunityId: 'OPP-COMM-HANDOVER-AUDIENCE' }, assistance: { mode: 'GUIDED', hintsUsed: 0, scaffoldRequested: false }, stimulus: { source: 'ASSESSMENT_MOMENT', opportunityId: 'OPP-COMM-HANDOVER-AUDIENCE', text: 'Ade: I only need to know whether the workshop goes ahead.', presentedAt: null } })
+    const { calls } = renderWithProbe('/app/development', <DevelopmentPage />, {
+      '/api/v1/me/development-plan': planWith(),
+      '/api/v1/me/growth': growthNone,
+      'POST /api/v1/development/replay': () => jsonResponse(201, { data: { attempt: replayed, missionId: M04.id } }),
+      'POST /api/v1/development/challenge': () => jsonResponse(201, { data: { attempt: attempt({ id: ATT_C, missionId: M02.id, assistance: { mode: 'UNCOACHED', hintsUsed: 0, scaffoldRequested: false }, stimulus: null }), missionId: M02.id } }),
+    }, { route: '/app/development?source=sess-1&moment=OPP-COMM-HANDOVER-AUDIENCE' })
+    const panel = await screen.findByTestId('replay-moment')
+    expect(panel).toHaveTextContent('Your assessment and its report stay unchanged')
+    await userEvent.click(within(panel).getByRole('button', { name: 'Try that moment again' }))
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith('/development/replay'))).toBe(true))
+    const call = calls.find((c) => c.url.endsWith('/development/replay'))
+    expect(call.body).toEqual({ sessionId: 'sess-1', opportunityId: 'OPP-COMM-HANDOVER-AUDIENCE' })
+    expect(call.headers['Idempotency-Key']).toMatch(/^replay-/)
+    await landedOn(`/app/development/missions/${M04.id}?attempt=${ATT_R}`)
+  })
+
+  it('a fresh challenge sends the capability and lands on the uncoached attempt', async () => {
+    const { calls } = renderWithProbe('/app/development', <DevelopmentPage />, {
+      '/api/v1/me/development-plan': planWith(),
+      '/api/v1/me/growth': growthNone,
+      'POST /api/v1/development/challenge': () => jsonResponse(201, { data: { attempt: attempt({ id: ATT_C, missionId: M02.id, assistance: { mode: 'UNCOACHED', hintsUsed: 0, scaffoldRequested: false } }), missionId: M02.id } }),
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Fresh challenge for Making decisions' }))
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith('/development/challenge'))).toBe(true))
+    expect(calls.find((c) => c.url.endsWith('/development/challenge')).body).toEqual({ capabilityId: 'CAP-L1-REASONING' })
+    await landedOn(`/app/development/missions/${M02.id}?attempt=${ATT_C}`)
+  })
+
+  it('a server refusal (nothing unfamiliar left) is shown inline, not as success', async () => {
+    renderWithProbe('/app/development', <DevelopmentPage />, {
+      '/api/v1/me/development-plan': planWith(),
+      '/api/v1/me/growth': growthNone,
+      'POST /api/v1/development/challenge': () => jsonResponse(409, { error: { code: 'NO_FRESH_CHALLENGE', message: 'No unfamiliar practice setting is available for this capability yet.', requestId: 'r' } }),
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Fresh challenge for Making decisions' }))
+    await waitFor(() => expect(screen.getAllByRole('alert').some((a) => /No unfamiliar practice setting is available/.test(a.textContent))).toBe(true))
+    expect(screen.queryByTestId('location-probe')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Fresh challenge for Making decisions' })).toBeEnabled()
+  })
+})
+
+describe('P6 mission player: uncoached mode and completion flow', () => {
+  const m02 = { ...mission, mission: { ...mission.mission, id: M02.id, title: M02.title, displayCode: 'M02', status: 'DRAFT', targetCapability: { id: 'CAP-L1-REASONING', name: 'Making decisions' }, whyItMatters: 'A confident summary is easy to forward.', reflectionPrompt: 'What made the summary sound reliable?', hintCount: 3 } }
+  it('opens the ?attempt= attempt, hides hints with an honest note when uncoached, and shows the replay stimulus when present', async () => {
+    const uncoached = attempt({ id: ATT_C, missionId: M02.id, hints: [], hintsRemaining: 0, assistance: { mode: 'UNCOACHED', hintsUsed: 0, scaffoldRequested: false }, stimulus: null })
+    const { calls, unmount } = renderStudent('/app/development/missions/:missionId', <MissionPlayerPage />, {
+      [`/api/v1/missions/${M02.id}`]: { data: m02 },
+      [`/api/v1/mission-attempts/${ATT_C}`]: { data: uncoached },
+    }, { route: `/app/development/missions/${M02.id}?attempt=${ATT_C}` })
+    expect(await screen.findByLabelText('Hypothesis')).toBeEnabled()
+    expect(calls.some((c) => c.url.endsWith(`/mission-attempts/${ATT_C}`))).toBe(true)
+    expect(screen.getByTestId('uncoached-note')).toHaveTextContent('hints are off for this attempt')
+    expect(screen.getByTestId('uncoached-note')).toHaveTextContent('It is still practice')
+    expect(screen.queryByRole('button', { name: /^Hints/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Submit for feedback' })).toBeInTheDocument()
+    expect(screen.getByText('Why it matters')).toBeInTheDocument()
+    expect(screen.queryByTestId('replay-stimulus')).not.toBeInTheDocument()
+    unmount()
+    vi.restoreAllMocks()
+    const replayed = attempt({ id: ATT_R, missionId: M02.id, origin: { kind: 'ASSESSMENT_MOMENT', sessionId: 'sess-1', opportunityId: 'OPP-X' }, assistance: { mode: 'GUIDED', hintsUsed: 0, scaffoldRequested: false }, stimulus: { source: 'ASSESSMENT_MOMENT', opportunityId: 'OPP-X', text: 'Dev: Can you confirm the room booking?', presentedAt: null } })
+    renderStudent('/app/development/missions/:missionId', <MissionPlayerPage />, {
+      [`/api/v1/missions/${M02.id}`]: { data: m02 },
+      [`/api/v1/mission-attempts/${ATT_R}`]: { data: replayed },
+    }, { route: `/app/development/missions/${M02.id}?attempt=${ATT_R}` })
+    const stim = await screen.findByTestId('replay-stimulus')
+    expect(stim).toHaveTextContent('Dev: Can you confirm the room booking?')
+    expect(stim).toHaveTextContent('Your earlier answer is not shown or compared')
+    expect(screen.getByTestId('practice-origin')).toHaveTextContent('does not change that assessment or its report')
+    expect(screen.getByRole('button', { name: /^Hints/ })).toBeInTheDocument()
+  })
+
+  it('completion is calm: reflection, observed criteria with the learner\'s words, then one next action (another mission or a fresh challenge)', async () => {
+    const done = {
+      status: 'EVALUATED', verified: true, summary: 'Mission completed — 1 of 2 target behaviours demonstrated.', counts: { demonstrated: 1, uncertain: 0, total: 2 },
+      criteria: [
+        { criterionId: 'C-CLAIM', description: 'Names the claim that was checked.', result: 'OBSERVED', quote: 'the supplier delivers in two days', checks: [{ description: 'The note names the claim that was checked.', passed: true }], note: 'Shown in this attempt.' },
+        { criterionId: 'C-UNCERTAIN', description: 'Names what is still uncertain.', result: 'NOT_OBSERVED', quote: null, checks: [], note: 'Not shown yet in this attempt.' },
+      ],
+    }
+    const { calls } = renderStudent('/app/development/missions/:missionId', <MissionPlayerPage />, {
+      [`/api/v1/missions/${M02.id}`]: { data: { ...m02, openAttemptId: ATT } },
+      '/api/v1/mission-attempts/': { data: attempt({ missionId: M02.id, status: 'EVALUATED', version: 3, result: done, submittedAt: '2026-10-10T09:00:00Z', assistance: { mode: 'GUIDED', hintsUsed: 1, scaffoldRequested: true } }) },
+      '/api/v1/me/development-plan': planWith({ catalogue: [M01, M02] }),
+      '/api/v1/me/growth': growthNone,
+      'POST /api/v1/development/challenge': () => jsonResponse(201, { data: { attempt: attempt({ id: ATT_C, missionId: M01.id, assistance: { mode: 'UNCOACHED', hintsUsed: 0, scaffoldRequested: false } }), missionId: M01.id } }),
+    }, { route: `/app/development/missions/${M02.id}` })
+    const next = await screen.findByTestId('mission-next-steps')
+    expect(within(next).getByTestId('reflection-prompt')).toHaveTextContent('What made the summary sound reliable?')
+    const observed = within(next).getByTestId('observed-criteria')
+    expect(observed).toHaveTextContent('What was observed: 1 of 2 behaviours in this attempt.')
+    expect(observed).toHaveTextContent('Names the claim that was checked.')
+    expect(observed).toHaveTextContent('the supplier delivers in two days')
+    expect(observed).not.toHaveTextContent('Names what is still uncertain.')
+    const action = within(next).getByTestId('next-action')
+    expect(within(action).getByRole('link', { name: 'Find the missing fact' })).toHaveAttribute('href', `/app/development/missions/${M01.id}`)
+    expect(screen.getByRole('link', { name: 'Back to history' })).toHaveAttribute('href', '/app/assessments?tab=history')
+    expect(document.body.textContent).not.toMatch(/congrat|well done|streak|badge|!|level\s*\d|\d+\s*%/i)
+    await userEvent.click(within(action).getByRole('button', { name: 'Try a fresh challenge for this capability' }))
+    await waitFor(() => expect(calls.find((c) => c.url.endsWith('/development/challenge'))?.body).toEqual({ capabilityId: 'CAP-L1-REASONING' }))
+    // The player navigates to the new attempt in the same route; the mission query for M01 is then requested.
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith(`/missions/${M01.id}`))).toBe(true))
   })
 })
 

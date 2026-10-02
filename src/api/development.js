@@ -45,8 +45,13 @@ export async function exploreRoles({ candidateInterests = null } = {}) {
 
 // ── Development Engine V2 (/api/v1, spec §16, §26, §32.2) ────────────────
 const nullableStr = z.string().nullable()
+const AllowanceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('UNLIMITED') }),
+  z.object({ kind: z.literal('BOUNDED'), total: z.number(), used: z.number(), remaining: z.number(), validUntil: nullableStr }),
+])
 const MissionCardSchema = z.object({
   id: z.string(), version: z.number(), title: z.string(), targetCapabilityId: z.string(), targetCapabilityName: nullableStr,
+  status: z.string().optional(), displayCode: nullableStr.optional(), modes: z.array(z.string()).optional(),
   estimatedMinutes: z.number(), behaviorCount: z.number(),
   intervention: z.object({ id: z.string(), name: z.string(), endsOn: nullableStr }).nullable(),
   latestAttempt: z.object({ id: z.string(), status: z.string(), summary: nullableStr, submittedAt: nullableStr }).nullable(),
@@ -60,14 +65,17 @@ const ArtifactSchema = z.object({
 const MissionViewSchema = z.object({
   mission: z.object({
     id: z.string(), version: z.number(), title: z.string(),
+    status: z.string().optional(), displayCode: nullableStr.optional(),
     targetCapability: z.object({ id: z.string(), name: nullableStr }),
     scenario: z.object({ setting: z.string(), objective: z.string() }),
+    whyItMatters: nullableStr.optional(), reflectionPrompt: nullableStr.optional(),
     instructions: z.array(z.string()), artifacts: z.array(ArtifactSchema), constraints: z.array(z.string()),
     whatIsChecked: z.array(z.object({ criterionId: z.string(), description: z.string() })),
     hintCount: z.number(), estimatedMinutes: z.number(), evidenceType: z.literal('PRACTICE'),
   }),
   intervention: z.object({ id: z.string(), name: z.string(), endsOn: nullableStr }).nullable(),
   openAttemptId: nullableStr,
+  allowance: AllowanceSchema.optional(),
   pastAttempts: z.array(z.object({ id: z.string(), status: z.string(), summary: nullableStr, submittedAt: nullableStr })),
 })
 const ResultSchema = z.object({
@@ -89,8 +97,13 @@ export const AttemptSchema = z.object({
   status: z.enum(['IN_PROGRESS', 'EVALUATED', 'EVALUATION_UNAVAILABLE']),
   version: z.number(), work: z.record(z.unknown()), hints: z.array(z.string()), hintsRemaining: z.number(),
   origin: OriginSchema.nullable().optional(),
+  // P6: assistance mode (GUIDED hints on request / UNCOACHED fresh challenge)
+  // and, for a replayed moment, the stimulus text the learner was shown.
+  assistance: z.object({ mode: z.enum(['GUIDED', 'UNCOACHED']), hintsUsed: z.number(), scaffoldRequested: z.boolean() }).optional(),
+  stimulus: z.object({ source: z.enum(['ASSESSMENT_MOMENT', 'MISSION_BRIEFING']), opportunityId: nullableStr.optional(), text: z.string(), presentedAt: nullableStr.optional() }).nullable().optional(),
   result: ResultSchema.nullable(), submittedAt: nullableStr, evidenceType: z.literal('PRACTICE'),
 })
+const StartedSchema = z.object({ attempt: AttemptSchema, missionId: z.string() })
 
 export const fetchV2Missions = () => request('/api/v1/missions', { schema: z.object({ items: z.array(MissionCardSchema) }).passthrough(), defaultErrorMessage: 'Practice missions could not be loaded.' }).then((r) => r.data.items)
 export const fetchV2Mission = (id) => request(`/api/v1/missions/${encodeURIComponent(id)}`, { schema: MissionViewSchema, defaultErrorMessage: 'This mission could not be loaded.' }).then((r) => r.data)
@@ -108,6 +121,15 @@ export const revealMissionHint = (attemptId, version) => request(`/api/v1/missio
 }).then((r) => r.data)
 export const submitMissionAttempt = (attemptId) => request(`/api/v1/mission-attempts/${encodeURIComponent(attemptId)}/submit`, {
   method: 'POST', schema: AttemptSchema, defaultErrorMessage: 'Your work could not be submitted.',
+}).then((r) => r.data)
+// P6.6 "Try that moment again": identifiers only; the server copies the
+// stimulus it showed, never the learner's transcript.
+export const replayMoment = ({ sessionId, opportunityId, idempotencyKey = newIdempotencyKey('replay') }) => request('/api/v1/development/replay', {
+  method: 'POST', body: { sessionId, opportunityId }, idempotencyKey, schema: StartedSchema, defaultErrorMessage: 'This moment could not be opened for practice.',
+}).then((r) => r.data)
+// P6.7 fresh challenge for a capability (uncoached; hints off).
+export const startChallenge = ({ capabilityId, idempotencyKey = newIdempotencyKey('challenge') }) => request('/api/v1/development/challenge', {
+  method: 'POST', body: { capabilityId }, idempotencyKey, schema: StartedSchema, defaultErrorMessage: 'A fresh challenge could not be started.',
 }).then((r) => r.data)
 
 // Campus interventions (spec §26).

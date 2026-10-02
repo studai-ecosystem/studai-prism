@@ -16,6 +16,7 @@ export function createDevelopmentRepoMemory(db) {
   db.planItems ||= []
   db.interventions ||= new Map()
   db.interventionMembers ||= new Map() // `${interventionId}:${userId}`
+  db.practiceAllowances ||= new Map()
   const vkey = (id, v) => `${id}:${v}`
 
   return {
@@ -61,6 +62,8 @@ export function createDevelopmentRepoMemory(db) {
         id: db.id(), userId: a.userId, missionId: a.missionId, missionVersion: a.missionVersion, organizationId: a.organizationId || null,
         interventionId: a.interventionId || null, status: 'IN_PROGRESS', work: clone(a.work), version: 1, hintsUsed: 0,
         origin: a.origin ? clone(a.origin) : null,
+        assistance: a.assistance ? clone(a.assistance) : null,
+        stimulus: a.stimulus ? clone(a.stimulus) : null,
         idempotencyKey: a.idempotencyKey, evaluation: null, submittedAt: null, createdAt: now(), updatedAt: now(),
       }
       db.missionAttempts.set(row.id, row)
@@ -153,6 +156,27 @@ export function createDevelopmentRepoMemory(db) {
     async listInterventionsForUser(userId, organizationId) {
       const ids = new Set([...db.interventionMembers.values()].filter((m) => m.userId === userId).map((m) => m.interventionId))
       return [...db.interventions.values()].filter((x) => ids.has(x.id) && x.organizationId === organizationId).map(clone)
+    },
+
+    // ── P6 practice allowance (0046) ─────────────────────────────────────
+    // No row = unlimited. `setPracticeAllowance` is for tests/admin tooling;
+    // no purchase flow exists here (P8).
+    async getPracticeAllowance({ userId, organizationId = null }) {
+      return clone([...db.practiceAllowances.values()].find((r) => r.userId === userId && (r.organizationId || null) === (organizationId || null)) || null)
+    },
+    async setPracticeAllowance({ userId, organizationId = null, kind = 'BOUNDED', total, used = 0, validUntil = null, source }) {
+      const existing = [...db.practiceAllowances.values()].find((r) => r.userId === userId && (r.organizationId || null) === (organizationId || null))
+      const row = existing || { id: db.id(), userId, organizationId: organizationId || null, createdAt: now() }
+      Object.assign(row, { kind, total, used, validUntil, source, updatedAt: now() })
+      db.practiceAllowances.set(row.id, row)
+      return clone(row)
+    },
+    async consumePracticeAllowance(id) {
+      const row = db.practiceAllowances.get(id)
+      if (!row) return null
+      row.used += 1
+      row.updatedAt = now()
+      return clone(row)
     },
   }
 }

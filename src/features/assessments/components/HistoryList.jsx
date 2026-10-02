@@ -15,11 +15,13 @@ import {
   HISTORY_ACTION_COPY, HISTORY_DATE_UNKNOWN, HISTORY_EMPTY, HISTORY_LEGACY_ACTION, HISTORY_MODE_LABEL, HISTORY_STATUS_COPY, SCOPE_LABEL,
 } from '../../../lib/copy/student.js'
 
-const UNTITLED = { FORMAL: 'Assessment', PRACTICE: 'Practice mission' }
+const UNTITLED = { FORMAL: 'Assessment', PRACTICE: 'Practice mission', PREPARATION: 'Preparation', SELF_REPORT: 'Your own note' }
+const MODE_TONE = { FORMAL: 'neutral', PRACTICE: 'accent', PREPARATION: 'neutral', SELF_REPORT: 'insufficient' }
+const DONE_VERB = { FORMAL: 'Completed', PRACTICE: 'Submitted', PREPARATION: 'Finished', SELF_REPORT: 'Noted' }
 
 function dateLine(item) {
   const when = formatDate(item.completedAt || item.issuedAt)
-  if (when) return `${item.status === 'ACTIVE' ? 'Started' : item.mode === 'PRACTICE' ? 'Submitted' : 'Completed'} ${when}`
+  if (when) return `${item.status === 'ACTIVE' ? 'Started' : DONE_VERB[item.mode] || 'Completed'} ${when}`
   const started = formatDate(item.startedAt)
   if (started) return `Started ${started}`
   return HISTORY_DATE_UNKNOWN
@@ -39,7 +41,7 @@ export function HistoryItemCard({ item, headingLevel = 3 }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap gap-1">
-            <Badge tone={item.mode === 'PRACTICE' ? 'accent' : 'neutral'}>{HISTORY_MODE_LABEL[item.mode]}</Badge>
+            <Badge tone={MODE_TONE[item.mode] || 'neutral'}>{HISTORY_MODE_LABEL[item.mode]}</Badge>
             <Badge tone="neutral">{scope}</Badge>
           </div>
           <H className="text-base font-semibold text-prism-ink">{title}</H>
@@ -89,6 +91,8 @@ export function HistoryList({ headingLevel = 2 }) {
     <div className="space-y-6" data-testid="history-list">
       <Group label="FORMAL" items={items.filter((i) => i.mode === 'FORMAL')} headingLevel={headingLevel} />
       <Group label="PRACTICE" items={items.filter((i) => i.mode === 'PRACTICE')} headingLevel={headingLevel} />
+      <Group label="PREPARATION" items={items.filter((i) => i.mode === 'PREPARATION')} headingLevel={headingLevel} />
+      <Group label="SELF_REPORT" items={items.filter((i) => i.mode === 'SELF_REPORT')} headingLevel={headingLevel} />
       {query.hasNextPage && (
         <Button variant="secondary" onClick={() => query.fetchNextPage()} loading={query.isFetchingNextPage} loadingLabel="Loading more…">Show more</Button>
       )}

@@ -152,6 +152,12 @@ test('T0 gate: research tables define no PII columns and never reference user_id
     // Report review requests (0045, P5.7): an account's own request that a
     // person reviews its published report version (WHO asked for WHAT) —
     // identity plane; it never joins research tables.
+    // Practice allowances (0046, P6.8): how many practice attempts one
+    // account may start (WHO may do WHAT) — identity plane, in the erasure
+    // cascade; never pooled into research tables.
+    // Private preparation (0047, P7): an account's own preparation attempts,
+    // action cards and SELF_REPORT check-ins — PERSONAL-only, never evidence,
+    // never read by analytics or reports, in the erasure cascade.
     // Named explicitly (no prefix wildcard) so research tables stay guarded.
     const CAMPUS_IDENTITY_PLANE = new Set([
       'cohort_members', 'organization_memberships', 'organization_invites', 'entitlements',
@@ -160,6 +166,8 @@ test('T0 gate: research tables define no PII columns and never reference user_id
       'mission_attempts', 'practice_evidence_units', 'development_plans', 'intervention_memberships',
       'capability_growth_snapshots',
       'report_review_requests',
+      'practice_allowances',
+      'preparation_attempts', 'action_cards', 'application_checkins',
     ])
     const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)]
     for (const [, name, body] of tables) {

@@ -1,5 +1,32 @@
 # Experience programme - source traceability and execution checkpoints
 
+## Current P6-P7 checkpoint - 2026-10-03
+
+Status: **IMPLEMENTED locally (DRAFT content, flag-gated); P8 in progress.**
+
+- CH-30 / P6.1: ten original DRAFT missions, two per family (`missionLibrary.p6.js`), exposure
+  tags = real form opportunity ids; behind `PRISM_DRAFT_CONTENT`; never recommended by default.
+- CH-31 / T40: MEANING criterion type (paraphrase accepted, keyword stuffing alone not;
+  EMPTY_WORK for empty input without a model call); pipeline v2 with quote verification.
+- CH-32 / T41: replay copies only the presented stimulus text (ledger) into a new PRACTICE
+  attempt; formal report hash unchanged (tested).
+- CH-33 / T42: fresh challenge selects an unexposed mission; `assistance.mode: UNCOACHED`,
+  hints refused 409; exposure metadata recorded.
+- Allowance: migration 0046 `practice_allowances` (no row = unlimited in non-production);
+  `ALLOWANCE_EXHAUSTED` blocks only new activity. No pricing here.
+- CH-34 / T43-T44: `domain/preparation/*` + migration 0047 (PERSONAL + PREPARATION CHECKs,
+  no FK to formal tables); sanitization (emails/phones/URLs) with explicit confirm step;
+  bounded AI participant with no tools; zod-validated action card, failure → `card: null`
+  with explicit error (nothing fabricated). Flag `PRISM_PREPARATION_V1` default OFF;
+  Campus workspaces get NOT_FOUND; static scan proves analytics/reports/evidence never
+  read preparation tables. Nav "Prepare" enabled only with the flag.
+- CH-35 / T45: `application_checkins` mode SELF_REPORT; shown as "Your own notes" on Growth
+  and in History as a separate type; cannot change any capability.
+- CH-36 / T46: Growth separates Practice history / Self-reported notes / formal comparison
+  (existing comparable-form gate unchanged, no deltas).
+
+Verification: server 730 (705/0/25 skips); frontend 34 files 463/0; isolated PG 6/6 (47 migrations).
+
 ## Current P5 checkpoint - 2026-10-03
 
 Status: **IMPLEMENTED locally; comprehension study (P5/P9 human) open.**

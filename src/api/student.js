@@ -39,18 +39,18 @@ const AssessmentsSchema = z.object({
 // Authorized history projection (P1.2). Dates are stored facts or null.
 export const HistoryItemSchema = z.object({
   id: z.string(),
-  sourceType: z.enum(['FORMAL_SESSION', 'LEGACY_REPORT', 'PRACTICE_ATTEMPT']),
+  sourceType: z.enum(['FORMAL_SESSION', 'LEGACY_REPORT', 'PRACTICE_ATTEMPT', 'PREPARATION_ATTEMPT', 'SELF_REPORT']),
   sourceId: z.string(),
-  mode: z.enum(['FORMAL', 'PRACTICE']),
+  mode: z.enum(['FORMAL', 'PRACTICE', 'PREPARATION', 'SELF_REPORT']),
   title: z.string().nullable(),
   startedAt: z.string().nullable(),
   completedAt: z.string().nullable(),
   issuedAt: z.string().nullable(),
   scope: z.enum(['PERSONAL', 'SPONSORED']),
   sponsorOrganizationId: z.string().nullable(),
-  status: z.enum(['ACTIVE', 'COMPLETED', 'PROCESSING', 'TECHNICAL_FAILED', 'UNDER_REVIEW', 'LEGACY']),
+  status: z.enum(['ACTIVE', 'COMPLETED', 'PROCESSING', 'TECHNICAL_FAILED', 'UNDER_REVIEW', 'LEGACY', 'ABANDONED']),
   reportFormat: z.enum(['V3', 'LEGACY_V2']).nullable(),
-  permittedAction: z.object({ kind: z.enum(['VIEW_REPORT', 'RESUME', 'RECOVER', 'NONE']), to: z.string().nullable() }),
+  permittedAction: z.object({ kind: z.enum(['VIEW_REPORT', 'RESUME', 'RECOVER', 'VIEW', 'NONE']), to: z.string().nullable() }),
   recoveryState: z.enum(['NONE', 'RESUMABLE', 'AWAITING_REPORT', 'RECOVERABLE', 'SUPPORT_REQUIRED', 'HELD']),
 }).passthrough()
 
@@ -128,15 +128,22 @@ const EvidenceSchema = z.object({
 
 const PlanMission = z.object({
   id: z.string(), title: z.string(), targetCapabilityName: z.string().nullable(), estimatedMinutes: z.number(),
+  targetCapabilityId: z.string().optional(), status: z.string().optional(), displayCode: z.string().nullable().optional(), modes: z.array(z.string()).optional(),
   intervention: z.object({ id: z.string(), name: z.string(), endsOn: z.string().nullable() }).nullable(),
   latestAttempt: z.object({ id: z.string(), status: z.string(), summary: z.string().nullable(), submittedAt: z.string().nullable() }).nullable(),
 }).passthrough()
+// P6.8 practice allowance: shown only when it is actually bounded.
+const PlanAllowance = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('UNLIMITED') }),
+  z.object({ kind: z.literal('BOUNDED'), total: z.number(), used: z.number(), remaining: z.number(), validUntil: z.string().nullable() }),
+])
 
 const PlanSchema = z.object({
   status: z.enum(['FOCUS_FROM_EVIDENCE', 'NO_PLAN']),
   priorities: z.array(Focus).max(3),
   missions: z.array(PlanMission),
   catalogue: z.array(PlanMission).optional().default([]),
+  allowance: PlanAllowance.optional().default({ kind: 'UNLIMITED' }),
   completedMissions: z.array(z.object({ attemptId: z.string(), missionId: z.string(), title: z.string().nullable(), status: z.string(), summary: z.string().nullable(), submittedAt: z.string().nullable() }).passthrough()),
   missionsAvailable: z.boolean(),
   missionsEnabled: z.boolean().optional().default(false),

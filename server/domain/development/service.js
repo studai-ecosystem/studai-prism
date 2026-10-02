@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { ApiError } from '../http/errors.js'
 import { can } from '../permissions/can.js'
 import { capabilityInfo } from '../assessments/catalog.js'
+import { CORE_TEAMREADY_A, opportunityById } from '../assessments/universalForm.js'
 import { parseMission, MISSION_SCHEMA_VERSION } from './missionSchema.js'
 import { MISSION_LIBRARY, draftContentEnabled } from './missionLibrary.js'
 import { normaliseWork, initialWork, runDeterministicChecks, candidateTextFor } from './validators.js'
@@ -15,6 +16,16 @@ import { evaluateMissionWork, practiceUnitsFrom } from './evaluate.js'
 const hash = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex')
 const orgOf = (workspace) => (workspace.type === 'CAMPUS_STUDENT' ? workspace.organizationId : null)
 const sameIntervention = (attempt, intervention) => (attempt.interventionId || null) === (intervention?.id || null)
+
+// P6 assistance state of an attempt. GUIDED attempts may reveal hints;
+// UNCOACHED (fresh challenge) attempts never do, so the feedback shows what
+// the learner does without coaching.
+export const ASSISTANCE_MODES = Object.freeze(['GUIDED', 'UNCOACHED'])
+export const assistanceOf = (attempt) => {
+  const mode = ASSISTANCE_MODES.includes(attempt.assistance?.mode) ? attempt.assistance.mode : 'GUIDED'
+  return { mode, hintsUsed: attempt.hintsUsed || 0, scaffoldRequested: (attempt.hintsUsed || 0) > 0 }
+}
+const MAX_STIMULUS_CHARS = 2000
 
 // Why a practice attempt was started (P2.8). Only identifiers are kept: a
 // practice attempt links to an approved assessment moment without ever
@@ -32,7 +43,7 @@ export function normaliseOrigin(origin) {
   throw new ApiError('VALIDATION_FAILED', 'The practice origin could not be read.')
 }
 
-export function createDevelopmentService({ repos, evaluator = null, clock = () => new Date(), audit = () => {}, library = MISSION_LIBRARY }) {
+export function createDevelopmentService({ repos, evaluator = null, clock = () => new Date(), audit = () => {}, library = MISSION_LIBRARY, sourceSession = async () => null }) {
   const store = () => repos.development
   let seeded = null
   // An intervention is open while ACTIVE and inside its date window. Dates are
@@ -107,11 +118,15 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       id: m.mission_id,
       version: m.version,
       status: m.status,
+      displayCode: m.display_code || null,
       title: m.title,
       targetCapabilityId: m.target_capability_id,
       targetCapabilityName: capabilityInfo(m.target_capability_id)?.name || null,
       estimatedMinutes: m.estimated_duration.minutes,
       behaviorCount: m.target_behavior_ids.length,
+      // GUIDED: hints on request. A fresh (UNCOACHED) challenge is started
+      // per capability, not per card, so it is not listed as a card mode.
+      modes: ['GUIDED'],
       intervention: intervention ? { id: intervention.id, name: intervention.name, endsOn: intervention.endsOn } : null,
       latestAttempt: latest ? { id: latest.id, status: latest.status, summary: latest.evaluation?.summary || null, submittedAt: latest.submittedAt } : null,
     }
@@ -123,9 +138,12 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       id: m.mission_id,
       version: m.version,
       status: m.status,
+      displayCode: m.display_code || null,
       title: m.title,
       targetCapability: { id: m.target_capability_id, name: capabilityInfo(m.target_capability_id)?.name || null },
       scenario: m.scenario_context,
+      whyItMatters: m.why_it_matters || null,
+      reflectionPrompt: m.reflection_prompt || null,
       instructions: m.instructions,
       artifacts: m.artifacts.map((a) => ({ id: a.artifact_id, type: a.type, title: a.title, prompt: a.prompt, fields: a.fields || null, columns: a.columns || null, maxLength: a.max_length || null })),
       constraints: m.constraints.notes,
@@ -158,6 +176,8 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
   }
 
   function attemptView(a, mission) {
+    const assistance = assistanceOf(a)
+    const coached = assistance.mode === 'GUIDED'
     return {
       id: a.id,
       missionId: a.missionId,
@@ -165,9 +185,11 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       status: a.status,
       version: a.version,
       work: a.work,
-      hints: mission.scaffolding_policy.hints.slice(0, a.hintsUsed),
-      hintsRemaining: Math.max(0, mission.scaffolding_policy.hints.length - a.hintsUsed),
+      hints: coached ? mission.scaffolding_policy.hints.slice(0, a.hintsUsed) : [],
+      hintsRemaining: coached ? Math.max(0, mission.scaffolding_policy.hints.length - a.hintsUsed) : 0,
       origin: a.origin || { kind: 'GOAL' },
+      assistance,
+      stimulus: a.stimulus || null,
       result: a.evaluation ? feedbackView(a.evaluation, mission) : null,
       submittedAt: a.submittedAt,
       evidenceType: 'PRACTICE',
@@ -194,6 +216,60 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
     }
   }
 
+  // ── P6 allowance (0046) ───────────────────────────────────────────────
+  // No row = unlimited (today's behaviour). A BOUNDED row caps how many
+  // practice attempts can be STARTED; finished attempts stay readable. No
+  // pricing or purchase flow lives here (P8).
+  async function allowanceFor(user, workspace) {
+    const row = typeof store().getPracticeAllowance === 'function' ? await store().getPracticeAllowance({ userId: user.id, organizationId: orgOf(workspace) }) : null
+    if (!row || row.kind !== 'BOUNDED') return { kind: 'UNLIMITED', row: null }
+    const expired = Boolean(row.validUntil) && new Date(row.validUntil).getTime() < clock().getTime()
+    const remaining = Math.max(0, row.total - row.used)
+    return { kind: 'BOUNDED', total: row.total, used: row.used, remaining, validUntil: row.validUntil || null, exhausted: expired || remaining === 0, row }
+  }
+  const allowanceView = (a) => (a.kind === 'UNLIMITED' ? { kind: 'UNLIMITED' } : { kind: 'BOUNDED', total: a.total, used: a.used, remaining: a.remaining, validUntil: a.validUntil })
+
+  // Every NEW practice attempt goes through here: allowance first, then the
+  // idempotent create. One unit is consumed only when a row was actually
+  // created, so a repeated request never charges twice.
+  async function newAttempt(user, workspace, { mission, intervention, idempotencyKey, origin, assistance, stimulus = null }) {
+    const allowance = await allowanceFor(user, workspace)
+    if (allowance.kind === 'BOUNDED' && allowance.exhausted) throw new ApiError('ALLOWANCE_EXHAUSTED', 'Your practice allowance is used up. Finished attempts stay readable.')
+    const organizationId = orgOf(workspace)
+    const { attempt, replayed } = await store().createAttempt({
+      userId: user.id, missionId: mission.mission_id, missionVersion: mission.version, organizationId, interventionId: intervention?.id || null,
+      work: initialWork(mission), idempotencyKey, origin, assistance, stimulus,
+    })
+    if (attempt.missionId !== mission.mission_id || (attempt.organizationId || null) !== organizationId || !sameIntervention(attempt, intervention)) throw new ApiError('CONFLICT', 'This request was already used for another mission.')
+    if (!replayed && allowance.row && typeof store().consumePracticeAllowance === 'function') await store().consumePracticeAllowance(allowance.row.id)
+    return { attempt, replayed }
+  }
+
+  // ── P6.6 replay source checks ─────────────────────────────────────────
+  // The source session must belong to this user and to this workspace's
+  // sponsorship (personal ↔ no sponsor; campus ↔ that organization).
+  async function authorizeSource(user, workspace, sessionId) {
+    const scope = typeof repos.scopes?.getSessionScope === 'function' ? await repos.scopes.getSessionScope(sessionId) : null
+    const session = await sourceSession(sessionId)
+    const owner = scope?.ownerUserId || session?.userId || null
+    if (!owner || owner !== user.id) throw new ApiError('NOT_FOUND', 'Not found')
+    const sponsor = scope?.sponsorType === 'INSTITUTION' ? scope.sponsorOrganizationId : null
+    if ((sponsor || null) !== orgOf(workspace)) throw new ApiError('NOT_FOUND', 'Not found')
+  }
+  async function ledgerOpportunity(sessionId, opportunityId) {
+    if (typeof repos.sessionIo?.listOpportunities !== 'function') return null
+    return (await repos.sessionIo.listOpportunities(sessionId)).find((o) => o.opportunityId === opportunityId) || null
+  }
+  // ONLY the stimulus the learner was shown (speaker + content), never their
+  // own actions, scores or evidence. Without a ledger row the mission's own
+  // briefing is the teaching situation.
+  function stimulusFor(row, mission, opportunityId) {
+    const messages = Array.isArray(row?.stimulus?.messages) ? row.stimulus.messages : []
+    const text = messages.map((m) => `${m?.speaker ? `${m.speaker}: ` : ''}${typeof m?.content === 'string' ? m.content : ''}`.trim()).filter(Boolean).join('\n').slice(0, MAX_STIMULUS_CHARS)
+    if (row && text) return { source: 'ASSESSMENT_MOMENT', opportunityId, text, presentedAt: row.presentedAt || null }
+    return { source: 'MISSION_BRIEFING', opportunityId, text: mission.scenario_context.setting, presentedAt: null }
+  }
+
   return {
     ensureSeeded,
 
@@ -205,7 +281,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
     async listMissions(user, workspace) {
       const { missions, interventionFor } = await reachable(user, workspace)
       const attempts = await store().listAttempts({ userId: user.id, organizationId: orgOf(workspace) })
-      return { items: missions.map((m) => card(m, attempts, interventionFor.get(m.mission_id) || null)), evidenceType: 'PRACTICE' }
+      return { items: missions.map((m) => card(m, attempts, interventionFor.get(m.mission_id) || null)), allowance: allowanceView(await allowanceFor(user, workspace)), evidenceType: 'PRACTICE' }
     },
 
     async getMission(user, workspace, missionId) {
@@ -216,6 +292,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
         mission: playerView(mission),
         intervention: intervention ? { id: intervention.id, name: intervention.name, endsOn: intervention.endsOn } : null,
         openAttemptId: open?.id || null,
+        allowance: allowanceView(await allowanceFor(user, workspace)),
         pastAttempts: attempts.filter((a) => a.status !== 'IN_PROGRESS').map((a) => ({ id: a.id, status: a.status, summary: a.evaluation?.summary || null, submittedAt: a.submittedAt })),
       }
     },
@@ -233,12 +310,63 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
         const open = (await store().listAttempts({ userId: user.id, organizationId })).find((a) => a.missionId === missionId && a.status === 'IN_PROGRESS' && sameIntervention(a, intervention))
         if (open) return { attempt: attemptView(open, mission), resumed: true }
       }
-      const { attempt, replayed } = await store().createAttempt({
-        userId: user.id, missionId, missionVersion: mission.version, organizationId, interventionId: intervention?.id || null,
-        work: initialWork(mission), idempotencyKey: `start:${idempotencyKey}`, origin: normalisedOrigin,
-      })
-      if (attempt.missionId !== missionId || (attempt.organizationId || null) !== organizationId || !sameIntervention(attempt, intervention)) throw new ApiError('CONFLICT', 'This request was already used for another mission.')
+      const { attempt, replayed } = await newAttempt(user, workspace, { mission, intervention, idempotencyKey: `start:${idempotencyKey}`, origin: normalisedOrigin, assistance: { mode: 'GUIDED' } })
       return { attempt: attemptView(attempt, mission), resumed: replayed }
+    },
+
+    // P6.6 "Try that moment again": a separate PRACTICE attempt from one
+    // authorized assessment moment. Copies only the presented stimulus text;
+    // the formal session, its evidence and its report are never read for
+    // content or written to.
+    async replayMoment(user, workspace, { sessionId, opportunityId, idempotencyKey }) {
+      if (!idempotencyKey) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
+      const origin = normaliseOrigin({ kind: 'ASSESSMENT_MOMENT', sessionId, opportunityId })
+      await authorizeSource(user, workspace, origin.sessionId)
+      const row = await ledgerOpportunity(origin.sessionId, origin.opportunityId)
+      const capabilityId = row?.capabilityId || opportunityById(CORE_TEAMREADY_A, origin.opportunityId)?.capabilityId || null
+      const { missions, interventionFor } = await reachable(user, workspace)
+      const candidates = missions.filter((m) => !capabilityId || m.target_capability_id === capabilityId)
+      const mission = candidates.find((m) => (m.exposure_tags || []).includes(origin.opportunityId)) || candidates.find((m) => m.status === 'PUBLISHED') || candidates[0] || null
+      if (!mission) throw new ApiError('NOT_FOUND', 'No practice mission matches this moment yet.')
+      const stimulus = stimulusFor(row, mission, origin.opportunityId)
+      const intervention = interventionFor.get(mission.mission_id) || null
+      const { attempt, replayed } = await newAttempt(user, workspace, { mission, intervention, idempotencyKey: `replay:${idempotencyKey}`, origin, assistance: { mode: 'GUIDED' }, stimulus })
+      if (!replayed) audit('development.replay.started', null, { attemptId: attempt.id, missionId: mission.mission_id, sessionId: origin.sessionId, opportunityId: origin.opportunityId, stimulusSource: stimulus.source, evidenceType: 'PRACTICE' })
+      return { attempt: attemptView(attempt, mission), resumed: replayed, missionId: mission.mission_id }
+    },
+
+    // P6.7 fresh challenge: a different practice setting for the same
+    // capability — a mission the learner has not attempted whose exposure
+    // tags do not overlap anything they have practised or replayed — with
+    // hints off for the whole attempt (UNCOACHED). The outcome is an observed
+    // practice behaviour in a fresh situation, not growth or a retest.
+    async startChallenge(user, workspace, { capabilityId, idempotencyKey }) {
+      if (!idempotencyKey) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
+      if (!capabilityInfo(capabilityId)) throw new ApiError('VALIDATION_FAILED', 'Choose a capability from the framework.')
+      const { missions, interventionFor } = await reachable(user, workspace)
+      const attempts = await store().listAttempts({ userId: user.id, organizationId: orgOf(workspace) })
+      // A repeated request returns the attempt it already created, even
+      // though that attempt has since made its own setting "exposed".
+      const prior = attempts.find((a) => a.idempotencyKey === `challenge:${idempotencyKey}`)
+      if (prior) {
+        const v = await store().getMissionVersion(prior.missionId, prior.missionVersion)
+        return { attempt: attemptView(prior, parseMission(v.content)), resumed: true, missionId: prior.missionId }
+      }
+      const attempted = new Set(attempts.map((a) => a.missionId))
+      const exposed = new Set()
+      for (const a of attempts) {
+        if (a.origin?.kind === 'ASSESSMENT_MOMENT') exposed.add(a.origin.opportunityId)
+        const v = await store().getMissionVersion(a.missionId, a.missionVersion)
+        for (const t of v?.content?.exposure_tags || []) exposed.add(t)
+      }
+      const fresh = missions.filter((m) => m.target_capability_id === capabilityId && !attempted.has(m.mission_id) && !(m.exposure_tags || []).some((t) => exposed.has(t)))
+      if (!fresh.length) throw new ApiError('NO_FRESH_CHALLENGE', 'No unfamiliar practice setting is available for this capability yet.')
+      const mission = fresh[0]
+      const intervention = interventionFor.get(mission.mission_id) || null
+      const assistance = { mode: 'UNCOACHED', exposureTags: mission.exposure_tags || [] }
+      const { attempt, replayed } = await newAttempt(user, workspace, { mission, intervention, idempotencyKey: `challenge:${idempotencyKey}`, origin: { kind: 'GOAL' }, assistance })
+      if (!replayed) audit('development.challenge.started', null, { attemptId: attempt.id, missionId: mission.mission_id, capabilityId, exposureTags: assistance.exposureTags, evidenceType: 'PRACTICE' })
+      return { attempt: attemptView(attempt, mission), resumed: replayed, missionId: mission.mission_id }
     },
 
     async getAttempt(user, workspace, attemptId) {
@@ -257,6 +385,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
 
     async revealHint(user, workspace, attemptId, { expectedVersion }) {
       const { attempt, mission } = await attemptFor(user, workspace, attemptId, { write: true })
+      if (assistanceOf(attempt).mode === 'UNCOACHED') throw new ApiError('CONFLICT', 'Hints are off for a fresh challenge, so the feedback shows what you do without coaching.')
       if (attempt.hintsUsed >= mission.scaffolding_policy.hints.length) return attemptView(attempt, mission)
       const out = await store().saveAttemptWork(attempt.id, { expectedVersion, hintsUsed: attempt.hintsUsed + 1 })
       if (out?.conflict) throw new ApiError('CONFLICT', 'This attempt changed. Reload to continue.')
@@ -279,6 +408,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
         attemptId: attempt.id, missionId: mission.mission_id, missionVersion: mission.version, status: evaluation.status,
         demonstrated: evaluation.counts.demonstrated, uncertain: evaluation.counts.uncertain, total: evaluation.counts.total,
         evaluator: evaluation.evaluator.available ? evaluation.evaluator.promptVersion : evaluation.evaluator.reason, evidenceType: 'PRACTICE',
+        assistance: assistanceOf(done.attempt), origin: done.attempt.origin?.kind || 'GOAL',
       })
       return { attempt: attemptView(done.attempt, mission), replayed: false }
     },
@@ -323,6 +453,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
           title: v?.content?.title || null,
           status: a.status,
           origin: a.origin || { kind: 'GOAL' },
+          assistance: assistanceOf(a),
           startedAt: a.createdAt || null,
           submittedAt: a.submittedAt || null,
         })
@@ -343,6 +474,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       const recommended = missions.filter((m) => m.status !== 'DRAFT' && (focus.has(m.target_capability_id) || interventionFor.has(m.mission_id)))
       return {
         planId: plan?.id || null,
+        allowance: allowanceView(await allowanceFor(user, workspace)),
         recommended: recommended.map((m) => card(m, attempts, interventionFor.get(m.mission_id) || null)),
         catalogue: missions.map((m) => card(m, attempts, interventionFor.get(m.mission_id) || null)),
         completed: attempts.filter((a) => a.status !== 'IN_PROGRESS').slice(0, 20).map((a) => {

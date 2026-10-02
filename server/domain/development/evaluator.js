@@ -9,6 +9,36 @@ import { sanitizeCandidateText } from '../../lib/promptSecurity.js'
 import { tokenizeForModel } from '../../lib/identityIsolation.js'
 
 export const EVALUATOR_PROMPT = 'mission_evaluator.v1'
+export const MEANING_PROMPT = 'mission_meaning.v1'
+// Work shorter than this (all artifacts together) is never sent to the model
+// for a meaning check: it is "not met — EMPTY_WORK", not guessed feedback.
+export const MIN_MEANING_CHARS = 20
+export const MEANING_REASONS = Object.freeze(['EXPRESSED', 'NOT_EXPRESSED', 'KEYWORDS_ONLY', 'CONTRADICTED'])
+const MEANING_SCHEMA = {
+  name: 'mission_meaning',
+  description: 'Per-criterion meaning decisions with verbatim quotes.',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['criteria'],
+    properties: {
+      criteria: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['criterion_id', 'met', 'quote', 'reason'],
+          properties: {
+            criterion_id: { type: 'string' },
+            met: { type: 'boolean' },
+            quote: { type: 'string' },
+            reason: { type: 'string', enum: [...MEANING_REASONS] },
+          },
+        },
+      },
+    },
+  },
+}
 const OUTPUT_SCHEMA = {
   name: 'mission_criteria',
   description: 'Per-criterion practice observations with verbatim quotes.',
@@ -68,19 +98,76 @@ function parseOutput(content) {
     }))
 }
 
+// P6.4 meaning messages: intent + example phrasings per criterion. Exported
+// so tests can prove the payload is identity-free.
+export function buildMeaningMessages({ mission, criteria, workTexts, candidateName }) {
+  const text = workTexts.map((t) => sanitizeCandidateText(tokenizeForModel(t, candidateName), 4000)).join('\n\n---\n\n')
+  const prompt = renderPrompt(MEANING_PROMPT, {
+    MISSION_OBJECTIVE: mission.scenario_context.objective,
+    MEANING_JSON: JSON.stringify(criteria.map((c) => ({ criterion_id: c.criterion_id, intent: c.meaning.intent, phrasings: c.meaning.synonyms, guidance: c.evaluator_guidance }))),
+    WORK_TEXT: text,
+  })
+  return [
+    { role: 'system', content: prompt },
+    { role: 'user', content: 'Return the JSON object for the meaning criteria listed.' },
+  ]
+}
+
+function parseMeaningOutput(content) {
+  let data = content
+  if (typeof data === 'string') {
+    const m = data.match(/\{[\s\S]*\}/)
+    if (!m) return null
+    try { data = JSON.parse(m[0]) } catch { return null }
+  }
+  if (!data || !Array.isArray(data.criteria)) return null
+  return data.criteria
+    .filter((c) => c && typeof c.criterion_id === 'string' && typeof c.met === 'boolean')
+    .map((c) => ({
+      criterionId: c.criterion_id,
+      met: c.met,
+      quote: typeof c.quote === 'string' ? c.quote : '',
+      reason: MEANING_REASONS.includes(c.reason) ? c.reason : (c.met ? 'EXPRESSED' : 'NOT_EXPRESSED'),
+    }))
+}
+
+export const meaningWorkTooShort = (workTexts) => workTexts.join(' ').replace(/\s+/g, ' ').trim().length < MIN_MEANING_CHARS
+
 export function createMissionEvaluator({ complete, timeoutMs = 20_000 } = {}) {
+  const withTimeout = (call) => {
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'TIMEOUT' })), timeoutMs).unref?.())
+    return Promise.race([call, timeout])
+  }
   return {
     promptVersion: EVALUATOR_PROMPT,
+    meaningPromptVersion: MEANING_PROMPT,
     async evaluate({ mission, criteria, workTexts, candidateName }) {
       if (!criteria.length) return { available: true, results: [], model: null }
       if (!complete) return { available: false, reason: 'EVALUATOR_NOT_CONFIGURED' }
       try {
         const messages = buildEvaluatorMessages({ mission, criteria, workTexts, candidateName })
         const call = complete({ messages, temperature: 0, max_completion_tokens: 800, json_schema: OUTPUT_SCHEMA }, { task: 'mission_evaluator', retries: 1 })
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'TIMEOUT' })), timeoutMs).unref?.())
-        const out = await Promise.race([call, timeout])
+        const out = await withTimeout(call)
         const content = out?.choices?.[0]?.message?.content ?? out?.content ?? out
         const results = parseOutput(content)
+        if (!results) return { available: false, reason: 'UNPARSEABLE_OUTPUT' }
+        return { available: true, results, model: out?.model || null }
+      } catch (err) {
+        return { available: false, reason: err?.code === 'TIMEOUT' ? 'TIMEOUT' : 'PROVIDER_ERROR' }
+      }
+    },
+    // P6.4 — semantic equivalence. Empty or very short work never reaches the
+    // model: every criterion is "not met, EMPTY_WORK" and nothing is invented.
+    async evaluateMeaning({ mission, criteria, workTexts, candidateName }) {
+      if (!criteria.length) return { available: true, results: [], model: null }
+      if (meaningWorkTooShort(workTexts)) return { available: true, results: criteria.map((c) => ({ criterionId: c.criterion_id, met: false, quote: '', reason: 'EMPTY_WORK' })), model: null }
+      if (!complete) return { available: false, reason: 'EVALUATOR_NOT_CONFIGURED' }
+      try {
+        const messages = buildMeaningMessages({ mission, criteria, workTexts, candidateName })
+        const call = complete({ messages, temperature: 0, max_completion_tokens: 800, json_schema: MEANING_SCHEMA }, { task: 'mission_evaluator', retries: 1 })
+        const out = await withTimeout(call)
+        const content = out?.choices?.[0]?.message?.content ?? out?.content ?? out
+        const results = parseMeaningOutput(content)
         if (!results) return { available: false, reason: 'UNPARSEABLE_OUTPUT' }
         return { available: true, results, model: out?.model || null }
       } catch (err) {
