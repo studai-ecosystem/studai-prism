@@ -72,7 +72,10 @@ test.describe('@critical @campus Journey A — direct user to Report V3', () => 
     const res = await api(page, `/api/v1/assessment-sessions/${sessionId}/report`, { token: student.token })
     expect(res.status).toBe(200)
     assertEveryClaimCitesEvidence(res.body.data.report)
-    await expect(page.getByTestId('report-capability').first()).toBeVisible()
+    // Report V3 first screen (P5): the capability map lists every capability
+    // as a row; detail cards live behind "see evidence" / the Evidence tab.
+    await expect(page.getByTestId('capability-map')).toBeVisible()
+    await expect(page.getByTestId('capability-map-row').first()).toBeVisible()
     await expectNoSeriousAxe(page)
 
     await page.getByRole('tab', { name: 'Development' }).click()
@@ -169,6 +172,10 @@ test.describe('@critical @campus Journey D — insufficient evidence', () => {
     assertEveryClaimCitesEvidence(report)
     expect(report.summary.describedCount).toBe(0)
     await expect(page.getByText('Not enough evidence yet')).toBeVisible()
+    // Report V3 first screen: every capability row carries no level band.
+    const rows = page.getByTestId('capability-map-row')
+    expect(await rows.count()).toBeGreaterThan(0)
+    for (const row of await rows.all()) await expect(row).toHaveAttribute('data-band', 'NONE')
     for (const card of await page.getByTestId('report-capability').all()) {
       await expect(card.getByText('What we observed')).toHaveCount(0)
     }

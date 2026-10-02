@@ -88,7 +88,12 @@ export default function Pricing({ onGetAssessed, onContactSales }) {
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-canvas">
+        <div
+          role="region"
+          aria-label="Offer comparison table"
+          tabIndex={0}
+          className="overflow-x-auto rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-canvas focus:outline-none focus-visible:ring-2 focus-visible:ring-prism-accent"
+        >
           <table className="w-full min-w-[720px] border-collapse text-left text-sm">
             <caption className="sr-only">Offer comparison: what you get, allowance, window, limits, provisional results and recovery or review policy</caption>
             <thead>

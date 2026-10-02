@@ -23,6 +23,7 @@ test('RECOVERY-UI pending report can be rechecked without scoring and retains su
   await expect(page.getByRole('link', { name: 'Contact support' })).toHaveAttribute('href', '/contact')
   await expect(page.getByRole('button', { name: 'Share', exact: true })).toHaveCount(0)
   await expect(page.getByTestId('report-capability')).toHaveCount(0)
+  await expect(page.getByTestId('capability-map')).toHaveCount(0)
   await page.getByRole('button', { name: 'Check again' }).click()
   await expect(page.getByText('This report is under review', { exact: true })).toBeVisible()
   await expect(page.getByText('Reference: req-report-ui-2')).toBeVisible()

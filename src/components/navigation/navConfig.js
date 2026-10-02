@@ -13,13 +13,18 @@ export const NAV_GROUP_LABELS = Object.freeze({
 
 // Matches a nav item to the current location. Items whose `to` carries a
 // query string (History) are current only when that query is present; the
-// plain route (Assessments) is current only when it is absent.
+// plain route (Assessments) is current only when it is absent. `also` lists
+// further routes that count as this item (My Prism's Evidence and Growth
+// sections).
 const hasTab = (search, tab) => new URLSearchParams(search).get('tab') === tab
 const pathOf = (to) => String(to).split('?')[0]
 export function isNavItemActive(item, location) {
   if (!item.to) return false
-  const path = pathOf(item.to)
-  const onPath = location.pathname === path || location.pathname.startsWith(`${path}/`)
+  const onAny = (to) => {
+    const path = pathOf(to)
+    return location.pathname === path || location.pathname.startsWith(`${path}/`)
+  }
+  const onPath = onAny(item.to) || (item.also || []).some(onAny)
   if (!onPath) return false
   if (item.tab) return hasTab(location.search, item.tab)
   if (item.excludeTab) return !hasTab(location.search, item.excludeTab)
@@ -35,7 +40,7 @@ export function isNavItemActive(item, location) {
 export const STUDENT_NAV = [
   { id: 'home', label: 'Home', to: '/app/home', icon: Home },
   { id: 'assessments', label: 'Assessments', to: '/app/assessments', icon: ClipboardList, excludeTab: 'history' },
-  { id: 'capabilities', label: 'My Prism', to: '/app/capabilities', icon: Layers },
+  { id: 'capabilities', label: 'My Prism', to: '/app/capabilities', icon: Layers, also: ['/app/evidence', '/app/growth'] },
   { id: 'development', label: 'Practice', to: '/app/development', icon: Sprout },
   { id: 'prepare', label: 'Prepare', to: null, icon: Target, unavailable: NAV_UNAVAILABLE_NOTE },
   { id: 'history', label: 'History', to: '/app/assessments?tab=history', icon: HistoryIcon, tab: 'history' },
@@ -71,7 +76,7 @@ export const STUDENT_NAV_FOOTER = [
 export const STUDENT_BOTTOM_NAV = [
   { id: 'home', label: 'Home', to: '/app/home', icon: Home },
   { id: 'assessments', label: 'Assessments', to: '/app/assessments', icon: ClipboardList, excludeTab: 'history' },
-  { id: 'capabilities', label: 'My Prism', to: '/app/capabilities', icon: Layers },
+  { id: 'capabilities', label: 'My Prism', to: '/app/capabilities', icon: Layers, also: ['/app/evidence', '/app/growth'] },
   { id: 'development', label: 'Practice', to: '/app/development', icon: Sprout },
 ]
 

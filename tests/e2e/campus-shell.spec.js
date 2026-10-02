@@ -12,7 +12,9 @@ for (const width of WIDTHS) {
     await page.goto(`${CAMPUS_BASE_URL}/app`)
     await expect(page).toHaveURL(/\/app\/home$/)
     await expect(page.getByRole('heading', { level: 1, name: /^Good (morning|afternoon|evening), Synthetic$/ })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Take your first Prism assessment' })).toBeVisible()
+    // A new learner (P3.3 / P8.2) sees the intent step first, or the
+    // intention chooser once that is answered or skipped.
+    await expect(page.getByRole('heading', { level: 2, name: /^(Three quick choices|What would you like to do\?)$/ })).toBeVisible()
     await expectNoHorizontalOverflow(page)
 
     // Which navigation is shown follows the browser's own `md` media query:
@@ -24,26 +26,40 @@ for (const width of WIDTHS) {
     if (!(await isDesktop())) {
       const quick = page.getByRole('navigation', { name: 'Quick navigation' })
       await expect(quick).toBeVisible()
-      await quick.getByRole('link', { name: 'Assess' }).click()
+      await quick.getByRole('link', { name: 'Assessments' }).click()
       await expect(page.getByRole('heading', { level: 1, name: 'Assessments' })).toBeVisible()
       if (await isDesktop()) {
-        await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Capabilities' }).click()
+        await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'My Prism' }).click()
       } else {
-        await quick.getByRole('link', { name: 'Capabilities' }).click()
-        // Everything not in the quick bar opens from More.
+        await quick.getByRole('link', { name: 'My Prism' }).click()
+        // Everything not in the quick bar opens from More: History, Explore,
+        // Shared reports, and Prepare announced as not yet available.
         await page.getByRole('button', { name: 'More' }).click()
         const drawer = page.getByRole('dialog', { name: 'More' })
         await expect(drawer).toBeVisible()
         await expect(drawer.getByRole('link', { name: 'Explore' })).toBeVisible()
+        await expect(drawer.getByRole('link', { name: 'History' })).toBeVisible()
+        await expect(drawer.getByRole('link', { name: /^Prepare/ })).toHaveAttribute('aria-disabled', 'true')
         await page.keyboard.press('Escape')
+        await expect(drawer).toBeHidden()
       }
+      await expect(page.getByRole('heading', { level: 1, name: 'Capabilities' })).toBeVisible()
+      await expect(page.getByRole('navigation', { name: 'My Prism sections' }).getByRole('link', { name: 'Evidence' })).toBeVisible()
       await expect(page.getByText('You do not have a formal capability profile yet.')).toBeVisible()
     } else {
       const nav = page.getByRole('navigation', { name: 'Primary' })
       await expect(nav).toBeVisible()
-      await nav.getByRole('link', { name: 'Evidence' }).click()
+      await expect(nav.getByRole('link', { name: /^Prepare/ })).toHaveAttribute('aria-disabled', 'true')
+      await nav.getByRole('link', { name: 'My Prism' }).click()
+      await expect(page.getByRole('heading', { level: 1, name: 'Capabilities' })).toBeVisible()
+      await expect(nav.getByRole('link', { name: 'My Prism' })).toHaveAttribute('aria-current', 'page')
+      // Evidence is a section under My Prism, not a primary item.
+      await expect(nav.getByRole('link', { name: 'Evidence' })).toHaveCount(0)
+      const sections = page.getByRole('navigation', { name: 'My Prism sections' })
+      await sections.getByRole('link', { name: 'Evidence' }).click()
       await expect(page.getByRole('heading', { level: 1, name: 'Evidence' })).toBeVisible()
-      await expect(nav.getByRole('link', { name: 'Evidence' })).toHaveAttribute('aria-current', 'page')
+      await expect(sections.getByRole('link', { name: 'Evidence' })).toHaveAttribute('aria-current', 'page')
+      await expect(nav.getByRole('link', { name: 'My Prism' })).toHaveAttribute('aria-current', 'page')
     }
     await expectNoHorizontalOverflow(page)
   })
