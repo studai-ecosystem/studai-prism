@@ -41,14 +41,14 @@ export function MissionArtifactEditor({ artifact, value, onChange, disabled }) {
         <table className="w-max min-w-full text-left text-sm">
           <caption className="sr-only">{artifact.title}</caption>
           <thead className="bg-prism-subtle text-prism-ink-muted">
-            <tr>{columns.map((c) => <th key={c.key} scope="col" className="px-3 py-2 font-semibold">{c.label}</th>)}</tr>
+            <tr>{columns.map((c, ci) => <th key={c.key} scope="col" className={ci === 0 ? 'sticky left-0 z-10 bg-prism-subtle px-3 py-2 font-semibold' : 'px-3 py-2 font-semibold'}>{c.label}</th>)}</tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={r.id} className="border-t border-prism-border">
-                {columns.map((c) => {
+                {columns.map((c, ci) => {
                   const label = `${c.label} for ${rows[i][columns.find((x) => !x.editable)?.key] || `row ${i + 1}`}`
-                  if (!c.editable) return <th key={c.key} scope="row" className="min-w-[9rem] max-w-[16rem] px-3 py-2 align-top font-medium text-prism-ink">{r[c.key]}</th>
+                  if (!c.editable) return <th key={c.key} scope="row" className={`min-w-[9rem] max-w-[16rem] px-3 py-2 align-top font-medium text-prism-ink ${ci === 0 ? 'sticky left-0 z-10 bg-prism-surface shadow-[1px_0_0_var(--prism-border)]' : ''}`}>{r[c.key]}</th>
                   return (
                     <td key={c.key} className="px-3 py-2">
                       <input

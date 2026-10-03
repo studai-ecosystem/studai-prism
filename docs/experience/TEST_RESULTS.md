@@ -1,5 +1,18 @@
 # P0 - Verification results
 
+## P6 screenshot review follow-up - 2026-10-03
+
+Independent review of the `p6` screenshots found two copy/layout defects, fixed and re-verified:
+
+- A partial attempt was headed "Mission completed — 1 of 2 …". Now only all-shown attempts say "Mission completed";
+  partial verified attempts say "Attempt reviewed — n of N target behaviours demonstrated." (`evaluate.js`;
+  `campus-development.spec.js` copy updated; the `completed` only-when-verified guard in `campusDevelopment.test.js` still holds).
+- The board's task-name column scrolled out of view while editing owner / done-when cells; the first column is now sticky
+  (`MissionArtifactEditor.jsx`).
+
+Re-run: `server npm test` 830 pass / 0 fail; `vitest src/features/development` 20/20; build PASS; audit:static PASS;
+`node scripts/run-experience-baseline-tests.mjs p6` 1 passed (screenshots regenerated under `audit-results/ui/p6/`).
+
 ## P6 remaining gaps closed - 2026-10-03
 
 Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider

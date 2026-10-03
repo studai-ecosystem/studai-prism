@@ -102,7 +102,9 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
   const summary = (verified
     ? (demonstrated === 0
       ? `Attempt reviewed — none of the ${total} target ${noun(total)} shown yet.`
-      : `Mission completed — ${demonstrated} of ${total} target ${noun(total)} demonstrated.`)
+      : demonstrated === total
+        ? `Mission completed — ${demonstrated} of ${total} target ${noun(total)} demonstrated.`
+        : `Attempt reviewed — ${demonstrated} of ${total} target ${noun(total)} demonstrated.`)
     : `${demonstrated} of ${total} target ${noun(total)} demonstrated so far; ${uncertain} could not be checked reliably this time.`) + copiedNote
   const focus = buildFocus({ mission, criteria, status, learnerTextFor: (c) => candidateTextFor(mission, work, mission.rubric.criteria.find((x) => x.criterion_id === c.criterionId)?.artifact_ids || []) })
 

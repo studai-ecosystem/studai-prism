@@ -37,7 +37,7 @@ async function doMission(page, missionUrlPattern) {
   await page.getByRole('button', { name: 'Submit for feedback' }).click()
   const confirm = page.getByRole('dialog', { name: 'Submit this attempt?' })
   await confirm.getByRole('button', { name: 'Submit' }).click()
-  await expect(page.getByTestId('mission-summary')).toHaveText('Mission completed — 2 of 4 target behaviours demonstrated.')
+  await expect(page.getByTestId('mission-summary')).toHaveText('Attempt reviewed — 2 of 4 target behaviours demonstrated.')
   await expect(page.getByTestId('mission-criterion')).toHaveCount(4)
   await expect(page.getByTestId('mission-feedback').getByText('Shown', { exact: true })).toHaveCount(2)
   await expect(page.getByTestId('mission-feedback').getByText('Not shown yet', { exact: true })).toHaveCount(2)
@@ -65,7 +65,7 @@ test.describe('@critical @campus Development V2 — practice missions and interv
     await page.getByRole('button', { name: 'Try again' }).click()
     await expect(page.getByLabel('Hypothesis', { exact: true })).toBeEnabled()
     await expect(page.getByLabel('Hypothesis', { exact: true })).toHaveValue('')
-    await expect(page.getByText(/Mission completed — 2 of 4 target behaviours demonstrated\./).first()).toBeVisible()
+    await expect(page.getByText(/Attempt reviewed — 2 of 4 target behaviours demonstrated\./).first()).toBeVisible()
 
     // Practice units are labelled practice and never become formal evidence.
     const evidence = await api(page, '/api/v1/me/evidence', { token: me.token })
