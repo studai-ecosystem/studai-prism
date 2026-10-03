@@ -10,7 +10,7 @@ export function reportPdfLines(report, { visibility = null, versionNumber = null
   const h = report.header
   lines.push({ text: 'Prism report', size: 18, bold: true })
   if (h.candidateName) lines.push({ text: h.candidateName, size: 12 })
-  lines.push({ text: `${h.assessment.title}${h.scenarioTitle ? ` — ${h.scenarioTitle}` : ''}`, size: 11 })
+  lines.push({ text: `${h.assessment.title}${h.scenarioTitle && h.scenarioTitle !== h.assessment.title ? ` — ${h.scenarioTitle}` : ''}`, size: 11 })
   if (h.sponsor) lines.push({ text: `Sponsored by ${h.sponsor.name}`, size: 10 })
   if (h.completedAt) lines.push({ text: `Completed ${new Date(h.completedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`, size: 10 })
   if (identityText) lines.push({ text: identityText, size: 10 })

@@ -1,5 +1,24 @@
 # Experience programme - source traceability and execution checkpoints
 
+## P3 acceptance gaps closed - 2026-10-03
+
+- Real-browser canonical journey `tests/e2e/p3-real-journey.spec.js` (runner mode `p3`, no route
+  fixtures): dev entitlement → server-pinned DRAFT universal form → intro (Escape never begins) →
+  Begin → message → keyboard board edit → reload (same deadline) → Finish → real `EVALUATE_RUN`
+  worker → published Report V3, on all four browser projects; screenshots in `audit-results/ui/p3/`.
+- P3.6: `ConversationPane` follows only near the latest message and offers "New reply — jump to
+  latest" (polite live region); `PlanBoard.jsx` (PLAN_BOARD) with labelled owner/due/status/
+  dependency/why controls from the contract's server-validated `schema`, "Provided" vs "Your edit".
+- P3.5/T11: missing required material → recovery with retry/support; zero-artifact stays centred.
+- P3.7: Briefing during ACTIVE states the clock keeps running, Escape/Close return focus to the
+  toggle; intro without situation/role disables Begin and offers reload.
+- P3.8: contract `timing.policyDurationMs`/`policyStatus`; 10/5/1 warnings only for longer policies;
+  late drafts read-only and "not submitted". P3.9: text-only decision (DECISIONS.md), static
+  no-hint/no-auto-send test. P3.3: Home `PREPARATION_IN_PROGRESS` and `PRACTICE_AVAILABLE`.
+- Results: TEST_RESULTS.md "P3 acceptance gaps closed". No scoring, evidence, legacy stimulus/timing,
+  entitlement or authorization change. Open: manual AT/zoom, T18 approved adjustments, T21 copy,
+  Layer C.
+
 ## P2.9 Layer B gap closed - 2026-10-03
 
 - Draft/universal runs (only with `PRISM_DRAFT_CONTENT=true`) no longer call the legacy engine to

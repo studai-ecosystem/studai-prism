@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'p2', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, p2, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
+if (!['database', 'p2', 'p3', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, p3, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -81,6 +81,12 @@ try {
   // Specs whose selectors track the P3-P5 UI (nav IA, Home, Report V3 first screen).
   if (mode === 'browser-sync') browserArgs.splice(2, browserArgs.length, 'campus-journey-a.spec.js', 'campus-shell.spec.js', 'ui-matrix.spec.js', 'flow-recovery.spec.js')
   if (mode === 'browser-smoke') browserArgs.push('--grep', 'returning login|pending report')
+  // P3: the real-browser canonical journey (draft content on the 4174 audit
+  // server only) plus the player frame, recovery and shell specs, all projects.
+  if (mode === 'p3') {
+    env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
+    browserArgs.splice(2, browserArgs.length, 'p3-real-journey.spec.js', 'flow-player-layout.spec.js', 'flow-recovery.spec.js', 'campus-shell.spec.js')
+  }
   exitCode = await run(mode === 'database'
     ? ['--test', 'server/test/experienceBaseline.db.test.js']
     // P2.9 Layer B: action → evidence → report → practice chain on this cluster.

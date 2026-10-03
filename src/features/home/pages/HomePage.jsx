@@ -45,7 +45,7 @@ export default function HomePage() {
   // Strengths are only capabilities with a governed demonstrated level; a
   // provisional one stays labelled provisional.
   const strengths = data.capabilitySnapshot.filter((c) => c.level && (c.level.band === 'DEMONSTRATED' || c.level.band === 'STRONG')).slice(0, 3)
-  const mission = !campus && plan.data && plan.data.missionsAvailable ? plan.data.missions[0] : null
+  const mission = !campus && plan.data && plan.data.missionsAvailable && data.primaryAction.kind !== 'PRACTICE_AVAILABLE' ? plan.data.missions[0] : null
   const comparable = Boolean(growth.data && growth.data.comparable)
   const historyTo = `${assignmentsListPath(active)}?tab=history`
   // A new learner: the server offers "get started" and the workspace owns no

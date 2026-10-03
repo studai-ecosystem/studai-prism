@@ -17,14 +17,36 @@ export function NextActionCard({ action, sponsorName, historyTo }) {
   const session = SESSION_KINDS.has(action.kind)
   const failed = action.kind === 'ASSESSMENT_TECHNICAL_FAILED'
   const processing = action.kind === 'ASSESSMENT_PROCESSING'
+  const practice = action.kind === 'PRACTICE_AVAILABLE'
+  const preparing = action.kind === 'PREPARATION_IN_PROGRESS'
+  const started = formatDate(action.startedAt)
   const due = formatDate(action.dueAt)
   const received = formatDate(action.completedAt)
-  const title = assignment ? action.title : copy.title
+  const title = assignment || practice ? action.title : copy.title
   const to = processing ? historyTo : action.to
+  const allowance = practice && action.allowance?.kind === 'BOUNDED' && Number.isFinite(action.allowance.remaining)
+    ? `${action.allowance.remaining} of ${action.allowance.total} practice ${action.allowance.total === 1 ? 'attempt' : 'attempts'} left`
+    : practice && action.allowance?.kind === 'UNLIMITED' ? 'Included in your plan' : null
   return (
     <Card className="space-y-3 border-prism-accent-soft p-6" aria-labelledby="primary-action" data-testid="next-action" data-kind={action.kind}>
       <p className="text-xs font-semibold uppercase tracking-wide text-prism-accent-strong">{copy.eyebrow}</p>
       <h2 id="primary-action" className="text-xl font-semibold text-prism-ink">{title}</h2>
+      {practice && (
+        <ul className="flex flex-wrap items-center gap-2 text-sm text-prism-ink-muted" aria-label="About this practice" data-testid="practice-facts">
+          <li><Badge tone="neutral">Practice</Badge></li>
+          {action.mode === 'GUIDED' && <li>Guided, with hints on request</li>}
+          {Number.isFinite(action.estimatedMinutes) && <li>About {action.estimatedMinutes} minutes</li>}
+          {action.targetCapabilityName && <li>Develops {action.targetCapabilityName}</li>}
+          {allowance && <li>{allowance}</li>}
+        </ul>
+      )}
+      {preparing && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-prism-ink-muted">
+          <Badge tone="neutral">Private preparation</Badge>
+          {action.title && <span className="font-medium text-prism-ink">{action.title}</span>}
+          {started && <span>Started {started}</span>}
+        </div>
+      )}
       {(assignment || session) && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-prism-ink-muted">
           {session && action.title && <span className="font-medium text-prism-ink">{action.title}</span>}

@@ -283,6 +283,13 @@ export function worldStateFor(form, { appliedWorldChangeIds = [], revealedFactId
 // Validates a learner board patch against the schema WITHOUT completing any
 // field. Keys are `${rowId}.${field}`; unknown rows/fields/owners/statuses or
 // a dependency on an unknown row are rejected. Returns { ok, errors }.
+// P3.6: the choices the board accepts, for accessible labelled controls in
+// the player. Exactly the lists validateBoardPatch enforces; no rubric content.
+export function boardSchemaFor(artifactId) {
+  if (artifactId !== BOARD_ARTIFACT_ID) return null
+  return { fields: [...BOARD_FIELDS], editable: [...BOARD_EDITABLE_FIELDS], owners: [...BOARD_OWNERS], statuses: [...BOARD_STATUSES] }
+}
+
 export function validateBoardPatch(form, updates) {
   const errors = []
   if (!updates || typeof updates !== 'object' || Array.isArray(updates)) return { ok: false, errors: ['Updates must be an object.'] }

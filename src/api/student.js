@@ -85,7 +85,7 @@ const HomeSchema = z.object({
   user: z.object({ name: z.string().nullable() }),
   workspace: z.object({ id: z.string(), type: z.string(), name: z.string().nullable(), organizationName: z.string().nullable() }),
   primaryAction: z.object({
-    kind: z.enum(['ASSESSMENT_DUE', 'ASSESSMENT_IN_PROGRESS', 'ASSESSMENT_READY', 'ASSESSMENT_PROCESSING', 'ASSESSMENT_TECHNICAL_FAILED', 'REPORT_READY', 'CAPABILITY_SUMMARY', 'GET_STARTED', 'NOTHING_ASSIGNED']),
+    kind: z.enum(['ASSESSMENT_DUE', 'ASSESSMENT_IN_PROGRESS', 'ASSESSMENT_READY', 'ASSESSMENT_PROCESSING', 'ASSESSMENT_TECHNICAL_FAILED', 'PREPARATION_IN_PROGRESS', 'REPORT_READY', 'PRACTICE_AVAILABLE', 'CAPABILITY_SUMMARY', 'GET_STARTED', 'NOTHING_ASSIGNED']),
     to: z.string().nullable(),
     title: z.string().nullable().optional(),
     scope: z.enum(['PERSONAL', 'SPONSORED']).optional(),
@@ -94,6 +94,14 @@ const HomeSchema = z.object({
     // Session-backed kinds (processing / technical failure): the saved run.
     sessionId: z.string().optional(),
     completedAt: z.string().nullable().optional(),
+    // P3.3 private preparation (PERSONAL only) and one practice mission.
+    attemptId: z.string().optional(),
+    startedAt: z.string().nullable().optional(),
+    missionId: z.string().optional(),
+    targetCapabilityName: z.string().nullable().optional(),
+    estimatedMinutes: z.number().nullable().optional(),
+    mode: z.string().optional(),
+    allowance: z.object({ kind: z.enum(['UNLIMITED', 'BOUNDED']), total: z.number().optional(), used: z.number().optional(), remaining: z.number().optional(), validUntil: z.string().nullable().optional() }).nullable().optional(),
   }),
   capabilitySnapshot: z.array(z.object({ id: z.string(), name: z.string(), status: Status, level: Level, change: z.null(), evidenceSummary: z.string() }).passthrough()),
   assessedCount: z.number().int(),

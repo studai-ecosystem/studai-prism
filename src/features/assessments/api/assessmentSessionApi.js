@@ -20,7 +20,11 @@ export const SessionContractSchema = z.object({
   }),
   jobFamilyId: z.string().nullable(),
   capabilities: z.array(z.object({ id: z.string(), name: z.string() })),
-  artifacts: z.array(z.object({ artifactId: z.string(), type: z.string(), title: z.string().nullable(), data: z.unknown(), version: z.number().int().min(0), notes: z.string().optional() })),
+  artifacts: z.array(z.object({
+    artifactId: z.string(), type: z.string(), title: z.string().nullable(), data: z.unknown(), version: z.number().int().min(0), notes: z.string().optional(),
+    // P3.6: the choices a PLAN_BOARD accepts (server-validated lists).
+    schema: z.object({ fields: z.array(z.string()), editable: z.array(z.string()), owners: z.array(z.string()), statuses: z.array(z.string()) }).optional(),
+  })),
   messages: z.array(Message),
   progress: z.object({ exchanges: z.number().int().min(0), requiredExchanges: z.number().int().min(0) }),
   integrityPolicy: z.string(),
@@ -28,7 +32,7 @@ export const SessionContractSchema = z.object({
   timing: z.object({
     serverTime: z.string().datetime(), startedAt: z.string().datetime().nullable(), deadlineAt: z.string().datetime().nullable(), remainingMs: z.number().nonnegative().nullable(),
     // P3.8 additive: server-authoritative begin/grace/policy; absent on legacy contracts.
-    begun: z.boolean().optional(), graceDeadlineAt: z.string().datetime().nullable().optional(), policyVersion: z.string().nullable().optional(), policyDurationMs: z.number().nullable().optional(),
+    begun: z.boolean().optional(), graceDeadlineAt: z.string().datetime().nullable().optional(), policyVersion: z.string().nullable().optional(), policyDurationMs: z.number().nullable().optional(), policyStatus: z.string().nullable().optional(),
   }),
   reportPath: z.string().nullable(),
   // P4.6: task-stage strip (names and state only; never scores or coverage).

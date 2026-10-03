@@ -1,5 +1,42 @@
 # Experience programme - decision and external-gate register
 
+## P3 acceptance-gap decisions - 2026-10-03
+
+1. **Speech in the V3 formal path: text only in V3 formal path; speech
+   review-before-commit deferred.** The V3 player has no speech capture or
+   transcription. The intro says replies are typed and that speech input is not
+   part of this assessment version. The legacy player's short automatic-send
+   timer is NOT ported. A speech path needs a reviewed transcription-review
+   step (learner sees and edits the transcript before committing), mode and
+   correction provenance and an accessibility review; that is a later,
+   separately approved change. A static test (`p3Player.test.jsx`) keeps
+   speech auto-send, hint and coaching wording out of the formal player.
+2. Plan board (P3.6): the client renders the server-validated owner/status/
+   dependency lists sent in the contract as `artifacts[].schema` (same lists as
+   `validateBoardPatch`; no rubric content). Learner changes stay stored as
+   `<rowId>.<field>` keys; seeded TEMPLATE values are shown as "Provided" and
+   learner values as "Your edit". No measurement, evidence or validation rule
+   changed.
+3. Required material (P3.5/T11): an artifact entry without data shows a
+   recovery state (reload the session contract, contact support) instead of
+   the old "continue in the conversation" placeholder; an unsupported type is
+   named and routed to support. Zero-artifact forms keep the centred
+   conversation.
+4. Time warnings (P3.8): 10/5/1-minute milestones apply only when the run's
+   persisted policy duration exceeds the milestone (`policyDurationMs` is now
+   in the contract; legacy runs report their 35-minute limit). Post-cutoff
+   drafts stay visible, read-only and labelled "not submitted"; they are never
+   sent. Server-side cutoff enforcement is unchanged (`server/test/runTiming.test.js`).
+5. Home (P3.3): `PREPARATION_IN_PROGRESS` (PERSONAL workspace, flag
+   `PRISM_PREPARATION_V1`, own DRAFT/REHEARSING attempt) ranks after a formal
+   run in progress; `PRACTICE_AVAILABLE` (first recommended non-DRAFT mission
+   from the development plan, with duration, mode and allowance) ranks after a
+   ready report. A failed read omits the state; nothing is invented. Technical
+   failure still leads to recovery and support, never a purchase.
+6. The P3 real-browser journey enables `PRISM_DRAFT_CONTENT` only inside the
+   throwaway 4174 audit server, via `PRISM_AUDIT_DRAFT_CONTENT` set by the
+   runner's `p3` mode. No `.env`, flag default or real environment changed.
+
 ## P1 execution decisions - 2026-10-02
 
 The supplied P1 block authorizes continuing independent implementation after

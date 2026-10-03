@@ -18,7 +18,7 @@ import { DocumentTitle } from '../../../components/ui/DocumentTitle.jsx'
 import { ErrorState, UnauthorizedState } from '../../../components/states/index.js'
 import { track } from '../../../lib/telemetry.js'
 import { useAssessmentSession } from '../hooks/useAssessmentSession.js'
-import { useAssessmentClock } from '../hooks/useAssessmentClock.js'
+import { useAssessmentClock, warningsForPolicy } from '../hooks/useAssessmentClock.js'
 import { useAssessmentAutosave } from '../hooks/useAssessmentAutosave.js'
 import { createArtifactStore } from '../state/artifactStore.js'
 import { sendSessionMessage, saveSessionArtifact, finishSession, beginSession } from '../api/assessmentSessionApi.js'
@@ -26,7 +26,7 @@ import { ScenarioIntroDialog } from '../components/ScenarioIntroDialog.jsx'
 import { AssessmentHeader } from '../components/AssessmentHeader.jsx'
 import { ConversationPane } from '../components/ConversationPane.jsx'
 import { ResponseComposer } from '../components/ResponseComposer.jsx'
-import { ArtifactPane } from '../components/ArtifactPane.jsx'
+import { ArtifactPane, materialMissing } from '../components/ArtifactPane.jsx'
 import { AssessmentExitDialog } from '../components/AssessmentExitDialog.jsx'
 import { SubmissionProgress } from '../components/SubmissionProgress.jsx'
 import { overallSaveState } from '../components/SessionSaveStatus.jsx'
@@ -34,8 +34,6 @@ import { PLAYER_COPY } from '../../../lib/copy/player.js'
 import { assignmentsListPath } from './BriefingPage.jsx'
 
 const RECONNECT_MS = 3000
-// Announced once each, politely, as the server clock passes them.
-const TIME_WARNINGS = [{ ms: 10 * 60000, text: 'Less than 10 minutes left.' }, { ms: 5 * 60000, text: 'Less than 5 minutes left.' }, { ms: 60000, text: 'Less than 1 minute left.' }]
 
 function useMedia(query, fallback = true) {
   const [match, setMatch] = useState(() => (typeof window === 'undefined' || !window.matchMedia ? fallback : window.matchMedia(query).matches))
@@ -113,6 +111,21 @@ export default function AssessmentPlayerPage() {
   const [connection, setConnection] = useState('ONLINE')
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine !== false))
   const [briefingOpen, setBriefingOpen] = useState(false)
+  // P3.7: reopening the Briefing during the timed phase shows the same pinned
+  // facts; the clock keeps running. Closing returns focus to the toggle.
+  const openBriefing = useCallback(() => {
+    setBriefingOpen(true)
+    requestAnimationFrame(() => {
+      const a = document.activeElement
+      if (!a || a === document.body || a.id === 'briefing-toggle') document.getElementById('player-briefing')?.focus()
+    })
+  }, [])
+  const closeBriefing = useCallback(() => {
+    setBriefingOpen(false)
+    // The toggle stays mounted in the header: return focus to it now, not on
+    // a later frame that could steal focus the learner has since moved.
+    document.getElementById('briefing-toggle')?.focus()
+  }, [])
   // P3.7: the intro is modal until the server records a timed begin. One key per
   // mount so a double click or a retry returns the original timestamps.
   const beginKey = useRef(null)
@@ -195,13 +208,15 @@ export default function AssessmentPlayerPage() {
 
   // Screen-reader time warnings (the visible timer is a role="timer").
   const remainingForWarnings = contract?.status === 'IN_PROGRESS' && !accessError ? remainingMs : null
+  const policyDurationMs = contract?.timing?.policyDurationMs ?? (contract?.timing?.deadlineAt && contract?.timing?.startedAt ? Date.parse(contract.timing.deadlineAt) - Date.parse(contract.timing.startedAt) : null)
   useEffect(() => {
     if (remainingForWarnings == null) return
-    const due = TIME_WARNINGS.filter((w) => remainingForWarnings <= w.ms && remainingForWarnings > 0 && !warned.current.has(w.ms))
+    const applicable = warningsForPolicy(policyDurationMs)
+    const due = applicable.filter((w) => remainingForWarnings <= w.ms && remainingForWarnings > 0 && !warned.current.has(w.ms))
     if (!due.length) return
-    for (const w of TIME_WARNINGS) if (remainingForWarnings <= w.ms) warned.current.add(w.ms)
+    for (const w of applicable) if (remainingForWarnings <= w.ms) warned.current.add(w.ms)
     setTimeNotice(due[due.length - 1].text)
-  }, [remainingForWarnings])
+  }, [remainingForWarnings, policyDurationMs])
 
   // While the connection is interrupted, re-read the session; when it answers,
   // resend the pending answer with the SAME client event id (the server
@@ -281,7 +296,7 @@ export default function AssessmentPlayerPage() {
       remainingMs={inProgress ? remainingMs : null}
       saveState={inProgress ? saveState : null}
       briefingOpen={briefingOpen}
-      onToggleBriefing={inProgress ? () => setBriefingOpen((v) => !v) : null}
+      onToggleBriefing={inProgress ? () => (briefingOpen ? closeBriefing() : openBriefing()) : null}
       onFinish={inProgress ? () => setExit((e) => ({ ...e, open: true, error: null })) : null}
       finishing={exit.submitting || exit.scoring}
     />
@@ -377,14 +392,14 @@ export default function AssessmentPlayerPage() {
     return frame(
       <>
         <div className="p-6" aria-hidden="true"><Skeleton label="Waiting to begin" lines={4} /></div>
-        <ScenarioIntroDialog open contract={contract} onBegin={onBegin} onNotYet={() => navigate(listPath)} notYetTo={listPath} beginning={begin.busy} error={begin.error} />
+        <ScenarioIntroDialog open contract={contract} onBegin={onBegin} onNotYet={() => navigate(listPath)} notYetTo={listPath} beginning={begin.busy} error={begin.error} onRetry={() => session.refetch()} retrying={session.isFetching} />
       </>,
     )
   }
   const interrupted = connection === 'INTERRUPTED' && online
   const hasWork = contract.artifacts.length > 0
   const needsLarge = contract.device.requiresLargeScreen && small && !smallOk
-  const workNeedsAttention = artifactState.items.some((i) => i.status === 'ERROR' || i.status === 'CONFLICT')
+  const workNeedsAttention = artifactState.items.some((i) => i.status === 'ERROR' || i.status === 'CONFLICT' || materialMissing(i))
   const conversation = (
     <section aria-label="Conversation" className={hasWork && wide ? 'flex min-h-0 w-[45%] min-w-0 shrink-0 flex-col overflow-hidden border-r border-prism-border' : 'mx-auto flex min-h-0 w-full min-w-0 max-w-4xl flex-col overflow-hidden'}>
       <ConversationPane messages={contract.messages} pending={pending} onRetry={() => pending && deliver(pending)} onEdit={editPending} />
@@ -392,7 +407,7 @@ export default function AssessmentPlayerPage() {
   )
   const workspace = (
     <section aria-label="Work materials" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <ArtifactPane items={artifactState.items} activeId={activeArtifact} onSelect={setActiveArtifact} store={store} />
+      <ArtifactPane items={artifactState.items} activeId={activeArtifact} onSelect={setActiveArtifact} store={store} onRetryLoad={() => session.refetch()} retrying={session.isFetching} />
     </section>
   )
 
@@ -415,7 +430,11 @@ export default function AssessmentPlayerPage() {
         </div>
       )}
       {briefingOpen && (
-        <section id="player-briefing" aria-label="Briefing" tabIndex={0} className="grid max-h-[40dvh] shrink-0 gap-4 overflow-y-auto overscroll-contain border-b border-prism-border bg-prism-surface p-4 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-prism-accent md:grid-cols-3">
+        <section id="player-briefing" aria-label="Briefing" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); closeBriefing() } }} className="grid max-h-[40dvh] shrink-0 gap-4 overflow-y-auto overscroll-contain border-b border-prism-border bg-prism-surface p-4 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-prism-accent md:grid-cols-3">
+          <div className="flex flex-wrap items-start justify-between gap-2 md:col-span-3">
+            <p className="font-medium text-prism-ink" data-testid="briefing-clock-note">The clock keeps running while you read the briefing. It does not pause or restart.</p>
+            <Button size="sm" variant="secondary" onClick={closeBriefing}>Close briefing</Button>
+          </div>
           {contract.scenario.context && <div><h2 className="font-semibold text-prism-ink">Context</h2><p className="mt-1 text-prism-ink-muted">{contract.scenario.context}</p></div>}
           {contract.scenario.yourRole && <div><h2 className="font-semibold text-prism-ink">Your role</h2><p className="mt-1 text-prism-ink-muted">{contract.scenario.yourRole}</p></div>}
           {contract.scenario.participants.length > 0 && (
@@ -456,7 +475,7 @@ export default function AssessmentPlayerPage() {
       {!needsLarge && (
         <div className={hasWork ? 'min-w-0 shrink-0' : 'mx-auto w-full min-w-0 max-w-4xl shrink-0'}>
           {timeUp && <div className="px-3"><Callout tone="partial" title={PLAYER_COPY.timeUpTitle}>{PLAYER_COPY.timeUp}</Callout></div>}
-          <ResponseComposer ref={answerRef} draft={draft} onDraft={setDraft} onSend={onSend} disabled={timeUp} readOnly={Boolean(pending)} busy={pending?.status === 'SENDING'} />
+          <ResponseComposer ref={answerRef} draft={draft} onDraft={setDraft} onSend={onSend} disabled={timeUp} readOnly={Boolean(pending)} busy={pending?.status === 'SENDING'} lockedNote={timeUp && draft.trim() ? PLAYER_COPY.draftNotSubmitted : null} />
         </div>
       )}
       <AssessmentExitDialog

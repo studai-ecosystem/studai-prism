@@ -8,6 +8,7 @@ import { renderParsedTurn } from '../../lib/identityIsolation.js'
 import { participantMessages } from './engine.js'
 import { capabilityName, definitionForScenario } from './catalog.js'
 import { LEGACY_35 } from './timingPolicy.js'
+import { boardSchemaFor } from './universalForm.js'
 
 // The legacy player asks for at least three exchanges before finishing; a
 // governed-bank scenario defines one evidence opportunity per probing turn.
@@ -102,6 +103,8 @@ export function buildSessionContract({
     version: versionOf.get(a.artifactId)?.version || 0,
     // The candidate's own saved reasoning for this material (resume).
     notes: typeof versionOf.get(a.artifactId)?.content?.notes === 'string' ? versionOf.get(a.artifactId).content.notes : '',
+    // P3.6: allowed board choices (the same lists the server validates).
+    ...(a.type === 'PLAN_BOARD' && boardSchemaFor(a.artifactId) ? { schema: boardSchemaFor(a.artifactId) } : {}),
   }))
   return {
     sessionId: session.sessionId,
@@ -128,6 +131,10 @@ export function buildSessionContract({
       graceDeadlineAt: graceDeadline ? new Date(graceDeadline).toISOString() : null,
       remainingMs: deadline ? Math.max(0, deadline - now.getTime()) : null,
       policyVersion,
+      // P3.7/P3.8: the run's persisted policy duration, shown in the intro
+      // before Begin and used to decide which time warnings apply.
+      policyDurationMs: runTiming ? (Number.isFinite(runTiming.policy?.durationMs) ? runTiming.policy.durationMs : null) : (Number.isFinite(limitMs) ? limitMs : null),
+      policyStatus: runTiming?.policy?.status || null,
     },
     reportPath: hasReport ? reportPath : null,
   }

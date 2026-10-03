@@ -20,6 +20,17 @@ export const PRIMARY_ACTION_COPY = {
     support: 'Contact support',
   },
   REPORT_READY: { eyebrow: 'Report ready', cta: 'Open my report' },
+  PREPARATION_IN_PROGRESS: {
+    eyebrow: 'Private preparation',
+    title: 'Return to your private preparation',
+    description: 'Your preparation is saved and visible only to you. It is practice, not a formal assessment, and never changes your results.',
+    cta: 'Return to your private preparation',
+  },
+  PRACTICE_AVAILABLE: {
+    eyebrow: 'Practice available',
+    description: 'Practice is labelled as practice and never changes your formal results.',
+    cta: 'Start practice',
+  },
   CAPABILITY_SUMMARY: {
     eyebrow: 'Nothing due right now',
     title: 'Your capability profile',

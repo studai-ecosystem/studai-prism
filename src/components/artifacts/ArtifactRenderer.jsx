@@ -7,6 +7,7 @@
 import AnalyticsDashboard from './AnalyticsDashboard.jsx'
 import CustomerTicketLog from './CustomerTicketLog.jsx'
 import BudgetModeler from './BudgetModeler.jsx'
+import PlanBoard from './PlanBoard.jsx'
 import { ArtifactUnavailable } from './ArtifactUnavailable.jsx'
 import { artifactStore } from '../../lib/artifactStore.js'
 
@@ -14,7 +15,10 @@ const COMPONENTS = {
   ANALYTICS_DASHBOARD: AnalyticsDashboard,
   CUSTOMER_TICKET_LOG: CustomerTicketLog,
   BUDGET_MODELER: BudgetModeler,
+  PLAN_BOARD: PlanBoard,
 }
+
+export const isSupportedArtifactType = (type) => Object.prototype.hasOwnProperty.call(COMPONENTS, String(type || '').toUpperCase())
 
 function legacyController(artifactId, sessionId) {
   return {
@@ -32,6 +36,7 @@ export default function ArtifactRenderer({ artifact, sessionId, controller }) {
       artifactId={artifact.artifactId}
       title={artifact.title}
       data={artifact.data}
+      schema={artifact.schema || null}
       controller={controller || legacyController(artifact.artifactId, sessionId)}
     />
   )

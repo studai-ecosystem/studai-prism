@@ -11,12 +11,15 @@ function minutes(ms) {
   return Number.isFinite(ms) ? Math.round(ms / 60000) : null
 }
 
-export function ScenarioIntroDialog({ open, contract, onBegin, onNotYet, notYetTo, beginning, error }) {
+export function ScenarioIntroDialog({ open, contract, onBegin, onNotYet, notYetTo, beginning, error, onRetry, retrying = false }) {
   const beginRef = useRef(null)
   const s = contract?.scenario
   const timing = contract?.timing || {}
   const duration = minutes(timing.policyDurationMs ?? (timing.deadlineAt && timing.startedAt ? new Date(timing.deadlineAt) - new Date(timing.startedAt) : null))
   const hasMaterials = (contract?.artifacts || []).length > 0
+  // Without the situation or the role the task cannot be understood, so the
+  // clock cannot start; the learner can reload the pinned facts instead.
+  const missing = !s || (!s.context && !s.yourRole)
   return (
     <Modal
       open={open}
@@ -29,7 +32,7 @@ export function ScenarioIntroDialog({ open, contract, onBegin, onNotYet, notYetT
       footer={(
         <>
           {notYetTo ? <LinkButton variant="secondary" to={notYetTo}>Not yet</LinkButton> : <Button variant="secondary" onClick={onNotYet}>Not yet</Button>}
-          <Button ref={beginRef} onClick={onBegin} loading={beginning} loadingLabel="Starting…" disabled={!s}>Begin timed assessment</Button>
+          <Button ref={beginRef} onClick={onBegin} loading={beginning} loadingLabel="Starting…" disabled={missing}>Begin timed assessment</Button>
         </>
       )}
     >
@@ -52,7 +55,7 @@ export function ScenarioIntroDialog({ open, contract, onBegin, onNotYet, notYetT
         <section>
           <h3 className="font-semibold text-prism-ink">How you respond</h3>
           <p className="mt-1 text-prism-ink-muted">
-            You reply in the conversation by typing.{hasMaterials ? ' This assessment also includes work material you can open and edit; your changes are saved as you go.' : ' This assessment has no separate work material.'}
+            You reply in the conversation by typing. Speech input is not part of this assessment version.{hasMaterials ? ' This assessment also includes work material you can open and edit; your changes are saved as you go.' : ' This assessment has no separate work material.'}
           </p>
         </section>
         <section>
@@ -64,7 +67,12 @@ export function ScenarioIntroDialog({ open, contract, onBegin, onNotYet, notYetT
           </p>
         </section>
         {error && <Callout tone="blocked" role="alert" title="The assessment did not start">{error.message}{error.requestId ? ` Reference: ${error.requestId}` : ''} Nothing has been timed yet; try again.</Callout>}
-        {!s && <Callout tone="blocked" title="Scenario details are unavailable">We could not load the situation for this assessment, so it cannot begin. Try again or go back.</Callout>}
+        {missing && (
+          <Callout tone="blocked" role="alert" title="Scenario details are unavailable">
+            We could not load the situation for this assessment, so it cannot begin. Nothing has been timed. Try again or go back.
+            {onRetry && <div className="mt-3"><Button size="sm" variant="secondary" onClick={onRetry} loading={retrying} loadingLabel="Loading...">Load the situation again</Button></div>}
+          </Callout>
+        )}
       </div>
     </Modal>
   )

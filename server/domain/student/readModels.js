@@ -28,7 +28,7 @@ function verifiedQuote(unit, turns) {
   return turns.some((t) => normalise(t).includes(q)) ? excerpt.trim() : null
 }
 
-export function createStudentReadModels({ directory, catalog, assignments, evidence, practice = { list: async () => [] }, development = { enabled: () => false }, growth = { enabled: () => false }, roles, legacy, clock = () => new Date(), repos = null }) {
+export function createStudentReadModels({ directory, catalog, assignments, evidence, practice = { list: async () => [] }, development = { enabled: () => false }, growth = { enabled: () => false }, preparation = { enabled: () => false }, roles, legacy, clock = () => new Date(), repos = null }) {
   // Accepted candidate actions: the quote source that survives a history purge (T32).
   const actionsFor = async (sessionId) => (repos?.sessionIo && typeof repos.sessionIo.listActions === 'function'
     ? repos.sessionIo.listActions(sessionId).catch(() => [])
@@ -220,14 +220,34 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
       const recentReport = lists.completed.find((a) => a.cta.kind === 'VIEW_REPORT' && a.completedAt
         && at.getTime() - new Date(a.completedAt).getTime() <= REPORT_READY_DAYS * 86400000)
       const anyLevel = caps.items.some((c) => c.level)
+      // P3.3: a private preparation the learner can return to (PERSONAL only,
+      // flag-gated). A failed read omits the state; it never invents one.
+      const preparing = !due && !failed && !processing && !inProgress && workspace.type === 'PERSONAL' && preparation.enabled()
+        ? ((await preparation.list(user, workspace).catch(() => ({ items: [] })))?.items || []).find((a) => a.state === 'DRAFT' || a.state === 'REHEARSING') || null
+        : null
+      // P3.3: one relevant reviewed practice mission from the development plan
+      // (never DRAFT content); only offered when nothing more urgent applies.
+      const practiceMission = !due && !failed && !processing && !inProgress && !preparing && !ready && !recentReport && development.enabled()
+        ? await development.planFor(user, workspace, focusFrom(caps.items)).then((p) => ({ mission: (p?.recommended || []).find((m) => m.status !== 'DRAFT') || null, allowance: p?.allowance || null })).catch(() => null)
+        : null
       let primaryAction
       const fromCard = (kind, a) => ({ kind, assignmentId: a.id, title: a.title, scope: a.scope, dueAt: a.dueAt, to: a.cta.to || `${workspace.type === 'CAMPUS_STUDENT' ? `/app/campus/${workspace.organizationId}/assignments` : '/app/assessments'}/${a.id}/briefing` })
       if (due) primaryAction = fromCard('ASSESSMENT_DUE', due)
       else if (failed) primaryAction = fromSession('ASSESSMENT_TECHNICAL_FAILED', failed, recoveryTo(failed))
       else if (processing) primaryAction = fromSession('ASSESSMENT_PROCESSING', processing, null)
       else if (inProgress) primaryAction = fromCard('ASSESSMENT_IN_PROGRESS', inProgress)
+      else if (preparing) primaryAction = { kind: 'PREPARATION_IN_PROGRESS', attemptId: preparing.id, title: preparing.situationLabel || null, scope: 'PERSONAL', completedAt: null, startedAt: preparing.createdAt || null, to: `/app/prepare/${encodeURIComponent(preparing.id)}` }
       else if (ready) primaryAction = fromCard('ASSESSMENT_READY', ready)
       else if (recentReport) primaryAction = fromCard('REPORT_READY', recentReport)
+      else if (practiceMission?.mission) {
+        const m = practiceMission.mission
+        const base = workspace.type === 'CAMPUS_STUDENT' ? `/app/campus/${workspace.organizationId}/development` : '/app/development'
+        primaryAction = {
+          kind: 'PRACTICE_AVAILABLE', missionId: m.id, title: m.title, targetCapabilityName: m.targetCapabilityName || null,
+          estimatedMinutes: Number.isFinite(m.estimatedMinutes) ? m.estimatedMinutes : null, mode: (m.modes || [])[0] || 'GUIDED',
+          allowance: practiceMission.allowance, to: `${base}/missions/${encodeURIComponent(m.id)}`,
+        }
+      }
       else if (anyLevel) primaryAction = { kind: 'CAPABILITY_SUMMARY', to: workspace.type === 'PERSONAL' ? '/app/capabilities' : null }
       else if (workspace.type === 'PERSONAL') primaryAction = { kind: 'GET_STARTED', to: legacy.paths.purchase }
       else primaryAction = { kind: 'NOTHING_ASSIGNED', to: null }

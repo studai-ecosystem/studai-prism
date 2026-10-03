@@ -437,4 +437,12 @@ describe('report PDF', () => {
     expect(summary).not.toContain('Your words')
     expect(summary).not.toContain('Moments that mattered')
   })
+
+  it('P3 journey defect: a scenario titled like its assessment is not repeated in the header', () => {
+    const r = reportFixture()
+    r.header.scenarioTitle = r.header.assessment.title
+    const lines = reportPdfLines(r).map((l) => l.text)
+    expect(lines).toContain('Prism Workplace Simulation')
+    expect(lines.join('\n')).not.toContain('Prism Workplace Simulation \u2014 Prism Workplace Simulation')
+  })
 })

@@ -211,7 +211,7 @@ export function ReportView({ report, versionNumber, visibilityText, actions = nu
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
             {h.candidateName && <p className="text-lg font-semibold text-prism-ink">{h.candidateName}</p>}
-            <p className="text-sm text-prism-ink">{h.assessment.title}{h.scenarioTitle ? ` — ${h.scenarioTitle}` : ''}</p>
+            <p className="text-sm text-prism-ink">{h.assessment.title}{h.scenarioTitle && h.scenarioTitle !== h.assessment.title ? ` — ${h.scenarioTitle}` : ''}</p>
             <p className="text-xs text-prism-ink-muted">
               {[
                 formatDate(h.completedAt) && `Completed ${formatDate(h.completedAt)}`,

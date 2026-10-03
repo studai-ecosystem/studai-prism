@@ -18,6 +18,7 @@ export const PLAYER_COPY = {
   pendingAfterRefresh: 'This answer may not have been sent before the page reloaded. Retry to make sure it arrives — it is never counted twice.',
   timeUpTitle: 'Time is up',
   timeUp: 'The time for this assessment has ended. Finish to submit your work.',
+  draftNotSubmitted: 'This draft was not submitted. It stays here for your reference and will not be sent.',
   alreadyComplete: 'This assessment has already been completed.',
   unsavedBeforeFinish: 'Some work is not saved yet. Wait for “All work saved”, then finish.',
   notSubmitted: 'Your assessment could not be submitted.',

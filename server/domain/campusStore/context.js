@@ -172,7 +172,7 @@ export function createCampusContext({
     resolver,
     catalog,
     assignments,
-    student: createStudentReadModels({ directory, catalog, assignments, evidence, practice: practiceSource, development: developmentPlans, growth: growthReads, roles, legacy, clock, repos: storeView }),
+    student: createStudentReadModels({ directory, catalog, assignments, evidence, practice: practiceSource, development: developmentPlans, growth: growthReads, preparation: { enabled: preparationOn, list: (user, workspace) => preparation.list(user, workspace) }, roles, legacy, clock, repos: storeView }),
     // Authorized history projection (P1.2): formal sessions, legacy reports
     // and practice attempts of the caller in the active workspace.
     history: createStudentHistory({

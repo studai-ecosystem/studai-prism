@@ -41,7 +41,7 @@ export function createArtifactStore({ save }) {
           next.set(a.artifactId, { ...prev, server: { data: clone(a.data), version: a.version, notes: serverNotes } })
         } else {
           next.set(a.artifactId, {
-            artifactId: a.artifactId, type: a.type, title: a.title,
+            artifactId: a.artifactId, type: a.type, title: a.title, schema: a.schema || null,
             server: { data: clone(a.data), version: a.version, notes: serverNotes },
             local: clone(a.data), pending: null, notes: serverNotes, notesDirty: false,
             status: 'SAVED', error: null, conflict: null, recovered: null, clientEventId: null,

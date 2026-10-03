@@ -32,6 +32,10 @@ const CAMPUS_FLAGS = [
 ]
 if (process.env.PRISM_AUDIT_CAMPUS === 'true') {
   for (const flag of CAMPUS_FLAGS) process.env[flag] = 'true'
+  // P3 real journey (runner mode p3 only): the DRAFT universal form is
+  // offered to non-production dev entitlements inside this throwaway campus
+  // audit process. Never set in .env or any real environment.
+  if (process.env.PRISM_AUDIT_DRAFT_CONTENT === 'true') process.env.PRISM_DRAFT_CONTENT = 'true'
   // Campus store for org/membership e2e (Journey B): ONLY a throwaway test
   // database handed in by the runner (local PGlite / CI service container).
   if (process.env.PRISM_AUDIT_CAMPUS_DATABASE_URL) {

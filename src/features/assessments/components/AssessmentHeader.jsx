@@ -32,7 +32,7 @@ export function AssessmentHeader({ title, scopeLabel, contextLine, remainingMs, 
         )}
         {saveState && <SessionSaveStatus state={saveState} />}
         {onToggleBriefing && (
-          <Button variant="secondary" size="sm" aria-expanded={briefingOpen} aria-controls="player-briefing" onClick={onToggleBriefing}>
+          <Button id="briefing-toggle" variant="secondary" size="sm" aria-expanded={briefingOpen} aria-controls="player-briefing" onClick={onToggleBriefing}>
             {briefingOpen ? 'Hide briefing' : 'Briefing'}
           </Button>
         )}

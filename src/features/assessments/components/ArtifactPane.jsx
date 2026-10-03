@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import ArtifactRenderer from '../../../components/artifacts/ArtifactRenderer.jsx'
+import ArtifactRenderer, { isSupportedArtifactType } from '../../../components/artifacts/ArtifactRenderer.jsx'
+import { LinkButton } from '../../../components/ui/Button.jsx'
 import { Callout } from '../../../components/ui/Notice.jsx'
 import { Button } from '../../../components/ui/Button.jsx'
 import { formatValue, humanizeKey } from '../../../components/artifacts/format.js'
@@ -24,9 +25,30 @@ function ConflictPanel({ item, onResolve }) {
   )
 }
 
+// P3.5/T11: a work material that is part of this assessment but did not load
+// is a recovery state with retry, never a silent conversation-only layout.
+export const materialMissing = (item) => Boolean(item) && (item.local == null || !isSupportedArtifactType(item.type))
+
+function MaterialRecovery({ item, onRetry, retrying }) {
+  const unsupported = !isSupportedArtifactType(item.type)
+  return (
+    <Callout tone="blocked" title={`${item.title || 'This work material'} did not load`} role="alert">
+      <p data-testid="material-recovery">
+        {unsupported
+          ? 'This work material cannot be shown on this version of the assessment. Your saved work is kept. Contact support before you finish; the conversation alone is not the whole task.'
+          : 'This assessment needs this work material, but it did not load. Your saved work is kept. Try loading it again; the clock keeps running.'}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {!unsupported && onRetry && <Button size="sm" onClick={onRetry} loading={retrying} loadingLabel="Loading…">Load work material again</Button>}
+        <LinkButton size="sm" variant="secondary" to="/contact">Contact support</LinkButton>
+      </div>
+    </Callout>
+  )
+}
+
 // Work materials (spec §12.1): every tab, its content and its save state come
 // from the server contract and the versioned artifact store.
-export function ArtifactPane({ items, activeId, onSelect, store }) {
+export function ArtifactPane({ items, activeId, onSelect, store, onRetryLoad, retrying = false }) {
   const active = items.find((i) => i.artifactId === activeId) || items[0] || null
   const controller = useMemo(() => active && ({
     autosave: true,
@@ -95,10 +117,11 @@ export function ArtifactPane({ items, activeId, onSelect, store }) {
             }}
           />
         )}
-        {active && (
+        {active && materialMissing(active) && <MaterialRecovery item={active} onRetry={onRetryLoad} retrying={retrying} />}
+        {active && !materialMissing(active) && (
           <ArtifactRenderer
             key={`${active.artifactId}:${active.status === 'CONFLICT' ? 'conflict' : 'live'}`}
-            artifact={{ artifactId: active.artifactId, type: active.type, title: active.title, data: active.local }}
+            artifact={{ artifactId: active.artifactId, type: active.type, title: active.title, data: active.local, schema: active.schema }}
             controller={controller}
           />
         )}

@@ -1,5 +1,74 @@
 # P0 - Verification results
 
+## P3 acceptance gaps closed - 2026-10-03
+
+Commands (from `studai-prism/`, Windows, isolated processes; no live model, no production data):
+
+| Command | Layer | Result |
+| --- | --- | --- |
+| `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | A | 36 files, **490 pass, 0 fail** (new `src/features/assessments/p3Player.test.jsx` 13, Home practice/preparation 2, report header 1) |
+| `npm --prefix server test` | A | 816: **790 pass, 0 fail**, 26 DB skips (new `server/test/homeStates.test.js` 5) |
+| `npm run build` | Build | PASS |
+| `npm run audit:static` | Static | PASS (1580 files scanned) |
+| `node scripts/run-experience-baseline-tests.mjs p3` | B in browser + A UI | **164 passed, 0 failed, 0 flaky** (41 per project x 4; 5.5 min; final run) |
+
+`p3` runner mode: embedded throwaway PostgreSQL for the 4174 campus audit server,
+`PRISM_AUDIT_DRAFT_CONTENT=true` (the audit server sets `PRISM_DRAFT_CONTENT` in its own process
+only), specs `p3-real-journey`, `flow-player-layout`, `flow-recovery`, `campus-shell` on chromium,
+firefox, webkit and mobile-chromium. `p3-real-journey.spec.js` uses NO route fixtures: real register,
+real `POST /api/payment/dev-session`, server-pinned DRAFT universal form, real start, intro, Escape
+(`timing.begun` stays false), Begin, real message (authored replies), keyboard-only board edit
+(Tab from the work-material tab, then typing), reload (same session, identical `deadlineAt`,
+message and `R2.due` persisted, "Your edit"/"Provided" attribution), Finish, the in-process
+`EVALUATE_RUN` worker with the audit provider, published Report V3 (every quote is the learner's own
+words; no capability band for the small DRAFT slice). Chromium also saves screenshots at
+1440/1024/768/390/360 for intro, active player and report into `audit-results/ui/p3/` with no
+horizontal overflow, and axe (serious/critical) is empty at 1440 and 390 for each.
+
+Earlier runs of the same mode: run 1 164 tests, 2 flaky + mobile journey failure (defects 2-3
+below); run 3 stopped after a screenshot-loop race in the new spec (layout read before the
+resize settled; fixed) and one pre-existing `campus-shell` /app/settings axe navigation flake.
+
+Screenshots inspected (intro 1440/360, active 1440/768/390, report 1440/1024/390). Defects found and
+fixed during this run:
+
+1. Report header repeated the title ("Get the team ready — Get the team ready") when the scenario
+   title equals the assessment title (also in the PDF). Fixed in `ReportView.jsx`/`reportPdf.js`
+   with a unit test.
+2. Closing the Briefing returned focus on a later animation frame, which could steal focus the
+   learner had already moved (flow-player-layout compact test failed first try in chromium and
+   mobile-chromium). Focus now returns synchronously; opening only moves focus when it is still on
+   the toggle.
+3. The mobile journey could not switch to the Workspace pane through the visually hidden radio
+   (its label takes the pointer, as for a real user); the spec now uses the label.
+4. `campusCopyCeiling` flagged `|| \`Task …\`` fallbacks in the new PlanBoard; replaced with
+   explicit helpers (no fallback content).
+
+Observation, not a defect of this phase: the plain statement uses the audit provider's stub wording
+("The candidate addressed the opportunity…"); live wording is a Layer C item.
+
+| ID | Requirement | Covered by | Layer | Result |
+| --- | --- | --- | --- | --- |
+| T09 | New-run canonical player | `p3-real-journey` (new run opens `/app/assessment/:id`, V3 only); `player.test.jsx` | B browser, A | PASS |
+| T10 | No work materials | `p3Player.test.jsx` (centred conversation); `player.test.jsx`; `flow-player-layout` conversation widths | A, A browser (fixture) | PASS |
+| T11 | Required material unavailable | `p3Player.test.jsx` (null data → recovery + retry reloads the contract; unsupported type → support) | A | PASS (browser fault not injected) |
+| T12 | Long transcript | `flow-player-layout` (fixed frame, independent scroll, 7 widths); jump-to-latest in `p3Player.test.jsx` | A browser (fixture), A | PASS |
+| T13 | Long artifact and mobile | `flow-player-layout` materials; `p3-real-journey` mobile-chromium Workspace switch | A browser, B browser | PASS; on-device soft keyboard: manual |
+| T14 | Scenario intro | `p3-real-journey` (pinned title/situation/role/participants, 25-min proposed policy, typing only, Begin focused, Escape does not begin); `player.test.jsx` | B browser, A | PASS |
+| T15 | Begin replay/concurrency | `server/test/runTiming.test.js` (repeated + concurrent begins, one start); `p2Slice.db`; `player.test.jsx` one key | A server, B | PASS |
+| T16 | Timer refresh/reconnect | `p3-real-journey` reload: identical `deadlineAt`; `flow-player-layout` countdown | B browser | PASS |
+| T17 | Deadline vs grace | `runTiming.test.js` "after the answer cutoff the server refuses new formal answers"; `p3Player.test.jsx` late draft visible, read-only, "not submitted", never sent | A server, A | PASS |
+| T18 | Approved timing adjustment | `runTiming.test.js` policy/version persisted; no adjustment is approved yet | A server | PARTIAL - no approved adjustment exists (HA gate) |
+| T19 | Requested scenario | `p2Slice.db` (body cannot swap the form); `player.test.jsx` unknown scenario never substituted | B, A | PASS |
+| T20 | Resume existing session | `p3-real-journey` reload: same session, transcript, board value | B browser | PASS |
+| T21 | Calibration vs context | contract never carries rubric/calibration (`homeStates.test.js` contract check); intro wording is task context only | A server | PARTIAL - separate calibration purpose copy not built (P4+) |
+| T24 | Candidate attribution | `p2Slice.db` (units only from CANDIDATE actions); PlanBoard "Provided" vs "Your edit" (`p3Player.test.jsx`, `p3-real-journey` data-origin) | B, A, B browser | PASS |
+| T56 | Keyboard/screen reader/zoom | `p3-real-journey` keyboard board edit + axe at 1440/390; Briefing focus return and jump-to-latest keyboard (`p3Player.test.jsx`); `campus-shell` keyboard/axe | B browser, A | PASS (automated); manual AT (NVDA/VoiceOver) and 200-400 % zoom remain manual |
+
+Remaining: manual screen-reader and zoom passes (MANUAL_JOURNEYS.md), on-device mobile soft
+keyboard, T18 approved adjustments (human gate), T21 calibration-purpose copy, a browser-injected
+T11 fault, and Layer C live-model wording. Universal opportunity coverage T22-T23 stays with P4.
+
 ## P2.9 Layer B checkpoint - 2026-10-03
 
 Real disposable PostgreSQL (embedded cluster, 49 migrations), `buildApp()` HTTP, PG campus + legacy

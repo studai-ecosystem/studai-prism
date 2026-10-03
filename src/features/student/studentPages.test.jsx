@@ -173,6 +173,34 @@ describe('Student Home (§9, P3.3)', () => {
     expect(within(next).getAllByRole('link').map((l) => l.textContent)).toEqual(['Contact support'])
   })
 
+  it('P3.3 practice available: one mission with duration, mode and allowance; labelled practice; one CTA', async () => {
+    const data = home({ primaryAction: { kind: 'PRACTICE_AVAILABLE', missionId: 'MIS-SYN-01', title: 'Synthetic mission', targetCapabilityName: 'Communication', estimatedMinutes: 12, mode: 'GUIDED', allowance: { kind: 'BOUNDED', total: 5, used: 1, remaining: 4, validUntil: null }, to: '/app/development/missions/MIS-SYN-01' } })
+    render(<HomePage />, { routes: { '/api/v1/me/home': data } })
+    const next = await screen.findByTestId('next-action')
+    expect(next).toHaveAttribute('data-kind', 'PRACTICE_AVAILABLE')
+    expect(within(next).getByRole('heading', { level: 2, name: 'Synthetic mission' })).toBeInTheDocument()
+    const facts = within(next).getByTestId('practice-facts')
+    expect(facts).toHaveTextContent('Practice')
+    expect(facts).toHaveTextContent('Guided, with hints on request')
+    expect(facts).toHaveTextContent('About 12 minutes')
+    expect(facts).toHaveTextContent('4 of 5 practice attempts left')
+    expect(next).toHaveTextContent('never changes your formal results')
+    expect(within(next).getAllByRole('link').map((l) => [l.textContent, l.getAttribute('href')])).toEqual([['Start practice', '/app/development/missions/MIS-SYN-01']])
+    expect(screen.queryByTestId('home-mission')).not.toBeInTheDocument()
+    noPercent()
+  })
+
+  it('P3.3 preparation in progress: returns privately to the saved attempt', async () => {
+    const data = home({ primaryAction: { kind: 'PREPARATION_IN_PROGRESS', attemptId: 'prep-1', title: 'Interview', scope: 'PERSONAL', completedAt: null, startedAt: '2026-09-30T10:00:00.000Z', to: '/app/prepare/prep-1' } })
+    render(<HomePage />, { routes: { '/api/v1/me/home': data } })
+    const next = await screen.findByTestId('next-action')
+    expect(within(next).getByRole('heading', { level: 2, name: 'Return to your private preparation' })).toBeInTheDocument()
+    expect(next).toHaveTextContent('visible only to you')
+    expect(next).toHaveTextContent('Private preparation')
+    expect(within(next).getAllByRole('link').map((l) => [l.textContent, l.getAttribute('href')])).toEqual([['Return to your private preparation', '/app/prepare/prep-1']])
+    expect(next).not.toHaveTextContent(/buy|payment/i)
+  })
+
   it('loading keeps the h1 and announces loading', async () => {
     render(<HomePage />, { routes: { '/api/v1/me/home': pending } })
     expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
