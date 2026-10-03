@@ -12,6 +12,7 @@ import { parseMission, MISSION_SCHEMA_VERSION } from './missionSchema.js'
 import { MISSION_LIBRARY, draftContentEnabled } from './missionLibrary.js'
 import { normaliseWork, initialWork, runDeterministicChecks, candidateTextFor } from './validators.js'
 import { evaluateMissionWork, practiceUnitsFrom } from './evaluate.js'
+import { resolveRecommendations } from './recommendations.js'
 
 const hash = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex')
 const orgOf = (workspace) => (workspace.type === 'CAMPUS_STUDENT' ? workspace.organizationId : null)
@@ -482,6 +483,19 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
           return { attemptId: a.id, missionId: a.missionId, title: m?.title || null, status: a.status, summary: a.evaluation?.summary || null, submittedAt: a.submittedAt }
         }),
       }
+    },
+
+    // P5.6: current recommendations for behaviour gaps, resolved at read time
+    // from the missions THIS workspace can open (DRAFT only behind the flag)
+    // and the live allowance. Never persisted with a report version.
+    async recommendFor(user, workspace, gaps) {
+      if (!store()) return resolveRecommendations({ gaps, practiceEnabled: false })
+      const { missions } = await reachable(user, workspace)
+      const base = workspace.type === 'CAMPUS_STUDENT' ? `/app/campus/${encodeURIComponent(workspace.organizationId)}/development` : '/app/development'
+      return resolveRecommendations({
+        gaps, missions, allowance: allowanceView(await allowanceFor(user, workspace)), draftEnabled: draftContentEnabled(),
+        pathFor: (id) => `${base}/missions/${encodeURIComponent(id)}`,
+      })
     },
 
     // ── Campus interventions (§26; C8.07) ─────────────────────────────────

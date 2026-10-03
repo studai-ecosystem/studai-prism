@@ -1,5 +1,85 @@
 # P0 - Verification results
 
+## P5 remaining gaps closed - 2026-10-03
+
+Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider only; no
+live model, no production data):
+
+| Command | Layer | Result |
+| --- | --- | --- |
+| `cd server; npm test` | A | 839: **813 pass, 0 fail**, 26 pre-existing DB skips (new `reportReviewCorrection.test.js` 5, `reportAudiences.test.js` 3; `experienceBaseline.db.test.js` now expects 51 migrations) |
+| `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | A | 38 files, **503 pass, 0 fail** (new `src/features/capabilities/capabilityDetail.test.jsx` 9 replacing the 3 older detail tests in `studentPages.test.jsx`; `reports.test.jsx` +2 → 25) |
+| `npm run build` | Build | PASS |
+| `npm run audit:static` | Static | PASS (1598 files scanned) |
+| `node scripts/run-experience-baseline-tests.mjs database` | B | 6/6; **51 migrations** applied (0051 `report_review_decisions`) |
+| `node scripts/run-experience-baseline-tests.mjs p5` | B in browser | **40 passed, 0 failed** across chromium, firefox, webkit, mobile-chromium (1.4 min); the first run found defect 1 below (4 failed) |
+
+`p5` runner mode: embedded throwaway PostgreSQL for the 4174 campus audit server,
+`PRISM_AUDIT_DRAFT_CONTENT=true` for that process only, spec `tests/e2e/p5-report-states.spec.js`,
+all four projects. READY is real (NO route fixture): register, `POST /api/payment/dev-session`,
+server-pinned DRAFT universal form, Begin, one learner message, early Finish, the in-process
+`EVALUATE_RUN` worker, published Report V3, then the capability detail bound to that snapshot
+through `GET /me/capabilities/:id`. Every other state is a labelled SYNTHETIC API fixture.
+
+State matrix proven in the browser (1440 and 390; no horizontal overflow; axe serious/critical
+empty at both widths for every state; no `%` on any owner page):
+
+| State | Source | Checked |
+| --- | --- | --- |
+| ready | real run | header, moments quote the learner's own words only, no band from a small DRAFT slice, no per-row "Not enough evidence" chip, second GET serves the same version/createdAt, capability detail `latestSnapshot = {session, version 1}` with ONE plain state |
+| partly described | fixture | EARLY band on one row, others "Not yet measured"; 2 moments; next practice |
+| wholly insufficient | fixture | one "Not enough evidence yet" callout; 0 × exact "Not enough evidence"; no `.bg-prism-blocked`; no moments |
+| technical-incomplete / processing / under-review | fixture 409 | named title, reference id, Check again, Contact support, no map, no "insufficient" wording |
+| corrected version | fixture v2 | "Corrected after a review" badge, "Corrected version 2, replacing version 1", pending-review chip |
+| legacy `/score` | fixture on 4173 | original stored blob and stored dates, no Capability Map |
+| summary share vs full share | fixture `/shared/:token` | summary: no moments, no quote, no Evidence tab, no Share; full: 2 moments with quotes; neither shows review state or recommendations |
+| expired share / access denied | fixture 404 | link invalid copy / "This page is not available"; no header, no map, no SYNTHETIC text |
+
+Screenshots inspected (`audit-results/ui/p5/*-{1440,390}.png`, 26 files): `ready` shows one
+bounded moment card with the learner's words, the single "Not enough evidence yet" callout and the
+draft-labelled practice recommendation at 390; `capability-detail-390` shows meaning → single state
+→ moment → next behaviour → practice → scope → Details → Ask for a review; `corrected-version-1440`
+shows both banners and the header badges; `insufficient` has no red and no duplicate badge.
+
+Defects found and fixed during this run:
+
+1. **New-run completions were invisible to every directory-backed read model** (`sessionDirectory`
+   set `hasReport` only from a legacy report row): after a real draft run the home, capabilities,
+   capability detail and history projections showed PROCESSING → TECHNICAL_FAILED although Report V3
+   was published. A DONE `EVALUATE_RUN` job now counts as a report, with `completedAt` from the
+   worker's stored time and `reportIssuedAt` from the stored V3 version (never the clock). Covered by
+   `reportReviewCorrection.test.js` T35 and the real `p5` READY run.
+2. The "Not enough evidence yet" callout carried two near-identical sentences for the owner (CH-27);
+   now one sentence per audience.
+3. The bounded-only capability detail exposed `BELOW_MINIMUM_…` reason codes in its first
+   explanation; the codes stay under Details (`statusReasons`) and the limitation is plain.
+4. The single-assessment capability timeline repeated the state as an "Insufficient evidence" chip
+   below the page; it is shown only when more than one assessment measured the capability.
+
+| ID | Requirement | Covered by | Layer | Result |
+| --- | --- | --- | --- | --- |
+| T29 | Missing/contradictory evidence | `reportReviewCorrection` (HUMAN_REVIEW_REQUIRED units → UNDER_REVIEW detail, no deficit, no recommendation); `judgeDisagreement.test.js` | A | PASS |
+| T30 | Clear developing behaviour | `reportReviewCorrection` CAP_B bounded-only (one moment, next behaviour, honest no-practice); `p5` READY bounded moment in the browser | A, B browser | PASS (deterministic provider) |
+| T31 | Evaluator/schema/write outage | `p5` technical-incomplete / processing states (409 named, recovery, no deficit); `sliceEvaluator.test.js` | B browser, A | PASS |
+| T32 | Source quote mismatch | `reportMoments` (no invented quote), `p5` READY (every quote ⊂ learner message); withheld unit never cited after correction | A, B browser | PASS |
+| T33 | Judge disagreement | `judgeDisagreement.test.js`; `capabilityDetail.test.jsx` under-review state | A | PASS |
+| T35 | Publish without legacy report | `reportReviewCorrection` T35 (DONE job → history COMPLETED/V3, capabilities, detail snapshot); `p5` READY | A, B browser | PASS (was failing before defect 1) |
+| T36 | Historical snapshot | `reportReviewCorrection` (version 1 byte-identical after CORRECT; version 2 reason `REVIEW_CORRECTION`, prior 1; GET publishes nothing; decide twice → 409; decision rows frozen); `p5` READY second GET; `reportAudiences` CH-28 dates | A, B browser | PASS |
+| T37 | Report map semantics | `p5` partly/insufficient rows (`data-band`, "Not yet measured", no red); `reports.test.jsx` map tests | B browser, A | PASS |
+| T38 | Duplicate insufficient badges | `p5` insufficient (0 × exact chip, 1 callout); `capabilityDetail.test.jsx` insufficient/bounded single state | B browser, A | PASS |
+| T39 | Development recommendation | `reportReviewCorrection` P5.6 (behaviour-matched mission, DRAFT only behind flag, allowance exhausted, NO_REVIEWED_PRACTICE, legacy mission never); resolver purity test | A | PASS |
+| T47 | Report and evidence authorization | `reportAudiences` (sponsor SUMMARY: no quotes/moments/recommendations/review; nested owner endpoints 404 for staff; evidence drawer and capability detail scoped to caller; `/shared/:token/*` 404; staff share 404/422) | A over /api/v1 | PASS |
+| T48 | Revoked/expired share | `reportAudiences` (expiry, revoke); `p5` expired-share | A, B browser | PASS |
+| T51 | Report-version race | `campusReports` immutable/dedup; `persist` CONFLICT → `findByHash` (unchanged) | A | PASS (unchanged) |
+| T56 | Keyboard/screen reader/zoom | axe serious/critical empty on every `p5` state at 1440/390; map rows are buttons; Details is a native disclosure | B browser | PASS (automated only; manual AT pass still pending) |
+| CH-26/CH-27 | Meaning → evidence → next behaviour → practice; one insufficient state | `capabilityDetail.test.jsx` (section order, separate chips, Details-only vocabulary, one state), `p5` capability-detail | A, B browser | PASS |
+| CH-29 | Interpretation challenge / reviewed correction | `reportReviewCorrection` + `routes/admin/reportReviews.js` (403/401, validation, append-only, new version) | A | PASS (reviewer UI is a minimal admin panel; no live reviewer has used it) |
+
+Remaining (unchanged human gates): five-second / two-minute comprehension study (protocol and
+recording sheet prepared in `RESEARCH_PROTOCOLS.md` §3a; NOT run; no figure exists), manual
+AT/zoom passes, content / measurement approvals (CORE-TEAMREADY-A and all P6 missions stay DRAFT),
+Layer C live-model wording.
+
 ## P4 remaining gaps closed - 2026-10-03
 
 Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider only; no

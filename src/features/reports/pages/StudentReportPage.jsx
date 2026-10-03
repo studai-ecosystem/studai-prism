@@ -162,7 +162,16 @@ export default function StudentReportPage() {
     <div className="space-y-6">
       {header}
       {pdfError && <Callout tone="blocked" role="alert" title="Download failed">{pdfError}</Callout>}
-      <ReportView report={data.report} versionNumber={data.version.number} visibilityText={visibilityText(data)} actions={actions} canReview={Boolean(data.privacy?.canShare)} />
+      <ReportView
+        report={data.report}
+        versionNumber={data.version.number}
+        versionMeta={data.version}
+        visibilityText={visibilityText(data)}
+        actions={actions}
+        canReview={Boolean(data.privacy?.canShare)}
+        reviewState={data.review || null}
+        recommendations={data.recommendations || []}
+      />
       {data.privacy?.canShare && <ActiveShares shares={data.privacy.activeShares} sessionId={sessionId} />}
       {data.privacy?.canShare && <ShareReportDialog open={shareOpen} onClose={() => setShareOpen(false)} sessionId={sessionId} organizations={organizations} />}
     </div>

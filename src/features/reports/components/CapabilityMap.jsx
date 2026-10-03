@@ -24,6 +24,13 @@ export function mapRowState(cap) {
   }
 }
 
+// The evidence-state chip used by the map rows, reused wherever a capability
+// level is shown so sufficiency never borrows the band's colour role.
+export function CapabilityEvidenceChip({ status }) {
+  const s = mapRowState({ status, level: null })
+  return <StatusChip tone={s.evidenceTone} label={s.evidenceLabel} />
+}
+
 export function CapabilityMap({ capabilities = [], onSelect, headingLevel = 2, collapseInsufficient = false }) {
   const H = `h${headingLevel}`
   const describedCount = capabilities.filter((c) => c.level).length

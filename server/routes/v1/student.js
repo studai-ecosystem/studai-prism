@@ -67,6 +67,11 @@ export function createStudentRouter({ requireUser, campus, clock = () => new Dat
 
   router.get('/me/home', ...scoped, asyncHandler(async (req, res) => ok(res, await campus.student.home(req.user, req.workspace))))
   router.get('/me/capabilities', ...scoped, asyncHandler(async (req, res) => ok(res, await campus.student.capabilities(req.user, req.workspace))))
+  // P5.4: one capability bound to its latest formal snapshot.
+  router.get('/me/capabilities/:id', ...scoped, asyncHandler(async (req, res) => {
+    if (!SAFE_ID.test(req.params.id)) throw new ApiError('NOT_FOUND', 'Not found')
+    return ok(res, await campus.student.capabilityDetail(req.user, req.workspace, req.params.id))
+  }))
   router.get('/me/assessments', ...scoped, asyncHandler(async (req, res) => ok(res, await campus.assignments.listForWorkspace(req.user, req.workspace))))
   router.get('/me/history', ...scoped, asyncHandler(async (req, res) => {
     const parsed = HistoryQuery.safeParse(req.query || {})

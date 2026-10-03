@@ -34,6 +34,7 @@ export const PERMISSIONS = {
   'reports:resend': 'Resend report delivery to the candidate',
   'reports:hold': 'Place or release a delivery hold on a report',
   'reports:supersede': 'Supersede a report after an approved review (never silent edit)',
+  'reports:review': 'Decide a learner\'s report interpretation review request (a correction is a new version, never an edit)',
 
   // Disputes
   'disputes:read': 'View disputes',
@@ -149,7 +150,7 @@ export const ROLES = {
     description: 'Users, assessments, reports, content, support, routine configuration. No calibration or signing.',
     permissions: [
       'dashboard:read', 'users:read', 'users:read_pii', 'users:write', 'users:suspend',
-      'sessions:read', 'sessions:review', 'reports:read', 'reports:resend', 'reports:hold', 'reports:supersede',
+      'sessions:read', 'sessions:review', 'reports:read', 'reports:resend', 'reports:hold', 'reports:supersede', 'reports:review',
       'disputes:read', 'disputes:manage', 'consents:read', 'verifications:read',
       'integrity:read', 'payments:read', 'content:read', 'flags:read', 'system:read',
       'organizations:read',
@@ -163,7 +164,7 @@ export const ROLES = {
     description: 'Sessions, review queues, disputes, proctoring, report delivery, candidate support.',
     permissions: [
       'dashboard:read', 'users:read', 'sessions:read', 'sessions:review', 'sessions:invalidate',
-      'reports:read', 'reports:resend', 'reports:hold', 'disputes:read', 'disputes:manage',
+      'reports:read', 'reports:resend', 'reports:hold', 'reports:review', 'disputes:read', 'disputes:manage',
       'consents:read', 'verifications:read', 'integrity:read', 'integrity:review',
       'credentials:read', 'replays:read', 'replays:flag', 'teamfit:read', 'teamfit:manage',
       'invites:read', 'invites:manage',

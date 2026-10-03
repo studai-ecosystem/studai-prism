@@ -3,7 +3,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkspace, wsKey } from '../../app/providers/WorkspaceProvider.jsx'
 import {
-  fetchStudentHome, fetchStudentAssessments, fetchStudentCapabilities, fetchStudentEvidence, fetchDevelopmentPlan,
+  fetchStudentHome, fetchStudentAssessments, fetchStudentCapabilities, fetchCapabilityDetail, fetchStudentEvidence, fetchDevelopmentPlan,
   fetchGrowth, fetchAssignmentBriefing, acknowledgeAssignment, exploreRolesV2, fetchPreferences, savePreferences,
   fetchShareGrants, revokeShareGrant, fetchHistory,
 } from '../../api/student.js'
@@ -32,6 +32,7 @@ export function useStudentHistory() {
   })
 }
 export const useStudentCapabilities = () => useScopedQuery('capabilities', fetchStudentCapabilities)
+export const useCapabilityDetail = (capabilityId) => useScopedQuery('capability', () => fetchCapabilityDetail(capabilityId), [capabilityId], { enabled: Boolean(capabilityId) })
 export const useDevelopmentPlan = () => useScopedQuery('development-plan', fetchDevelopmentPlan)
 export const useGrowth = () => useScopedQuery('growth', fetchGrowth)
 // Previous results stay on screen while filters change (the filter form keeps

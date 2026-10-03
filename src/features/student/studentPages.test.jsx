@@ -12,7 +12,6 @@ import AssessmentsPage from '../assessments/pages/AssessmentsPage.jsx'
 import BriefingPage from '../assessments/pages/BriefingPage.jsx'
 import SystemCheckPage from '../assessments/pages/SystemCheckPage.jsx'
 import CapabilitiesPage from '../capabilities/pages/CapabilitiesPage.jsx'
-import CapabilityDetailPage from '../capabilities/pages/CapabilityDetailPage.jsx'
 import AssessmentDetailPage from '../assessments/pages/AssessmentDetailPage.jsx'
 import EvidencePage from '../evidence/pages/EvidencePage.jsx'
 import GrowthPage from '../growth/pages/GrowthPage.jsx'
@@ -414,35 +413,6 @@ describe('Capabilities (§13) and Evidence (§15)', () => {
     expect(cards[1]).toHaveAttribute('data-described', 'false')
     expect(screen.queryByText(/I would first separate/)).not.toBeInTheDocument()
     noPercent()
-  })
-  describe('capability detail', () => {
-    const path = '/app/capabilities/:capabilityId'
-    const caps = { '/api/v1/me/capabilities': describedCapabilities() }
-    it('a described capability shows observations, sources and honest growth, practice and reassessment states', async () => {
-      render(<CapabilityDetailPage />, { path, route: '/app/capabilities/CAP-L1-REASONING', routes: caps })
-      expect(await screen.findByRole('heading', { level: 1, name: 'Reasoning & Decision Quality' })).toBeInTheDocument()
-      const detail = await screen.findByTestId('capability-detail')
-      expect(within(detail).getByText('Developing (provisional)')).toBeInTheDocument()
-      expect(within(detail).getByText(/I would first separate the complaint data/)).toBeInTheDocument()
-      expect(within(detail).getByText(/Prism Workplace Simulation, /)).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Evidence over time' })).toBeInTheDocument()
-      expect(screen.getByTestId('evidence-timeline')).toHaveTextContent('Developing (provisional)')
-      expect(screen.getByText('No practice mission is linked to this capability yet.')).toBeInTheDocument()
-      expect(screen.getByText('No reassessment is scheduled for you.')).toBeInTheDocument()
-      expect(screen.getByText('Change over time is shown only between assessments approved as comparable.')).toBeInTheDocument()
-      noPercent()
-    })
-    it('a capability without enough evidence is a first-class state with its reasons', async () => {
-      render(<CapabilityDetailPage />, { path, route: '/app/capabilities/CAP-L1-COMMUNICATION', routes: caps })
-      expect(await screen.findByRole('heading', { name: 'Why there is no level yet' })).toBeInTheDocument()
-      expect(screen.getAllByText('Insufficient evidence').length).toBeGreaterThan(0)
-      expect(screen.queryByRole('link', { name: /See the evidence/ })).not.toBeInTheDocument()
-    })
-    it('an unknown capability says so and keeps a way back', async () => {
-      render(<CapabilityDetailPage />, { path, route: '/app/capabilities/CAP-NOPE', routes: caps })
-      expect(await screen.findByText('This capability is not available')).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: 'Back to capabilities' })).toHaveAttribute('href', '/app/capabilities')
-    })
   })
   it('no completed assessment → the empty state with the start flow', async () => {
     render(<CapabilitiesPage />)

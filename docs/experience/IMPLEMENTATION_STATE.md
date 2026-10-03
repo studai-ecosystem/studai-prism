@@ -1,5 +1,57 @@
 # Experience programme - source traceability and execution checkpoints
 
+## P5 remaining gaps closed - 2026-10-03
+
+State: P5 code-safe work IMPLEMENTED and INTEGRATION_VERIFIED (Layer B browser run of the real
+report plus the fixture state matrix). Human gates stay BLOCKED: comprehension study (protocol
+ready, not run), AT/zoom manual pass, content/measurement approvals, live-model wording.
+
+- P5.4 capability detail (CH-26, CH-27): `GET /api/v1/me/capabilities/:id`
+  (`readModels.capabilityDetail`) binds one capability to the latest formal snapshot that measured
+  it: `latestSnapshot {sessionId, version, issuedAt, reason, priorVersion, completedAt,
+  assessmentTitle, scope, formId, methodVersion, sufficiencyRulesVersion}`, this capability's
+  moments / evidence / bounded observation from the STORED report version (the pure builder when no
+  version exists yet), `nextBehavior`, `whyItMatters`, one read-time `recommendation`, open-review
+  count and a plain `limitation`; `state` is one of DESCRIBED, BOUNDED_ONLY, INSUFFICIENT,
+  UNDER_REVIEW, STRETCH, NOT_MEASURED. `CapabilityDetailPage` renders meaning → level with a
+  separate evidence chip (`CapabilityEvidenceChip` reused from the map) → `MomentCard`s with
+  attribution → next behaviour and why → `RecommendationCard` (reviewed mission / optional stretch /
+  honest none) → scope, date, method, limitation → "Ask for a review" (dialog pre-scoped to the
+  capability). Database vocabulary only under Details; one state when nothing is publishable.
+- P5.6 recommendations outside findings (T39): `domain/development/recommendations.js`
+  (`behaviourGaps`, `resolveRecommendations`, pure) + `development.recommendFor`; the report
+  service attaches `recommendations[]` to the OWNER response at read time. Stored versions keep
+  `recommendedMission: null`; a mission publication or an allowance change never changes a
+  version or `evidence_set_hash` (tested). Eligible content: PUBLISHED missions whose
+  `form_behaviour_ids` meet the gap's behaviour ids (from unit provenance), DRAFT only behind
+  `PRISM_DRAFT_CONTENT` and labelled "Draft practice mission (test content)"; `MIS-MKT-EXP-01`
+  has no form behaviours and is never recommended. Each item states availability, duration,
+  label, allowance and whether starting consumes an activity.
+- P5.7 reviewed correction (CH-29, T36): migration 0051 `report_review_decisions` (CHECKs,
+  append-only trigger); `repos.reportReviews.{get,listOpen,addDecision,listDecisions,
+  listWithheldEvidenceIds}` (memory + pg); `reports.listOpenReviews` / `reports.decideReview`;
+  admin router `routes/admin/reportReviews.js` (`GET /api/admin/report-reviews`,
+  `POST /:id/decide`, permission `reports:review` added to the catalogue and to product_admin /
+  assessment_ops). CORRECT validates the withheld ids against the session's own units, publishes a
+  NEW version through the existing publication path (reason `REVIEW_CORRECTION`, prior version
+  set, `report.review.withheldEvidenceIds`), then records the decision; version 1 stays
+  byte-identical; decide twice → 409. Withholding is a provenance flag in the review ledger — the
+  evidence unit is never mutated; the builder and every directory-backed read model exclude the
+  withheld ids. Owner response carries `review {openRequests, pending}`; the report page shows the
+  pending chip and the corrected banner; `AdminReports` has a "Review requests" panel with the
+  decide form.
+- P5.8 audience hardening (T47/T48): `reportAudiences.test.js` proves SUMMARY sponsor/share
+  projections carry no quotes, moments, recommendations or review state; nested owner endpoints
+  and `/shared/:token/*` deny; staff cannot create a learner share; served dates are stored facts;
+  legacy reader paths unchanged. No gap required a server change beyond keeping the new fields
+  owner-only.
+- P5.9 state matrix: `tests/e2e/p5-report-states.spec.js` + runner mode `p5` (all four projects);
+  screenshots in `audit-results/ui/p5/`. Comprehension protocol script and recording sheet added
+  to `RESEARCH_PROTOCOLS.md` §3a (no results).
+- Defect fixed on the way (T35): `sessionDirectory` now treats a DONE evaluation run as a report
+  (stored worker time / stored version issue time), so new-run completions reach home, history,
+  capabilities and capability detail without a legacy report row.
+
 ## P4 remaining gaps closed - 2026-10-03
 
 - P4.8 content review tooling: `domain/content/tooling.js` + `routes/admin/content.js`

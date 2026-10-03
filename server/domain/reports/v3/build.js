@@ -67,12 +67,16 @@ function provenanceOf(unit) {
  * @param input.disclosure 'FULL' | 'SUMMARY' (share links may restrict)
  * @param input.opportunities opportunity ledger rows of THIS session (context for moments; optional)
  */
-export function buildStudentReportV3({ sessionId, definition = null, formId = null, units = [], turns = [], header = {}, disclosure = 'FULL', opportunities = [], coverage = null }) {
+export function buildStudentReportV3({ sessionId, definition = null, formId = null, units = [], turns = [], header = {}, disclosure = 'FULL', opportunities = [], coverage = null, withheldEvidenceIds = [] }) {
   if (!DISCLOSURE_LEVELS.includes(disclosure)) throw new Error(`Unknown disclosure level: ${disclosure}`)
   const title = header.assessmentTitle || definition?.title || 'your assessment'
   const capabilityIds = definition?.measures?.length ? definition.measures : PRIMARY_CAPABILITY_IDS
   // Only this session's units are ever considered (a stray row cannot count).
-  const ownUnits = units.filter((u) => u.session_id === sessionId)
+  // Units withheld by a reviewed correction (P5.7) are excluded here: the
+  // stored unit is untouched, the published version simply never cites it.
+  const withheld = new Set((withheldEvidenceIds || []).filter((id) => typeof id === 'string'))
+  const ownUnits = units.filter((u) => u.session_id === sessionId && !withheld.has(u.evidence_id))
+  const withheldHere = [...withheld].filter((id) => units.some((u) => u.session_id === sessionId && u.evidence_id === id)).sort()
   const decisions = evaluateProfile(ownUnits, { capabilityIds })
   const index = new Map(ownUnits.filter((u) => ADMISSIBLE.has(u.evidence_status)).map((u) => [u.evidence_id, u]))
 
@@ -321,6 +325,10 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
     // P4.5/P4.7: counts-only coverage of the run (never a capability hint).
     // Absent for legacy runs and for stored versions that predate it.
     ...(coverage ? { coverage: { planned: coverage.planned, presented: coverage.presented, answered: coverage.answered, withheld: coverage.reasons?.REVIEW_REQUIRED || 0, notes: [...(coverage.notes || [])] } } : {}),
+    // P5.7: a corrected version records which evidence units a reviewer
+    // withheld (ids only). Absent on every other version, so older hashes
+    // are unchanged.
+    ...(withheldHere.length ? { review: { withheldEvidenceIds: withheldHere } } : {}),
     methodology: {
       builderVersion: REPORT_V3_BUILDER_VERSION,
       sufficiencyRulesVersion: SUFFICIENCY_RULES_VERSION,

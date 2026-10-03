@@ -52,6 +52,7 @@ import marginRouter from './margin.js'
 import organizationsRouter from './organizations.js'
 import validationRouter from './validation.js'
 import qualityRouter from './quality.js'
+import reportReviewsRouter from './reportReviews.js'
 
 const router = Router()
 
@@ -142,5 +143,7 @@ router.use('/organizations', organizationsRouter)
 router.use('/validation', validationRouter)
 // P9.1 — three independent quality views (aggregate counts only).
 router.use('/quality', qualityRouter)
+// P5.7 — report interpretation review decisions (append-only; corrections are new versions).
+router.use('/report-reviews', reportReviewsRouter)
 
 export default router

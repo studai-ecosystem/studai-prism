@@ -15,6 +15,7 @@ import { DevelopmentPriorityCard } from './DevelopmentPriorityCard.jsx'
 import { CapabilityMap } from './CapabilityMap.jsx'
 import { MomentCard, practiceHref } from './MomentCard.jsx'
 import { ReportVersionHistory } from './ReportVersionHistory.jsx'
+import { RecommendationCard } from './RecommendationCard.jsx'
 import { REPORT_COPY, reportCopyFor } from '../../../lib/copy/report.js'
 import { formatDate } from '../../student/QueryState.jsx'
 
@@ -25,7 +26,7 @@ import { formatDate } from '../../student/QueryState.jsx'
 // (Evidence, Development, Methodology with version history and review). A
 // summary-only share has no quotes, so no moments, evidence or development.
 // `audience` picks second-person copy for the student, neutral copy otherwise.
-export function ReportView({ report, versionNumber, visibilityText, actions = null, audience = 'OWNER', canReview = false }) {
+export function ReportView({ report, versionNumber, versionMeta = null, visibilityText, actions = null, audience = 'OWNER', canReview = false, reviewState = null, recommendations = [] }) {
   const [tab, setTab] = useState('summary')
   const [capabilityFilter, setCapabilityFilter] = useState(null)
   const [focusTarget, setFocusTarget] = useState(null)
@@ -64,11 +65,25 @@ export function ReportView({ report, versionNumber, visibilityText, actions = nu
   // priority, else a bounded moment's next behaviour. Nothing is invented.
   const nextMoment = moments.find((m) => m.nextBehavior) || null
   const nextPractice = priorities[0]
-    ? { title: priorities[0].name, behavior: priorities[0].behaviorToImprove, why: priorities[0].claim, level: priorities[0].currentLevel, moment: moments.find((m) => m.capability.id === priorities[0].capabilityId) || null }
-    : nextMoment ? { title: nextMoment.capability.displayLabel || nextMoment.capability.name, behavior: nextMoment.nextBehavior, why: nextMoment.observedBehavior, level: null, moment: nextMoment } : null
+    ? { title: priorities[0].name, behavior: priorities[0].behaviorToImprove, why: priorities[0].claim, level: priorities[0].currentLevel, moment: moments.find((m) => m.capability.id === priorities[0].capabilityId) || null, capabilityId: priorities[0].capabilityId }
+    : nextMoment ? { title: nextMoment.capability.displayLabel || nextMoment.capability.name, behavior: nextMoment.nextBehavior, why: nextMoment.observedBehavior, level: null, moment: nextMoment, capabilityId: nextMoment.capability.id } : null
+  // P5.6: the read-time recommendation for the insight shown (never stored in the version).
+  const nextRecommendation = nextPractice ? (recommendations || []).find((r) => r.kind === 'PRACTICE' && r.capabilityId === nextPractice.capabilityId) || null : null
+  const corrected = versionMeta?.reason === 'REVIEW_CORRECTION'
+  const pending = owner && Boolean(reviewState?.pending)
 
   const summary = (
     <div className="space-y-8">
+      {pending && (
+        <Callout tone="partial" title={REPORT_COPY.reviewPending} role="status">
+          <p data-testid="report-review-pending">{REPORT_COPY.reviewPendingBody}</p>
+        </Callout>
+      )}
+      {corrected && (
+        <Callout tone="info" title={REPORT_COPY.correctedTitle(versionNumber, versionMeta.priorVersion)}>
+          <p data-testid="report-corrected">{REPORT_COPY.correctedBody}</p>
+        </Callout>
+      )}
       {report.plainStatement && (
         <p className="text-lg leading-relaxed text-prism-ink" data-testid="report-plain-statement">{report.plainStatement}</p>
       )}
@@ -84,8 +99,8 @@ export function ReportView({ report, versionNumber, visibilityText, actions = nu
       {report.summary.describedCount === 0 && (
         <div data-testid="report-none-described">
           <Callout tone="insufficient" title="Not enough evidence yet">
-            <p>{REPORT_COPY.mapNoneDescribed}</p>
-            {owner && <p className="mt-1">{copy.noDescribed}</p>}
+            {/* One sentence for one state (CH-27): second person for the owner, neutral otherwise. */}
+            <p>{owner ? copy.noDescribed : REPORT_COPY.mapNoneDescribed}</p>
           </Callout>
         </div>
       )}
@@ -113,10 +128,12 @@ export function ReportView({ report, versionNumber, visibilityText, actions = nu
               </div>
               {nextPractice.behavior && <p className="text-sm text-prism-ink"><span className="font-medium">What to practise: </span>{nextPractice.behavior}</p>}
               {nextPractice.why && <p className="text-sm text-prism-ink-muted"><span className="font-medium text-prism-ink">{REPORT_COPY.nextWhy}: </span>{nextPractice.why}</p>}
-              <p className="text-xs text-prism-ink-subtle">{REPORT_COPY.missionsLater}</p>
+              {owner && nextRecommendation
+                ? <RecommendationCard recommendation={nextRecommendation} headingLevel={3} />
+                : <p className="text-xs text-prism-ink-subtle">{REPORT_COPY.missionsLater}</p>}
               {owner && (
                 <div className="flex flex-wrap gap-2">
-                  <LinkButton size="sm" variant="primary" to={practiceHref(report.sessionId, nextPractice.moment)}>{REPORT_COPY.practiseThis}</LinkButton>
+                  {!nextRecommendation?.mission && <LinkButton size="sm" variant="primary" to={practiceHref(report.sessionId, nextPractice.moment)}>{REPORT_COPY.practiseThis}</LinkButton>}
                   {priorities.length > 0 && <Button size="sm" variant="ghost" onClick={() => setTab('development')}>{REPORT_COPY.focusTeaser}</Button>}
                 </div>
               )}
@@ -231,6 +248,8 @@ export function ReportView({ report, versionNumber, visibilityText, actions = nu
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={h.scope === 'SPONSORED' ? 'accent' : 'neutral'}>{h.sponsor ? `Sponsored by ${h.sponsor.name}` : 'Personal assessment'}</Badge>
             {!full && <Badge tone="neutral">Summary only</Badge>}
+            {corrected && <Badge tone="neutral" data-testid="report-corrected-badge">{REPORT_COPY.versionReasons.REVIEW_CORRECTION}</Badge>}
+            {pending && <Badge tone="partial">{REPORT_COPY.reviewPending}</Badge>}
             {report.methodology.levelLabelsStatus === 'PROVISIONAL' && <Badge tone="neutral">Level names are provisional</Badge>}
           </div>
         </div>

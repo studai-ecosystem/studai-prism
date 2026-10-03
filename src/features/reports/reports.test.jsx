@@ -323,6 +323,49 @@ describe('Student Report V3 page', () => {
     expect(document.body.textContent).not.toMatch(/\d\s*%/)
   })
 
+  it('P5.6/P5.7 a pending review is a chip for the owner; a corrected version names what replaced it; the next practice shows the read-time recommendation with duration, label and allowance', async () => {
+    const body = ownerBody()
+    body.data.version = { number: 2, createdAt: '2026-10-03T10:00:00.000Z', reason: 'REVIEW_CORRECTION', priorVersion: 1 }
+    body.data.review = { openRequests: 1, pending: true }
+    body.data.report.review = { withheldEvidenceIds: ['e3'] }
+    body.data.recommendations = [{
+      kind: 'PRACTICE', capabilityId: 'CAP-A', behaviourIds: ['QUESTION_ASSUMPTION'], nextBehavior: 'Weighs two options before deciding.',
+      availability: 'AVAILABLE', allowance: { kind: 'BOUNDED', total: 3, used: 1, remaining: 2, validUntil: null }, consumesActivity: true,
+      mission: { id: 'MIS-CORE-MISSING-FACT-01', title: 'Find the missing fact', displayCode: 'P6-01', status: 'PUBLISHED', label: 'Practice mission', estimatedMinutes: 10, matchedBehaviourIds: ['QUESTION_ASSUMPTION'], matchedBy: 'BEHAVIOUR', to: '/app/development/missions/MIS-CORE-MISSING-FACT-01' },
+    }]
+    renderReport({ '/api/v1/assessment-sessions/sess-report-0001/report': () => jsonResponse(200, body) })
+    const header = await screen.findByTestId('report-header')
+    expect(within(header).getByText('An interpretation review is pending')).toBeInTheDocument()
+    expect(within(header).getByTestId('report-corrected-badge')).toHaveTextContent('Corrected after a review')
+    expect(screen.getByTestId('report-review-pending')).toHaveTextContent(/stays as published until they decide/)
+    expect(screen.getByTestId('report-corrected')).toHaveTextContent(/earlier version is kept unchanged/)
+    expect(screen.getByText('Corrected version 2, replacing version 1')).toBeInTheDocument()
+    const next = screen.getByTestId('report-next-practice')
+    const rec = within(next).getByTestId('practice-recommendation')
+    expect(rec).toHaveAttribute('data-availability', 'AVAILABLE')
+    expect(within(rec).getByText('Practice mission')).toBeInTheDocument()
+    expect(within(rec).getByText('Find the missing fact')).toBeInTheDocument()
+    expect(within(rec).getByText('About 10 minutes')).toBeInTheDocument()
+    expect(within(rec).getByText('2 of 3 practice activities left')).toBeInTheDocument()
+    expect(within(rec).getByText(/Starting uses one practice activity/)).toBeInTheDocument()
+    expect(within(rec).getByRole('link', { name: /^Practise this/ })).toHaveAttribute('href', '/app/development/missions/MIS-CORE-MISSING-FACT-01')
+    expect(within(next).getAllByRole('link', { name: /^Practise this/ })).toHaveLength(1)
+    expect(within(next).queryByText('Recommended practice missions are not available here yet.')).not.toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/\d\s*%/)
+  })
+
+  it('P5.6 without a reachable reviewed mission the next practice says so and never names the legacy mission', async () => {
+    const body = ownerBody()
+    body.data.recommendations = [{ kind: 'PRACTICE', capabilityId: 'CAP-A', behaviourIds: [], nextBehavior: 'Weighs two options before deciding.', availability: 'NO_REVIEWED_PRACTICE', allowance: { kind: 'UNLIMITED' }, consumesActivity: false, mission: null }]
+    renderReport({ '/api/v1/assessment-sessions/sess-report-0001/report': () => jsonResponse(200, body) })
+    const next = await screen.findByTestId('report-next-practice')
+    expect(within(next).getByTestId('practice-unavailable')).toHaveTextContent('No reviewed practice is available yet for this.')
+    expect(within(next).getByRole('link', { name: /^Practise this/ })).toHaveAttribute('href', '/app/development?source=sess-report-0001&moment=OPP-1')
+    expect(document.body.textContent).not.toMatch(/MIS-MKT|marketing experiment/i)
+    expect(screen.queryByText('An interpretation review is pending')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('report-corrected')).not.toBeInTheDocument()
+  })
+
   it('an evidence item opens its details with how it was reviewed; methodology keeps technical detail behind a disclosure', async () => {
     renderReport({ '/api/v1/assessment-sessions/sess-report-0001/report': ownerBody() })
     await userEvent.click(await screen.findByRole('tab', { name: 'Evidence' }))

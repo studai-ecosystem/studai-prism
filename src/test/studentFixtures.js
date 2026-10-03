@@ -21,6 +21,44 @@ export function capability(id, name, overrides = {}) {
 
 export const emptyCapabilities = () => ({ data: { items: CAPS.map(([id, n]) => capability(id, n)), assessedCount: 0, excludedCount: 0, levelLabelsStatus: 'PROVISIONAL' } })
 
+// P5.4 capability detail (GET /me/capabilities/:id): a described capability
+// bound to its latest snapshot; override `state` and fields for other states.
+const PROVENANCE = { evidenceId: 'u1', source: 'CONVERSATION', turn: 1, artifactId: null, rubricVersion: 'rubric.v1', reviewedBy: 'AI', legacy: false }
+export const detailMoment = (over = {}) => ({
+  id: 'u1', basis: 'DESCRIBED', capability: { id: 'CAP-L1-REASONING', name: 'Reasoning & Decision Quality', displayLabel: 'Making decisions' },
+  observedBehavior: 'Separated symptoms from causes', quote: 'I would first separate the complaint data',
+  context: 'Priya (Coordinating colleague): Before we plan, what do you want to check or ask?',
+  source: { turn: 1, artifactId: null, opportunityId: 'OPP-1' }, rubricAnchor: { criteria: 'Separates evidence from assumption.' },
+  nextBehavior: 'States what is uncertain before deciding.', evidenceStatus: 'PROVISIONAL', provenance: PROVENANCE, ...over,
+})
+export const recommendation = (over = {}) => ({
+  kind: 'PRACTICE', capabilityId: 'CAP-L1-REASONING', behaviourIds: ['QUESTION_ASSUMPTION'], nextBehavior: 'States what is uncertain before deciding.',
+  availability: 'AVAILABLE', allowance: { kind: 'UNLIMITED' }, consumesActivity: false,
+  mission: { id: 'MIS-CORE-MISSING-FACT-01', title: 'Find the missing fact', displayCode: 'P6-01', status: 'PUBLISHED', label: 'Practice mission', estimatedMinutes: 10, matchedBehaviourIds: ['QUESTION_ASSUMPTION'], matchedBy: 'BEHAVIOUR', to: '/app/development/missions/MIS-CORE-MISSING-FACT-01' },
+  ...over,
+})
+export function capabilityDetail(overrides = {}) {
+  const base = describedCapabilities().data.items[0]
+  return {
+    data: {
+      ...base,
+      displayLabel: 'Making decisions',
+      state: 'DESCRIBED',
+      latestSnapshot: { sessionId: 'sess-1', version: 1, issuedAt: '2026-09-20T10:05:00.000Z', reason: 'INITIAL', priorVersion: null, completedAt: '2026-09-20T10:00:00.000Z', assessmentTitle: 'Prism Workplace Simulation', scope: 'PERSONAL', formId: 'prism-workplace-core:syn:1', methodVersion: 'student-report.v3.1', sufficiencyRulesVersion: 'sufficiency-rules.v1-provisional' },
+      levelDescriptor: 'Weighs more than one option before deciding.',
+      moments: [detailMoment()],
+      evidence: [],
+      boundedObservation: null,
+      nextBehavior: 'States what is uncertain before deciding.',
+      whyItMatters: 'Decisions hold up better when the uncertain parts are named.',
+      recommendation: recommendation(),
+      review: { openRequests: 0, pending: false },
+      limitation: 'This describes what was observed in Prism Workplace Simulation only. Levels are ordered categories, not scores, and change over time is shown only between assessments approved as comparable.',
+      ...overrides,
+    },
+  }
+}
+
 export const describedCapabilities = () => ({
   data: {
     items: CAPS.map(([id, n], i) => (i === 0

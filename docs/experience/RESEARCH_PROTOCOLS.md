@@ -88,6 +88,54 @@ Post-task questions: "What does this report not know about you?"; "Did anything 
 
 Unassisted rule: any facilitator hint before the participant answers marks the trial COACHED; it is excluded from `comprehension` and reported separately.
 
+### 3a. Ready-to-run session script (P5.9; no results are recorded in this file)
+
+Prepared so that the protocol can be run exactly as written once §6 approvals exist. It records the procedure only; running it, and any comprehension figure, remain BLOCKED on research-lead approval, consent materials and (where an institution is involved) its research/ethics clearance. Nothing below was executed and no participant observation exists.
+
+Variant assignment
+- Before recruitment the research lead prepares a sealed assignment list of alternating `MAP`/`LIST` labels per cohort (students, early-career), shuffled in blocks of four so each block of four participants has two of each. Assignment is read from the list in participant order; it is never chosen after seeing the participant or their report.
+- The variant is set in the browser by the facilitator before the participant sits down: `MAP` shows the report summary as shipped (Capability Map with its segmented track); `LIST` shows the same report with the decorative track hidden — the map's own accessible rendering, obtained by the facilitator's browser at a viewport narrower than 640 px (or an equivalent facilitator stylesheet override that hides only the track). Rows, order, band labels, evidence-state labels and copy are identical in both. No separate list component exists or is required. The participant is not told which variant they have.
+- A participant whose report state is wholly insufficient, under review, technical-incomplete or processing is still run (their task is to understand that limit), with `report_state` recorded.
+
+Facilitator script (read aloud; square brackets are facilitator actions)
+1. [Confirm consent is signed and the recording sheet header is filled: participant code, cohort, variant, report_state, channel, incentive, compulsion, prior_relationship_to_team, date, facilitator code.]
+2. "This is your own report from the Prism session you completed. I am going to show it for five seconds and then hide it. There are no right answers; I want to know what it says to you. Ready?"
+3. [Start the five-second timer on "Ready"; show the first screen of the report; hide it at five seconds.]
+4. "In your own words, what did it say about you?" [Write verbatim. No prompting. If silence > 10 s: "Take your time." once; anything more marks the trial COACHED.]
+5. "What did it say it could not tell?" [Write verbatim.]
+6. "Now you can see the whole report. You have two minutes. Find the one thing you would work on next and start doing something about it. I will stay quiet." [Start the two-minute timer; observe only; note the path, first relevant click, confusion moments, abandonment; stop at two minutes or when a practice starts.]
+7. "What does this report not know about you?" [Verbatim.]
+8. "Did anything here feel like a grade?" [Verbatim.]
+9. [Show the other variant for thirty seconds.] "Which of the two did you prefer, and why?" [Record preference and one reason; preference only.]
+10. "Thank you. Nothing you said will be quoted in the product." [End recording.]
+
+Recording sheet fields (one row per participant; blank template kept in the research store, never in this repository)
+
+| Field | Values / notes |
+|---|---|
+| participant_code | pseudonymous code from the consent register |
+| cohort | STUDENT, EARLY_CAREER |
+| variant | MAP, LIST (from the sealed list) |
+| report_state | READY, PARTLY_DESCRIBED, WHOLLY_INSUFFICIENT, UNDER_REVIEW, TECHNICAL_INCOMPLETE, PROCESSING, CORRECTED_VERSION |
+| five_second_answer_self | verbatim |
+| five_second_answer_limit | verbatim |
+| finding_score | FINDING_CORRECT, FINDING_OVERSTATED, FINDING_MISSED (blinded rater, later) |
+| limit_score | LIMIT_CORRECT, LIMIT_MISSED (blinded rater, later) |
+| two_minute_first_relevant_click_s | seconds, or NONE |
+| two_minute_path | ordered list from: MOMENT_OPENED, SEE_THE_MOMENT, CAPABILITY_OPENED, PRACTISE_THIS, RECOMMENDATION_OPENED, MISSION_STARTED, EVIDENCE_TAB, DEVELOPMENT_TAB, METHODOLOGY_TAB, SHARE, OTHER |
+| next_step_score | NEXT_STEP_RELEVANT, NEXT_STEP_UNRELATED, NO_NEXT_STEP (blinded rater, later) |
+| practice_started | YES, NO, NOT_AVAILABLE (no reviewed mission reachable for that report) |
+| confusion_moments | free text, facilitator |
+| abandonment | YES, NO |
+| not_know_answer | verbatim |
+| grade_answer | verbatim |
+| preference | MAP, LIST, NONE; one reason verbatim |
+| coached | YES, NO (any hint before an answer) |
+| technical_event | free text; a product fault stops the session and is a technical event, not a participant result |
+| channel / incentive / compulsion / prior_relationship_to_team | §5 values |
+
+Scoring happens after all sessions, by a rater blinded to variant, from the verbatim fields only. Results, if and when they exist, are reported in `METRICS.md` with the sample, the share of COACHED and NOT_AVAILABLE rows and the compulsion split — never here.
+
 ## 4. Sample and stopping
 
 Planning sizes, not a power claim: 12 + 12 interviews; 16–24 participants for the comparator study; 24–40 for the comprehension tasks (balanced MAP/LIST). The measurement lead may change these with a written reason before recruitment starts. Stop any session on distress, request, or a product fault that would mislead the participant (record the fault as a technical event, not a participant result).

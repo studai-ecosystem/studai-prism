@@ -21,6 +21,7 @@ import { createReportService } from '../reports/v3/service.js'
 import { createTelemetryService } from '../telemetry/events.js'
 import { createCampusAdminService } from '../campusAdmin/service.js'
 import { createDevelopmentService } from '../development/service.js'
+import { resolveRecommendations } from '../development/recommendations.js'
 import { createGrowthService } from '../growth/service.js'
 import { createSessionEntryLoader } from '../growth/entries.js'
 import { createAnalyticsService } from '../analytics/service.js'
@@ -123,7 +124,8 @@ export function createCampusContext({
   const developmentOn = () => isEnabled('PRISM_DEVELOPMENT_V2') && Boolean(liveRepos())
   // Practice evidence reaches the student read models only while Development V2 is on.
   const practiceSource = practice || { list: async (user, workspace) => (developmentOn() ? development.listPractice(user, workspace) : []) }
-  const developmentPlans = { enabled: developmentOn, planFor: (user, workspace, priorities) => development.planFor(user, workspace, priorities) }
+  const recommendFor = async (user, workspace, gaps) => (developmentOn() ? development.recommendFor(user, workspace, gaps) : resolveRecommendations({ gaps, practiceEnabled: false }))
+  const developmentPlans = { enabled: developmentOn, planFor: (user, workspace, priorities) => development.planFor(user, workspace, priorities), recommendFor }
   // Late-bound: invites and sessions notify campus admin, which uses invites.
   let admin = null
   const invites = createInviteService({
@@ -212,6 +214,8 @@ export function createCampusContext({
     ledger,
     reports: createReportService({
       repos: storeView, legacy, catalog, evidence, sessionScopes, dataAccess, scenarioSource, audit: auditWriter, clock, ...(shareTokenFactory ? { tokenFactory: shareTokenFactory } : {}),
+      // P5.6 read-time recommendations: honest PRACTICE_OFF while Development V2 is dark.
+      development: { recommendFor },
     }),
     invites,
     admin,

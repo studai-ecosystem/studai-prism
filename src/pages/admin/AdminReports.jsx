@@ -7,6 +7,113 @@ import {
   Pill, btn, field, when, mono, actWithReason,
 } from './ui.jsx'
 
+// ── Review requests (P5.7) — a learner asked for a human review ─────────────
+// OPEN cases only: ids, category and the learner's stated reason. Deciding
+// records an append-only decision; CORRECT publishes a NEW report version
+// without the named evidence units. Nothing here edits a version.
+const DECISIONS = ['UPHOLD', 'CORRECT', 'REJECT']
+const CATEGORY = { TRANSCRIPTION: 'transcription', ATTRIBUTION: 'attribution', SCENARIO_FACT: 'scenario fact', INTERPRETATION: 'interpretation', OTHER: 'other' }
+
+function DecideForm({ item, onDone }) {
+  const [decision, setDecision] = useState('UPHOLD')
+  const [reason, setReason] = useState('')
+  const [withhold, setWithhold] = useState(item.momentId || '')
+  const [note, setNote] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (reason.trim().length < 10) { setError('A specific reason (>= 10 characters) is required.'); return }
+    const ids = withhold.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean)
+    if (decision === 'CORRECT' && !ids.length) { setError('A correction names at least one evidence unit id to withhold.'); return }
+    setBusy(true)
+    try {
+      const out = await adminFetch(`/api/admin/report-reviews/${item.id}/decide`, {
+        method: 'POST',
+        body: { decision, reason: reason.trim(), ...(decision === 'CORRECT' ? { correction: { withholdEvidenceIds: ids, ...(note.trim() ? { note: note.trim() } : {}) } } : {}) },
+      })
+      onDone(out)
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
+  }
+  return (
+    <form onSubmit={submit} className="mt-2 grid gap-2 rounded-[6px] border border-prism-border bg-prism-subtle p-3 text-[13px]" aria-label={`Decide review ${item.id.slice(0, 8)}`} data-testid="review-decide-form">
+      <label className="grid gap-1">
+        <span className="font-medium">Decision</span>
+        <select className={field} value={decision} onChange={(e) => setDecision(e.target.value)}>
+          {DECISIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </label>
+      <label className="grid gap-1">
+        <span className="font-medium">Reason (recorded with the decision)</span>
+        <textarea className={field} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} required minLength={10} maxLength={2000} />
+      </label>
+      {decision === 'CORRECT' && (
+        <>
+          <label className="grid gap-1">
+            <span className="font-medium">Evidence unit ids to withhold (comma separated)</span>
+            <input className={field} value={withhold} onChange={(e) => setWithhold(e.target.value)} />
+          </label>
+          <label className="grid gap-1">
+            <span className="font-medium">Correction note (optional)</span>
+            <input className={field} value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} />
+          </label>
+          <p className="text-prism-ink-muted">Publishes a new report version built without these units. The original version is kept unchanged.</p>
+        </>
+      )}
+      {error && <p role="alert" className="text-prism-blocked">{error}</p>}
+      <div><button type="submit" className={btn} disabled={busy}>{busy ? 'Recording…' : 'Record decision'}</button></div>
+    </form>
+  )
+}
+
+export function ReviewRequestsPanel() {
+  const [items, setItems] = useState(null)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [open, setOpen] = useState(null)
+  const canReview = adminHasPermission('reports:review')
+  const load = useCallback(async () => {
+    setError('')
+    try { setItems((await adminFetch('/api/admin/report-reviews')).items || []) } catch (err) { setError(err.message) }
+  }, [])
+  useEffect(() => { if (canReview) load() }, [canReview, load])
+  if (!canReview) return null
+  return (
+    <section className="mt-8" aria-labelledby="review-requests-title" data-testid="review-requests">
+      <h2 id="review-requests-title" className="font-display text-[15px] font-semibold text-prism-ink">Review requests</h2>
+      <p className="mb-2 text-[12px] text-prism-ink-muted">Open learner requests for a human review of a published report version. A correction is a new version; nothing is rewritten.</p>
+      <ErrorNotice error={error} />
+      {notice && <Notice>{notice}</Notice>}
+      <DataTable
+        busy={items === null}
+        rowKey={(r) => r.id}
+        onRowClick={(r) => setOpen((o) => (o === r.id ? null : r.id))}
+        columns={[
+          { key: 'sessionId', label: 'Session', render: (r) => `${mono(r.sessionId, 13)}…`, className: 'font-mono text-[12px]' },
+          { key: 'version', label: 'Version', className: 'font-mono text-[12px]' },
+          { key: 'category', label: 'Category', render: (r) => CATEGORY[r.category] || r.category },
+          { key: 'momentId', label: 'Moment', render: (r) => r.momentId || '—', className: 'font-mono text-[11px]' },
+          { key: 'reason', label: 'Learner reason', render: (r) => <span className="line-clamp-2">{r.reason}</span> },
+          { key: 'createdAt', label: 'Opened', render: (r) => when(r.createdAt), className: 'whitespace-nowrap font-mono text-[11px]' },
+        ]}
+        rows={items || []}
+        empty="No open review requests."
+      />
+      {open && items?.some((r) => r.id === open) && (
+        <DecideForm
+          item={items.find((r) => r.id === open)}
+          onDone={(out) => {
+            setOpen(null)
+            setNotice(out.publishedVersion ? `Decision recorded. Corrected report published as version ${out.publishedVersion.version} (replacing ${out.publishedVersion.priorVersion}).` : `Decision recorded: ${out.decision.decision}.`)
+            load()
+          }}
+        />
+      )}
+    </section>
+  )
+}
+
 // ── /admin/reports — report administration (Phase 2) ─────────────────────────
 
 export function AdminReports() {
@@ -44,6 +151,7 @@ export function AdminReports() {
         empty="No reports."
       />
       <Pager data={data} onPage={setPage} />
+      <ReviewRequestsPanel />
     </div>
   )
 }

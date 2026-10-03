@@ -13,7 +13,7 @@ const MAX = 2000
 // Interpretation review (P5.7, CH-29): the learner points at a bounded
 // category and a specific concern. The request becomes an OPEN case; the
 // report is not changed here, and no outcome or timing is promised.
-export function InterpretationReviewDialog({ open, onClose, sessionId, version, moments = [] }) {
+export function InterpretationReviewDialog({ open, onClose, sessionId, version, moments = [], capability = null }) {
   const review = useRequestReview(sessionId)
   const [category, setCategory] = useState('INTERPRETATION')
   const [momentId, setMomentId] = useState('')
@@ -22,6 +22,10 @@ export function InterpretationReviewDialog({ open, onClose, sessionId, version, 
   const [sent, setSent] = useState(null)
   const doneRef = useRef(null)
   useEffect(() => { if (sent) doneRef.current?.focus() }, [sent])
+  // Pre-selected from a capability detail page: moments are narrowed to that
+  // capability and the request names it, so the reviewer knows the scope.
+  const scopedMoments = capability ? moments.filter((m) => m.capability?.id === capability.id) : moments
+  const capabilityName = capability ? capability.displayLabel || capability.name : null
 
   const close = () => {
     setSent(null); setError(null); setReason(''); setMomentId(''); setCategory('INTERPRETATION'); review.reset(); onClose()
@@ -33,7 +37,7 @@ export function InterpretationReviewDialog({ open, onClose, sessionId, version, 
     if (text.length > MAX) { setError('Please keep this shorter.'); return }
     setError(null)
     try {
-      const out = await review.mutateAsync({ ...(version ? { version } : {}), category, ...(momentId ? { momentId } : {}), reason: text })
+      const out = await review.mutateAsync({ ...(version ? { version } : {}), category, ...(momentId ? { momentId } : {}), reason: capabilityName ? `[${capabilityName}] ${text}`.slice(0, MAX) : text })
       setSent(out)
     } catch {
       // The mutation error is shown inline below.
@@ -57,19 +61,20 @@ export function InterpretationReviewDialog({ open, onClose, sessionId, version, 
         </Callout>
       ) : (
         <form id="report-review-form" onSubmit={submit} className="space-y-4" noValidate>
+          {capabilityName && <p className="text-sm text-prism-ink" data-testid="review-capability-scope"><span className="font-medium">About: </span>{capabilityName}</p>}
           <Select
             label={R.reviewCategory}
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             options={REVIEW_CATEGORIES.map((c) => ({ value: c, label: R.reviewCategories[c] || c }))}
           />
-          {moments.length > 0 && (
+          {scopedMoments.length > 0 && (
             <Select
               label="Which moment (optional)"
               value={momentId}
               onChange={(e) => setMomentId(e.target.value)}
               placeholder="Not about one moment"
-              options={moments.map((m) => ({ value: m.id, label: m.observedBehavior }))}
+              options={scopedMoments.map((m) => ({ value: m.id, label: m.observedBehavior }))}
             />
           )}
           <Textarea

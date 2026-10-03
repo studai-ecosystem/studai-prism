@@ -9,6 +9,9 @@
 import { evaluateProfile } from '../evidence/sufficiency.js'
 import { LEVEL_LABELS_STATUS } from '../evidence/levels.js'
 import { buildClaim, validateClaims, candidateTurnsUnion } from '../reports/claims.js'
+import { buildStudentReportV3 } from '../reports/v3/build.js'
+import { behaviourGaps } from '../development/recommendations.js'
+import { ApiError } from '../http/errors.js'
 import { PRIMARY_CAPABILITY_IDS, CORE_DEFINITION_ID, capabilityInfo, definitionForScenario, formForSession } from '../assessments/catalog.js'
 import { playerPath } from '../assessments/assignmentService.js'
 import { isEnabled } from '../flags/index.js'
@@ -33,6 +36,12 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
   const actionsFor = async (sessionId) => (repos?.sessionIo && typeof repos.sessionIo.listActions === 'function'
     ? repos.sessionIo.listActions(sessionId).catch(() => [])
     : [])
+  // P5.7: evidence ids withheld from a session by a reviewed correction. The
+  // units stay stored; every downstream read model recomputes without them,
+  // exactly as the corrected report version does.
+  const withheldFor = async (sessionId) => (repos?.reportReviews && typeof repos.reportReviews.listWithheldEvidenceIds === 'function'
+    ? repos.reportReviews.listWithheldEvidenceIds(sessionId).catch(() => [])
+    : [])
   // One entry per completed formal session in the workspace (newest first).
   // Held or invalidated sessions are never formal evidence (K59).
   async function formalSessions(user, workspace) {
@@ -44,7 +53,8 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
     for (const s of sessions) {
       const definitionId = definitionForScenario(cat, s.scenarioId)
       const definition = cat.definitions.find((d) => d.id === definitionId) || null
-      const units = await evidence.units(s.sessionId)
+      const withheld = new Set(await withheldFor(s.sessionId))
+      const units = (await evidence.units(s.sessionId)).filter((u) => !withheld.has(u.evidence_id))
       const capabilityIds = definition?.measures || PRIMARY_CAPABILITY_IDS
       out.push({
         session: s,
@@ -100,6 +110,7 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
     return {
       id: cap.id,
       name: cap.name,
+      displayLabel: cap.displayLabel || null,
       definition: cap.description,
       layer: cap.layer,
       status: decision?.status || 'INSUFFICIENT_EVIDENCE',
@@ -143,6 +154,81 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
 
   return {
     capabilities,
+
+    // P5.4 capability detail, bound to the latest formal snapshot that
+    // measured it: meaning -> level with a separate evidence state -> the
+    // learner's own verified moments -> one next behaviour -> a reachable
+    // reviewed practice or an honest "none yet" -> scope, date, method and
+    // limitation -> review. Everything comes from the stored report version
+    // of that session (or the same pure builder when no version is stored);
+    // nothing is invented when evidence is thin.
+    async capabilityDetail(user, workspace, capabilityId) {
+      const cap = capabilityInfo(capabilityId)
+      if (!cap) throw new ApiError('NOT_FOUND', 'Not found')
+      const entries = await formalSessions(user, workspace)
+      const view = capabilityView(capabilityId, entries)
+      const current = entries.find((e) => e.decisions[capabilityId]) || null
+      const base = { ...view, latestSnapshot: null, moments: [], evidence: [], boundedObservation: null, nextBehavior: null, whyItMatters: cap.description || null, recommendation: null, review: { openRequests: 0, pending: false }, limitation: null }
+      if (!current) return { ...base, state: 'NOT_MEASURED', limitation: view.evidenceSummary.text }
+      const sid = current.session.sessionId
+      const latest = repos?.reportVersions && typeof repos.reportVersions.latest === 'function' ? await repos.reportVersions.latest(sid).catch(() => null) : null
+      const report = latest?.report || buildStudentReportV3({
+        sessionId: sid, definition: current.definition, formId: current.form?.id || null, units: current.units, turns: current.turns,
+        header: { assessmentTitle: current.definition?.title || null, completedAt: current.session.completedAt, scope: current.session.scope },
+      })
+      const card = (report.summary?.capabilities || []).find((c) => c.id === capabilityId) || null
+      const moments = (report.moments || []).filter((m) => m.capability?.id === capabilityId)
+      const evidenceItems = (report.evidence || []).filter((e) => e.capability?.id === capabilityId).slice(0, 3)
+      const bounded = (report.boundedObservations || []).find((b) => b.capability?.id === capabilityId) || null
+      const priority = (report.development?.priorities || []).find((p) => p.capabilityId === capabilityId) || null
+      const band = view.level?.band || null
+      const state = view.status === 'HUMAN_REVIEW_REQUIRED' ? 'UNDER_REVIEW'
+        : band === 'STRONG' ? 'STRETCH'
+          : band ? 'DESCRIBED'
+            : bounded ? 'BOUNDED_ONLY' : 'INSUFFICIENT'
+      const nextBehavior = priority?.behaviorToImprove || moments.find((m) => m.nextBehavior)?.nextBehavior || bounded?.nextBehavior || null
+      // One recommendation for this capability: a priority gap, a STRONG
+      // stretch, or the single bounded moment's behaviour. None otherwise.
+      const gap = behaviourGaps(report, current.units).find((g) => g.capabilityId === capabilityId) || null
+      const recommendation = gap && typeof development.recommendFor === 'function'
+        ? (await development.recommendFor(user, workspace, [gap]).catch(() => []))[0] || null
+        : null
+      const reviews = repos?.reportReviews && typeof repos.reportReviews.listForSession === 'function' ? await repos.reportReviews.listForSession(sid).catch(() => []) : []
+      const openRequests = reviews.filter((r) => r.state === 'OPEN').length
+      const title = current.definition?.title || 'this assessment'
+      // Plain limitation; the sufficiency reason codes stay in statusReasons
+      // (shown under Details), never in the first explanation (CH-27).
+      const limitation = state === 'DESCRIBED' || state === 'STRETCH'
+        ? `This describes what was observed in ${title} only. Levels are ordered categories, not scores, and change over time is shown only between assessments approved as comparable.`
+        : state === 'BOUNDED_ONLY' ? bounded.limitation.replace(/;\s*sufficiency reasons:[^.]*\.?$/, '.')
+          : state === 'UNDER_REVIEW' ? view.evidenceSummary.text
+            : card?.summary?.text || view.evidenceSummary.text
+      return {
+        ...base,
+        state,
+        latestSnapshot: {
+          sessionId: sid,
+          version: latest?.version ?? null,
+          issuedAt: latest?.issuedAt ?? null,
+          reason: latest?.reason ?? null,
+          priorVersion: latest?.priorVersion ?? null,
+          completedAt: current.session.completedAt,
+          assessmentTitle: current.definition?.title || null,
+          scope: current.session.scope,
+          formId: current.form?.id || report.methodology?.formId || null,
+          methodVersion: report.methodology?.builderVersion || null,
+          sufficiencyRulesVersion: report.methodology?.sufficiencyRulesVersion || null,
+        },
+        levelDescriptor: card?.levelDescriptor || null,
+        moments,
+        evidence: evidenceItems,
+        boundedObservation: bounded,
+        nextBehavior,
+        recommendation,
+        review: { openRequests, pending: openRequests > 0 },
+        limitation,
+      }
+    },
 
     async evidence(user, workspace, filters = {}) {
       const entries = await formalSessions(user, workspace)

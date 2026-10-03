@@ -79,6 +79,64 @@ export const CapabilitySchema = z.object({
 
 const CapabilitiesSchema = z.object({ items: z.array(CapabilitySchema), assessedCount: z.number().int(), excludedCount: z.number().int(), levelLabelsStatus: z.string() })
 
+// P5.4 capability detail bound to the latest formal snapshot. Moments and
+// evidence use the Report V3 shapes; the recommendation is a read-time
+// projection (never part of the stored version).
+const DetailProvenance = z.object({
+  evidenceId: z.string(), source: z.enum(['CONVERSATION', 'WORK_MATERIAL']), turn: z.number().nullable(), artifactId: z.string().nullable(),
+  rubricVersion: z.string().nullable(), reviewedBy: z.enum(['AI', 'AI_AND_HUMAN']), legacy: z.boolean(),
+}).passthrough()
+const DetailMoment = z.object({
+  id: z.string(), basis: z.enum(['DESCRIBED', 'BOUNDED']),
+  capability: z.object({ id: z.string(), name: z.string(), displayLabel: z.string().nullable() }),
+  observedBehavior: z.string(), quote: z.string(), context: z.string(),
+  source: z.object({ turn: z.number().nullable(), artifactId: z.string().nullable(), opportunityId: z.string().nullable() }),
+  rubricAnchor: z.object({ criteria: z.string() }).nullable(), nextBehavior: z.string().nullable(),
+  evidenceStatus: z.enum(['PROVISIONAL', 'SUFFICIENT']), provenance: DetailProvenance,
+}).passthrough()
+const DetailEvidence = z.object({
+  id: z.string(), kind: z.literal('FORMAL'), claimId: z.string(), claim: z.string(), claimStatus: z.enum(['SUPPORTED', 'PROVISIONAL', 'INSUFFICIENT']),
+  capability: z.object({ id: z.string(), name: z.string() }), assessmentTitle: z.string(),
+  candidateAction: z.object({ quote: z.string().nullable(), turn: z.number().nullable(), artifactId: z.string().nullable() }),
+  observedBehavior: z.string(), rubricAnchor: z.object({ criteria: z.string() }).nullable(), evidenceStatus: z.enum(['PROVISIONAL', 'SUFFICIENT']),
+  provenance: DetailProvenance,
+}).passthrough()
+export const RecommendationSchema = z.object({
+  kind: z.enum(['PRACTICE', 'STRETCH']),
+  capabilityId: z.string(),
+  behaviourIds: z.array(z.string()),
+  nextBehavior: z.string().nullable(),
+  availability: z.enum(['AVAILABLE', 'NO_REVIEWED_PRACTICE', 'ALLOWANCE_EXHAUSTED', 'PRACTICE_OFF']),
+  allowance: z.object({ kind: z.enum(['UNLIMITED', 'BOUNDED']), total: z.number().optional(), used: z.number().optional(), remaining: z.number().optional(), validUntil: z.string().nullable().optional() }),
+  consumesActivity: z.boolean(),
+  mission: z.object({
+    id: z.string(), title: z.string(), displayCode: z.string().nullable(), status: z.string(), label: z.string(),
+    estimatedMinutes: z.number().nullable(), matchedBehaviourIds: z.array(z.string()), matchedBy: z.enum(['BEHAVIOUR', 'CAPABILITY']), to: z.string(),
+  }).nullable(),
+})
+export const CapabilityDetailSchema = CapabilitySchema.extend({
+  state: z.enum(['DESCRIBED', 'BOUNDED_ONLY', 'INSUFFICIENT', 'UNDER_REVIEW', 'STRETCH', 'NOT_MEASURED']),
+  latestSnapshot: z.object({
+    sessionId: z.string(), version: z.number().int().nullable(), issuedAt: z.string().nullable(), reason: z.string().nullable(), priorVersion: z.number().int().nullable(),
+    completedAt: z.string().nullable(), assessmentTitle: z.string().nullable(), scope: z.enum(['PERSONAL', 'SPONSORED']),
+    formId: z.string().nullable(), methodVersion: z.string().nullable(), sufficiencyRulesVersion: z.string().nullable(),
+  }).nullable(),
+  levelDescriptor: z.string().nullable().optional().default(null),
+  moments: z.array(DetailMoment),
+  evidence: z.array(DetailEvidence),
+  boundedObservation: z.object({
+    id: z.string(), capability: z.object({ id: z.string(), name: z.string() }), observedBehavior: z.string(), quote: z.string(),
+    source: z.object({ turn: z.number().nullable(), artifactId: z.string().nullable(), opportunityId: z.string().nullable() }),
+    rubricAnchor: z.object({ criteria: z.string() }).nullable(), nextBehavior: z.string().nullable(), limitation: z.string(),
+    provenance: DetailProvenance,
+  }).passthrough().nullable(),
+  nextBehavior: z.string().nullable(),
+  whyItMatters: z.string().nullable(),
+  recommendation: RecommendationSchema.nullable(),
+  review: z.object({ openRequests: z.number().int(), pending: z.boolean() }),
+  limitation: z.string().nullable(),
+})
+
 const Focus = z.object({ capabilityId: z.string(), name: z.string(), level: Level, status: Status }).passthrough()
 
 const HomeSchema = z.object({
@@ -258,6 +316,7 @@ export const fetchStudentHome = () => get('/api/v1/me/home', HomeSchema)
 export const fetchStudentAssessments = () => get('/api/v1/me/assessments', AssessmentsSchema)
 export const fetchHistory = ({ cursor = null, limit } = {}) => get('/api/v1/me/history', HistorySchema, { ...(cursor ? { cursor } : {}), ...(limit ? { limit } : {}) })
 export const fetchStudentCapabilities = () => get('/api/v1/me/capabilities', CapabilitiesSchema)
+export const fetchCapabilityDetail = (capabilityId) => get(`/api/v1/me/capabilities/${encodeURIComponent(capabilityId)}`, CapabilityDetailSchema)
 export const fetchStudentEvidence = (filters = {}) => get('/api/v1/me/evidence', EvidenceSchema, filters)
 export const fetchDevelopmentPlan = () => get('/api/v1/me/development-plan', PlanSchema)
 export const fetchGrowth = () => get('/api/v1/me/growth', GrowthSchema)

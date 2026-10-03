@@ -1,5 +1,51 @@
 # Experience programme - decision and external-gate register
 
+## P5 remaining-gap decisions - 2026-10-03
+
+1. **Recommendations are a read-time projection, never part of the stored
+   version.** `development.priorities[].recommendedMission` stays `null` in
+   every published version and the schema still forbids anything else. The
+   owner response carries a separate `recommendations[]` computed from the
+   stored version's own evidence (behaviour ids in unit provenance), the
+   missions the workspace can open today and the live allowance. A mission
+   publication, a content-state change or an allowance change therefore
+   never changes a version number or `evidence_set_hash`; historical reports
+   remain reproducible. Sponsors and share links never receive
+   recommendations. DRAFT missions are eligible only behind
+   `PRISM_DRAFT_CONTENT` (test/local) and are labelled as draft; the legacy
+   `MIS-MKT-EXP-01` has no form behaviours and is never a recommendation.
+2. **Withholding evidence after a review is a provenance flag, not a
+   mutation.** A CORRECT decision stores `withholdEvidenceIds` in the
+   append-only `report_review_decisions` row; the evidence unit's
+   `evidence_status`, `human_review_status`, level and provenance are
+   untouched. The report builder and the directory-backed read models exclude
+   the withheld ids and the corrected publication is a NEW version (reason
+   `REVIEW_CORRECTION`, prior version set, `report.review.withheldEvidenceIds`
+   recorded) built through the ordinary publication path; the original version
+   is byte-identical afterwards. Rejected: mutating `evidence_status` (would
+   rewrite calibration/rating inputs) and editing the stored version (append-only
+   trigger, and a silent rewrite is exactly what CH-29 forbids). Sufficiency
+   floors are unchanged; withholding can only reduce evidence.
+3. **Reviewer permission.** A new `reports:review` key (product_admin,
+   assessment_ops) rather than reusing `reports:supersede`, because a review
+   decision never changes a score and must not require the dual approval the
+   legacy score supersession needs. UPHOLD and REJECT record only; nothing
+   is decided twice.
+4. **A DONE evaluation run is a report for the session directory (T35).**
+   `hasReport` no longer depends on a legacy report row; `completedAt` is the
+   worker's stored completion time and `reportIssuedAt` the stored V3
+   version's issue time. No clock-derived date is introduced.
+5. **One insufficient state (CH-27).** The report callout shows one sentence
+   per audience; the capability detail shows a single plain state and keeps
+   reason codes under Details; the single-assessment timeline is not shown
+   because it would only repeat that state.
+6. **Comprehension protocol prepared, not run.** `RESEARCH_PROTOCOLS.md`
+   §3a holds the facilitator script, sealed MAP/LIST assignment and the
+   recording-sheet fields. The LIST variant is the map's own accessible
+   rendering (track hidden), not a new component. No participant, no
+   observation and no comprehension figure exist; the study stays BLOCKED on
+   the §6 approvals.
+
 ## P3 acceptance-gap decisions - 2026-10-03
 
 1. **Speech in the V3 formal path: text only in V3 formal path; speech

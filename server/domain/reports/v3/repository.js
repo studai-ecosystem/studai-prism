@@ -72,13 +72,21 @@ export function createReportVersionsRepoPg({ query }) {
 
 // Report review requests (0045, P5.7): a learner's request that a person
 // reviews a published version. Append-only cases; the version itself is
-// never rewritten by a request.
+// never rewritten by a request. Decisions (0051) are an append-only history
+// per request; a CORRECT decision names evidence units to withhold, which the
+// report service treats as a provenance flag (the units are not mutated).
 export const REVIEW_CATEGORIES = Object.freeze(['TRANSCRIPTION', 'ATTRIBUTION', 'SCENARIO_FACT', 'INTERPRETATION', 'OTHER'])
+export const REVIEW_DECISIONS = Object.freeze(['UPHOLD', 'CORRECT', 'REJECT'])
 
 const reviewView = (r) => r && ({ id: r.id, sessionId: r.sessionId, version: r.version, category: r.category, momentId: r.momentId ?? null, state: r.state, createdAt: r.createdAt })
+// The reviewer's queue view: ids, category and the learner's stated reason —
+// never report content, quotes or the learner's identity.
+const queueView = (r) => r && ({ ...reviewView(r), reason: r.reason })
+const decisionView = (d) => d && ({ id: d.id, reviewId: d.reviewId, reviewerId: d.reviewerId, decision: d.decision, reason: d.reason, correction: d.correction ?? null, createdAt: d.createdAt })
 
 export function createReportReviewsRepoMemory(db) {
   db.reportReviewRequests ||= []
+  db.reportReviewDecisions ||= []
   return {
     async create({ sessionId, version, userId, category = 'INTERPRETATION', momentId = null, reason }) {
       if (!db.reportVersions?.some((v) => v.sessionId === sessionId && v.version === version)) throw new ApiError('NOT_FOUND', 'That report version does not exist.')
@@ -89,10 +97,34 @@ export function createReportReviewsRepoMemory(db) {
     async listForSession(sessionId) {
       return db.reportReviewRequests.filter((r) => r.sessionId === sessionId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((r) => reviewView(clone(r)))
     },
+    async get(id) {
+      return queueView(clone(db.reportReviewRequests.find((r) => r.id === id))) || null
+    },
+    async listOpen() {
+      return db.reportReviewRequests.filter((r) => r.state === 'OPEN').sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((r) => queueView(clone(r)))
+    },
+    async addDecision({ reviewId, reviewerId, decision, reason, correction = null }) {
+      const review = db.reportReviewRequests.find((r) => r.id === reviewId)
+      if (!review) throw new ApiError('NOT_FOUND', 'That review request does not exist.')
+      if (!REVIEW_DECISIONS.includes(decision)) throw new ApiError('VALIDATION_FAILED', 'Invalid decision.')
+      const row = { id: db.id(), reviewId, reviewerId, decision, reason, correction: correction ? clone(correction) : null, createdAt: db.clock().toISOString() }
+      db.reportReviewDecisions.push(Object.freeze(row))
+      review.state = 'RESOLVED'
+      return decisionView(clone(row))
+    },
+    async listDecisions(reviewId) {
+      return db.reportReviewDecisions.filter((d) => d.reviewId === reviewId).map((d) => decisionView(clone(d)))
+    },
+    // Evidence ids withheld from a session's report by CORRECT decisions.
+    async listWithheldEvidenceIds(sessionId) {
+      const ids = new Set(db.reportReviewRequests.filter((r) => r.sessionId === sessionId).map((r) => r.id))
+      return [...new Set(db.reportReviewDecisions.filter((d) => ids.has(d.reviewId) && d.decision === 'CORRECT').flatMap((d) => d.correction?.withholdEvidenceIds || []))].sort()
+    },
   }
 }
 
-const reviewRow = (r) => r && ({ id: r.id, sessionId: r.session_id, version: r.version, category: r.category, momentId: r.moment_id ?? null, state: r.state, createdAt: iso(r.created_at) })
+const reviewRow = (r) => r && ({ id: r.id, sessionId: r.session_id, version: r.version, category: r.category, momentId: r.moment_id ?? null, state: r.state, createdAt: iso(r.created_at), ...(r.reason !== undefined ? { reason: r.reason } : {}) })
+const decisionRow = (d) => d && ({ id: d.id, reviewId: d.review_id, reviewerId: d.reviewer_id, decision: d.decision, reason: d.reason, correction: d.correction_json ?? null, createdAt: iso(d.created_at) })
 
 export function createReportReviewsRepoPg({ query }) {
   return {
@@ -115,6 +147,42 @@ export function createReportReviewsRepoPg({ query }) {
         'SELECT id, session_id, version, category, moment_id, state, created_at FROM report_review_requests WHERE session_id = $1 ORDER BY created_at ASC', [sessionId],
       )
       return rows.map(reviewRow)
+    },
+    async get(id) {
+      const { rows } = await query('SELECT id, session_id, version, category, moment_id, reason, state, created_at FROM report_review_requests WHERE id = $1', [id])
+      return reviewRow(rows[0]) || null
+    },
+    async listOpen() {
+      const { rows } = await query("SELECT id, session_id, version, category, moment_id, reason, state, created_at FROM report_review_requests WHERE state = 'OPEN' ORDER BY created_at ASC")
+      return rows.map(reviewRow)
+    },
+    async addDecision({ reviewId, reviewerId, decision, reason, correction = null }) {
+      try {
+        const { rows } = await query(
+          `INSERT INTO report_review_decisions (review_id, reviewer_id, decision, reason, correction_json)
+           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+          [reviewId, reviewerId, decision, reason, correction ? JSON.stringify(correction) : null],
+        )
+        await query("UPDATE report_review_requests SET state = 'RESOLVED' WHERE id = $1", [reviewId])
+        return decisionRow(rows[0])
+      } catch (err) {
+        if (err.code === '23503') throw new ApiError('NOT_FOUND', 'That review request does not exist.')
+        if (err.code === '23514') throw new ApiError('VALIDATION_FAILED', 'Invalid decision.')
+        throw err
+      }
+    },
+    async listDecisions(reviewId) {
+      const { rows } = await query('SELECT * FROM report_review_decisions WHERE review_id = $1 ORDER BY created_at ASC', [reviewId])
+      return rows.map(decisionRow)
+    },
+    async listWithheldEvidenceIds(sessionId) {
+      const { rows } = await query(
+        `SELECT DISTINCT jsonb_array_elements_text(d.correction_json -> 'withholdEvidenceIds') AS evidence_id
+           FROM report_review_decisions d JOIN report_review_requests r ON r.id = d.review_id
+          WHERE r.session_id = $1 AND d.decision = 'CORRECT' AND jsonb_typeof(d.correction_json -> 'withholdEvidenceIds') = 'array'
+          ORDER BY evidence_id`, [sessionId],
+      )
+      return rows.map((r) => r.evidence_id)
     },
   }
 }

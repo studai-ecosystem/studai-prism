@@ -2,6 +2,7 @@
 // server contract; unknown fields are dropped and a shape error fails loudly.
 import { z } from 'zod'
 import { request } from './client.js'
+import { RecommendationSchema } from './student.js'
 
 const Level = z.object({ band: z.enum(['EARLY', 'DEVELOPING', 'DEMONSTRATED', 'STRONG']), label: z.string() })
 const Status = z.enum(['INSUFFICIENT_EVIDENCE', 'PROVISIONAL', 'SUFFICIENT', 'HUMAN_REVIEW_REQUIRED'])
@@ -106,6 +107,8 @@ export const ReportSchema = z.object({
   development: z.object({ priorities: z.array(Priority).max(3), maxPriorities: z.number() }).nullable(),
   // P4.5/P4.7 counts-only coverage notes; absent on legacy and older versions.
   coverage: z.object({ planned: z.number(), presented: z.number(), answered: z.number(), withheld: z.number(), notes: z.array(z.string()) }).optional(),
+  // P5.7 reviewed correction: evidence ids a reviewer withheld from this version.
+  review: z.object({ withheldEvidenceIds: z.array(z.string()) }).optional(),
   methodology: z.object({
     builderVersion: z.string(), sufficiencyRulesVersion: z.string(), levelLabelsStatus: z.string(), catalogVersion: z.string(),
     assessmentDefinitionId: z.string().nullable(), formId: z.string().nullable(),
@@ -116,10 +119,13 @@ const Share = z.object({ id: z.string(), recipientType: z.enum(['LINK', 'ORGANIZ
 
 const ReportResponse = z.object({
   report: ReportSchema,
-  version: z.object({ number: z.number().int(), createdAt: z.string().nullable() }),
+  version: z.object({ number: z.number().int(), createdAt: z.string().nullable(), reason: z.string().nullable().optional().default(null), priorVersion: z.number().int().nullable().optional().default(null) }),
   audience: z.enum(['OWNER', 'SPONSOR', 'SHARE_LINK']),
   privacy: z.object({ visibility: z.string(), activeShares: z.array(Share), canShare: z.boolean() }).optional(),
   share: z.object({ expiresAt: z.string(), disclosureLevel: z.enum(['SUMMARY', 'FULL']) }).optional(),
+  // Owner only (P5.6/P5.7): read-time recommendations and the pending-review state.
+  review: z.object({ openRequests: z.number().int(), pending: z.boolean() }).optional(),
+  recommendations: z.array(RecommendationSchema).optional().default([]),
 })
 
 const CreatedShare = z.object({ id: z.string(), recipientType: z.enum(['LINK', 'ORGANIZATION']), disclosureLevel: z.enum(['SUMMARY', 'FULL']), expiresAt: z.string(), token: z.string().nullable() })

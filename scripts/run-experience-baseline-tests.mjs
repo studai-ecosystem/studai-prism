@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'p2', 'p3', 'p4', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, p2, p3, p4, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
+if (!['database', 'p2', 'p3', 'p4', 'p5', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, p3, p4, p5, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -92,6 +92,13 @@ try {
   if (mode === 'p4') {
     env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
     browserArgs.splice(2, browserArgs.length, 'p4-six-stages.spec.js', '--project=chromium')
+  }
+  // P5: the report UX state matrix (one real integrated READY run plus
+  // labelled API-fixture states) across all four projects; draft content on
+  // the 4174 audit server only.
+  if (mode === 'p5') {
+    env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
+    browserArgs.splice(2, browserArgs.length, 'p5-report-states.spec.js')
   }
   exitCode = await run(mode === 'database'
     ? ['--test', 'server/test/experienceBaseline.db.test.js']

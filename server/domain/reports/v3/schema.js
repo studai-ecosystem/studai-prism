@@ -113,6 +113,8 @@ export const StudentReportV3Schema = z.object({
   development: z.object({ priorities: z.array(Priority).max(3), maxPriorities: z.literal(3) }).strict().nullable(),
   // P4.5/P4.7 coverage diagnostics: counts and plain notes only.
   coverage: z.object({ planned: z.number().int().min(0), presented: z.number().int().min(0), answered: z.number().int().min(0), withheld: z.number().int().min(0), notes: z.array(z.string().min(1)) }).strict().optional(),
+  // P5.7 reviewed correction: evidence ids a reviewer withheld (ids only).
+  review: z.object({ withheldEvidenceIds: z.array(z.string().min(1)).min(1) }).strict().optional(),
   methodology: z.object({
     builderVersion: z.string(), sufficiencyRulesVersion: z.string(), levelLabelsStatus: z.string(), catalogVersion: z.string(),
     assessmentDefinitionId: z.string().nullable(), formId: z.string().nullable(),
