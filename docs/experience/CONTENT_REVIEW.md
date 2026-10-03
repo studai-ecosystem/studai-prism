@@ -1,5 +1,16 @@
 # P0 content review and research preparation
 
+## P10 handover status - no approval inferred
+
+The controlled-rollout work adds version pinning, approved-content readiness
+and support/version discipline; it does not approve content. Universal form
+`draft-core-teamready-a:0.1.0-draft`, assessment method `v3-slice-0.1`,
+rubrics `draft-teamready-rubric.v0.1` and `draft-handover-rubric.v0.1`,
+Development Missions (library v1; M09 v2) and preparation prompts remain
+DRAFT/review-owned. No prompt, mission, scenario, price, tax, privacy,
+measurement or scientific claim was self-approved. Formal assessment still
+contains no rubric, hints or coaching; practice coaching stays labelled.
+
 Prepared: 2026-10-02. **DRAFT intake and proposed protocols only.**
 
 This record implements the approved diagnostic-only P0.6 boundary. It is not new

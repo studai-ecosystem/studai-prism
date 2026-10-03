@@ -1,5 +1,48 @@
 # P0 - Verification results
 
+## P10 controlled-rollout verification - code-safe complete
+
+Preserved P9 baseline: build PASS; unit 516; server 858 pass / 26 skip; static
+PASS; critical browser 217; disposable DB 21; calibration 64; full browser
+805 pass / 81 intentional skips / 6 recovered retries / zero final failures.
+T ledger remains 56 PASS / 3 BLOCKED / 1 UNVERIFIED.
+
+Current P10 targeted evidence:
+
+| Command | Result |
+|---|---|
+| `node --test --test-concurrency=1 server/test/release.test.js server/test/rollback.test.js server/test/metricsAlerts.test.js server/test/migrationsReversible.test.js` | 23 pass, 0 fail |
+| `node scripts/check-change-ledger.mjs` | PASS; CH-01-CH-52 complete |
+| `node scripts/check-route-inventory.mjs` | PASS; 159 rows: 25 ACTIVE_NEW, 4 HISTORICAL_READER, 8 ADAPTER, 8 RETIRE_AFTER_DRAIN, 114 DEFERRED |
+| `node scripts/rehearse-rollback.mjs` | PASS; 8 synthetic safety scenarios; no production/schema drop |
+| `node scripts/rehearse-migrations.mjs` | PASS; 53 up, 14 down/up, interrupted 0040 transaction rolled back, head 0053 |
+| `npm run build` | PASS |
+| `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | 38 files; 517 pass, 0 fail |
+| `npm --prefix server test` | 887 total; 861 pass, 26 skip, 0 fail |
+| `npm run audit:static` | PASS; JSON/Markdown written |
+| `node scripts/run-experience-baseline-tests.mjs database` | 21 pass, 0 fail |
+| `CI=1 node scripts/run-experience-baseline-tests.mjs p10` | 43 pass, 0 retry/final failure; Chromium; real local HTTP/browser with disposable PostgreSQL |
+| `node scripts/check-p10-route-manifest.mjs` | PASS; 20 direct routes + 9 integrated resources |
+| `node scripts/check-programme-validation.mjs` | PASS; 56 PASS / 3 BLOCKED / 1 UNVERIFIED |
+| `node scripts/check-final-handover.mjs` | PASS; state `CODE_IMPLEMENTED_WITH_VERIFICATION_BLOCKERS`, verdict NO_GO |
+
+Development failures fixed before the final pass:
+
+1. Importing the release config from run-pin construction created a
+   content/config initialization cycle. Release config version moved to a
+   dependency-free leaf module.
+2. The Campus Journey A helper stopped at the new explicit timed-start dialog;
+   it now waits for and activates the formal Begin control.
+3. The P10 manifest assumed a history array and session id on a not-started
+   assignment. It now selects the owned draft assignment from `active`.
+4. Compatibility tests still asserted retired inventory class names; they now
+   assert the five P10 dispositions.
+
+Manual accessibility/human comprehension/production/Layer C: NOT RUN. P10 did
+not rerun the complete 805-test four-project browser suite because routing,
+player and authorization production code were unchanged; the 43-test focused
+runner exercised the modified handover and the existing P3-P8/Campus journeys.
+
 ## P9 screenshot review follow-up - 2026-10-03
 
 Independent screenshot review found that never-assessed capabilities were labelled `Insufficient evidence`, making a neutral missing state look like a low result. `NO_EVIDENCE` now renders `Not yet measured` with the assistive explanation `This capability has not been measured yet`; genuinely measured-but-insufficient states retain `Insufficient evidence`. The Home snapshot now forwards governed reason codes to the badge.

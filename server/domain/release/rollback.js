@@ -54,7 +54,9 @@ export function rollbackPlan({ activeRuns = [], flags = {} } = {}) {
     { order: 5, id: 'DISABLE_SERVING_FLAGS', owner: ROLLBACK_ROLES.STOP_NEW_STARTS, action: enabledActiveFlags.length ? `Disable ${enabledActiveFlags.join(', ')} only when canDisable() is true for each.` : 'No active-run flags are enabled.', blocking: active > 0 && enabledActiveFlags.length > 0, flags: enabledActiveFlags.map((flag) => ({ flag, canDisable: canDisable(flag, activeRuns) })) },
     { order: 6, id: 'RECOVERY_DISPOSITION', owner: ROLLBACK_ROLES.RECOVERY_DISPOSITION, action: 'If safe continuation is impossible, preserve saved work and use the reviewed, auditable reissue/refund/review process; no automatic credits.', blocking: false },
     { order: 7, id: 'CUSTOMER_COMMUNICATION', owner: ROLLBACK_ROLES.CUSTOMER_COMMUNICATION, action: 'Tell affected learners what is preserved and what happens next, without session URLs or tokens.', blocking: false },
-    { order: 8, id: 'SCHEMA_ROLLBACK_SEPARATE_REVIEW', owner: ROLLBACK_ROLES.SCHEMA_REVIEW, action: 'Schema rollback is a separate review; never drop evidence/action/job tables as part of an application rollback.', blocking: false, separateReview: true },
+    { order: 8, id: 'PRESERVE_ERASURE_TOMBSTONES', owner: ROLLBACK_ROLES.SCHEMA_REVIEW, action: 'Keep queued/completed erasure tombstones and fencing checks active so late worker/model results cannot recreate erased evidence.', blocking: false },
+    { order: 9, id: 'SCHEMA_ROLLBACK_SEPARATE_REVIEW', owner: ROLLBACK_ROLES.SCHEMA_REVIEW, action: 'Schema rollback is a separate review; never drop evidence/action/job tables as part of an application rollback.', blocking: false, separateReview: true },
+    { order: 10, id: 'RESTART_AFTER_READINESS', owner: ROLLBACK_ROLES.RESTART, action: 'Restart new allocations only after readiness, compatibility, recovery disposition and communications are re-checked and recorded.', blocking: true },
   ]
   return {
     configVersion: RELEASE_CONFIG.version,

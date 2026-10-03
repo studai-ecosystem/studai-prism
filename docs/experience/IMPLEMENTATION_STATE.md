@@ -1,5 +1,30 @@
 # Experience programme - source traceability and execution checkpoints
 
+## P10 final code-safe closure checkpoint - 2026-10-03
+
+State: **`CODE_IMPLEMENTED_WITH_VERIFICATION_BLOCKERS`** from
+`ui/prism-brand-transformation` at starting HEAD `d9186b8`. Verdict:
+**NO-GO**. The pre-existing deleted `.github/copilot-instructions.md` and
+untracked brand-pack/data paths remain unstaged.
+
+Release config v2, pre-allocation readiness, config pinning, the 53-migration
+interrupted/resume rehearsal, local rollback/drain rehearsal, five-class
+compatibility inventory, 20-route/9-resource tested handover manifest,
+reference-only alerts, support/migration runbooks, CH-01-CH-52 and the final
+machine handover are implemented.
+
+Final P10 evidence: build PASS; unit 517; server 861 pass / 26 skip; static
+PASS; isolated database 21; focused P10 browser 43 pass; migration rehearsal
+53 up + 14 down/up; CH, compatibility, route, T and handover validators PASS.
+Preserved P9 evidence: critical browser 217; calibration 64; full browser 805
+pass / 81 intentional skip / 6 recovered retry / zero final. T ledger remains
+56 PASS / 3 BLOCKED / 1 UNVERIFIED.
+
+T46, T54 and T58 remain BLOCKED; T56 remains UNVERIFIED; six independent
+sign-offs remain OPEN. No deployment, production activation/flag change,
+production database/backfill, live model/payment, human/manual or Layer C work
+was run or approved.
+
 ## P9 code-safe gap closure - 2026-10-03
 
 State: CODE-SAFE COMPLETE and AUTOMATED LAYERS VERIFIED from starting HEAD
@@ -293,7 +318,7 @@ ready, not run), AT/zoom manual pass, content/measurement approvals, live-model 
 - `server/test/p2Slice.db.test.js` + runner mode `p2`: 14/14 on real PG (see TEST_RESULTS.md); no PG
   repository bug found. Layer C live-model run remains the open blocker.
 
-## Current P9-P10 checkpoint - 2026-10-03
+## Historical initial P9-P10 checkpoint - 2026-10-03 (superseded by P10 closure above)
 
 Status: **Code-safe programme COMPLETE locally. Release: NO-GO until human gates close.**
 

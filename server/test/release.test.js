@@ -5,7 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { RELEASE_CONFIG, RELEASE_STAGES, READINESS_CHECKS, readiness, assertAllocatable, createReleaseGate, summarize, stageConfig } from '../domain/release/config.js'
-import { goNoGo, HUMAN_GATES, INDEPENDENT_SIGNOFF_GATES, defaultHumanGates, defaultIndependentSignoffs } from '../domain/release/goNoGo.js'
+import { goNoGo, HUMAN_GATES, INDEPENDENT_SIGNOFF_GATES, RELEASE_PROHIBITIONS, defaultHumanGates, defaultIndependentSignoffs } from '../domain/release/goNoGo.js'
 import { ALERTS, ALERT_IDS, alertsByTriage } from '../domain/release/alerts.js'
 import { ERROR_STATUS } from '../domain/http/errors.js'
 import { FLAG_CATALOGUE } from '../lib/flagRegistry.js'
@@ -18,10 +18,15 @@ process.env.PRISM_DRAFT_CONTENT = 'true'
 const ALL_READY = { player: true, durableWriter: true, migrationsApplied: ['0040_candidate_actions_jobs', '0049_preview_attempts'], evaluator: true, publication: true, contentState: 'APPROVED_FOR_INTENDED_USE', worker: true }
 const ALL_FLAGS = Object.fromEntries(['PRISM_APP_SHELL_V3', 'PRISM_ASSESSMENT_WORKSPACE_V3', 'PRISM_STUDENT_REPORT_V3', 'PRISM_EVIDENCE_FAIL_CLOSED', 'PRISM_DEVELOPMENT_V2'].map((k) => [k, 'true']))
 
-test('P10.2: RELEASE_CONFIG v1 is frozen, covers every stage, only names registered flags and never requires growth', () => {
-  assert.equal(RELEASE_CONFIG.version, 1)
+test('P10.2: RELEASE_CONFIG v2 is frozen, covers every stage and ordered dependency bundle, only names registered flags and never requires growth', () => {
+  assert.equal(RELEASE_CONFIG.version, 2)
   assert.ok(Object.isFrozen(RELEASE_CONFIG))
   assert.deepEqual(Object.keys(RELEASE_CONFIG.stages).sort(), [...RELEASE_STAGES].sort())
+  assert.deepEqual(RELEASE_CONFIG.activationOrder, [
+    'PERSONAL_HOME_HISTORY', 'PLAYER_EVIDENCE_REPORT', 'REVIEWED_PRACTICE',
+    'PRIVATE_PREPARATION', 'APPROVED_PAID_PACKAGES', 'CAMPUS', 'GROWTH',
+  ])
+  for (const component of RELEASE_CONFIG.activationOrder) assert.ok(RELEASE_CONFIG.components[component])
   const registered = new Set(FLAG_CATALOGUE.map((f) => f.key))
   for (const stage of RELEASE_STAGES) {
     const cfg = stageConfig(stage)
@@ -34,15 +39,15 @@ test('P10.2: RELEASE_CONFIG v1 is frozen, covers every stage, only names registe
 })
 
 test('P10.2: readiness reports READY / NOT_READY / UNVERIFIED per check and never collapses UNVERIFIED into READY', () => {
-  const ready = readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: ALL_READY })
+  const ready = readiness({ env: ALL_FLAGS, stage: 'WIDER_RELEASE', checks: ALL_READY })
   assert.equal(ready.allocatable, true)
   assert.deepEqual(ready.blockers, [])
-  const unknown = readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: { ...ALL_READY, worker: null, migrationsApplied: null } })
+  const unknown = readiness({ env: ALL_FLAGS, stage: 'WIDER_RELEASE', checks: { ...ALL_READY, worker: null, migrationsApplied: null } })
   assert.equal(unknown.checks.WORKER_REACHABILITY.state, 'UNVERIFIED')
   assert.equal(unknown.checks.DURABLE_WRITER.state, 'UNVERIFIED')
   assert.equal(unknown.allocatable, false)
-  assert.ok(unknown.blockers.includes('UNVERIFIED:WORKER_REACHABILITY'))
-  const broken = readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: { ...ALL_READY, evaluator: false, migrationsApplied: ['0039_x'] } })
+  assert.ok(unknown.blockers.includes('RDY_UNVERIFIED_WORKER_REACHABILITY'))
+  const broken = readiness({ env: ALL_FLAGS, stage: 'WIDER_RELEASE', checks: { ...ALL_READY, evaluator: false, migrationsApplied: ['0039_x'] } })
   assert.equal(broken.checks.EVALUATOR.state, 'NOT_READY')
   assert.equal(broken.checks.DURABLE_WRITER.state, 'NOT_READY')
   const empty = readiness({})
@@ -51,15 +56,15 @@ test('P10.2: readiness reports READY / NOT_READY / UNVERIFIED per check and neve
 })
 
 test('P10.2: content state is compared against the stage minimum; flags missing from the stage set block', () => {
-  assert.equal(readiness({ env: {}, stage: 'LOCAL', checks: { ...ALL_READY, contentState: 'DRAFT' } }).allocatable, true, 'LOCAL accepts DRAFT and needs no flags')
+  assert.equal(readiness({ env: {}, stage: 'LOCAL_CI', checks: { ...ALL_READY, contentState: 'DRAFT' } }).allocatable, true, 'LOCAL_CI accepts DRAFT and needs no flags')
   const canary = readiness({ env: ALL_FLAGS, stage: 'INTERNAL_CANARY', checks: { ...ALL_READY, contentState: 'DRAFT' } })
   assert.equal(canary.checks.APPROVED_CONTENT.state, 'NOT_READY')
   assert.equal(readiness({ env: ALL_FLAGS, stage: 'INTERNAL_CANARY', checks: { ...ALL_READY, contentState: 'APPROVED_FOR_PILOT' } }).allocatable, true)
-  assert.equal(readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: { ...ALL_READY, contentState: 'APPROVED_FOR_PILOT' } }).checks.APPROVED_CONTENT.state, 'NOT_READY')
-  assert.equal(readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: { ...ALL_READY, contentState: 'RETIRED' } }).checks.APPROVED_CONTENT.state, 'NOT_READY')
+  assert.equal(readiness({ env: ALL_FLAGS, stage: 'WIDER_RELEASE', checks: { ...ALL_READY, contentState: 'APPROVED_FOR_PILOT' } }).checks.APPROVED_CONTENT.state, 'NOT_READY')
+  assert.equal(readiness({ env: ALL_FLAGS, stage: 'WIDER_RELEASE', checks: { ...ALL_READY, contentState: 'RETIRED' } }).checks.APPROVED_CONTENT.state, 'NOT_READY')
   const dark = readiness({ env: {}, stage: 'STAGING', checks: ALL_READY })
   assert.equal(dark.allocatable, false)
-  assert.ok(dark.blockers.includes('FLAG_OFF:PRISM_ASSESSMENT_WORKSPACE_V3'))
+  assert.ok(dark.blockers.includes('RDY_FLAG_OFF_PRISM_ASSESSMENT_WORKSPACE_V3'))
 })
 
 test('P10.2: assertAllocatable throws RUN_NOT_ALLOCATABLE (503) with state-only details and no secrets', () => {
@@ -71,18 +76,18 @@ test('P10.2: assertAllocatable throws RUN_NOT_ALLOCATABLE (503) with state-only 
   assert.equal(err.status, 503)
   assert.equal(err.details.checks.WORKER_REACHABILITY, 'UNVERIFIED')
   assert.doesNotMatch(JSON.stringify(err.details), /private-/)
-  assert.deepEqual(Object.keys(summarize(result)).sort(), ['blockers', 'checks', 'configVersion', 'missingFlags', 'stage'])
+  assert.deepEqual(Object.keys(summarize(result)).sort(), ['allocatable', 'blockerIds', 'checks', 'configVersion', 'effectiveFlags', 'missingFlags', 'stage'])
   assert.equal(assertAllocatable(readiness({ env, stage: 'STAGING', checks: ALL_READY })).allocatable, true)
 })
 
 test('P10.2: a throwing or missing probe is UNVERIFIED, never READY', async () => {
-  const gate = createReleaseGate({ env: {}, stage: 'LOCAL', probes: { player: () => { throw new Error('boom') }, evaluator: async () => true } })
+  const gate = createReleaseGate({ env: {}, stage: 'LOCAL_CI', probes: { player: () => { throw new Error('boom') }, evaluator: async () => true } })
   const r = await gate.readiness({ scenarioId: 'x' })
   assert.equal(r.checks.COMPATIBLE_PLAYER.state, 'UNVERIFIED')
   assert.equal(r.checks.EVALUATOR.state, 'READY')
   assert.equal(r.checks.PUBLICATION.state, 'UNVERIFIED')
   await assert.rejects(gate.assertAllocatable({ scenarioId: 'x' }), (e) => e.code === 'RUN_NOT_ALLOCATABLE')
-  assert.equal(createReleaseGate({ env: { PRISM_RELEASE_STAGE: 'bogus' } }).stage, 'LOCAL')
+  assert.equal(createReleaseGate({ env: { PRISM_RELEASE_STAGE: 'bogus' } }).stage, 'LOCAL_CI')
 })
 
 // ── start() gate: the credit never moves when the chain is not ready ────────
@@ -90,7 +95,7 @@ function startWorld({ allocatable }) {
   const db = createMemoryDb()
   const io = createSessionIoRepoMemory(db)
   const calls = { reserve: 0, engineStart: 0, createEntitlement: 0, draftSession: 0 }
-  const gate = createReleaseGate({ env: {}, stage: 'LOCAL', probes: allocatable
+  const gate = createReleaseGate({ env: {}, stage: 'LOCAL_CI', probes: allocatable
     ? { player: () => true, durableWriter: () => true, migrationsApplied: () => ['0040_x'], evaluator: () => true, publication: () => true, contentState: () => 'DRAFT' }
     : { player: () => true, durableWriter: () => true, migrationsApplied: () => ['0040_x'], evaluator: () => false, publication: () => true, contentState: () => 'DRAFT' } })
   let session = null
@@ -127,49 +132,53 @@ test('P10.2: the same start proceeds when readiness is READY (gate is a pre-chec
   assert.equal(calls.draftSession, 1)
   const start = await io.getClientEvent(out.sessionId, 'start')
   assert.ok(start.response.runPin.methodVersion, 'run is pinned to its method')
+  assert.equal(start.response.runPin.releaseConfigVersion, RELEASE_CONFIG.version, 'run is pinned to its release configuration')
 })
 
 // ── go/no-go ─────────────────────────────────────────────────────────────────
 test('P9.9/P10.9: human gates and six independent sign-offs default OPEN and each preserves NO_GO', () => {
   assert.deepEqual(Object.values(defaultHumanGates()), HUMAN_GATES.map(() => 'OPEN'))
   assert.deepEqual(Object.values(defaultIndependentSignoffs()), INDEPENDENT_SIGNOFF_GATES.map(() => 'OPEN'))
-  const ready = readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: ALL_READY })
+  const ready = readiness({ env: ALL_FLAGS, stage: 'WIDER_RELEASE', checks: ALL_READY })
   const verdict = goNoGo({ readiness: ready })
   assert.equal(verdict.verdict, 'NO_GO')
   assert.ok(verdict.reasons.some((r) => r.startsWith('HUMAN_GATE_OPEN:')))
   assert.ok(verdict.reasons.some((r) => r.startsWith('INDEPENDENT_SIGNOFF_OPEN:')))
   const approved = Object.fromEntries(HUMAN_GATES.map((id) => [id, 'APPROVED']))
   const signed = Object.fromEntries(INDEPENDENT_SIGNOFF_GATES.map((id) => [id, 'APPROVED']))
-  assert.equal(goNoGo({ readiness: ready, humanGates: approved, independentSignoffs: signed }).verdict, 'GO')
-  for (const id of stageConfig('WIDER').humanGates) {
-    assert.equal(goNoGo({ readiness: ready, humanGates: { ...approved, [id]: 'OPEN' }, independentSignoffs: signed }).verdict, 'NO_GO', `${id} OPEN must be NO_GO`)
+  const clear = Object.fromEntries(RELEASE_PROHIBITIONS.map((id) => [id, 'CLEAR']))
+  assert.equal(goNoGo({ readiness: ready, humanGates: approved, independentSignoffs: signed, releaseProhibitions: clear }).verdict, 'GO')
+  for (const id of stageConfig('WIDER_RELEASE').humanGates) {
+    assert.equal(goNoGo({ readiness: ready, humanGates: { ...approved, [id]: 'OPEN' }, independentSignoffs: signed, releaseProhibitions: clear }).verdict, 'NO_GO', `${id} OPEN must be NO_GO`)
   }
   for (const id of INDEPENDENT_SIGNOFF_GATES) {
-    assert.equal(goNoGo({ readiness: ready, humanGates: approved, independentSignoffs: { ...signed, [id]: 'OPEN' } }).verdict, 'NO_GO', `${id} sign-off OPEN must be NO_GO`)
+    assert.equal(goNoGo({ readiness: ready, humanGates: approved, independentSignoffs: { ...signed, [id]: 'OPEN' }, releaseProhibitions: clear }).verdict, 'NO_GO', `${id} sign-off OPEN must be NO_GO`)
   }
+  for (const id of RELEASE_PROHIBITIONS) assert.equal(goNoGo({ readiness: ready, humanGates: approved, independentSignoffs: signed, releaseProhibitions: { ...clear, [id]: 'PRESENT' } }).verdict, 'NO_GO')
   // Unknown gate values are ignored (treated as OPEN), readiness gaps are reasons too.
   assert.equal(goNoGo({ readiness: ready, humanGates: { ...approved, 'HA-C001': 'yes please' }, independentSignoffs: signed }).verdict, 'NO_GO')
-  const partial = goNoGo({ readiness: readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: { ...ALL_READY, worker: null } }), humanGates: approved, independentSignoffs: signed })
+  const partial = goNoGo({ readiness: readiness({ env: ALL_FLAGS, stage: 'WIDER_RELEASE', checks: { ...ALL_READY, worker: null } }), humanGates: approved, independentSignoffs: signed, releaseProhibitions: clear })
   assert.deepEqual(partial.reasons, ['UNVERIFIED:WORKER_REACHABILITY'])
   assert.equal(goNoGo({}).verdict, 'NO_GO')
-  assert.equal(goNoGo({ readiness: readiness({ env: {}, stage: 'LOCAL', checks: { ...ALL_READY, contentState: 'DRAFT' } }), humanGates: {} }).verdict, 'GO', 'LOCAL has no human gates')
+  assert.equal(goNoGo({ readiness: readiness({ env: {}, stage: 'LOCAL_CI', checks: { ...ALL_READY, contentState: 'DRAFT' } }), humanGates: {} }).verdict, 'GO', 'LOCAL_CI has no human gates')
 })
 
 // ── diagnostic script integration ────────────────────────────────────────────
 test('P10.2: check-experience-baseline reports release readiness per stage without collapsing UNVERIFIED and refuses bad --stage values', async () => {
   const { runDiagnostic, baselineReport } = await import('../../scripts/check-experience-baseline.mjs')
   const out = baselineReport({ DATABASE_URL: 'private-url' })
-  assert.equal(out.release.stage, 'LOCAL')
-  for (const c of ['COMPATIBLE_PLAYER', 'EVALUATOR', 'PUBLICATION', 'APPROVED_CONTENT', 'WORKER_REACHABILITY', 'DURABLE_WRITER']) assert.equal(out.release.checks[c].state, 'UNVERIFIED')
+  assert.equal(out.release.stage, 'LOCAL_CI')
+  for (const c of ['COMPATIBLE_PLAYER', 'EVALUATOR', 'PUBLICATION', 'APPROVED_CONTENT', 'WORKER_REACHABILITY', 'DURABLE_WRITER']) assert.equal(out.release.checks[c], 'UNVERIFIED')
   assert.equal(out.release.allocatable, false)
+  assert.equal(out.release.schemaCompatibility, 'UNVERIFIED')
   assert.doesNotMatch(JSON.stringify(out), /private-/)
   const lines = []
-  assert.equal(await runDiagnostic({ args: ['--stage', 'WIDER'], env: {}, write: (l) => lines.push(l) }), 1)
+  assert.equal(await runDiagnostic({ args: ['--stage', 'WIDER_RELEASE'], env: {}, write: (l) => lines.push(l) }), 1)
   const parsed = JSON.parse(lines[0])
-  assert.equal(parsed.release.stage, 'WIDER')
-  assert.ok(parsed.release.blockers.includes('FLAG_OFF:PRISM_APP_SHELL_V3'))
+  assert.equal(parsed.release.stage, 'WIDER_RELEASE')
+  assert.ok(parsed.release.blockerIds.includes('RDY_FLAG_OFF_PRISM_APP_SHELL_V3'))
   assert.equal(parsed.database.status, 'UNVERIFIED')
-  for (const args of [['--stage'], ['--stage', 'prod'], ['--stage', 'LOCAL', '--stage', 'WIDER'], ['--stage', 'postgres://private']]) {
+  for (const args of [['--stage'], ['--stage', 'prod'], ['--stage', 'LOCAL_CI', '--stage', 'WIDER_RELEASE'], ['--stage', 'postgres://private']]) {
     const bad = []
     assert.equal(await runDiagnostic({ args, env: {}, write: (l) => bad.push(l) }), 1)
     assert.equal(JSON.parse(bad[0]).database.code, 'DIAGNOSTIC_INVALID_ARGUMENTS')

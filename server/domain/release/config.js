@@ -5,8 +5,10 @@
 // the inputs it is given (it never assigns process.env, never probes a secret).
 import { ApiError } from '../http/errors.js'
 import { CONTENT_STATES } from '../content/versions.js'
+import { RELEASE_CONFIG_VERSION } from './version.js'
 
-export const RELEASE_STAGES = Object.freeze(['LOCAL', 'STAGING', 'INTERNAL_CANARY', 'EXTERNAL_PILOT', 'WIDER'])
+export const RELEASE_STAGES = Object.freeze(['LOCAL_CI', 'STAGING', 'INTERNAL_CANARY', 'EXTERNAL_PILOT', 'WIDER_RELEASE'])
+export const RELEASE_STAGE_ALIASES = Object.freeze({ LOCAL: 'LOCAL_CI', WIDER: 'WIDER_RELEASE' })
 export const CHECK_STATES = Object.freeze(['READY', 'NOT_READY', 'UNVERIFIED'])
 export const READINESS_CHECKS = Object.freeze([
   'COMPATIBLE_PLAYER', 'DURABLE_WRITER', 'EVALUATOR', 'PUBLICATION', 'APPROVED_CONTENT', 'WORKER_REACHABILITY',
@@ -19,13 +21,31 @@ const ALL_CHECKS = [...READINESS_CHECKS]
 const freeze = (o) => Object.freeze(Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Array.isArray(v) ? Object.freeze([...v]) : v])))
 
 export const RELEASE_CONFIG = Object.freeze({
-  version: 1,
+  version: RELEASE_CONFIG_VERSION,
+  components: Object.freeze({
+    PERSONAL_HOME_HISTORY: freeze({ dependsOn: ['APP_SHELL', 'SCOPED_HISTORY'] }),
+    PLAYER_EVIDENCE_REPORT: freeze({ dependsOn: ['ASSESSMENT_WORKSPACE', 'DURABLE_WRITER', 'EVALUATOR', 'PUBLICATION'] }),
+    REVIEWED_PRACTICE: freeze({ dependsOn: ['PLAYER_EVIDENCE_REPORT', 'APPROVED_PRACTICE_CONTENT'] }),
+    PRIVATE_PREPARATION: freeze({ dependsOn: ['PERSONAL_HOME_HISTORY', 'PRIVACY_ERASURE_APPROVAL'] }),
+    APPROVED_PAID_PACKAGES: freeze({ dependsOn: ['PLAYER_EVIDENCE_REPORT', 'REVIEWED_PRACTICE', 'APPROVED_RECOVERY_POLICY'] }),
+    CAMPUS: freeze({ dependsOn: ['PLAYER_EVIDENCE_REPORT', 'CAMPUS_PRIVACY_ERASURE_APPROVAL'] }),
+    GROWTH: freeze({ dependsOn: ['PLAYER_EVIDENCE_REPORT', 'APPROVED_FORM_COMPARABILITY'] }),
+  }),
+  activationOrder: Object.freeze([
+    'PERSONAL_HOME_HISTORY',
+    'PLAYER_EVIDENCE_REPORT',
+    'REVIEWED_PRACTICE',
+    'PRIVATE_PREPARATION',
+    'APPROVED_PAID_PACKAGES',
+    'CAMPUS',
+    'GROWTH',
+  ]),
   // Flags that are never part of a stage's required set: growth stays
   // independently disabled until equivalence/interpretation are approved.
   neverRequired: Object.freeze(['PRISM_GROWTH_ENABLED']),
   stages: Object.freeze({
     // Disposable synthetic/draft data; the in-process worker is acceptable.
-    LOCAL: freeze({ requiredFlags: [], requiredChecks: ALL_CHECKS.filter((c) => c !== 'WORKER_REACHABILITY'), minimumContentState: 'DRAFT', humanGates: [] }),
+    LOCAL_CI: freeze({ requiredFlags: [], requiredChecks: ALL_CHECKS.filter((c) => c !== 'WORKER_REACHABILITY'), minimumContentState: 'DRAFT', humanGates: [] }),
     // Approved synthetic/consented test data and spend.
     STAGING: freeze({ requiredFlags: CORE_CHAIN, requiredChecks: ALL_CHECKS, minimumContentState: 'DRAFT', humanGates: ['HA-C007'] }),
     // Authorized testers, approved pilot content.
@@ -33,14 +53,18 @@ export const RELEASE_CONFIG = Object.freeze({
     // Consenting target users after content/privacy/security/measurement gates.
     EXTERNAL_PILOT: freeze({ requiredFlags: ['PRISM_APP_SHELL_V3', ...CORE_CHAIN, 'PRISM_DEVELOPMENT_V2'], requiredChecks: ALL_CHECKS, minimumContentState: 'APPROVED_FOR_PILOT', humanGates: ['HA-C001', 'HA-C002', 'HA-C003', 'HA-C005', 'HA-C007', 'HA-C009', 'HA-C012', 'HA-C013'] }),
     // Own intended-use and support readiness.
-    WIDER: freeze({ requiredFlags: ['PRISM_APP_SHELL_V3', ...CORE_CHAIN, 'PRISM_DEVELOPMENT_V2'], requiredChecks: ALL_CHECKS, minimumContentState: 'APPROVED_FOR_INTENDED_USE', humanGates: ['HA-C001', 'HA-C002', 'HA-C003', 'HA-C005', 'HA-C007', 'HA-C008', 'HA-C009', 'HA-C010', 'HA-C012', 'HA-C013'] }),
+    WIDER_RELEASE: freeze({ requiredFlags: ['PRISM_APP_SHELL_V3', ...CORE_CHAIN, 'PRISM_DEVELOPMENT_V2'], requiredChecks: ALL_CHECKS, minimumContentState: 'APPROVED_FOR_INTENDED_USE', humanGates: ['HA-C001', 'HA-C002', 'HA-C003', 'HA-C005', 'HA-C007', 'HA-C008', 'HA-C009', 'HA-C010', 'HA-C012', 'HA-C013'] }),
   }),
 })
 
 export function stageConfig(stage) {
-  const key = typeof stage === 'string' ? stage.toUpperCase() : ''
+  const requested = typeof stage === 'string' ? stage.toUpperCase() : ''
+  const key = RELEASE_STAGE_ALIASES[requested] || requested
   return RELEASE_CONFIG.stages[key] ? { stage: key, ...RELEASE_CONFIG.stages[key] } : null
 }
+
+export const readinessBlockerId = (state, check) => `RDY_${state}_${check}`
+export const flagBlockerId = (key) => `RDY_FLAG_OFF_${key}`
 
 const tri = (value, detail) => ({
   state: value === true ? 'READY' : value === false ? 'NOT_READY' : 'UNVERIFIED',
@@ -70,8 +94,8 @@ function migrationsCheck(applied) {
  *   contentState (CONTENT_STATES value or null), worker.
  * Nothing here reads secrets or learner data; `env` is used for flags only.
  */
-export function readiness({ env = {}, stage = 'LOCAL', checks = {} } = {}) {
-  const cfg = stageConfig(stage) || stageConfig('LOCAL')
+export function readiness({ env = {}, stage = 'LOCAL_CI', checks = {} } = {}) {
+  const cfg = stageConfig(stage) || stageConfig('LOCAL_CI')
   const flags = Object.fromEntries(cfg.requiredFlags.map((key) => [key, env[key] === 'true']))
   const missingFlags = cfg.requiredFlags.filter((key) => !flags[key])
   const durable = tri(checks.durableWriter)
@@ -89,8 +113,8 @@ export function readiness({ env = {}, stage = 'LOCAL', checks = {} } = {}) {
     WORKER_REACHABILITY: tri(checks.worker),
   }
   const blockers = [
-    ...missingFlags.map((key) => `FLAG_OFF:${key}`),
-    ...cfg.requiredChecks.filter((c) => verdicts[c].state !== 'READY').map((c) => `${verdicts[c].state}:${c}`),
+    ...missingFlags.map(flagBlockerId),
+    ...cfg.requiredChecks.filter((c) => verdicts[c].state !== 'READY').map((c) => readinessBlockerId(verdicts[c].state, c)),
   ]
   return {
     configVersion: RELEASE_CONFIG.version,
@@ -108,9 +132,11 @@ export function summarize(result) {
   return {
     configVersion: result.configVersion,
     stage: result.stage,
+    allocatable: result.allocatable === true,
     missingFlags: [...result.flags.missing],
+    effectiveFlags: { ...result.flags.effective },
     checks: Object.fromEntries(Object.entries(result.checks).map(([k, v]) => [k, v.state])),
-    blockers: [...result.blockers],
+    blockerIds: [...result.blockers],
   }
 }
 
@@ -126,8 +152,8 @@ export function assertAllocatable(result) {
  * probes. Each probe is sync or async and returns a raw fact (true/false/
  * null); a throwing probe counts as UNVERIFIED, never READY.
  */
-export function createReleaseGate({ env = process.env, stage = env.PRISM_RELEASE_STAGE || 'LOCAL', probes = {} } = {}) {
-  const resolvedStage = stageConfig(stage)?.stage || 'LOCAL'
+export function createReleaseGate({ env = process.env, stage = env.PRISM_RELEASE_STAGE || 'LOCAL_CI', probes = {} } = {}) {
+  const resolvedStage = stageConfig(stage)?.stage || 'LOCAL_CI'
   async function probe(name, context) {
     const fn = probes[name]
     if (typeof fn !== 'function') return null

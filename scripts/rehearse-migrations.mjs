@@ -1,13 +1,14 @@
 // P10.3 — migration rehearsal on a NEW throwaway embedded-postgres cluster.
-// migrateUp all → record head → migrateDown the last N (0040..0049, one by
-// one) → migrateUp again → assert the result is idempotent and every new
+// migrateUp all → record head → migrateDown the experience migrations (0040
+// through current head) one by one → simulate an interrupted transactional
+// migration → resume migrateUp → assert the result is idempotent and every new
 // migration has a .down.sql. Prints one JSON report. Connection strings are
 // never arguments and the application DATABASE_URL is never read.
 //
 //   node scripts/rehearse-migrations.mjs            (N = every 004x migration)
 //   node scripts/rehearse-migrations.mjs --steps 3
 import { createRequire } from 'node:module'
-import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -49,6 +50,8 @@ try {
   if (process.env.DATABASE_URL && process.argv.slice(2).some((a) => /postgres(ql)?:\/\//i.test(a))) throw new Error('REHEARSAL_INVALID_ARGUMENTS')
   const { steps } = parseArgs(process.argv.slice(2))
   const ups = await sortedUps()
+  report.migrationCount = ups.length
+  if (ups.length !== 53) throw new Error('REHEARSAL_EXPECTED_53_MIGRATIONS')
   const fresh = ups.filter((n) => /^00[4-9]\d_/.test(n))
   const down = await readdir(MIGRATIONS)
   report.newMigrations = fresh
@@ -110,6 +113,29 @@ try {
       if (!legacyTables.includes(t)) throw new Error('REHEARSAL_LEGACY_TABLE_LOST')
     }
 
+    stage = 'SIMULATE_INTERRUPTED_MIGRATION'
+    const appliedAfterDown = await applied(pool)
+    const pendingAfterDown = ups.filter((name) => !appliedAfterDown.includes(name))
+    const interrupted = pendingAfterDown[0]
+    if (interrupted) {
+      const client = await pool.connect()
+      const beforeInterrupted = await applied(pool)
+      try {
+        await client.query('BEGIN')
+        await client.query(await readFile(join(MIGRATIONS, `${interrupted}.sql`), 'utf8'))
+        await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [interrupted])
+        throw new Error('SYNTHETIC_INTERRUPTION')
+      } catch (error) {
+        await client.query('ROLLBACK')
+        if (error.message !== 'SYNTHETIC_INTERRUPTION') throw error
+      } finally {
+        client.release()
+      }
+      const afterInterrupted = await applied(pool)
+      if (!same(beforeInterrupted, afterInterrupted)) throw new Error('REHEARSAL_INTERRUPTION_NOT_ATOMIC')
+      report.steps.push({ step: 'SIMULATE_INTERRUPTED_MIGRATION', migration: interrupted, transactionRolledBack: true })
+    }
+
     stage = 'MIGRATE_UP_AGAIN'
     const reapplied = await migrateUp()
     const headFinal = (await applied(pool)).at(-1)
@@ -126,7 +152,7 @@ try {
     report.rolledBack = rolledBack.length
     report.idempotent = true
     report.verdict = 'REHEARSED_ON_DISPOSABLE_CLUSTER'
-    report.notProduction = 'This is a schema rehearsal with no data; backup/restore and production migration-resume evidence remain operator-owned.'
+    report.notProduction = 'Disposable synthetic schema only. No production database, backup, restore or backfill was used.'
   } finally {
     console.log = silent
     await closePool().catch(() => {})

@@ -11,7 +11,15 @@ export const ALERT_KINDS = Object.freeze([
   'REPEATED_BEGIN',
   'OWNERSHIP_CONFLICT',
   'CROSS_SCOPE_DENIALS',
+  'COST_OUTLIER',
+  'RECOVERY_CREDIT_ANOMALY',
 ])
+
+export const ALERT_VIEWS = Object.freeze({
+  OPERATIONAL: Object.freeze(['ACCEPTED_ACTIONS_WITHOUT_JOB', 'JOBS_WITHOUT_APPLIED_RESULT', 'EXPIRED_LEASES', 'REPEATED_BEGIN', 'COST_OUTLIER']),
+  MEASUREMENT: Object.freeze(['ZERO_EVIDENCE_CLUSTER', 'CLAIM_REJECTION_SPIKE', 'OWNERSHIP_CONFLICT']),
+  CUSTOMER: Object.freeze(['CROSS_SCOPE_DENIALS', 'RECOVERY_CREDIT_ANOMALY']),
+})
 
 export const DEFAULT_THRESHOLDS = Object.freeze({
   zeroEvidenceClusterMin: 3,        // submitted runs with zero units in the window
@@ -21,6 +29,8 @@ export const DEFAULT_THRESHOLDS = Object.freeze({
   repeatedBeginMin: 3,              // begin requests per session
   crossScopeDenialsMin: 5,          // 404/403 cross-scope per actor in window
   ownershipConflictMin: 1,
+  costOutlierMinorUnits: 500,
+  recoveryCreditMin: 1,
 })
 
 const alert = (kind, severity, refs, detail = {}) => ({ kind, severity, refs, ...detail })
@@ -94,6 +104,28 @@ export function detectCrossScopeDenials(denials, t = DEFAULT_THRESHOLDS) {
     .map(([actorHash, v]) => alert('CROSS_SCOPE_DENIALS', 'HIGH', { actorHash, requestIds: v.requestIds }, { count: v.count }))
 }
 
+// costs: { requestId, jobId, minorUnits }. The detector never carries prompts,
+// responses, provider payloads or learner identifiers.
+export function detectCostOutliers(costs, t = DEFAULT_THRESHOLDS) {
+  const outliers = (costs || []).filter((cost) => Number(cost.minorUnits || 0) >= t.costOutlierMinorUnits)
+  return outliers.length ? [alert('COST_OUTLIER', 'MEDIUM', {
+    requestIds: outliers.map((cost) => cost.requestId).filter(Boolean),
+    jobIds: outliers.map((cost) => cost.jobId).filter(Boolean),
+  }, { count: outliers.length })] : []
+}
+
+// recoveries: { grantId, requestId, kind, status }. Only explicitly approved
+// grants should reach APPLIED; all other recovery credit activity is reviewed.
+export function detectRecoveryCreditAnomalies(recoveries, t = DEFAULT_THRESHOLDS) {
+  const anomalies = (recoveries || []).filter((recovery) => recovery.kind === 'RECOVERY_CREDIT'
+    && recovery.status !== 'APPROVED_APPLIED')
+  if (anomalies.length < t.recoveryCreditMin) return []
+  return [alert('RECOVERY_CREDIT_ANOMALY', 'HIGH', {
+    grantIds: anomalies.map((recovery) => recovery.grantId).filter(Boolean),
+    requestIds: anomalies.map((recovery) => recovery.requestId).filter(Boolean),
+  }, { count: anomalies.length })]
+}
+
 export function runAllDetectors(input, { now = Date.now(), thresholds = DEFAULT_THRESHOLDS } = {}) {
   return [
     ...detectZeroEvidenceClusters(input.runs, thresholds),
@@ -104,5 +136,7 @@ export function runAllDetectors(input, { now = Date.now(), thresholds = DEFAULT_
     ...detectRepeatedBegin(input.beginRequests, thresholds),
     ...detectOwnershipConflicts(input.ownershipClaims, thresholds),
     ...detectCrossScopeDenials(input.denials, thresholds),
+    ...detectCostOutliers(input.costs, thresholds),
+    ...detectRecoveryCreditAnomalies(input.recoveries, thresholds),
   ]
 }

@@ -1,5 +1,22 @@
 # Experience programme - decision and external-gate register
 
+## P10 controlled-rollout decisions - current candidate
+
+| Decision | Outcome | Boundary |
+|---|---|---|
+| Release configuration | Versioned config v2 and ordered component bundles, not per-component flags | No stage activated |
+| Allocation | Require compatible player, durable writer/worker, evaluator, publication, approved content and worker reachability before reserve/consume | Unverified is blocking |
+| Active runs | Serve pinned compatible handler or fail `RUN_VERSION_UNSUPPORTED` | Never route to legacy |
+| Rollback | Stop -> drain/pin -> preserve readers/shares/erasure fencing -> disable -> disposition/comms -> separately review schema -> restart after readiness | No schema drop |
+| Retirement | Classify; do not delete without monitored drain and approval | Historical readers/adapters retained |
+| Growth | Independently activated after T46 comparability | T46 remains BLOCKED |
+| Final state | `CODE_IMPLEMENTED_WITH_VERIFICATION_BLOCKERS`, `NO_GO` | Six sign-offs and external approvals remain open |
+
+Absolute NO-GO conditions are acknowledged work loss, cross-user exposure,
+fabricated evidence, repeated technical zero result, no approved recovery
+policy, or advertised practice being unavailable. Code authors cannot
+self-certify those conditions clear in a real environment.
+
 ## P9 integrated-validation decisions - 2026-10-03
 
 1. **The source event catalogue is authoritative.** It contains 21 events from

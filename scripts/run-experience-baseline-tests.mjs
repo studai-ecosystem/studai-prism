@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'browser', 'browser-smoke', 'browser-critical', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, p2, p3, p4, p5, p6, p7, p8, p9, browser, browser-smoke, browser-critical, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
+if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'browser', 'browser-smoke', 'browser-critical', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, p3, p4, p5, p6, p7, p8, p9, p10, browser, browser-smoke, browser-critical, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -134,6 +134,25 @@ try {
     env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
     env.PRISM_AUDIT_PREPARATION = 'true'
     browserArgs.splice(2, browserArgs.length, 'p9-visual-matrix.spec.js')
+  }
+  // P10: a focused handover route/resource manifest plus the existing real
+  // Layer B journeys that own dynamic player/report/practice/preparation,
+  // paid-package, Campus and share resources. Synthetic data and provider
+  // test mode only.
+  if (mode === 'p10') {
+    env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
+    env.PRISM_AUDIT_PREPARATION = 'true'
+    browserArgs.splice(2, browserArgs.length,
+      'p10-handover-journey.spec.js',
+      'p1-legacy-report.spec.js',
+      'p3-real-journey.spec.js',
+      'p5-report-states.spec.js',
+      'p6-practice-journey.spec.js',
+      'p7-preparation-journey.spec.js',
+      'p8-commercial-journey.spec.js',
+      'campus-journey-a.spec.js',
+      'campus-journey-c.spec.js',
+      '--project=chromium')
   }
   exitCode = await run(mode === 'database'
     ? ['--test', '--test-concurrency=1', 'server/test/experienceBaseline.db.test.js', 'server/test/p2Slice.db.test.js']

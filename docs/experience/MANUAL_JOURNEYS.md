@@ -1,6 +1,7 @@
 # Manual journeys (P10.7) — environment-relative URLs
 
-Status: **PREPARED, UNTESTED IN PRODUCTION.** These URLs are relative to the
+Status: **LOCAL_CI SYNTHETIC ROUTE RUN PASS (20 direct routes + 9 integrated
+resources); HUMAN/PRODUCTION NOT RUN.** These URLs are relative to the
 environment under test (`<base>` = the deployment candidate's origin). Every
 `<...>` placeholder is resolved during testing from an authorized synthetic or
 consented test identity; nothing here is a production session id, and no URL
@@ -21,6 +22,29 @@ Placeholders
 
 Record the test identity indirectly (role + environment + workspace type), never
 a password, token or e-mail.
+
+## Machine-checked local manifest
+
+`tests/e2e/p10-handover-journey.spec.js` resolves synthetic assignment/session
+placeholders during the local disposable-database run and records each tested
+route in `audit-results/p10-route-results.json`. The file records route id,
+resolved environment-relative path, HTTP status and PASS/FAIL only. It excludes
+credentials and share tokens.
+
+`scripts/check-p10-route-manifest.mjs` requires every direct route result and
+cross-checks dynamic resources against passed tests in the Playwright JSON:
+
+- P3: actual player -> evidence -> Report V3.
+- P5: selected report/share states including expired and denied.
+- P6: mission, replay/retry and fresh challenge.
+- P7: private preparation attempt.
+- P8: approved-package gating in provider test mode.
+- Campus Journey A: learner/sponsor report and open/revoked share.
+- Campus Journey C: staff programme.
+
+This automated local evidence does not replace the final human sequence. A
+share token is generated and exercised in memory/browser but represented in
+the manifest as `{generated-token-redacted}`.
 
 ## 1. Account entry
 
@@ -60,7 +84,7 @@ a password, token or e-mail.
 | Capabilities | `<base>/app/capabilities` and detail | Formal only; practice never raises formal | Screenshot |
 | Development | `<base>/app/development` → `/app/development/missions/<mission-id>` | Reviewed mission, source-linked replay, fresh challenge; coaching labelled Practice | Screenshot |
 | Preparation (if on) | `<base>/app/prepare` → `/app/prepare/<preparation-attempt-id>` | Private; never visible to Campus | Screenshot + Campus staff view shows nothing |
-| Growth/history | `<base>/app/home` growth area | Comparison unavailable unless `PRISM_GROWTH_ENABLED` and approval | Screenshot of unavailable state |
+| Growth/history | `<base>/app/growth` and `<base>/app/assessments` | Comparison unavailable unless `PRISM_GROWTH_ENABLED` and approval | Screenshot of unavailable state |
 
 ## 5. Campus and sharing
 

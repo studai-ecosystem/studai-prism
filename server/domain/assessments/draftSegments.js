@@ -7,6 +7,7 @@
 import { createHash } from 'node:crypto'
 import { PRIMARY_CAPABILITY_IDS } from './catalog.js'
 import { CORE_TEAMREADY_A, CORE_TEAMREADY_A_ID, CORE_TEAMREADY_A_FORM_ID, UNIVERSAL_RUBRIC_REF } from './universalForm.js'
+import { RELEASE_CONFIG_VERSION } from '../release/version.js'
 
 export const DRAFT_SEGMENT_ID = 'draft-core-teamready-a-handover'
 export const SLICE_METHOD_VERSION = 'v3-slice-0.1'
@@ -167,6 +168,7 @@ export function buildRunPin({ formId, engineVersion = 'legacy-engine', scenarioI
     scenarioId,
     engineVersion,
     formId,
+    releaseConfigVersion: RELEASE_CONFIG_VERSION,
     methodVersion: SLICE_METHOD_VERSION,
     rubricRef: snapshot.rubricRef,
     snapshotVersion: snapshot.version,

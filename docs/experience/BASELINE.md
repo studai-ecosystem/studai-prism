@@ -1,5 +1,22 @@
 # P0 - Actual learner-path baseline
 
+## P10 controlled-rollout baseline - current candidate
+
+- Canonical release configuration is `p10.release.v2`; stages are `LOCAL_CI`,
+  `STAGING`, `INTERNAL_CANARY`, `EXTERNAL_PILOT`, `WIDER_RELEASE`.
+- New draft/universal allocation is fail-closed before reserve/consume and pins
+  release config, engine, method, form, rubric and snapshot.
+- Database head is 0053 with 53 migrations. Disposable rehearsal applies all,
+  safely rolls down 0040-0053, proves interrupted transactional resume and
+  returns to 0053 without backfill.
+- Compatibility inventory is conservative: no deletion; active-new,
+  historical-reader, adapter, retire-after-drain and deferred dispositions.
+- P9 evidence and T outcomes remain authoritative: 56 PASS / 3 BLOCKED /
+  1 UNVERIFIED. T46, T54 and T58 are BLOCKED; T56 is UNVERIFIED.
+- Allowed state is `CODE_IMPLEMENTED_WITH_VERIFICATION_BLOCKERS`; verdict is
+  NO_GO. No production, live-model, live-payment, manual or human evidence was
+  added.
+
 ## P9 integrated-validation baseline - 2026-10-03
 
 P9 code-safe closure was measured on branch `ui/prism-brand-transformation`

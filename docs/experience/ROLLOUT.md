@@ -342,9 +342,12 @@ work. Pending human gates and existing full-journey NO-GO are preserved.
 
 Appended by P10 (code-safe work only; nothing deployed, no flag flipped).
 
-**Release configuration v1** (`server/domain/release/config.js`): stages
-`LOCAL`, `STAGING`, `INTERNAL_CANARY`, `EXTERNAL_PILOT`, `WIDER`, each with a
-required flag set (growth is never required) and six readiness checks:
+**Release configuration v2** (`server/domain/release/config.js`): canonical
+stages `LOCAL_CI`, `STAGING`, `INTERNAL_CANARY`, `EXTERNAL_PILOT`,
+`WIDER_RELEASE` (`LOCAL`/`WIDER` are compatibility aliases only). Versioned
+component bundles bind Personal Home/history; player/evidence/report; reviewed
+practice; private preparation; approved paid packages; Campus; and independent
+growth. Growth is never required by another bundle. Six readiness checks:
 `COMPATIBLE_PLAYER`, `DURABLE_WRITER` (store surface + migrations >= 0040),
 `EVALUATOR`, `PUBLICATION`, `APPROVED_CONTENT` (content state >= the stage
 minimum: DRAFT locally/staging, APPROVED_FOR_PILOT for canary/pilot,
@@ -356,45 +359,63 @@ state-only details). The legacy start path is unchanged. Diagnostic:
 `node scripts/check-experience-baseline.mjs [--database] [--stage <stage>]`
 now reports `release` (safe, no secrets); unprobed checks stay UNVERIFIED.
 
+Every new draft/universal run also pins release config v2 with its engine,
+method, form, rubric and snapshot.
+
+**Activation order**: Personal Home/history -> player/evidence/report together
+-> reviewed practice -> private preparation -> approved paid packages ->
+Campus after privacy/retention/erasure -> growth independently after
+comparability. Publication NOT_READY/UNVERIFIED prevents new allocation. No
+stage is activated by this work.
+
 **Migration rehearsal** (`node scripts/rehearse-migrations.mjs`): on a new
-throwaway embedded-postgres cluster, up all (head 0049_preview_attempts) ->
-down 0049..0040 one by one -> up again; schema identical and idempotent; every
+throwaway embedded-postgres cluster, up all 53 (head
+0053_intent_display_and_research) -> down 0053..0040 one by one -> simulate an
+interrupted 0040 transaction -> prove no ledger/schema change -> resume to
+0053; schema is idempotent; every
 0040+ migration has a `.down.sql`; no pre-0040 table is dropped
 (`server/test/migrationsReversible.test.js`). This is a schema rehearsal with
-no data; backup/restore and production migration-resume evidence remain
-operator-owned.
+no data/backfill. Backup/restore templates and read-only candidate
+reconciliation are in `docs/experience/P10_MIGRATION_RUNBOOK.md`; production
+execution remains operator-owned and NOT RUN.
 
 **Rollback safety** (`server/domain/release/rollback.js`): `rollbackPlan`
 orders stop-new-allocations -> inventory -> drain/pin active runs -> preserve
 readers/shares -> disable serving flags only when `canDisable()` -> reviewed
-recovery disposition -> customer communication -> schema rollback as a separate
-review. `canDisable(flag, activeRuns)` is false while active V3 runs exist. A
+recovery disposition -> customer communication -> preserve erasure tombstones
+-> schema rollback as a separate review -> recheck before restart.
+`canDisable(flag, activeRuns)` is false while active V3 runs exist. A
 universal run pinned to a method this build does not carry fails with
 `RUN_VERSION_UNSUPPORTED` and is never handed to the legacy engine; a model
 result arriving after an erasure marker is never written; stale fencing tokens
 cannot complete; payment webhooks stay idempotent after rollback
 (`server/test/rollback.test.js`).
 
+`node scripts/rehearse-rollback.mjs` is the executable local synthetic T60
+rehearsal. No schema drop occurs.
+
 **Retirement inventory** (`node scripts/route-usage-inventory.mjs`, no
-deletion): LEGACY_CREATION (`/assessment`, `/payment`, `/workspace/:sessionId`,
-`/missions*`, `/explore`, `/api/assessment`, `/api/payment`), LEGACY_READER
-(`/score`, `/report/:sessionId/v2`, `/report/:sessionId/employee`,
-`/shared/:token` - keep), V3 (`/app/*`, `/api/v1`).
-Drain-window criteria before any LEGACY_CREATION removal: no active V3 run
+deletion): `ACTIVE_NEW`, `HISTORICAL_READER`, `ADAPTER`,
+`RETIRE_AFTER_DRAIN`, `DEFERRED`.
+Drain-window criteria before any `RETIRE_AFTER_DRAIN` removal: no active V3 run
 depends on the route (`canDisable` true for every serving flag); zero new
-sessions through LEGACY_CREATION routes for an operator-agreed window (proposal
-14 days) measured from route telemetry; route tests green on the deployment
-candidate (`server/test/legacyReadersRetained.test.js`); every LEGACY_READER
+sessions through candidate routes for an operator-approved window measured
+from route telemetry; route tests green on the deployment
+candidate (`server/test/legacyReadersRetained.test.js`); every `HISTORICAL_READER`
 still serves owned reports and approved shares; operator sign-off recorded here
 (HA-C007 covers the deploy). Readers are never retirement candidates.
 
-**Monitoring/support**: alert definitions in `server/domain/release/alerts.js`
-(operational view only), triage paths in `docs/experience/SUPPORT_RUNBOOK.md`,
-manual journey URLs with placeholders in `docs/experience/MANUAL_JOURNEYS.md`
-(untested in production).
+**Monitoring/support**: reference-only alert definitions in
+`server/domain/metrics/alerts.js` and release blockers in
+`server/domain/release/alerts.js`; operational, measurement and customer views
+and safe query shapes are in `docs/experience/SUPPORT_RUNBOOK.md`. The local
+synthetic route manifest is machine checked; the human/production journey in
+`docs/experience/MANUAL_JOURNEYS.md` remains NOT RUN.
 
 **Go/no-go** (`server/domain/release/goNoGo.js`): verdict from readiness plus
-HA-C001-HA-C013 statuses; every human gate defaults to OPEN; any OPEN gate of
-the stage, missing flag, NOT_READY or UNVERIFIED required check -> `NO_GO`.
-Current verdict for every stage above LOCAL: **NO_GO** (all human gates OPEN,
-real environment UNVERIFIED). Nothing in P10 closes or weakens HA-C001-HA-C013.
+HA-C001-HA-C013, six independent sign-offs and six absolute release
+prohibitions. Every human gate/sign-off defaults OPEN; each prohibition defaults
+UNVERIFIED; any unresolved item yields `NO_GO`. Checklist areas expose only
+PASS/BLOCKED/UNVERIFIED. Current verdict for every stage above LOCAL_CI:
+**NO_GO**. Nothing in P10 closes or weakens HA-C001-HA-C013, T46, T54, T56 or
+T58.

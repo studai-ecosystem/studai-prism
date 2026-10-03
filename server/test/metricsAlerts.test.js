@@ -2,9 +2,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  ALERT_KINDS, DEFAULT_THRESHOLDS, runAllDetectors,
+  ALERT_KINDS, ALERT_VIEWS, DEFAULT_THRESHOLDS, runAllDetectors,
   detectZeroEvidenceClusters, detectAcceptedActionsWithoutJobs, detectJobsWithoutAppliedResults, detectClaimRejectionSpike,
   detectExpiredLeases, detectRepeatedBegin, detectOwnershipConflicts, detectCrossScopeDenials,
+  detectCostOutliers, detectRecoveryCreditAnomalies,
 } from '../domain/metrics/alerts.js'
 
 const NOW = Date.parse('2026-10-02T12:00:00Z')
@@ -67,6 +68,8 @@ test('runAllDetectors emits only known kinds and never carries content fields', 
     runs: [{ sessionId: 's1', submitted: true, unitCount: 0 }, { sessionId: 's2', submitted: true, unitCount: 0 }, { sessionId: 's3', submitted: true, unitCount: 0 }],
     actions: [{ sessionId: 's1', kind: 'FINISH', state: 'ACCEPTED', payload: { text: 'secret learner text' } }],
     jobs: [], published: [], units: [], beginRequests: [], ownershipClaims: [], denials: [],
+    costs: [{ requestId: 'r-cost', jobId: 'j-cost', minorUnits: 900, prompt: 'secret learner text' }],
+    recoveries: [{ grantId: 'g1', requestId: 'r-credit', kind: 'RECOVERY_CREDIT', status: 'PENDING', learnerText: 'secret learner text' }],
   }, { now: NOW })
   assert.ok(out.length >= 2)
   for (const a of out) assert.ok(ALERT_KINDS.includes(a.kind), a.kind)
@@ -74,4 +77,9 @@ test('runAllDetectors emits only known kinds and never carries content fields', 
   assert.equal(raw.includes('secret learner text'), false)
   assert.equal(/"(text|payload|email|name)"/.test(raw), false)
   assert.ok(Object.isFrozen(DEFAULT_THRESHOLDS))
+  assert.deepEqual(detectCostOutliers([{ requestId: 'r1', minorUnits: 499 }]), [])
+  assert.equal(detectCostOutliers([{ requestId: 'r2', jobId: 'j2', minorUnits: 500 }])[0].refs.requestIds[0], 'r2')
+  assert.deepEqual(detectRecoveryCreditAnomalies([{ grantId: 'g2', kind: 'RECOVERY_CREDIT', status: 'APPROVED_APPLIED' }]), [])
+  assert.equal(detectRecoveryCreditAnomalies([{ grantId: 'g3', kind: 'RECOVERY_CREDIT', status: 'PENDING' }])[0].refs.grantIds[0], 'g3')
+  assert.ok(Object.isFrozen(ALERT_VIEWS))
 })

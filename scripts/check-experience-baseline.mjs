@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 import { readdir } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { checkStudentFlowFlags } from './check-student-flow-flags.mjs'
-import { readiness, stageConfig } from '../server/domain/release/config.js'
+import { readiness, stageConfig, summarize } from '../server/domain/release/config.js'
 
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const { z } = require('zod')
@@ -153,7 +153,7 @@ export async function inspectDatabase(client) {
 function releaseReadiness(env, database, stage) {
   const migrations = database?.status === 'AVAILABLE' && database.migrations
     ? database.migrations.pending === 0 && database.migrations.unknown === 0 : null
-  return readiness({
+  const result = readiness({
     env, stage,
     checks: {
       player: null, evaluator: null, publication: null, contentState: null, worker: null,
@@ -161,9 +161,15 @@ function releaseReadiness(env, database, stage) {
       migrationsApplied: migrations === true ? ['0040_candidate_actions_jobs'] : migrations === false ? [] : null,
     },
   })
+  return {
+    ...summarize(result),
+    buildCompatibility: 'OPERATOR_PROVENANCE_REQUIRED',
+    schemaCompatibility: database?.status === 'AVAILABLE' ? 'COMPATIBLE'
+      : database?.status === 'INCOMPATIBLE' ? 'INCOMPATIBLE' : 'UNVERIFIED',
+  }
 }
 
-export function baselineReport(env, database = null, { stage = env.PRISM_RELEASE_STAGE || 'LOCAL' } = {}) {
+export function baselineReport(env, database = null, { stage = env.PRISM_RELEASE_STAGE || 'LOCAL_CI' } = {}) {
   const config = configuration(env)
   const parsed = database === null ? { status: 'UNVERIFIED' } : Database.parse(database)
   return {
@@ -186,7 +192,7 @@ export async function runDiagnostic({ args = [], env = process.env, clientFactor
   let client
   let output
   let failed = false
-  let stage = env.PRISM_RELEASE_STAGE || 'LOCAL'
+  let stage = env.PRISM_RELEASE_STAGE || 'LOCAL_CI'
   try {
     // Accepted: `--database` (once) and `--stage <LOCAL|STAGING|...>` (once).
     // Anything else — in particular identifiers or connection strings — is refused.

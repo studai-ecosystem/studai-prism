@@ -1,243 +1,168 @@
-# Programme handoff - P0 to P10 (code-safe)
+# P10 final handover - controlled rollout and compatibility
 
-## P9 post-P8 integrated validation checkpoint - 2026-10-03
+## 1. Decision and allowed state
 
-Verdict remains **NO-GO**. The source hypotheses (80% comprehension, 40%
-voluntary relevant-practice activation, 25% seven-day voluntary return, at
-least 30 genuine non-refunded purchases, a user-articulated advantage over a
-strong matched-effort generic-AI comparator, and positive contribution under
-measured use/recovery costs) are **INITIAL HYPOTHESES, NOT BENCHMARKS**. No
-participant, payment, refund, transfer or live-model outcome has been entered.
+**Allowed state: `CODE_IMPLEMENTED_WITH_VERIFICATION_BLOCKERS`. Release verdict:
+`NO_GO`.** This work did not deploy, activate a release stage, flip production
+flags, access a production database, call a live model or payment provider, or
+claim manual, human, accessibility, content, privacy, security, commercial,
+operations, measurement or Layer C approval.
 
-Engineering, Content, Measurement, Security / privacy, Product-finance and
-Operations are separate gates and are all **OPEN** pending human sign-off.
-Machine validation is recorded in
-`docs/experience/programme-validation-results.json`; BLOCKED and UNVERIFIED
-entries are not converted to PASS by a green build or fixture.
+The machine-readable authority is `docs/experience/P10_HANDOVER.json`.
 
-Code-safe P9 closure is complete. Final evidence: build PASS; unit 516 passed;
-server 858 passed / 26 skipped; static audit PASS (1,623 files, 113 review
-leads); critical browser 217 passed / 3 recovered retries; real isolated
-database 21 passed; calibration 64 passed; full four-project browser run 805
-passed / 81 intentional skips / 6 recovered retries. T01-T60: **56 PASS / 3
-BLOCKED / 1 UNVERIFIED**. All 18 new P9 screenshots were inspected. The
-initial critical run found and fixed a non-self-contained database command and
-a stale payment CTA test; no product entitlement or purchase behaviour changed.
+## 2. Candidate scope and provenance
 
-Local load evidence met every planning target on the recorded host:
-history 62.15/82.14 ms p50/p95, report 44.53/57.59 ms, durable acknowledgement
-5/13 ms, controlled-provider reply 23.09/33.06 ms, publication 190/197 ms, and
-controlled 150 ms client-delay history 177.98/185.55 ms. This is a
-controlled-adapter observation, not an SLA or Layer C result.
+- Branch: `ui/prism-brand-transformation`.
+- P10 baseline commit: `d9186b8`.
+- Release configuration: `p10.release.v2`.
+- Database head: `0053_intent_display_and_research`; 53 up migrations.
+- P9 evidence is preserved, not re-labelled: build PASS; unit 516; server 858
+  pass / 26 skip; static PASS; critical browser 217; database 21; calibration
+  64; full browser 805 pass / 81 intentional skips / 6 recovered retries /
+  zero final failures.
+- The P9 validation ledger remains 56 PASS / 3 BLOCKED / 1 UNVERIFIED.
 
-Kill/redesign logic is fixed before results: misunderstood reports require
-explanation/UX work; understood but unused practice requires a
-relevance/effort investigation; same-script improvement without fresh-task
-transfer requires learning-method revision; no willingness to pay requires
-buyer/offer/distribution work. More dashboards do not compensate.
+## 3. Canonical architecture and compatibility boundaries
 
-**Local implementation of P0-P10 is complete and verified at Layers A and B. Release verdict: NO-GO**
-(`domain/release/goNoGo.js`) until the human gates listed in IMPLEMENTATION_STATE close. No deployment,
-flag flip, push, live-model spend, production migration, pricing activation or participant contact occurred.
+New draft/universal allocation has one canonical player path. A readiness gate
+runs before reservation or consumption and requires compatible player, durable
+writer/worker, evaluator, publication, approved content and worker reachability.
+Every new run pins release configuration, engine, method, form, rubric and
+snapshot hash. Existing pinned runs use a compatible handler or fail closed;
+they never fall back to the legacy player.
 
-## Commits on `ui/prism-brand-transformation`
-| Phase | Commit | Summary |
-| --- | --- | --- |
-| P0 | `ff6002c` | diagnostic baseline, read-only tooling, 112-ID ledger |
-| P1 | `9d68738` | identity/history, durable actions (0040), erasure cascade, reconciliation |
-| P2-P5 | `2079629` | evidence slice, jobs/publication (0041), practice origin (0042), timing/begin (0043), universal form + Director + ledger (0044), review requests (0045), Your Prism report |
-| P6-P7 | `b9a97e4` | ten draft missions, meaning evaluator, replay/challenge, allowance (0046), private preparation + self-report (0047) |
-| P8 | `c2a38dd` | product grants (0048), webhook idempotency, free first experience (0049), intent onboarding, offer/checkout config, Campus content gate |
-| P9-P10 | this commit | metrics/events/alerts, fault suite, load/live harnesses, release config, rollback, migration rehearsal, retirement inventory, runbooks |
+Report V3 remains the single new publication boundary. History remains a
+workspace-scoped projection. The CH ledger and tests assert there is no hidden
+alternative score path or fourth player. Legacy owned-report readers, version
+adapters, frozen forms, entitlements, sponsor mappings and exports remain.
 
-## Final verification (this checkout)
-Server 808 tests: 783 pass / 0 fail / 25 DB-gated skips. Frontend 35 files, 474 pass. Build, static audit,
-flag check PASS. Isolated PostgreSQL (embedded, 49 migrations) 6/6 incl. real scorer, erasure cascade,
-durable actions. Browser (isolated, 4 projects): full `browser-all` 803 passed / 0 failed / 3 flaky-on-retry / 18 skipped.
-Migration rehearsal: up 49 → down to 0040 → up, schema identical. Layer C: BLOCKED (no authorization).
+## 4. Versioned content, methods and approval state
 
-## Invariants preserved
-No fourth player (V3 `AssessmentPlayerPage` canonical; legacy readers/adapters retained); Report V3 evolved
-in place with immutable versions; one history projection (no second store); practice/preparation/self-report
-isolated from formal evidence; legacy scoring/stimulus/35-minute timing byte-identical for legacy runs;
-sufficiency floors unchanged; all new content DRAFT behind `PRISM_DRAFT_CONTENT`; prices unchanged.
+| Asset | Version | State |
+|---|---|---|
+| Universal scenario/form | `draft-core-teamready-a:0.1.0-draft` | DRAFT; not approved |
+| Assessment method | `v3-slice-0.1` | Code-verified Layer A/B; Layer C not run |
+| Assessment rubric | `draft-teamready-rubric.v0.1` | DRAFT; not approved |
+| Handover rubric | `draft-handover-rubric.v0.1` | DRAFT; not approved |
+| Development mission library | library v1; M09 v2 | DRAFT; not approved |
+| Preparation prompts/assistance | versioned in preparation service | DRAFT; privacy/content approval open |
 
-## Next human actions
-See IMPLEMENTATION_STATE "What remains" and ROLLOUT "P10 release configuration and go/no-go";
-SUPPORT_RUNBOOK and MANUAL_JOURNEYS for operators; RESEARCH_PROTOCOLS / VALIDATION_PLAN for the
-measurement lead and product owner.
+Formal assessment surfaces expose no rubric, hints or coaching. Reviewed
+practice may coach and is labelled practice. No price, tax, scientific,
+readiness or validation claim is approved by this report.
 
----
+## 5. Migration and data rehearsal
 
-## Current P1 handoff checkpoint - 2026-10-02
+`node scripts/rehearse-migrations.mjs` used disposable embedded PostgreSQL only.
+It applied all 53 migrations, confirmed a no-op second up, rolled down
+0040-0053 one at a time, proved an interrupted 0040 transaction left the
+migration ledger unchanged, then resumed through 0053. Legacy tables remained.
+No backfill, production backup, production restore or production migration ran.
 
-**P1 IN_PROGRESS / BLOCKED, not COMPLETE.** This later checkpoint follows P0
-`ff6002c`; the P0-only report below remains its historical phase-close record.
+`scripts/reconcile-release-candidate.mjs` is a read-only aggregate candidate
+check (`BEGIN READ ONLY`); it emits table presence/counts and migration head,
+not rows, learner data, report content, tokens or identifiers. Backup/restore
+templates and the expand/contract sequence are in
+`docs/experience/P10_MIGRATION_RUNBOOK.md`.
 
-Implemented: safe account-default/explicit-intent navigation, approved next-path
-validation and visible invalid-link recovery; legacy guarded destination
-preservation; account/workspace request cancellation and stale-response guards;
-known browser-draft cleanup and scoped page-state resets preserving same-owner
-refresh and workspace-switcher focus/confirmation; honest issued legacy-report
-presentation/read errors.
+## 6. Environment matrix and activation order
 
-Verified so far: frontend 427 passed; server 624 passed/0 failed/25 skips;
-real self-owned PostgreSQL/HTTP 4 passed, including the issued V2 reader and
-unchanged original stored blob; build/static PASS. Full browser results are
-pending in [TEST_RESULTS](./TEST_RESULTS.md).
+The only stages are `LOCAL_CI`, `STAGING`, `INTERNAL_CANARY`,
+`EXTERNAL_PILOT`, and `WIDER_RELEASE`; `LOCAL` and `WIDER` are input aliases
+only. Required order:
 
-Not delivered: reviewed historical-ownership/support-write integration, access
-policy changes, durable pre-model acceptance/jobs/fencing/versioned lifecycle,
-source-retention/erasure/stale-worker implementation, or billing/recovery changes.
-Exact missing owners/contracts are in [ROLLOUT](./ROLLOUT.md). The phase prompt
-does not supply those pending implementation/review references. No P2 progression
-or completed-P1 commit is claimed. Protected runtime/production behavior stays
-unchanged; independent UI and reader verification cannot close the foundation.
+1. Personal Home/history.
+2. Player, evidence and Report V3 together.
+3. Reviewed practice.
+4. Private preparation.
+5. Approved paid packages.
+6. Campus after privacy/retention/erasure approval.
+7. Growth independently, after form comparability.
 
-Current changes are persistent working-tree files; overlapping pre-existing
-entry/router work is preserved and not swept into a phase-close commit.
+Publication unavailability blocks new allocation. The diagnostic exposes only
+effective booleans, readiness states, build/schema compatibility and stable
+blocker IDs. It does not expose secret values, probe payloads, learner data or
+administrative controls. No stage was activated.
 
-Scope: approved P0 baseline/recovery preparation only. **No P1 execution.**
-**P0 code-safe diagnostic baseline: COMPLETE.** Exact verification and preserved
-failures are in [TEST_RESULTS](./TEST_RESULTS.md).
-The full learner release remains **NO-GO**.
-No scientific, privacy, commercial, content or production gate was approved.
+## 7. Rollback, drain and recovery
 
-## Delivered
+`node scripts/rehearse-rollback.mjs` proves the local synthetic T60 order:
+stop starts; inventory and drain pinned active runs; preserve owned readers and
+share scope; disable serving flags only after drain; retain queued erasure
+tombstones and worker fencing; use an approved auditable reissue/refund/review
+disposition if continuation is impossible; communicate; separately review
+schema; restart only after readiness is re-established. There is no schema
+drop. Unit/DB evidence covers worker crash, late model result, idempotent
+payment callback, scoped shares and erased-run writeback fencing.
 
-- Repository-grounded [route/flag/ownership/lineage baseline](./BASELINE.md), preserving
-  recent repairs and the complete pre-existing dirty snapshot.
-- Operator-local [read-only diagnostic](../../scripts/check-experience-baseline.mjs):
-  one bounded read-only transaction, allowlisted schema-checked aggregate output,
-  no application DB fallback, migration/seeding/settlement/report-builder side effects,
-  candidate payloads or identifier arguments.
-- [Isolated runner](../../scripts/run-experience-baseline-tests.mjs) for real PostgreSQL
-  and scoped four-browser checks, with temporary clusters/data, UTF-8 initialization,
-  explicit child-process flag isolation and preserved failure exit status.
-- [Diagnostic contracts/fault-window fixture](../../server/test/experienceBaseline.test.js)
-  and [real HTTP/database baseline](../../server/test/experienceBaseline.db.test.js).
-  The completed report and evidence were not preseeded.
-- [112-ID requirement/phase/role mapping](./IMPLEMENTATION_STATE.md),
-  [13 architecture/approval decisions](./DECISIONS.md),
-  [screen inventory, 11 draft-review intakes and research protocols](./CONTENT_REVIEW.md),
-  and [authorized support/recovery procedure](./ROLLOUT.md).
+## 8. Compatibility and retirement inventory
 
-No new learner page, player, report architecture, practice store, formal scenario,
-rubric, package/price or migration was introduced.
+The generated route inventory has five dispositions: `ACTIVE_NEW`,
+`HISTORICAL_READER`, `ADAPTER`, `RETIRE_AFTER_DRAIN`, and `DEFERRED`. No route
+was deleted. Duplicate legacy creation surfaces are only retirement candidates:
+usage telemetry, a named/approved drain window, route tests and operator
+approval are required. Insecure readers are authorization problems, never
+deletion shortcuts; ownership and sponsor/share scope checks remain enforced.
 
-## Verified root causes and bounded observations
+## 9. Monitoring and support
 
-1. **Formal dialogue-to-strict-evidence gap:** a real synthetic PG/HTTP/legacy-scorer
-   run completed and saved its original report, but generated zero judged strict
-   dialogue evidence. Rendering V3 did not establish a publishable capability result.
-2. **Source verification dependency:** PG completion removes session history used
-   by V3 claim/quote construction. Separate optional telemetry retention is not the
-   builder's source contract; this is not a claim that all customer data was lost.
-3. **Receipt crash window:** with a Layer A injected receipt-write failure after
-   the engine effect, retrying one event produced two effects and one receipt.
-   Pending advisory locks do not by themselves close this window.
-4. **Non-read-only GET paths:** report construction can append a version; session
-   completion reads can settle state; admin initialization can seed RBAC. A store
-   migration dry run also applies schema migrations. The diagnostic avoids them.
-5. **Clock/introduction remain governed work:** the current start occurs before a
-   separate introductory acknowledgement and uses the existing 35-minute window.
-   P0 neither changes the administration nor clamps the displayed deadline.
-6. **UI repairs are not stale defects:** returning-entry, no-material layout,
-   fixed frame/panes/composer, countdown receipt and visible recovery states were
-   rechecked, not reimplemented. Browser history/report/player examples remain
-   explicitly fixture-labelled.
+Reference-only alerts cover accepted-action loss, technical empty reports,
+history/ownership conflict, repeated start, queues/leases, failed claims,
+unauthorized cross-scope attempts, cost outliers and recovery-credit anomalies.
+Operational, measurement and customer views are separate. Alerts carry request,
+run, job or grant references and aggregate counts only; no learner content.
 
-The isolated run also proved that accepted messages and receipts were stored,
-the completed owned run appeared in history, a second owner was denied, real
-dev-run telemetry was marked synthetic, and read-only diagnostic writes were
-rejected. Those bounded observations do not close the full audience, failure,
-research-exclusion, multi-instance or historical-customer matrices.
+`docs/experience/SUPPORT_RUNBOOK.md` assigns role placeholders (not people),
+daily checks and triage for absent history, failed evaluation, disputed
+interpretation, inappropriate content, privacy/erasure and paid technical
+failure. Support never asks for tokens or hidden URLs and never edits evidence
+or scores.
 
-## Verification
+## 10. Verification evidence
 
-See [exact commands/counts and failed development attempts](./TEST_RESULTS.md).
-At the current checkpoint: build/static/config checks pass; frontend 360 pass;
-server 624 pass, 0 fail, 25 DB-related skips; isolated P0 DB 3 pass; diagnostic
-unit selector 9 pass. The initial 92 browser assertions passed but runner cleanup
-failed. After the bounded Windows cleanup fix, the final runner exited 0 with
-91 passed plus 1 flaky navigation that passed the unchanged automatic retry.
-Runner-owned temporary clusters/data are removed and test ports are free.
-An optional test-only audit data root was added after the full browser baseline
-so each audit server's independent store is also within that cleanup boundary;
-its narrow four-project smoke check passed all 8 cases with runner exit 0 and
-the owned data-root cleanup verified.
+Layer A commands for this P10 candidate include targeted Node tests, full
+Vitest, full server tests, build, static audit, the CH/T/final-handover
+validators, compatibility inventory and rollback rehearsal. Layer B commands
+include the 53-migration disposable rehearsal, isolated database runner and the
+focused P10 browser runner. Exact current outcomes are appended to
+`docs/experience/TEST_RESULTS.md`.
 
-Diagnostic tests remain green while the measured product invariants above remain
-explicit FAIL/OPEN. Nothing was weakened, `.only`-selected or skipped to suppress
-a reproduced product failure. The normal DB skip is reported and the separate
-self-owned P0 DB invocation ran without skips.
+The integrated Layer B lineage is the real current P2 database chain and P3-P8
+browser journeys. It is not Layer C. Live-model/real-provider Layer C:
+**NOT RUN**. Manual accessibility, assistive-technology, real-device and human
+comprehension work: **NOT RUN**. No screenshot is presented as human approval.
 
-Screenshots were actually inspected at desktop and narrow widths for conversation,
-materials, dark portal, withheld report and failed scoring retry. Automated checks
-also cover the repository's seven widths and keyboard/axe assertions. This is not
-a manual assistive-technology audit or production UI approval.
+## 11. Blockers and owners
 
-## Exact P0 file set
+| Gate | State | Required owner/evidence |
+|---|---|---|
+| T46 form comparability | BLOCKED | Measurement owner; approved real-form comparability |
+| T54 recovery/refund policy | BLOCKED | Product/commercial owner; approved policy |
+| T56 manual accessibility | UNVERIFIED | Accessibility owner; manual AT/device record |
+| T58 Layer C | BLOCKED | Measurement/operations owners; authorized credentials, spend and lineage |
+| Content/prompts | OPEN | Content owner |
+| Price/tax | OPEN | Product/commercial owner |
+| Privacy/retention | OPEN | Privacy owner / DPO |
+| Security | OPEN | Security owner |
+| Operations | OPEN | Operations owner |
 
-```text
-scripts/check-experience-baseline.mjs
-scripts/run-experience-baseline-tests.mjs
-scripts/start-audit-server.mjs
-server/test/experienceBaseline.test.js
-server/test/experienceBaseline.db.test.js
-docs/experience/BASELINE.md
-docs/experience/IMPLEMENTATION_STATE.md
-docs/experience/DECISIONS.md
-docs/experience/TEST_RESULTS.md
-docs/experience/CONTENT_REVIEW.md
-docs/experience/ROLLOUT.md
-docs/experience/FINAL_REPORT.md
-docs/ui/UI_PROGRAM_STATE.md
-docs/ui/FLOW_REPAIR_MAP.md
-docs/ui/FLOW_REPAIR_READINESS.md
-```
+Six independent sign-offs remain OPEN: product, engineering, measurement,
+content, privacy/security and operations. Code/test authors do not self-sign.
 
-The final three files receive only related checkpoint cross-references. Existing
-A-M completion markers and previous repair evidence remain unchanged.
-Dependency manifests/locks, runtime sources and pre-existing work are excluded
-from the local P0 phase commit. Audit output is ignored, synthetic and not committed.
-Verification includes the preserved dirty checkout, including its already-installed
-embedded-postgres dependency and entry/locking fixtures. This is not a clean-checkout
-release assertion; those pending changes need separate review/integration.
+## 12. Safe preflight and complete handover
 
-## Remaining gates and ordered handoff
+Before any activation, an authorized operator must: name owners; approve
+content/prompt, measurement, privacy/retention, security, price/tax, recovery
+and operations gates; run read-only reconciliation on the actual candidate;
+take and verify an environment-owned backup; verify build/schema compatibility;
+run the environment-relative manual sequence; review alerts/support readiness;
+record all six independent sign-offs; and obtain an explicit GO.
 
-| Next dependency | Owner/evidence needed | Status |
-| --- | --- | --- |
-| Actual deployed failure/success comparison | Named operator; approved case access; build/config/applied-schema provenance | NOT SUPPLIED |
-| P1 proven-owner history and durable acceptance design | Engineering/security review; conflict handling, compatibility and idempotency proof | OPEN; next implementation phase |
-| Save-before-evaluate and effect-before-receipt recovery | Engineering; PG crash/race/restart tests across actual engine effects | OPEN |
-| Governed evaluator/opportunity source | Content + measurement; reviewed method, source/provenance and technical-failure contracts | OPEN; P2/P4 |
-| Source retention, deletion and rebuilding basis | Privacy/counsel + operations + measurement; explicit reviewed source/retention contract | OPEN; no policy change here |
-| Pre-clock start/timing/accommodations | Measurement/accessibility/product; version-pinned administration review | OPEN; P3 |
-| Durable jobs/report publication/rollback | Engineering/operator; restart, lease, immutable-version and active-run rehearsal | OPEN |
-| Recovery credit/refund/reissue | Paul/finance/support; approved auditable policy | PROPOSED ONLY |
-| Universal/practice content | Named content/measurement reviewers; CORE-TEAMREADY-A and M01-M10 decisions | DRAFT INTAKE ONLY |
-| Live models, research and manual accessibility | Approved budget/consent/protocol; independent reviewers and actual users/devices | NOT RUN |
-
-The first next task is P1's reviewed identity/history/persistence foundation, not a
-cosmetic redesign or production flag flip. The P0 failure evidence supplies its
-priorities; it does not authorize protected implementation.
-
-## Compatibility, rollback and unchanged behaviour
-
-No application rollback is needed for P0's documentation/standalone diagnostics.
-The application still has its previous active-run/flag-off constraints; safe
-mid-assessment rollback is not proved. Do not use diagnostics to re-score,
-reclaim ownership, reissue a report or modify retention.
-
-Scoring, scientific gates, evidence generation, historical stimulus, timing,
-entitlements/billing, backend authorization, privacy/retention and credential
-cryptography are unchanged. Test-only flags and the existing external-model
-fixture are confined to disposable processes/stores. No production change,
-customer data access, live-model spending, participant contact, push, PR, merge
-or deployment occurred.
-
-Local phase commit: the explicit 15-file commit containing this handoff; its
-identifier is reported in the execution response. No pre-existing dirty files
-are included, and no push is authorized.
+If any release prohibition is present or unverified - acknowledged work loss,
+cross-user exposure, fabricated evidence, repeated technical zero result, no
+approved recovery policy, or unavailable advertised practice - go/no-go remains
+NO_GO. Follow `docs/experience/ROLLOUT.md`,
+`docs/experience/P10_MIGRATION_RUNBOOK.md`,
+`docs/experience/MANUAL_JOURNEYS.md` and
+`docs/experience/SUPPORT_RUNBOOK.md`. This handover is complete for code-safe
+work only; deployment and activation remain outside its authority.

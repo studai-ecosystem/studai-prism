@@ -21,6 +21,8 @@ async function startPersonalV3(page, label) {
   for (const item of ASSESSMENT_CONSENT_ITEMS) await page.getByLabel(item.label).check()
   await page.getByRole('button', { name: 'Begin assessment' }).click()
   await expect(page).toHaveURL(new RegExp(`/app/assessment/${dev.body.sessionId}$`))
+  const beginTimed = page.getByRole('dialog').getByRole('button', { name: 'Begin timed assessment' })
+  if (await beginTimed.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)) await beginTimed.click()
   return { student, sessionId: dev.body.sessionId }
 }
 

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'db', 'migrations')
-const NEW = /^00[4-9]\d_[a-z0-9_]+\.sql$/
+const NEW = /^00(?:4\d|5[0-3])_[a-z0-9_]+\.sql$/
 const createdTables = (sql) => [...sql.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+(?:public\.)?"?([a-z0-9_]+)"?/gi)].map((m) => m[1].toLowerCase())
 const droppedTables = (sql) => [...sql.matchAll(/DROP TABLE(?: IF EXISTS)?\s+(?:public\.)?"?([a-z0-9_]+)"?/gi)].map((m) => m[1].toLowerCase())
 
@@ -24,7 +24,7 @@ async function inventory() {
 test('P10.3: every 0040+ migration has a .down.sql companion', async () => {
   const { files, ups } = await inventory()
   const fresh = ups.filter((f) => NEW.test(f))
-  assert.ok(fresh.length >= 10, `expected the 0040-0049 range, found ${fresh.length}`)
+  assert.equal(fresh.length, 14, `expected the 0040-0053 range, found ${fresh.length}`)
   for (const f of fresh) assert.ok(files.includes(f.replace(/\.sql$/, '.down.sql')), `${f} has no .down.sql`)
 })
 

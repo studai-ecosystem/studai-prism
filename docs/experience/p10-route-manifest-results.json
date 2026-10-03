@@ -1,0 +1,185 @@
+{
+  "schemaVersion": "p10.routes.v1",
+  "environment": "LOCAL_CI_SYNTHETIC",
+  "credentialsIncluded": false,
+  "tokensIncluded": false,
+  "directRoutes": [
+    {
+      "id": "LOGIN",
+      "resolvedPath": "/login",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "REGISTER",
+      "resolvedPath": "/register",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "APP_ROOT",
+      "resolvedPath": "/app",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "HOME",
+      "resolvedPath": "/app/home",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "DASHBOARD_ALIAS",
+      "resolvedPath": "/dashboard",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "PROFILE_ALIAS",
+      "resolvedPath": "/profile",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "ASSESSMENT_HISTORY",
+      "resolvedPath": "/app/assessments",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "ASSIGNMENT_DETAIL",
+      "resolvedPath": "/app/assessments/pa_6d2476df9ff0ab9f7da7cdb27edbfdb8",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "ASSIGNMENT_BRIEFING",
+      "resolvedPath": "/app/assessments/pa_6d2476df9ff0ab9f7da7cdb27edbfdb8/briefing",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "ASSIGNMENT_SYSTEM_CHECK",
+      "resolvedPath": "/app/assessments/pa_6d2476df9ff0ab9f7da7cdb27edbfdb8/system-check",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "OWNED_PLAYER",
+      "resolvedPath": "/app/assessment/dec991df-2994-447b-869e-4b4c0fd2c18b",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "OWNED_LEGACY_REPORT_READER",
+      "resolvedPath": "/report/dec991df-2994-447b-869e-4b4c0fd2c18b/v2",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "REPORT_SELECTED_VERSION",
+      "resolvedPath": "/app/reports/dec991df-2994-447b-869e-4b4c0fd2c18b?version=1",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "CAPABILITY_MAP",
+      "resolvedPath": "/app/capabilities",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "CAPABILITY_DETAIL",
+      "resolvedPath": "/app/capabilities/communication",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "DEVELOPMENT",
+      "resolvedPath": "/app/development",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "MISSION",
+      "resolvedPath": "/app/development/missions/M09",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "PREPARATION",
+      "resolvedPath": "/app/prepare",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "PREPARATION_ATTEMPT_HONEST_STATE",
+      "resolvedPath": "/app/prepare/synthetic-missing-attempt",
+      "status": "PASS",
+      "httpStatus": 200
+    },
+    {
+      "id": "GROWTH_NOT_COMPARABLE",
+      "resolvedPath": "/app/growth",
+      "status": "PASS",
+      "httpStatus": 200
+    }
+  ],
+  "integratedResources": [
+    {
+      "id": "OWNED_LEGACY_REPORT",
+      "routePattern": "/report/{owned-synthetic-legacy-session-id}/v2",
+      "status": "PASS",
+      "evidenceFile": "tests/e2e/p1-legacy-report.spec.js"
+    },
+    {
+      "id": "PLAYER_EVIDENCE_REPORT_READY",
+      "routePattern": "/app/assessment/{synthetic-session-id} -> /app/reports/{synthetic-session-id}",
+      "status": "PASS",
+      "evidenceFile": "tests/e2e/p3-real-journey.spec.js"
+    },
+    {
+      "id": "MISSION_REPLAY_FRESH",
+      "routePattern": "/app/development/missions/{approved-mission-id}",
+      "status": "PASS",
+      "evidenceFile": "tests/e2e/p6-practice-journey.spec.js"
+    },
+    {
+      "id": "PREPARATION_ATTEMPT",
+      "routePattern": "/app/prepare/{synthetic-attempt-id}",
+      "status": "PASS",
+      "evidenceFile": "tests/e2e/p7-preparation-journey.spec.js"
+    },
+    {
+      "id": "APPROVED_PAID_PACKAGE_GATING",
+      "routePattern": "/pricing -> /payment -> /app/assessments",
+      "status": "PASS",
+      "evidenceFile": "tests/e2e/p8-commercial-journey.spec.js"
+    },
+    {
+      "id": "CAMPUS_LEARNER_AND_REPORT",
+      "routePattern": "/app/campus/{synthetic-organization-id}/reports/{synthetic-session-id}",
+      "status": "PASS",
+      "evidenceFile": "tests/e2e/campus-journey-a.spec.js"
+    },
+    {
+      "id": "CAMPUS_STAFF_PROGRAMME",
+      "routePattern": "/campus/{synthetic-organization-id}/programs/{synthetic-program-id}",
+      "status": "PASS",
+      "evidenceFile": "tests/e2e/campus-journey-c.spec.js"
+    },
+    {
+      "id": "SHARE_PREVIEW_OPEN_REVOKED",
+      "routePattern": "/shared/{generated-token-redacted}",
+      "status": "PASS",
+      "evidenceFile": "tests/e2e/campus-journey-a.spec.js"
+    },
+    {
+      "id": "SHARE_EXPIRED_AND_DENIED",
+      "routePattern": "/shared/{synthetic-expired-token-redacted}",
+      "status": "PASS",
+      "evidenceFile": "tests/e2e/p5-report-states.spec.js"
+    }
+  ],
+  "humanJourneyStatus": "NOT_RUN"
+}

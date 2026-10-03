@@ -24,19 +24,19 @@ test('P10.6: ScoreReport and StudentReportV2 readers (and the share page) still 
   }
 })
 
-test('P10.6: the route inventory classifies readers as LEGACY_READER (keep) and never marks a reader for retirement', async () => {
+test('P10.6: the route inventory classifies historical readers as retained and never marks a reader for retirement', async () => {
   const inv = await inventoryRoutes()
   assert.deepEqual(Object.keys(inv.summary).sort(), [...CLASSES].sort())
   const byPath = Object.fromEntries(inv.client.map((r) => [r.path, r]))
   for (const path of ['/score', '/report/:sessionId/v2', '/report/:sessionId/employee', '/shared/:token']) {
-    assert.equal(byPath[path]?.class, 'LEGACY_READER', `${path} is a reader`)
+    assert.equal(byPath[path]?.class, 'HISTORICAL_READER', `${path} is a reader`)
     assert.equal(byPath[path]?.retire, false)
   }
-  assert.equal(byPath['/assessment']?.class, 'LEGACY_CREATION')
-  assert.equal(byPath['/payment']?.class, 'LEGACY_CREATION')
-  assert.equal(byPath['/app/assessment/:sessionId']?.class, 'V3')
-  assert.ok(inv.server.some((r) => r.mount === '/api/v1' && r.class === 'V3'))
-  assert.ok(inv.server.some((r) => r.mount === '/api/payment' && r.class === 'LEGACY_CREATION'))
+  assert.equal(byPath['/assessment']?.class, 'RETIRE_AFTER_DRAIN')
+  assert.equal(byPath['/payment']?.class, 'RETIRE_AFTER_DRAIN')
+  assert.equal(byPath['/app/assessment/:sessionId']?.class, 'ACTIVE_NEW')
+  assert.ok(inv.server.some((r) => r.mount === '/api/v1' && r.class === 'ACTIVE_NEW'))
+  assert.ok(inv.server.some((r) => r.mount === '/api/payment' && r.class === 'RETIRE_AFTER_DRAIN'))
   assert.equal(inv.deletionsPerformed, 0)
   assert.doesNotMatch(JSON.stringify(inv), /postgres:\/\/|Bearer /)
 })

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "p10.handover.v1",
+  "programme": "StudAI Prism experience transformation",
+  "baselineCommit": "d9186b8",
+  "releaseConfigVersion": 2,
+  "migrationHead": "0053_intent_display_and_research",
+  "migrationCount": 53,
+  "allowedState": "CODE_IMPLEMENTED_WITH_VERIFICATION_BLOCKERS",
+  "verdict": "NO_GO",
+  "productionActivated": false,
+  "deployed": false,
+  "manualApprovalClaimed": false,
+  "layerCClaimed": false,
+  "checklist": [
+    { "id": "P10.1", "status": "PASS", "evidence": ["scripts/change-ledger.mjs", "scripts/check-change-ledger.mjs"] },
+    { "id": "P10.2", "status": "PASS", "evidence": ["server/domain/release/config.js", "server/test/release.test.js"] },
+    { "id": "P10.3", "status": "PASS", "evidence": ["scripts/rehearse-migrations.mjs", "scripts/reconcile-release-candidate.mjs"] },
+    { "id": "P10.4", "status": "PASS", "evidence": ["server/domain/release/config.js", "docs/experience/ROLLOUT.md"] },
+    { "id": "P10.5", "status": "PASS", "evidence": ["scripts/rehearse-rollback.mjs", "server/test/rollback.test.js"] },
+    { "id": "P10.6", "status": "PASS", "evidence": ["scripts/route-usage-inventory.mjs", "scripts/check-route-inventory.mjs"] },
+    { "id": "P10.7", "status": "PASS", "evidence": ["tests/e2e/p10-handover-journey.spec.js", "scripts/check-p10-route-manifest.mjs", "docs/experience/p10-route-manifest-results.json"] },
+    { "id": "P10.8", "status": "PASS", "evidence": ["server/domain/metrics/alerts.js", "docs/experience/SUPPORT_RUNBOOK.md"] },
+    { "id": "P10.9", "status": "BLOCKED", "evidence": ["server/domain/release/goNoGo.js", "scripts/programme-validation-ledger.mjs"], "blockers": ["SIX_INDEPENDENT_SIGNOFFS_OPEN", "EXTERNAL_GATES_OPEN"] },
+    { "id": "P10.10", "status": "PASS", "evidence": ["docs/experience/FINAL_REPORT.md", "docs/experience/P10_HANDOVER.json"] }
+  ],
+  "validationLedger": {
+    "PASS": 56,
+    "BLOCKED": 3,
+    "UNVERIFIED": 1,
+    "blocked": ["T46", "T54", "T58"],
+    "unverified": ["T56"]
+  },
+  "changeLedger": {
+    "total": 52,
+    "IMPLEMENTED": 43,
+    "RETAINED": 3,
+    "EXTERNAL_GATE": 1,
+    "ADAPTER": 2,
+    "DEFERRED": 3
+  },
+  "independentSignoffs": [
+    { "id": "ENGINEERING", "ownerRole": "Engineering owner", "status": "OPEN" },
+    { "id": "CONTENT", "ownerRole": "Content owner", "status": "OPEN" },
+    { "id": "MEASUREMENT", "ownerRole": "Measurement owner", "status": "OPEN" },
+    { "id": "SECURITY_PRIVACY", "ownerRole": "Privacy/security owner", "status": "OPEN" },
+    { "id": "PRODUCT_FINANCE", "ownerRole": "Product/commercial owner", "status": "OPEN" },
+    { "id": "OPERATIONS", "ownerRole": "Operations owner", "status": "OPEN" }
+  ],
+  "externalGates": [
+    { "id": "T46", "status": "BLOCKED", "ownerRole": "Measurement owner", "reason": "Real form comparability approval is not available." },
+    { "id": "T54", "status": "BLOCKED", "ownerRole": "Product/commercial owner", "reason": "Recovery and refund policy is proposed, not approved." },
+    { "id": "T56", "status": "UNVERIFIED", "ownerRole": "Accessibility owner", "reason": "Manual accessibility and real-device evidence is not run." },
+    { "id": "T58", "status": "BLOCKED", "ownerRole": "Measurement and operations owners", "reason": "Authorized Layer C credentials, spend and lineage are unavailable." }
+  ],
+  "additionalApprovals": [
+    { "id": "CONTENT_AND_PROMPTS", "ownerRole": "Content owner", "status": "OPEN" },
+    { "id": "PRICE_AND_TAX", "ownerRole": "Product/commercial owner", "status": "OPEN" },
+    { "id": "PRIVACY_AND_RETENTION", "ownerRole": "Privacy owner / DPO", "status": "OPEN" },
+    { "id": "SECURITY", "ownerRole": "Security owner", "status": "OPEN" },
+    { "id": "OPERATIONS", "ownerRole": "Operations owner", "status": "OPEN" }
+  ],
+  "layerBLineage": [
+    "server/test/p2Slice.db.test.js",
+    "tests/e2e/p3-real-journey.spec.js",
+    "tests/e2e/p4-six-stages.spec.js",
+    "tests/e2e/p5-report-states.spec.js",
+    "tests/e2e/p6-practice-journey.spec.js",
+    "tests/e2e/p7-preparation-journey.spec.js",
+    "tests/e2e/p8-commercial-journey.spec.js"
+  ]
+}
