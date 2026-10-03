@@ -118,8 +118,8 @@ describe('Growth page (V2)', () => {
         historyItem({ id: 'PREPARATION_ATTEMPT:q1', sourceType: 'PREPARATION_ATTEMPT', mode: 'PREPARATION', title: 'Negotiate a deadline', completedAt: '2026-10-22T10:00:00.000Z', permittedAction: { kind: 'VIEW', to: '/app/prepare/q1' } }),
         historyItem({ id: 'SELF_REPORT:c1', sourceType: 'SELF_REPORT', mode: 'SELF_REPORT', title: 'Your own note', completedAt: '2026-10-23T10:00:00.000Z' }),
       ], nextCursor: null } },
-      'GET /api/v1/checkins': { data: { items: [{ id: 'c1', mode: 'SELF_REPORT', scope: 'PERSONAL', sourceType: 'PREPARATION', sourceId: 'q1', whatTried: 'Named the constraint first.', outcome: 'We agreed a date.', createdAt: '2026-10-23T10:00:00.000Z' }] } },
-      'POST /api/v1/checkins': (u, init) => jsonResponse(201, { data: { id: 'c2', mode: 'SELF_REPORT', scope: 'PERSONAL', sourceId: null, ...JSON.parse(init.body), createdAt: null } }),
+      'GET /api/v1/checkins': { data: { items: [{ id: 'c1', mode: 'SELF_REPORT', scope: 'PERSONAL', sourceType: 'PREPARATION', sourceId: 'q1',       whatTried: 'Named the constraint first.', outcome: 'We agreed a date.', nextStep: null, createdAt: '2026-10-23T10:00:00.000Z' }] } },
+            'POST /api/v1/checkins': (u, init) => jsonResponse(201, { data: { id: 'c2', mode: 'SELF_REPORT', scope: 'PERSONAL', sourceId: null, nextStep: null, ...JSON.parse(init.body), createdAt: null } }),
       '/api/v1/me': meBody({ flags: { ...flags, PRISM_PREPARATION_V1: true } }),
     })
     renderApp(<Routes><Route path="/app/growth" element={<GrowthPage />} /></Routes>, { route: '/app/growth' })
@@ -134,19 +134,39 @@ describe('Growth page (V2)', () => {
     expect(practice).toHaveTextContent('Negotiate a deadline')
     expect(practice).not.toHaveTextContent('Prism Workplace Simulation')
 
+    // Formal history (T46): one dated snapshot per published result, each
+    // saying why it is not compared; no arrow, delta or trend between them.
+    const formal = screen.getByTestId('growth-formal-history')
+    expect(within(formal).getByRole('heading', { name: 'Formal history' })).toBeInTheDocument()
+    const snapshots = within(formal).getAllByTestId('formal-snapshot')
+    expect(snapshots).toHaveLength(2)
+    for (const s of snapshots) {
+      expect(s).toHaveTextContent('Form version 1.0.0')
+      expect(s).toHaveTextContent(/Comparability: /)
+    }
+    expect(formal).toHaveTextContent(/never updates an earlier one/)
+    expect(formal).not.toHaveTextContent('Separate cause from symptom')
+    expect(formal.querySelector('svg, [data-direction], [data-delta]')).toBeNull()
+
     const notes = screen.getByTestId('growth-self-report')
-    expect(within(notes).getByRole('heading', { name: 'Your own notes (self-reported)' })).toBeInTheDocument()
-    expect(await within(notes).findByTestId('self-report-item')).toHaveTextContent('Named the constraint first.')
+    expect(within(notes).getByRole('heading', { name: 'Application reflections' })).toBeInTheDocument()
+    expect(notes).toHaveTextContent('Self-reported')
+    const note = await within(notes).findByTestId('self-report-item')
+    expect(note).toHaveTextContent('Named the constraint first.')
+    expect(note).toHaveTextContent('after a private preparation')
+    expect(within(note).getByRole('button', { name: /Edit/ })).toBeInTheDocument()
+    expect(within(note).getByRole('button', { name: /Delete/ })).toBeInTheDocument()
     expect(notes).toHaveTextContent(/cannot change a formal result/)
     await user.click(within(notes).getByRole('button', { name: 'Add a note' }))
-    expect(within(notes).getByText('What did you try? What happened?')).toBeInTheDocument()
-    await user.type(within(notes).getByLabelText('What did you try?'), 'Asked who owns the next step.')
+    expect(within(notes).getByText('Did you try it? What happened? What next?')).toBeInTheDocument()
+    await user.type(within(notes).getByLabelText('Did you try it? What did you do?'), 'Asked who owns the next step.')
     await user.type(within(notes).getByLabelText('What happened?'), 'It was agreed.')
     await user.click(within(notes).getByRole('button', { name: 'Save check-in' }))
     expect(await within(notes).findByTestId('checkin-saved')).toBeInTheDocument()
     const post = calls.find((c) => c.method === 'POST' && c.url.endsWith('/api/v1/checkins'))
     expect(post.body).toEqual({ sourceType: 'REPORT', whatTried: 'Asked who owns the next step.', outcome: 'It was agreed.' })
-    expect(document.body.textContent).not.toMatch(/\d+\s*%|score|points|±|higher level|lower level/i)
+    expect(post.body.mode).toBeUndefined()
+    expect(document.body.textContent).not.toMatch(/\d+\s*%|score|points|±|higher level|lower level|↑|↓|trend/i)
   })
 
   it('campus: an open reassessment links to campus assignments and says when it cannot show a change', async () => {

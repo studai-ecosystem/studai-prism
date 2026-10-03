@@ -37,6 +37,9 @@ export const ERROR_STATUS = Object.freeze({
   // P6 practice: a bounded allowance is used up / no unfamiliar setting left.
   ALLOWANCE_EXHAUSTED: 409,
   NO_FRESH_CHALLENGE: 409,
+  // P7.2: a preparation request Prism will not rehearse (harassment,
+  // coercion, deception, unauthorised disclosure, crisis). Bounded refusal.
+  PREPARATION_OUT_OF_SCOPE: 422,
   // P10.2/P10.5 release gates: a new run is refused before any credit moves;
   // a pinned run whose method this build no longer carries fails closed
   // (never a legacy-engine fallback).

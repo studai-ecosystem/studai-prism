@@ -7,7 +7,7 @@ import { PageHeader } from '../../../components/ui/PageHeader.jsx'
 import { Panel } from '../../../components/ui/Card.jsx'
 import { LinkButton } from '../../../components/ui/Button.jsx'
 import { EmptyState } from '../../../components/states/index.js'
-import { Callout } from '../../../components/ui/Notice.jsx'
+import { Callout, InlineNotice } from '../../../components/ui/Notice.jsx'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useGrowth } from '../../student/hooks.js'
 import { queryStateView, formatDateTime, formatDate } from '../../student/QueryState.jsx'
@@ -25,16 +25,18 @@ import { Badge } from '../../../components/ui/Badge.jsx'
 import { Button } from '../../../components/ui/Button.jsx'
 import { useState } from 'react'
 
-// CH-36: practice and self-reported notes sit in their own sections, apart
-// from the formal comparison. They list what happened and when; no change,
-// delta or trend is derived from them.
+// CH-36 / P7.6: three groups, kept apart. Practice history and application
+// reflections list what happened and when; no change, delta or trend is
+// derived from them. Formal history lists each published result as its own
+// dated snapshot with form and comparability; a later result never updates
+// an earlier one and nothing here draws an arrow or a line between them.
 function PracticeHistorySection() {
   const history = useStudentHistory()
   const items = history.data ? history.data.pages.flatMap((p) => p.items).filter((i) => i.mode === 'PRACTICE' || i.mode === 'PREPARATION') : []
   return (
     <section aria-labelledby="growth-practice-history" className="space-y-3" data-testid="growth-practice-history">
       <h2 id="growth-practice-history" className="text-lg font-semibold text-prism-ink">Practice history</h2>
-      <p className="text-sm text-prism-ink-muted">Practice missions and private preparation you did, kept separate from formal assessments. They are not part of any comparison.</p>
+      <p className="text-sm text-prism-ink-muted">Practice missions and private preparation you did, with the assistance you used and the behaviours Prism could quote from your own lines. Kept separate from formal assessments and never part of a comparison.</p>
       {history.isPending && <p className="text-sm text-prism-ink-muted">Loading practice history…</p>}
       {history.error && <p className="text-sm text-prism-ink-muted">Practice history could not be loaded right now.</p>}
       {history.data && items.length === 0 && <p className="text-sm text-prism-ink-muted">No practice yet.</p>}
@@ -44,9 +46,13 @@ function PracticeHistorySection() {
             <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm" data-mode={i.mode}>
               <span className="flex flex-wrap items-center gap-2">
                 <Badge tone={i.mode === 'PRACTICE' ? 'accent' : 'neutral'}>{HISTORY_MODE_LABEL[i.mode]}</Badge>
+                {i.practice?.assistanceMode === 'UNCOACHED' && <Badge tone="neutral">Uncoached</Badge>}
                 <span className="font-medium text-prism-ink">{i.title || (i.mode === 'PRACTICE' ? 'Practice mission' : 'Preparation')}</span>
               </span>
-              <span className="text-prism-ink-muted">{formatDate(i.completedAt || i.startedAt) || 'Date not recorded'}</span>
+              <span className="flex flex-wrap items-center gap-3">
+                <span className="text-prism-ink-muted">{formatDate(i.completedAt || i.startedAt) || 'Date not recorded'}</span>
+                {i.permittedAction?.to && i.permittedAction.kind !== 'NONE' && <LinkButton to={i.permittedAction.to} variant="ghost" size="sm">Open<span className="sr-only">: {i.title || 'practice'}</span></LinkButton>}
+              </span>
             </li>
           ))}
         </ul>
@@ -55,38 +61,95 @@ function PracticeHistorySection() {
   )
 }
 
+function SelfReportItem({ c, actions }) {
+  const [editing, setEditing] = useState(false)
+  if (editing) {
+    return (
+      <li className="rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface px-4 py-3 text-sm" data-testid="self-report-item">
+        <CheckinForm
+          sourceType={c.sourceType}
+          initial={c}
+          onSubmit={async (edits) => { const ok = await actions.editCheckin.mutateAsync({ id: c.id, edits }).catch(() => null); if (ok) setEditing(false) }}
+          submitting={actions.editCheckin.isPending}
+          error={actions.editCheckin.error}
+          onCancel={() => setEditing(false)}
+        />
+      </li>
+    )
+  }
+  return (
+    <li className="rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface px-4 py-3 text-sm" data-testid="self-report-item">
+      <p className="text-xs text-prism-ink-subtle">{formatDate(c.createdAt) || 'Date not recorded'}{c.sourceType === 'PREPARATION' && c.sourceId ? ' · after a private preparation' : ''}</p>
+      <p className="mt-1 text-prism-ink"><span className="font-medium">Tried:</span> {c.whatTried}</p>
+      <p className="mt-1 text-prism-ink"><span className="font-medium">Happened:</span> {c.outcome}</p>
+      {c.nextStep && <p className="mt-1 text-prism-ink"><span className="font-medium">Next:</span> {c.nextStep}</p>}
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Edit<span className="sr-only"> this note</span></Button>
+        <Button variant="ghost" size="sm" onClick={() => actions.deleteCheckin.mutate(c.id)} loading={actions.deleteCheckin.isPending && actions.deleteCheckin.variables === c.id} loadingLabel="Deleting…">Delete<span className="sr-only"> this note</span></Button>
+      </div>
+    </li>
+  )
+}
+
 function SelfReportSection() {
   const checkins = useCheckins()
-  const { checkin } = usePreparationActions()
+  const actions = usePreparationActions()
+  const { checkin } = actions
   const [open, setOpen] = useState(false)
   return (
     <section aria-labelledby="growth-self-report" className="space-y-3" data-testid="growth-self-report">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 id="growth-self-report" className="text-lg font-semibold text-prism-ink">Your own notes (self-reported)</h2>
+        <h2 id="growth-self-report" className="text-lg font-semibold text-prism-ink">Application reflections</h2>
         <Badge tone="insufficient">{PREPARATION_COPY.selfReportLabel}</Badge>
       </div>
-      <p className="text-sm text-prism-ink-muted">{PREPARATION_COPY.selfReportNote}</p>
+      <p className="text-sm text-prism-ink-muted">Your own notes about trying something outside Prism. {PREPARATION_COPY.selfReportNote} Private to you; nobody at an institution can see them.</p>
       {checkins.isPending && <p className="text-sm text-prism-ink-muted">Loading your notes…</p>}
       {checkins.error && <p className="text-sm text-prism-ink-muted">Your notes could not be loaded right now.</p>}
       {checkins.data && checkins.data.length === 0 && <p className="text-sm text-prism-ink-muted">No notes yet.</p>}
+      {actions.deleteCheckin.error && <InlineNotice tone="blocked">{actions.deleteCheckin.error.message}</InlineNotice>}
       {checkins.data && checkins.data.length > 0 && (
         <ul className="space-y-2">
-          {checkins.data.map((c) => (
-            <li key={c.id} className="rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface px-4 py-3 text-sm" data-testid="self-report-item">
-              <p className="text-xs text-prism-ink-subtle">{formatDate(c.createdAt) || 'Date not recorded'}</p>
-              <p className="mt-1 text-prism-ink"><span className="font-medium">Tried:</span> {c.whatTried}</p>
-              <p className="mt-1 text-prism-ink"><span className="font-medium">Happened:</span> {c.outcome}</p>
-            </li>
-          ))}
+          {checkins.data.map((c) => <SelfReportItem key={c.id} c={c} actions={actions} />)}
         </ul>
       )}
       {open
         ? (
           <Panel title={PREPARATION_COPY.checkinPrompt} headingLevel={3}>
-            <CheckinForm sourceType="REPORT" onSubmit={(body) => checkin.mutate(body)} submitting={checkin.isPending} error={checkin.error} saved={checkin.isSuccess} onDone={() => { checkin.reset(); setOpen(false) }} />
+            <CheckinForm sourceType="REPORT" onSubmit={(body) => checkin.mutate(body)} submitting={checkin.isPending} error={checkin.error} saved={checkin.isSuccess} onDone={() => { checkin.reset(); setOpen(false) }} onCancel={() => setOpen(false)} />
           </Panel>
         )
         : <Button variant="secondary" onClick={() => setOpen(true)}>Add a note</Button>}
+    </section>
+  )
+}
+
+// Formal history (P7.6): one dated snapshot per published result with its
+// method, form and comparability. Separate snapshots, no arrows, no deltas.
+function FormalHistorySection({ g }) {
+  const role = (sessionId) => (g.comparison?.baseline.sessionId === sessionId ? 'Baseline of the approved comparison' : g.comparison?.reassessment.sessionId === sessionId ? 'Reassessment of the approved comparison' : null)
+  const reason = GROWTH_REASON_COPY[g.reason]?.title || 'Not compared'
+  return (
+    <section aria-labelledby="growth-formal-history" className="space-y-3" data-testid="growth-formal-history">
+      <h2 id="growth-formal-history" className="text-lg font-semibold text-prism-ink">Formal history</h2>
+      <p className="text-sm text-prism-ink-muted">Each published formal result is its own dated snapshot. A later result is added; it never updates an earlier one. A change is named only between two snapshots whose forms are approved as comparable.</p>
+      {g.assessments.length === 0 && <p className="text-sm text-prism-ink-muted">No published formal result yet.</p>}
+      {g.assessments.length > 0 && (
+        <ul className="divide-y divide-prism-border rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface">
+          {g.assessments.map((a) => (
+            <li key={a.sessionId} className="space-y-1 px-4 py-3 text-sm" data-testid="formal-snapshot">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="accent">{HISTORY_MODE_LABEL.FORMAL}</Badge>
+                <span className="font-medium text-prism-ink">{a.title || 'Assessment'}</span>
+                <span className="text-prism-ink-muted">{formatDate(a.completedAt) || 'Date not recorded'}</span>
+              </div>
+              <p className="text-xs text-prism-ink-subtle">
+                Method: work simulation, evidence-based report{a.form ? ` · Form version ${a.form.version}${a.form.status === 'RETIRED' ? ' (retired)' : ''}` : ' · Form not recorded'}
+                {' · '}{role(a.sessionId) || `Comparability: ${reason}`}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }
@@ -165,6 +228,7 @@ export default function GrowthPage() {
       <GrowthTimeline assessments={g.assessments} interventions={g.interventions} reassessments={g.reassessments} comparison={g.comparison} />
       {preparationOn && (
         <>
+          <FormalHistorySection g={g} />
           <PracticeHistorySection />
           <SelfReportSection />
         </>

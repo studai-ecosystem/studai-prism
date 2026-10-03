@@ -221,7 +221,7 @@ const PlanSchema = z.object({
 
 const GrowthSessionRef = z.object({
   sessionId: z.string(), title: z.string().nullable(), completedAt: z.string().nullable(),
-  form: z.object({ id: z.string(), version: z.string() }).nullable().optional().default(null),
+  form: z.object({ id: z.string(), version: z.string(), status: z.string().nullable().optional().default(null) }).nullable().optional().default(null),
 })
 const BandLabel = z.object({ band: z.enum(['EARLY', 'DEVELOPING', 'DEMONSTRATED', 'STRONG']), label: z.string() })
 // A change is a level-label change on an approved comparable pair; there is

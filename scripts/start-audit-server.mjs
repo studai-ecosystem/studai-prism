@@ -36,6 +36,10 @@ if (process.env.PRISM_AUDIT_CAMPUS === 'true') {
   // offered to non-production dev entitlements inside this throwaway campus
   // audit process. Never set in .env or any real environment.
   if (process.env.PRISM_AUDIT_DRAFT_CONTENT === 'true') process.env.PRISM_DRAFT_CONTENT = 'true'
+  // P7 real journey (runner mode p7 only): private preparation routes and
+  // nav inside this throwaway campus audit process. Never set in .env or
+  // any real environment.
+  if (process.env.PRISM_AUDIT_PREPARATION === 'true') process.env.PRISM_PREPARATION_V1 = 'true'
   // Campus store for org/membership e2e (Journey B): ONLY a throwaway test
   // database handed in by the runner (local PGlite / CI service container).
   if (process.env.PRISM_AUDIT_CAMPUS_DATABASE_URL) {

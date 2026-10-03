@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, p2, p3, p4, p5, p6, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
+if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, p3, p4, p5, p6, p7, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -107,6 +107,16 @@ try {
   if (mode === 'p6') {
     env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
     browserArgs.splice(2, browserArgs.length, 'p6-practice-journey.spec.js', '--project=chromium')
+  }
+  // P7: the real-browser private preparation journey (wizard → sanitized
+  // summary with assumptions → rehearsal with assistance attribution → card
+  // → application suggestion → check-in → history/growth groups → delete),
+  // desktop Chromium with 1440/390 screenshots; draft content and the
+  // preparation routes on the 4174 audit server only.
+  if (mode === 'p7') {
+    env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
+    env.PRISM_AUDIT_PREPARATION = 'true'
+    browserArgs.splice(2, browserArgs.length, 'p7-preparation-journey.spec.js', '--project=chromium')
   }
   exitCode = await run(mode === 'database'
     ? ['--test', 'server/test/experienceBaseline.db.test.js']

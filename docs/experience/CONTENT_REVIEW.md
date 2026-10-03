@@ -59,8 +59,8 @@ configuration.
 | S14 | Meaningful moment | Existing report evidence view and `/app/evidence`; no dedicated new moment route identified | PARTIAL (code). Planned action -> behaviour -> capability -> next behaviour presentation needs real eligible lineage; no invented quote/moment. |
 | S15 | Practice and retry | `/app/development`, `/app/development/missions/:missionId`; DevelopmentPage/MissionPlayerPage; legacy `/missions` | EXISTS (code). Existing mission catalogue/attempts are not the proposed M01-M10 library; check unavailable/empty, practice label, assistance and separate attempts. |
 | S16 | Replay and unfamiliar challenge | Existing server replay domain mounted at `/api/replay`; no dedicated replay/fresh-challenge screen identified in AppRouter | PARTIAL (code). Retrying a current mission is not proof of the complete P6 replay/fresh-task experience. |
-| S17 | Private preparation | No dedicated preparation route identified in AppRouter | PLANNED (P7). Do not relabel Explore or a formal form as preparation. |
-| S18 | Application check-in | No dedicated application/self-report check-in route identified; existing Growth page is separate | PLANNED (P7). Self-report cannot silently change formal evidence or become measured growth. |
+| S17 | Private preparation | `/app/prepare`, `/app/prepare/:attemptId` (P7, flag `PRISM_PREPARATION_V1`): wizard, sanitized summary, untimed rehearsal, AI-assistance card, application suggestion | IMPLEMENTED (code, DRAFT prompts, flag off). Never relabels Explore or a formal form as preparation. |
+| S18 | Application check-in | `CheckinForm` on the card and on Growth "Application reflections"; `/api/v1/checkins` SELF_REPORT | IMPLEMENTED (code). Self-report cannot change formal evidence or become measured growth (tested). |
 | S19 | Campus learner disclosure and sponsored history | `/app/campus/:organizationId/{home,assignments,development,reports/:sessionId}`; shared pages plus workspace guards | EXISTS (code). Show sponsor/workspace and actual audience; personal history and preparation stay outside sponsored scope. |
 | S20 | Campus report audience and sharing | `/campus/:organizationId/reports/:sessionId`, `/shared/:token`, existing share dialog | EXISTS (code). Role, scope and SUMMARY/FULL disclosure must be confirmed server-side. No promise of complete privacy or unrestricted sponsor access. |
 
@@ -98,6 +98,26 @@ cannot close manual accessibility or real-pipeline gates.
 | Auto-filled plan board presented as the learner's work | Template/AI material retains attribution; only eligible learner actions can support findings. |
 
 ## Appendix B: DRAFT reviewer intake
+
+### Preparation prompts v2 + assist v1 (P7, 2026-10-03) - still DRAFT, not approved
+
+`server/prompts/preparation_participant.v2.md` (bounded counterpart: one to three sentences,
+plausible reasonable pushback, no coaching, in-character refusal of harassment/coercion/
+deception/disclosure, scoped limitation line for legal/medical/crisis, plain text only, cannot
+change mode/scope/timer/rubric/billing/publication/authorisation), `preparation_action_card.v2.md`
+(strict JSON card: situation, 3–5 plan steps, opening, 1–3 questions, ≤3 trade-offs, one
+boundary/escalation option, self-check, plus ≤4 observations that must quote the learner's own
+lines verbatim from `<candidate_transcript>`), and `preparation_assist.v1.md` (exactly one sample
+sentence ≤160 characters in the learner's voice, labelled assistance in the product, never
+assessed). The `.v1` participant and card prompts remain in the repository for version-aware
+adapters. The server enforces every rule the prompts state: learner text is delimited data in the
+user message, output is validated with strict schemas, non-verbatim quotes are dropped. Reviewers
+should judge: (1) whether the counterpart's pushback reads as a reasonable colleague rather than a
+test; (2) whether the card is usable in two minutes before a real conversation and never reads as
+advice about the learner's ability; (3) whether the refusal and limitation sentences are respectful
+and not alarming; (4) the deterministic safety word lists in `server/domain/preparation/safety.js`
+for false positives on ordinary assertive language. Nothing here is self-approved; the flag stays
+off.
 
 ### M01–M10 reviewer package complete in code (P6, 2026-10-03) - still DRAFT, not approved
 

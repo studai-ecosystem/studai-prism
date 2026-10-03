@@ -94,13 +94,27 @@ function textFor(task, request) {
     // Deterministic rehearsal counterpart: one bounded pushback line.
     return 'I hear you. Before I agree, what would change if we kept the current date, and who owns the next step?'
   }
+  if (task === 'preparation_assist') {
+    return 'Could we agree who owns the next step and when we will check in?'
+  }
   if (task === 'preparation_action_card') {
+    // P7: the learner's lines arrive in the user message inside
+    // <candidate_transcript>; quote the first learner line verbatim (as a real
+    // model is told to) so the server's quote check has something to verify.
+    const user = (request?.messages || []).map((m) => (m.content || []).map((c) => c.text || '').join('\n')).join('\n')
+    const transcript = (user.split('<candidate_transcript>').pop() || '').split('</candidate_transcript>')[0]
+    const learner = transcript.split('\n').map((l) => l.trim()).find((l) => l.startsWith('Learner: '))
+    const quote = learner ? learner.slice('Learner: '.length).trim() : ''
+    const observations = quote ? [{ behaviour: 'CLARIFIED_CONSTRAINT', quote: quote.length <= 400 ? quote : quote.slice(0, quote.lastIndexOf(' ', 400)) }] : []
     return JSON.stringify({
       situation: 'You are preparing to raise a timing concern with a counterpart.',
       plan: ['State the constraint you named in one sentence.', 'Offer one realistic alternative and its trade-off.', 'Ask who owns the next step and when you will check in.'],
-      keyMessage: 'I want to agree a date we can both hold, so here is the constraint I am working with.',
-      risks: ['The counterpart may ask for a detail you have not prepared.'],
-      checkpoint: 'Ownership and the next check-in are agreed before the conversation ends.',
+      opening: 'I want to agree a date we can both hold, so here is the constraint I am working with.',
+      questions: ['What would change for you if the date moved by a week?'],
+      tradeoffs: ['A later date keeps the review step but delays the demo.'],
+      boundary: 'If no date works for both of you, agree to take the decision to the person who owns the deadline.',
+      selfCheck: 'Ownership and the next check-in are agreed before the conversation ends.',
+      observations,
     })
   }
   if (task === 'opening' || task === 'conversation') {

@@ -1,5 +1,77 @@
 # P0 - Verification results
 
+## P7 remaining gaps closed - 2026-10-03
+
+Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider
+`auditConverse` only — NODE_ENV=test + PRISM_AUDIT_AI=true; no live model, no production data):
+
+| Command | Layer | Result |
+| --- | --- | --- |
+| `cd server; npm test` | A/B (routes + memory repos) | 868: **842 pass, 0 fail**, 26 pre-existing DB skips (`preparation.test.js` 16 incl. new gateway-policy test; `growthEligibility.test.js` T46 rules; `aiModelRouter.test.js` unchanged) |
+| `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | A | 38 files, **513 pass, 0 fail** (`preparation.test.jsx` rewritten 7 → 11 against the new UI; `growth.test.jsx` three groups; `history.test.jsx` +1 → 8 private groups) |
+| `npm run build` | Build | PASS |
+| `npm run audit:static` | Static | PASS (`audit-results/static-audit.md`, 1611 files, 429 routes, 110 review leads) |
+| `node scripts/run-experience-baseline-tests.mjs database` | B | 6/6; **52 migrations** (new `0052_preparation_hardening` + `.down.sql`) |
+| `node scripts/run-experience-baseline-tests.mjs p7` | B in browser | **1 passed, 0 failed** (chromium, 26.6 s): `tests/e2e/p7-preparation-journey.spec.js`; the first runs found defects 1–3 below |
+
+`p7` runner mode: embedded throwaway PostgreSQL for the 4174 campus audit server, with
+`PRISM_AUDIT_DRAFT_CONTENT=true` and `PRISM_AUDIT_PREPARATION=true` (→ `PRISM_PREPARATION_V1`) in
+that process only; desktop Chromium, screenshots at 1440 and 390 under `audit-results/ui/p7/`
+(`01-prepare-empty` … `09-growth-groups`, 18 files), axe serious/critical clean and no horizontal
+overflow at both widths on every step. The journey is REAL end to end for a learner with **no
+formal baseline**: register → Prepare from the nav (private by default, allowance stated) → wizard
+(six situations, one field per step; an email typed into the counterpart field comes back as
+`[email removed]`; sanitized summary with six restated assumptions; one assumption removed; confirm
+sends only the edits) → untimed rehearsal (opening sent with Tab + Enter, T56; deterministic
+counterpart pushback labelled AI-GENERATED; a requested sample sentence appears only under
+"Need a hand?" with `data-authorship=ASSISTANT`, never in the log; revised line; "Your lines: 3 of
+40 · AI suggestions: 1 of 5") → rename → pause → resume from the list → finish → card labelled
+"AI assistance" with plan / opening / questions / trade-offs / boundary / self-check; one
+observation "Clarified a constraint" quoting the learner's opening verbatim and neither the
+counterpart's nor the assistant's words → card edited ("You adjusted this card…") → application
+suggestion from the practice target, edited ("Your wording"), in-app reminder opted in and shown on
+the Prepare list only → SELF_REPORT check-in saved → History groups "Private preparation" and
+"Your own note (self-reported)", no Formal or Practice group → Growth: Formal history "No published
+formal result yet" with the not-comparable rule, Practice history (PREPARATION row), Application
+reflections (the note), no arrow/delta/trend. API: `assessedCount` 0, `/me/evidence` **empty**,
+history modes exactly `PREPARATION` + `SELF_REPORT`, learner turns = the three typed lines,
+campus workspace header on list/detail/check-ins → 403/404 with no learner text in the body,
+`mode: FORMAL` in a check-in body → 422 `VALIDATION_FAILED`.
+
+Real defects found by this pass (all fixed, re-verified):
+
+1. **Every rehearsal line failed with PROVIDER_ERROR on the real gateway.** `modelRouter.js` had no
+   routing policy for `preparation_participant` / `preparation_assist` / `preparation_action_card`,
+   so `createCompletion` threw "Unknown AI task"; unit tests passed because they stubbed `complete`.
+   Policies added (conversation model with fallback for the two spoken tasks; primary, **no
+   fallback**, for the strict card); `preparation.test.js` now asserts each task is routable with a
+   bounded timeout and that a client model override is refused.
+2. Counterpart role label under replies cut the learner's description mid-word
+   (`…reach them at [emai`). `RehearsalView.jsx` now cuts on a word boundary with an ellipsis.
+3. The sanitized summary capitalised mid-sentence ("with The project lead…", "want to Agree…");
+   `summaryOf` lower-cases an ordinary capitalised first word, leaving acronyms/names alone.
+4. History cards for a preparation or a note carried the scope badge **"Personal assessment"** and
+   a "Completed" status chip. They now say "Personal · Private to you" and "Finished" /
+   "Self-reported" (`HistoryList.jsx`, copy in `student.js`; `history.test.jsx` +1).
+5. Housekeeping from the interrupted pass: `preparation_action_card.v1.md` and
+   `preparation_participant.v1.md` restored (old prompt versions stay for version-aware adapters);
+   `preparation.test.jsx` restored and rewritten rather than deleted; UTF-8 mojibake a previous pass
+   wrote into `growth/service.js`, `src/api/student.js` and `GrowthPage.jsx` reversed byte-exactly.
+
+### T07, T41, T43–T47, T52, T56 coverage (this phase)
+
+| Test ID | Requirement | Where it is proven | Layer | Outcome |
+| --- | --- | --- | --- | --- |
+| T07 | Personal/Campus history: no cross-scope rows, credits or cached results | `preparation.test.js` (campus workspace → NOT_FOUND on every preparation/check-in route; history in PERSONAL only; static scan: no analytics/report/evidence/growth/campus/sharing module names a preparation table); p7 journey step 10 (foreign workspace header on list, detail, check-ins) ; hooks keyed `['ws', workspaceId, …]` dropped on switch | A/B, B-browser | PASS |
+| T41 | Practice retry leaves the formal snapshot unchanged | `missionsEndToEnd.test.js`, `practiceReplay.test.js` (P6, unchanged, green) | A/B | PASS |
+| T43 | Preparation privacy: Personal by default; no Campus/raw analytics leakage | `preparation.test.js` (telemetry serializer carries ids/counts only — ZEBRA probe; prompt builder keeps learner text out of the system role); `preparation.test.jsx` campus workspace explains scope and makes no call; p7 journey (Personal shell, "Private to you" on every screen) | A, B-browser | PASS |
+| T44 | Preparation output attribution: suggestions never scored as learner responses | `preparation.test.js` (AI_ASSISTANT turns excluded from the transcript sent to the card; observations quoting counterpart/assistant/paraphrase dropped, verbatim learner lines kept); `preparation.test.jsx` sample sentence apart from the log; p7 journey steps 3–4 (API: `authorship` LEARNER/ASSISTANT per turn) | A/B, B-browser | PASS |
+| T45 | Application check-in clearly SELF_REPORT; cannot raise formal capability | `preparation.test.js` (check-ins SELF_REPORT/PERSONAL, sanitized, editable, deletable, never evidence; `mode` in body → VALIDATION_FAILED); p7 journey steps 6 and 9 (`/me/evidence` empty, `assessedCount` 0 after a check-in) | A/B, B-browser | PASS |
+| T46 | Growth not approved: no comparative claim or delta; separate dated snapshots | `growthEligibility.test.js` (unapproved pair never comparable; fixture-approved pair applies equivalence/spacing/retirement/correction; a new result is an added snapshot); `growth.test.jsx` (formal snapshots with comparability text, no deltas/arrows/trends); p7 journey step 8 | A, B-browser | PASS (fixture approval only — a real comparison approval is a human gate) |
+| T47 | Report and evidence authorization at every read/export | `preparation.test.js` (foreign source id on a check-in → NOT_FOUND; owner checks on get/list/edit/delete/card/application); p7 journey step 10 | A/B, B-browser | PASS (preparation slice) |
+| T52 | Deletion with an active worker: no resurrection | `preparation.test.js` "deleting a preparation while the model is working cancels the result; nothing is recreated and linked check-ins go too" (re-read after the model returns; late result discarded) | A/B | PASS |
+| T56 | Keyboard/screen reader/zoom end to end | p7 journey (Tab to the composer + Enter sends; radios/checkbox by accessible name; axe clean at 1440/390; no overflow at 390) ; `preparation.test.jsx` semantic queries throughout | B-browser, A | PASS (slice; full programme rerun in P9/P10) |
+
 ## P6 screenshot review follow-up - 2026-10-03
 
 Independent review of the `p6` screenshots found two copy/layout defects, fixed and re-verified:

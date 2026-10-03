@@ -14,6 +14,7 @@ import { CampusShell } from '../layouts/CampusShell.jsx'
 import { LinkButton } from '../components/ui/Button.jsx'
 import { DocumentTitle } from '../components/ui/DocumentTitle.jsx'
 import { ErrorState } from '../components/states/ErrorState.jsx'
+import { EmptyState } from '../components/states/EmptyState.jsx'
 import { WorkspaceContent } from './providers/WorkspaceProvider.jsx'
 
 const lazy = lazyWithRetry
@@ -154,6 +155,22 @@ function ShellGate({ children, off = <Navigate to="/" replace /> }) {
   return <FlagRoute flag="PRISM_APP_SHELL_V3" onError="error" on={children} off={off} />
 }
 
+// P7.1: the Prepare route exists only while its APIs do. Flag off → an
+// honest in-shell "not yet available" state (never a silent redirect).
+function PrepareUnavailable() {
+  return (
+    <div className="space-y-6">
+      <DocumentTitle title="Prepare not yet available" />
+      <EmptyState
+        headingLevel={1}
+        title="Prepare is not yet available"
+        description="Private preparation for a real conversation is not switched on for your account yet. Nothing has been removed; your assessments, practice and history are unchanged."
+        action={<LinkButton to="/app/home" variant="secondary">Back to Home</LinkButton>}
+      />
+    </div>
+  )
+}
+
 function StudentPortalUnavailable() {
   return (
     <main id="main" className="prism-app min-h-screen bg-prism-canvas px-4 py-10">
@@ -260,8 +277,8 @@ export default function AppRouter() {
             <Route path="/app/development" element={<DevelopmentPage />} />
             <Route path="/app/growth" element={<GrowthPage />} />
             {/* P7 private preparation: dark unless PRISM_PREPARATION_V1 (Not yet available otherwise). */}
-            <Route path="/app/prepare" element={<FlagRoute flag="PRISM_PREPARATION_V1" onError="error" on={<PreparePage />} off={<Navigate to="/app/home" replace />} />} />
-            <Route path="/app/prepare/:attemptId" element={<FlagRoute flag="PRISM_PREPARATION_V1" onError="error" on={<PreparationAttemptPage />} off={<Navigate to="/app/home" replace />} />} />
+            <Route path="/app/prepare" element={<FlagRoute flag="PRISM_PREPARATION_V1" onError="error" on={<PreparePage />} off={<PrepareUnavailable />} />} />
+            <Route path="/app/prepare/:attemptId" element={<FlagRoute flag="PRISM_PREPARATION_V1" onError="error" on={<PreparationAttemptPage />} off={<PrepareUnavailable />} />} />
             <Route path="/app/sharing" element={<SharingPage />} />
             <Route path="/app/settings" element={<SettingsPage />} />
           </Route>

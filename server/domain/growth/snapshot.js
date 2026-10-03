@@ -41,16 +41,32 @@ export function compareCapability(before, after) {
 }
 
 /**
- * choosePair(entries, approvedKeys) — entries newest first, each with
+ * choosePair(entries, approvedKeys, options) — entries newest first, each with
  * `form.id`. The latest session is the reassessment; the baseline is the most
  * recent earlier session whose form pairs with it as APPROVED.
  *   → { reassessment, baseline } | { reason }
+ *
+ * P7.6 eligibility (applied only on an APPROVED pair; nothing here can make
+ * an unapproved pair comparable):
+ *   retiredFormIds   — a RETIRED form is no longer comparable: FORM_RETIRED.
+ *   correctedSessionIds — a session whose report is under correction / has a
+ *                      pending review decision is held: REPORT_CORRECTION_PENDING.
+ *   minSpacingDays   — the approval's spacing rule between the two sessions:
+ *                      TOO_CLOSE_IN_TIME (0 = no rule).
+ * A new formal result is an additional snapshot; earlier results are never
+ * rewritten by this choice.
  */
-export function choosePair(entries, approvedKeys) {
+export function choosePair(entries, approvedKeys, { retiredFormIds = new Set(), correctedSessionIds = new Set(), minSpacingDays = 0 } = {}) {
   const withForm = entries.filter((e) => e.form?.id && e.session.completedAt)
   if (withForm.length < 2) return { reason: 'NEEDS_COMPARABLE_REASSESSMENT' }
   const [latest, ...earlier] = withForm
   const baseline = earlier.find((e) => e.session.completedAt < latest.session.completedAt && approvedKeys.has(pairKey(latest.form.id, e.form.id)))
   if (!baseline) return { reason: 'FORMS_NOT_VALIDATED_FOR_COMPARISON' }
+  if (retiredFormIds.has(latest.form.id) || retiredFormIds.has(baseline.form.id)) return { reason: 'FORM_RETIRED' }
+  if (correctedSessionIds.has(latest.session.sessionId) || correctedSessionIds.has(baseline.session.sessionId)) return { reason: 'REPORT_CORRECTION_PENDING' }
+  if (minSpacingDays > 0) {
+    const days = (new Date(latest.session.completedAt) - new Date(baseline.session.completedAt)) / 86_400_000
+    if (!(days >= minSpacingDays)) return { reason: 'TOO_CLOSE_IN_TIME' }
+  }
   return { reassessment: latest, baseline }
 }

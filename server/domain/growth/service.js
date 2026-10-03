@@ -24,7 +24,7 @@ const EFFECTIVE = (c, at) => {
 }
 const sessionRef = (e) => ({
   sessionId: e.session.sessionId, title: e.definition?.title || null, completedAt: e.session.completedAt,
-  form: e.form ? { id: e.form.id, version: e.form.version } : null,
+  form: e.form ? { id: e.form.id, version: e.form.version, status: e.form.status || null } : null,
 })
 
 export function createGrowthService({ repos, catalog, clock = () => new Date(), audit = () => {}, entryFor, minGroupSize = MIN_GROUP_SIZE }) {
@@ -129,7 +129,12 @@ export function createGrowthService({ repos, catalog, clock = () => new Date(), 
       const approved = await approvedPairs()
       const organizationId = workspace.type === 'CAMPUS_STUDENT' ? workspace.organizationId : null
       const base = { assessments: entries.map(sessionRef), comparison: null, changes: [] }
-      const choice = choosePair(entries, approved)
+      // P7.6: a retired form or a report under correction withdraws
+      // comparison eligibility even on an approved pair.
+      const cat = await catalog.getCatalog()
+      const retiredFormIds = new Set(cat.forms.filter((f) => f.status === 'RETIRED').map((f) => f.id))
+      const correctedSessionIds = new Set(entries.filter((e) => e.reportCorrectionPending).map((e) => e.session.sessionId))
+      const choice = choosePair(entries, approved, { retiredFormIds, correctedSessionIds })
       if (choice.reason) return { ...base, comparable: false, reason: choice.reason }
       const { pairRow, changes } = await comparePair(choice.baseline, choice.reassessment, approved, { userId: user.id, organizationId })
       const comparable = changes.some((c) => c.comparable)

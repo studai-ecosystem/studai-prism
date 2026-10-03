@@ -87,6 +87,39 @@ describe('Assessment history (P1.2)', () => {
     noPercent()
   })
 
+  // P7 (CH-36, T45): preparation and self-reported notes are their own
+  // groups, never called an assessment and never "Completed" like a run.
+  it('groups private preparation and self-reported notes apart from formal and practice, without calling them assessments', async () => {
+    await render({ data: { nextCursor: null, items: [
+      item(),
+      item({ id: 'PREPARATION_ATTEMPT:q1', sourceType: 'PREPARATION_ATTEMPT', sourceId: 'q1', mode: 'PREPARATION', title: 'Demo date with the lead', reportFormat: null, issuedAt: null, completedAt: '2026-10-03T10:00:00.000Z', permittedAction: { kind: 'VIEW', to: '/app/prepare/q1' } }),
+      item({ id: 'SELF_REPORT:c1', sourceType: 'SELF_REPORT', sourceId: 'c1', mode: 'SELF_REPORT', title: null, reportFormat: null, issuedAt: null, completedAt: '2026-10-04T10:00:00.000Z', permittedAction: { kind: 'VIEW', to: '/app/growth' } }),
+    ] } })
+    const formal = await screen.findByRole('region', { name: 'Formal assessment' })
+    const prep = screen.getByRole('region', { name: 'Private preparation' })
+    const notes = screen.getByRole('region', { name: 'Your own note (self-reported)' })
+    expect(screen.queryByRole('region', { name: 'Practice' })).not.toBeInTheDocument()
+    expect(within(formal).getByText('Personal assessment')).toBeInTheDocument()
+    expect(within(formal).getByText('Completed')).toBeInTheDocument()
+
+    const prepCard = within(prep).getByTestId('history-item')
+    expect(prepCard).toHaveAttribute('data-mode', 'PREPARATION')
+    expect(within(prepCard).getByText('Personal · Private to you')).toBeInTheDocument()
+    expect(within(prepCard).queryByText(/assessment/i)).not.toBeInTheDocument()
+    expect(within(prepCard).getByText('Finished')).toBeInTheDocument()
+    expect(within(prepCard).getByText(/^Finished /)).toBeInTheDocument()
+    expect(within(prepCard).getByRole('link', { name: /^Open\s*:\s*Demo date with the lead$/ })).toHaveAttribute('href', '/app/prepare/q1')
+
+    const noteCard = within(notes).getByTestId('history-item')
+    expect(noteCard).toHaveAttribute('data-mode', 'SELF_REPORT')
+    expect(within(noteCard).getByRole('heading', { name: 'Your own note' })).toBeInTheDocument()
+    expect(within(noteCard).getByText('Personal · Private to you')).toBeInTheDocument()
+    expect(within(noteCard).getByText('Self-reported')).toBeInTheDocument()
+    expect(within(noteCard).queryByText('Completed')).not.toBeInTheDocument()
+    expect(within(noteCard).getByText(/^Noted /)).toBeInTheDocument()
+    noPercent()
+  })
+
   it('a record without a stored date says so instead of showing today', async () => {
     await render({ data: { nextCursor: null, items: [
       item({ id: 'LEGACY_REPORT:nd', sourceType: 'LEGACY_REPORT', sourceId: 'nd', title: null, status: 'LEGACY', reportFormat: 'LEGACY_V2', startedAt: null, completedAt: null, issuedAt: null, permittedAction: { kind: 'VIEW_REPORT', to: '/score?session=nd' } }),

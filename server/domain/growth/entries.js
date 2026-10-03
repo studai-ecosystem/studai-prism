@@ -11,7 +11,7 @@ const toIso = (v) => {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-export function createSessionEntryLoader({ catalog, evidence, legacy }) {
+export function createSessionEntryLoader({ catalog, evidence, legacy, reportReviews = null }) {
   return async function entryFor(sessionId) {
     if (!sessionId) return null
     const [session, report] = await Promise.all([legacy.getSession(sessionId), legacy.getReport(sessionId)])
@@ -22,11 +22,18 @@ export function createSessionEntryLoader({ catalog, evidence, legacy }) {
     const scenarioId = session?.scenarioId || report?.scenarioId || null
     const definition = cat.definitions.find((d) => d.id === definitionForScenario(cat, scenarioId)) || null
     const units = await evidence.units(sessionId)
+    // P7.6: an OPEN report review (a correction may follow) withdraws this
+    // session from growth comparison until it is decided.
+    let reportCorrectionPending = false
+    if (reportReviews?.listForSession) {
+      try { reportCorrectionPending = (await reportReviews.listForSession(sessionId)).some((r) => r.state === 'OPEN') } catch { reportCorrectionPending = false }
+    }
     return {
       session: { sessionId, completedAt: toIso(report.issuedAt) || toIso(session?.completedAt) },
       definition,
       form: formForSession(cat, scenarioId),
       decisions: evaluateProfile(units, { capabilityIds: definition?.measures || PRIMARY_CAPABILITY_IDS }),
+      reportCorrectionPending,
     }
   }
 }

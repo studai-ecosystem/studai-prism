@@ -1,5 +1,43 @@
 # Experience programme - decision and external-gate register
 
+## P7 remaining-gap decisions - 2026-10-03
+
+1. **Safety is a deterministic word-list gate, not a model judgement.** `safety.js`
+   decides REFUSED (harassment, coercion, deception, unauthorised disclosure, crisis)
+   versus LIMITED (legal, medical) versus OK before any model call, from the learner's
+   text alone. A refusal is a bounded explanation and no row; a limitation lets the
+   rehearsal run and states plainly that it is not professional advice. Ordinary
+   workplace disagreement is never a reason to block. The list is reviewable content,
+   not a safety guarantee; the system prompts repeat the same refusals in character.
+2. **Learner text is data, never instruction.** Every prompt puts the learner's words
+   inside `<learner_context>` / `<candidate_transcript>` in the user message; the system
+   message is template-only. Model output is validated with strict schemas so it cannot
+   carry mode, scope, authorization, rubric, timer, billing or publication fields.
+3. **Observations quote only verbatim learner lines.** A card observation whose quote is
+   not an exact substring of a LEARNER turn (counterpart, assistant sample, paraphrase)
+   is dropped, never corrected. Assistant samples are `AI_ASSISTANT` turns, excluded from
+   the transcript the card sees. Feedback vocabulary describes learner behaviours; the
+   counterpart's compliance is never the measure.
+4. **Deletion wins over a late model result.** After each model call the attempt is
+   re-read; if it is gone the result is discarded and nothing is recreated. Linked
+   check-ins go with the preparation.
+5. **The application suggestion is a template from the learner's chosen target**, not a
+   model output and not an observation; it is labelled so until the learner edits it
+   ("Your wording"). Reminders are in-app only; no notification channel exists here.
+6. **Private history items are not assessments.** History/Growth label them "Personal ·
+   Private to you" and "Finished" / "Self-reported"; Growth lists formal results as
+   separate dated snapshots with their comparability reason and draws no arrow, delta or
+   trend. Comparison eligibility is withdrawn for a retired form or a report under
+   correction even on an approved pair. T46 passes on a **fixture** approval only; a real
+   form-pair approval is a human gate.
+7. **Prompt versions are kept.** `preparation_participant.v1` / `preparation_action_card.v1`
+   stay in the repository (version-aware adapters); new behaviour uses `.v2` and
+   `preparation_assist.v1`. All three are DRAFT content pending review.
+8. **Model routing is part of the contract.** Each preparation task has a `modelRouter`
+   policy (conversation model with fallback for spoken turns; primary, no fallback, for the
+   strictly validated card) and a unit test proves it, after the browser journey found the
+   gateway refusing the unknown tasks.
+
 ## P6 remaining-gap decisions - 2026-10-03
 
 1. **A retry is deduplicated on the attempt it follows, not on the client key.**

@@ -28,6 +28,13 @@ const TASK_POLICIES = Object.freeze({
   // P2.4 slice evidence evaluator (prompt evidence_evaluator.v1); structured
   // units only, validated before any evidence write.
   evidence_evaluator: { model: 'primary', fallback: false, timeoutMs: 30_000 },
+  // P7 private preparation (prompts preparation_participant.v2,
+  // preparation_assist.v1, preparation_action_card.v2): a bounded practice
+  // counterpart and sample lines, and a strictly validated card. Never
+  // evidence, never a score; no tools.
+  preparation_participant: { model: 'conversation', fallback: true, timeoutMs: 20_000 },
+  preparation_assist: { model: 'conversation', fallback: true, timeoutMs: 15_000 },
+  preparation_action_card: { model: 'primary', fallback: false, timeoutMs: 20_000 },
 })
 
 function positiveInt(value, fallback) {

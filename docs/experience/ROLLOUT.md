@@ -1,5 +1,24 @@
 # P0 diagnostic recovery and operator handoff
 
+## P7 activation gates - 2026-10-03
+
+Private preparation is implemented and verified locally (DRAFT prompts, flag default OFF).
+These are the actions that remain before `PRISM_PREPARATION_V1` may be switched on anywhere.
+
+| Action | Owner / evidence needed | Status |
+| --- | --- | --- |
+| Review `server/prompts/preparation_participant.v2.md`, `preparation_action_card.v2.md`, `preparation_assist.v1.md` (CONTENT_REVIEW.md, Appendix B) | Content + measurement review; recorded approval | BLOCKED (DRAFT) |
+| Privacy/retention review of preparation copy, minimal-retention approach for intent/turn/card/check-in text, and the "redaction is help, not a guarantee" wording | Privacy/counsel | BLOCKED |
+| Live-model (Layer C) check of participant pushback, sample sentences and card wording on staging | Engineering with staging authorization; redacted transcripts | NOT RUN |
+| Migration 0052 on production (after 0047) | Operator; backup, reversible via `.down.sql` | Additive, tested on disposable PG (52 applied) |
+| Operator flip of `PRISM_PREPARATION_V1` (HA-C001) after the above | Operator | BLOCKED by the rows above |
+| Formal form-pair comparison approval (T46) | Measurement owner; equating evidence | BLOCKED — fixture approval only; Growth stays "not comparable" |
+
+Rollback: unset `PRISM_PREPARATION_V1` (routes → NOT_FOUND, nav item → "Not yet available",
+`/app/prepare` → in-shell unavailable state); `0052_preparation_hardening.down.sql` drops the
+added columns and restores the three-actor check. Historical preparation rows are never read
+by reports, analytics or Campus.
+
 ## P1 protected integration gates - 2026-10-02
 
 The foundation is implemented locally and verified on disposable PostgreSQL;

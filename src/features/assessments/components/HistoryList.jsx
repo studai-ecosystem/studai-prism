@@ -15,6 +15,7 @@ import { usePracticeStarters } from '../../development/hooks.js'
 import { formatDate } from '../../student/QueryState.jsx'
 import {
   DEVELOPMENT_COPY, HISTORY_ACTION_COPY, HISTORY_DATE_UNKNOWN, HISTORY_EMPTY, HISTORY_LEGACY_ACTION, HISTORY_MODE_LABEL, HISTORY_STATUS_COPY, SCOPE_LABEL,
+  HISTORY_PRIVATE_SCOPE_LABEL, HISTORY_PRIVATE_STATUS,
 } from '../../../lib/copy/student.js'
 
 const UNTITLED = { FORMAL: 'Assessment', PRACTICE: 'Practice mission', PREPARATION: 'Preparation', SELF_REPORT: 'Your own note' }
@@ -50,12 +51,13 @@ function dateLine(item) {
 export function HistoryItemCard({ item, headingLevel = 3 }) {
   const H = `h${headingLevel}`
   const { active } = useWorkspace()
-  const status = HISTORY_STATUS_COPY[item.status] || HISTORY_STATUS_COPY.COMPLETED
+  const privateMode = item.mode === 'PREPARATION' || item.mode === 'SELF_REPORT'
+  const status = (privateMode && item.status === 'COMPLETED' && HISTORY_PRIVATE_STATUS[item.mode]) || HISTORY_STATUS_COPY[item.status] || HISTORY_STATUS_COPY.COMPLETED
   const title = item.title || UNTITLED[item.mode]
   const action = item.permittedAction
   const legacyReport = action.kind === 'VIEW_REPORT' && item.reportFormat === 'LEGACY_V2'
   const actionLabel = legacyReport ? HISTORY_LEGACY_ACTION : HISTORY_ACTION_COPY[action.kind]
-  const scope = item.scope === 'SPONSORED' ? SCOPE_LABEL.SPONSORED(active.organizationName) : SCOPE_LABEL.PERSONAL
+  const scope = privateMode ? HISTORY_PRIVATE_SCOPE_LABEL : item.scope === 'SPONSORED' ? SCOPE_LABEL.SPONSORED(active.organizationName) : SCOPE_LABEL.PERSONAL
   return (
     <Card as="article" className="space-y-3 p-5" data-testid="history-item" data-mode={item.mode} data-status={item.status}>
       <div className="flex flex-wrap items-start justify-between gap-3">

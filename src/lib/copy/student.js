@@ -98,31 +98,58 @@ export const HISTORY_LEGACY_ACTION = 'Original report'
 // P7: preparation and self-reported notes are their own modes, never mixed
 // with formal items and never evidence of capability.
 export const HISTORY_MODE_LABEL = { FORMAL: 'Formal assessment', PRACTICE: 'Practice', PREPARATION: 'Private preparation', SELF_REPORT: 'Your own note (self-reported)' }
+// Preparation and notes are not assessments: their scope badge says so, and a
+// finished one is "Finished" / "Noted", never "Completed" like a formal run.
+export const HISTORY_PRIVATE_SCOPE_LABEL = 'Personal · Private to you'
+export const HISTORY_PRIVATE_STATUS = {
+  PREPARATION: { label: 'Finished', tone: 'neutral' },
+  SELF_REPORT: { label: 'Self-reported', tone: 'insufficient' },
+}
 export const HISTORY_DATE_UNKNOWN = 'Date not recorded'
 export const HISTORY_EMPTY = { title: 'No history yet', description: 'Completed assessments, reports, practice attempts and private preparation appear here once they exist. Nothing has been removed.' }
 
 // P7 private preparation copy (CH-34, CH-35).
 export const PREPARATION_COPY = {
-  privateLabel: 'Private preparation — not a formal assessment',
+  privateLabel: 'Personal preparation · Private to you',
+  notFormalLabel: 'Not a formal assessment',
   privateNote: 'Private to you. This stays in your personal workspace and never changes a formal result or appears in a campus report.',
+  contextBeforeDetails: 'Before you enter anything: this preparation is personal even though your account also belongs to a college. Nothing you write here is visible to your institution. Sponsored practice is a separate choice in your campus workspace, and what you do there is visible to the sponsor as its policy states.',
   omitNote: 'Leave out names, private employer or customer information, credentials and sensitive details about other people. We remove emails, phone numbers and links, but that is help, not a guarantee.',
   assistanceLabel: 'AI assistance',
-  cardIntro: 'A short plan to use before the real conversation. Suggestions are AI assistance based on what you wrote; saving a plan is not a measure of how the conversation will go.',
+  suggestionLabel: 'AI suggestion — not your line',
+  learnerLabel: 'You wrote',
+  observedLabel: 'Prism observed in your rehearsal',
+  allowanceNote: 'No limit on preparations. Each rehearsal allows 40 of your lines and 5 AI suggestions.',
+  cardIntro: 'A short plan to use before the real conversation. Suggestions are AI assistance based on what you wrote; saving a plan is not a measure of how the conversation will go, and it is never a credential.',
+  cardEditedNote: 'You adjusted this card. It is still assistance you edited, not an observation.',
+  observationsIntro: 'What you did in the rehearsal, quoting your own lines. The counterpart agreeing or not is not the measure.',
+  observationsEmpty: 'No specific behaviour could be quoted from your lines in this rehearsal.',
+  applicationTitle: 'One thing to try outside Prism',
+  applicationNote: 'Suggested from the practice target you chose. Edit it, dismiss it, or keep it. A reminder stays inside Prism; nothing is sent anywhere.',
+  reminderLabel: 'Remind me in Prism to record how it went',
   selfReportLabel: 'Self-reported',
   selfReportNote: 'Your own account. It is kept separately from assessments and cannot change a formal result.',
-  checkinPrompt: 'What did you try? What happened?',
+  checkinPrompt: 'Did you try it? What happened? What next?',
+  deleteConfirm: 'Delete this preparation, its rehearsal, card and linked notes? This cannot be undone.',
   cardError: {
     NO_LEARNER_TURNS: 'No card was written because the rehearsal had nothing from you yet.',
     CARD_NOT_CONFIGURED: 'The card writer is not available right now, so no card was written.',
     UNPARSEABLE_OUTPUT: 'The card could not be written in a usable form, so nothing was saved. Your rehearsal is kept.',
     TIMEOUT: 'Writing the card took too long, so nothing was saved. Your rehearsal is kept.',
     PROVIDER_ERROR: 'The card could not be written because of a technical problem. Your rehearsal is kept.',
+    DISCARDED_BY_LEARNER: 'You discarded the card. Your rehearsal is kept.',
   },
   replyError: {
     PARTICIPANT_NOT_CONFIGURED: 'The practice counterpart is not available right now. What you wrote is saved.',
     EMPTY_REPLY: 'The counterpart did not reply this time. What you wrote is saved.',
     TIMEOUT: 'The counterpart took too long to reply. What you wrote is saved.',
     PROVIDER_ERROR: 'The counterpart could not reply because of a technical problem. What you wrote is saved.',
+  },
+  assistError: {
+    ASSIST_NOT_CONFIGURED: 'Suggestions are not available right now.',
+    EMPTY_REPLY: 'No suggestion came back this time.',
+    TIMEOUT: 'The suggestion took too long. Nothing was used up.',
+    PROVIDER_ERROR: 'The suggestion could not be written because of a technical problem. Nothing was used up.',
   },
 }
 
@@ -213,6 +240,18 @@ export const GROWTH_REASON_COPY = {
   EVIDENCE_NOT_SUFFICIENT_FOR_COMPARISON: {
     title: 'Not enough evidence to show a change yet',
     description: 'These assessments are approved as comparable, but a change is shown only when both of them gathered enough evidence for the same capability.',
+  },
+  FORM_RETIRED: {
+    title: 'These assessments cannot be compared any more',
+    description: 'One of the assessment forms has been retired, so a direct comparison is no longer approved. Each result stays as its own dated snapshot.',
+  },
+  REPORT_CORRECTION_PENDING: {
+    title: 'A report is being reviewed',
+    description: 'One of these reports has an open review. No comparison is shown until the review is decided; the results stay as separate snapshots.',
+  },
+  TOO_CLOSE_IN_TIME: {
+    title: 'These assessments are too close together',
+    description: 'The approved comparison rule asks for more time between the two assessments. Each result stays as its own dated snapshot.',
   },
 }
 

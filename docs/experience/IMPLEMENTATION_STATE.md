@@ -1,5 +1,73 @@
 # Experience programme - source traceability and execution checkpoints
 
+## P7 remaining gaps closed - 2026-10-03
+
+State: P7 code-safe work IMPLEMENTED and INTEGRATION_VERIFIED (Layer B: real `/api/v1` router with
+memory repos and the deterministic provider; real browser journey on the 4174 audit server with
+throwaway PostgreSQL, 52 migrations). Human gates stay BLOCKED: prompt review of
+`preparation_participant.v2` / `preparation_action_card.v2` / `preparation_assist.v1`
+(CONTENT_REVIEW.md), privacy/retention review of the preparation copy and minimal-retention
+approach, approval of any formal form pair for comparison (T46 is fixture-approved only), and the
+operator flip of `PRISM_PREPARATION_V1` (HA-C001). Live-model wording (Layer C) not run. Source ids:
+CH-34, CH-35, CH-36; T07, T43, T44, T45, T46, T47, T52, T56 (T41 regression green).
+
+- P7.1 wizard (`PreparationWizard.jsx`): six bounded situations, one field per step, five
+  practice targets, omit-names guidance before any detail; the server returns a sanitized summary
+  and six restated assumptions (`summaryOf`, `defaultAssumptions`), editable and removable before
+  confirm; confirm sends only edits (`ConfirmEdits`, strict). Route `/app/prepare(/:attemptId)`
+  shows an honest in-shell "not yet available" state when the flag is off (no silent redirect).
+- P7.2 safety and bounded personalisation (`domain/preparation/safety.js`): deterministic
+  REFUSED (harassment, coercion, deception, unauthorised disclosure, crisis) ? 422
+  `PREPARATION_OUT_OF_SCOPE` with a bounded message and no row; LIMITED (legal, medical) ? the
+  rehearsal runs with a scoped limitation shown on review, rehearsal and in the system prompt;
+  ordinary firm disagreement passes. Learner text travels only in the user message inside
+  `<learner_context>` / `<candidate_transcript>`; system prompts never contain it. Model output is
+  validated with strict zod schemas: extra keys (mode, scope, authorization, rubric, timer,
+  publication, billing) fail and nothing is saved. Telemetry serializer carries ids/counts only.
+  **Gateway fix:** `modelRouter.js` now routes the three preparation tasks (the real gateway
+  threw "Unknown AI task" ? every rehearsal line was PROVIDER_ERROR; found by the browser journey,
+  now unit-tested).
+- P7.3 rehearsal (`RehearsalView.jsx`, service `sendTurn`/`assist`): untimed, "Personal
+  preparation ? Private to you" + "Not a formal assessment" badges, explicit allowance
+  (unlimited preparations; 40 learner lines and 5 AI suggestions per rehearsal). Authorship per
+  turn `LEARNER | ASSISTANT | SYSTEM`; a requested sample sentence is an `AI_ASSISTANT` turn shown
+  under "Need a hand?", never in the conversation and never in the transcript the card sees
+  (T44). Pause = leave (saved), resume from the list, rename (`PATCH /preparation/:id`), delete
+  with confirmation (`DELETE`, cascades turns/card/linked check-ins; T52: a late model result is
+  discarded after re-read). Counterpart failure keeps the learner line with an honest reason.
+- P7.4 card (`ActionCardView.jsx`, `CardOutputSchema`): situation, 3?5 plan steps, opening, 1?3
+  questions, ?3 trade-offs, one boundary/escalation option, self-check; labelled "AI assistance";
+  edit (`PATCH /card`, "You adjusted this card?") and discard (`DELETE /card` ?
+  `DISCARDED_BY_LEARNER`, rehearsal kept). Observations describe the learner's behaviours
+  (clarified a constraint, explained a trade-off, negotiated a boundary, asked a question,
+  confirmed ownership, left a question unresolved), quote only verbatim LEARNER lines, and say
+  the counterpart's agreement is not the measure. Missing card = explicit reason, nothing
+  generic.
+- P7.5 application card + check-ins: one behaviour from the chosen practice target
+  (`APPLICATION_SUGGESTIONS`, labelled "Suggested from your practice target" ? "Your wording"
+  once edited), dismissable, in-app reminder opt-in only (Prepare list; nothing sent anywhere).
+  Check-ins `SELF_REPORT` / PERSONAL with what tried / what happened / what next; editable and
+  deletable; `mode` in the body is rejected; never enters the evidence normalizer (T45).
+- P7.6 history and growth (`HistoryList.jsx`, `GrowthPage.jsx`, `growth/service.js`): History
+  groups Formal / Practice / Private preparation / Your own note (self-reported); private items
+  carry "Personal ? Private to you" and "Finished" / "Self-reported", never "Personal
+  assessment" / "Completed". Growth shows Formal history (one dated snapshot per published
+  result with form version, retired marker and comparability reason), Practice history and
+  Application reflections; no arrows, deltas or trends. `choosePair` withdraws eligibility for a
+  retired form or a report under correction even on an approved pair (`growthEligibility.test.js`).
+- P7.7 privacy: every route `NOT_FOUND` outside PERSONAL; hooks keyed `['ws', id, ?]` are dropped
+  on workspace switch and the whole cache on sign-out; campus page explains scope and makes no
+  call; static scan proves no analytics/report/evidence/growth/campus/sharing module names a
+  preparation table.
+- Schema: `0052_preparation_hardening(.down).sql` ? `preparation_attempts.title /
+  observations_json / application_json`, `AI_ASSISTANT` actor, `application_checkins.next_step /
+  updated_at`. Additive, reversible; still no FK to a formal table.
+- Verification: see TEST_RESULTS.md "P7 remaining gaps closed" (server 842/0, unit 513/0, build,
+  static, database 6/6 @52, `p7` browser journey 1/0 with 18 screenshots inspected; four real
+  defects fixed).
+- Next: P8 (admin/support workflows) per the sequence; carry the P7 human gates above as
+  activation blockers.
+
 ## P6 remaining gaps closed - 2026-10-03
 
 State: P6 code-safe work IMPLEMENTED and INTEGRATION_VERIFIED (Layer B: real `/api/v1` router per

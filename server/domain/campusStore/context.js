@@ -136,7 +136,7 @@ export function createCampusContext({
     repos: storeView, users, invites, catalog, clock, audit: auditWriter, appUrl, ledger, ...(sendAssignmentEmail ? { sendAssignmentEmail } : {}),
     onRosterSync: (organizationId, cohortId, userId) => development.syncCohortMember(organizationId, cohortId, userId),
   })
-  const growth = createGrowthService({ repos: storeView, catalog, clock, audit: auditWriter, entryFor: createSessionEntryLoader({ catalog, evidence, legacy }) })
+  const growth = createGrowthService({ repos: storeView, catalog, clock, audit: auditWriter, entryFor: createSessionEntryLoader({ catalog, evidence, legacy, reportReviews: { listForSession: (id) => (storeView.reportReviews ? storeView.reportReviews.listForSession(id) : []) } }) })
   // P7: private preparation and SELF_REPORT check-ins (PERSONAL only). Its
   // repository is separate from development/evidence and never read by
   // analytics or reports.
