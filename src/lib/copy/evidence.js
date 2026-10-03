@@ -9,7 +9,7 @@ export const SUFFICIENCY_STATUS_COPY = {
 }
 
 export const SUFFICIENCY_REASON_COPY = {
-  NO_EVIDENCE: 'No evidence was recorded for this capability.',
+  NO_EVIDENCE: 'This capability has not been measured yet.',
   NO_ADMISSIBLE_EVIDENCE: 'The evidence recorded could not be checked against what you actually did.',
   BELOW_MINIMUM_EVIDENCE_UNITS: 'Not enough separate pieces of evidence yet.',
   BELOW_MINIMUM_INDEPENDENT_OPPORTUNITIES: 'This capability was observed in too few separate moments.',

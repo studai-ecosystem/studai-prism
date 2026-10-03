@@ -29,6 +29,13 @@ describe('EvidenceSufficiencyBadge', () => {
     expect(screen.getByText(/Not enough separate pieces of evidence yet\./)).toHaveClass('sr-only')
     expect(screen.getByText(/There is not yet enough reliable evidence/)).toBeInTheDocument()
   })
+
+  it('distinguishes never measured from measured but insufficient', () => {
+    render(<EvidenceSufficiencyBadge status="INSUFFICIENT_EVIDENCE" reasons={['NO_EVIDENCE']} />)
+    expect(screen.getByText('Not yet measured')).toBeInTheDocument()
+    expect(screen.getByText('This capability has not been measured yet.')).toHaveClass('sr-only')
+    expect(screen.queryByText('Insufficient evidence')).not.toBeInTheDocument()
+  })
 })
 
 describe('CapabilityLevelBadge', () => {

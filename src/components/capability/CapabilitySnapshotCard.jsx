@@ -13,7 +13,7 @@ export function CapabilitySnapshotCard({ cap, detailsTo = null, headingLevel = 3
       <H className="text-sm font-semibold text-prism-ink">{cap.name}</H>
       <div className="flex flex-wrap gap-2">
         {cap.level && <CapabilityLevelBadge level={cap.level} provisional={cap.status === 'PROVISIONAL'} />}
-        <EvidenceSufficiencyBadge status={cap.status} />
+        <EvidenceSufficiencyBadge status={cap.status} reasons={cap.statusReasons} />
       </div>
       <p className="text-sm text-prism-ink-muted">{cap.evidenceSummary}</p>
       <p className="text-xs text-prism-ink-subtle">Change over time: shown only between comparable assessments.</p>

@@ -4,7 +4,8 @@ import { statusCopy, reasonText } from '../../lib/copy/evidence.js'
 // Evidence sufficiency for one capability (spec §33). Unknown or missing
 // status renders as insufficient — gray, never red, never a number.
 export function EvidenceSufficiencyBadge({ status, reasons = [], className }) {
-  const { label, tone } = statusCopy(status)
+  const notMeasured = reasons.includes('NO_EVIDENCE')
+  const { label, tone } = notMeasured ? { label: 'Not yet measured', tone: 'neutral' } : statusCopy(status)
   const explanation = reasons.length > 0 ? reasons.map(reasonText).join(' ') : undefined
   return (
     <span className={className} title={explanation} data-status={status || 'INSUFFICIENT_EVIDENCE'}>

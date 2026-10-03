@@ -1,5 +1,11 @@
 # P0 - Verification results
 
+## P9 screenshot review follow-up - 2026-10-03
+
+Independent screenshot review found that never-assessed capabilities were labelled `Insufficient evidence`, making a neutral missing state look like a low result. `NO_EVIDENCE` now renders `Not yet measured` with the assistive explanation `This capability has not been measured yet`; genuinely measured-but-insufficient states retain `Insufficient evidence`. The Home snapshot now forwards governed reason codes to the badge.
+
+Verification: focused Vitest **67/67**, build PASS, static audit PASS, P9 visual matrix **5 passed / 3 intentional project skips**; the regenerated 390 px capability-list screenshot was inspected.
+
 ## P9 programme validation and integrated reliability - 2026-10-03
 
 Final commands were run from `studai-prism/` against local isolated processes.
