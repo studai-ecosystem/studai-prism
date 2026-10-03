@@ -109,6 +109,10 @@ export function buildSessionContract({
   return {
     sessionId: session.sessionId,
     status,
+    // T21: every session contract is a FORMAL assessment context. Difficulty
+    // calibration (legacy pre-assessment step) is a separate purpose and is
+    // never part of this contract or of a universal run.
+    purpose: 'FORMAL',
     processing: processingView,
     scope,
     sponsorName,
@@ -121,6 +125,8 @@ export function buildSessionContract({
     progress: { exchanges: universal ? universal.exchanges : Number(session.exchangeCount) || 0, requiredExchanges: view.requiredExchanges },
     // Task names and position only: never scores or hidden coverage gaps.
     ...(universal ? { stages: universal.stages } : {}),
+    // P4.5/P4.7: counts-only coverage diagnostics once input is closed.
+    ...(universal?.coverage ? { coverage: universal.coverage } : {}),
     integrityPolicy,
     device: { requiresLargeScreen: artifacts.length > 0, allowSmallScreen: true },
     timing: {

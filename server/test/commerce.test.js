@@ -280,7 +280,15 @@ test('P8.7: a DRAFT governed form cannot be assigned (409 CONTENT_NOT_APPROVED);
   assert.equal(assertContentAssignable(null, registry), null)
   registry.transition({ formId: 'draft-core-teamready-a:0.1.0-draft', to: 'REVIEW', actor: { permissions: ['content:publish'] }, reason: 'ready for a review pass' })
   assert.throws(() => assertContentAssignable('draft-core-teamready-a:0.1.0-draft', registry), (e) => e.code === 'CONTENT_NOT_APPROVED')
-  registry.transition({ formId: 'draft-core-teamready-a:0.1.0-draft', to: 'APPROVED_FOR_PILOT', actor: { permissions: ['content:publish'] }, reason: 'pilot approval recorded' })
+  // P4.8: the pilot gate needs recorded APPROVE decisions from a content and a
+  // measurement reviewer (distinct people); without them the transition is a 409.
+  assert.throws(() => registry.transition({ formId: 'draft-core-teamready-a:0.1.0-draft', to: 'APPROVED_FOR_PILOT', actor: { permissions: ['content:publish'] }, reason: 'pilot approval recorded' }), (e) => e.code === 'CONFLICT')
+  assert.throws(() => assertContentAssignable('draft-core-teamready-a:0.1.0-draft', registry), (e) => e.code === 'CONTENT_NOT_APPROVED')
+  const decisions = [
+    { reviewerRole: 'CONTENT', reviewerId: 'content-reviewer', decision: 'APPROVE', createdAt: '2026-10-05T08:00:00Z' },
+    { reviewerRole: 'MEASUREMENT', reviewerId: 'measurement-reviewer', decision: 'APPROVE', createdAt: '2026-10-05T08:30:00Z' },
+  ]
+  registry.transition({ formId: 'draft-core-teamready-a:0.1.0-draft', to: 'APPROVED_FOR_PILOT', actor: { permissions: ['content:publish'] }, reason: 'pilot approval recorded', decisions })
   assert.equal(assertContentAssignable('draft-core-teamready-a:0.1.0-draft', registry), 'APPROVED_FOR_PILOT')
 })
 

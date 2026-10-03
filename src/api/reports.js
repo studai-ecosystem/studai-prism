@@ -104,6 +104,8 @@ export const ReportSchema = z.object({
     limitation: z.string(),
   }).passthrough()).optional().default([]),
   development: z.object({ priorities: z.array(Priority).max(3), maxPriorities: z.number() }).nullable(),
+  // P4.5/P4.7 counts-only coverage notes; absent on legacy and older versions.
+  coverage: z.object({ planned: z.number(), presented: z.number(), answered: z.number(), withheld: z.number(), notes: z.array(z.string()) }).optional(),
   methodology: z.object({
     builderVersion: z.string(), sufficiencyRulesVersion: z.string(), levelLabelsStatus: z.string(), catalogVersion: z.string(),
     assessmentDefinitionId: z.string().nullable(), formId: z.string().nullable(),

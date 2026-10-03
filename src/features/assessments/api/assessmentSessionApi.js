@@ -4,11 +4,16 @@
 import { z } from 'zod'
 import { request } from '../../../api/client.js'
 
-const Message = z.object({ speaker: z.string(), role: z.string().nullable(), content: z.string(), isUser: z.boolean().optional() })
+const Message = z.object({ speaker: z.string(), role: z.string().nullable(), content: z.string(), isUser: z.boolean().optional(), aiGenerated: z.boolean().optional(), actorKind: z.string().optional() })
+// P4.6: task-stage strip (names and state only; never scores or coverage).
+const StageStrip = z.array(z.object({ id: z.string(), label: z.string(), state: z.enum(['DONE', 'CURRENT', 'UPCOMING']) }))
 
 export const SessionContractSchema = z.object({
   sessionId: z.string(),
   status: z.enum(['ALLOCATED', 'IN_PROGRESS', 'SCORING', 'SCORING_FAILED', 'COMPLETED']),
+  // T21: the session contract is always a FORMAL context; difficulty
+  // calibration is a separate payload and never part of a universal run.
+  purpose: z.enum(['FORMAL', 'CALIBRATION']).optional(),
   scope: z.enum(['PERSONAL', 'SPONSORED']),
   sponsorName: z.string().nullable(),
   assessment: z.object({ definitionId: z.string(), title: z.string() }),
@@ -36,7 +41,13 @@ export const SessionContractSchema = z.object({
   }),
   reportPath: z.string().nullable(),
   // P4.6: task-stage strip (names and state only; never scores or coverage).
-  stages: z.array(z.object({ id: z.string(), label: z.string(), state: z.enum(['DONE', 'CURRENT', 'UPCOMING']) })).optional(),
+  stages: StageStrip.optional(),
+  // P4.5/P4.7: counts-only coverage diagnostics, present once input is closed.
+  coverage: z.object({
+    planned: z.number().int().min(0), presented: z.number().int().min(0), answered: z.number().int().min(0), notPresented: z.number().int().min(0),
+    stagesPlanned: z.number().int().min(0), stagesPresented: z.number().int().min(0),
+    reasons: z.record(z.string(), z.number().int().min(0)), reviewRequired: z.boolean(), notes: z.array(z.string()),
+  }).optional(),
   // P2.6: system-processing state, separate from any measurement outcome.
   processing: z.object({
     state: z.enum(['NONE', 'QUEUED', 'LEASED', 'DONE', 'FAILED']),
@@ -47,7 +58,7 @@ export const SessionContractSchema = z.object({
 })
 
 const StartSchema = z.object({ sessionId: z.string(), resumed: z.boolean(), to: z.string() })
-const MessageResultSchema = z.object({ messages: z.array(Message), exchanges: z.number().int().min(0), replayed: z.boolean() })
+const MessageResultSchema = z.object({ messages: z.array(Message), exchanges: z.number().int().min(0), replayed: z.boolean(), stages: StageStrip.optional() })
 const ArtifactResultSchema = z.object({ artifactId: z.string(), version: z.number().int().min(1), data: z.unknown(), notes: z.string().optional(), replayed: z.boolean() })
 const FinishSchema = z.object({ state: z.enum(['COMPLETE', 'SCORING']) })
 const BeginSchema = z.object({ startedAt: z.string().datetime(), deadlineAt: z.string().datetime(), graceDeadlineAt: z.string().datetime().nullable().optional(), policyVersion: z.string().nullable().optional(), replayed: z.boolean() })

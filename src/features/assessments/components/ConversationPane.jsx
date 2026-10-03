@@ -57,8 +57,13 @@ export function ConversationPane({ messages, pending, onRetry, onEdit }) {
       <div ref={feedRef} onScroll={onScroll} role="log" aria-label="Assessment conversation" tabIndex={0} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-prism-accent" aria-live="polite" aria-relevant="additions" data-testid="conversation">
         {messages.length === 0 && <p className="text-sm text-prism-ink-muted">The conversation has not started yet.</p>}
         {messages.map((msg, i) => (
-          <div key={i} className={msg.isUser ? 'flex flex-col items-end' : 'flex flex-col items-start'} data-role={msg.isUser ? 'candidate' : 'participant'}>
-            <span className="mb-1 px-1 text-xs font-medium text-prism-ink-muted">{msg.isUser ? 'You' : `${msg.speaker}${msg.role ? `, ${msg.role}` : ''}`}</span>
+          <div key={i} className={msg.isUser ? 'flex flex-col items-end' : 'flex flex-col items-start'} data-role={msg.isUser ? 'candidate' : 'participant'} data-actor-kind={msg.isUser ? undefined : msg.actorKind} data-ai-generated={msg.aiGenerated ? 'true' : undefined}>
+            <span className="mb-1 flex flex-wrap items-center gap-2 px-1 text-xs font-medium text-prism-ink-muted">
+              <span>{msg.isUser ? 'You' : `${msg.speaker}${msg.role ? `, ${msg.role}` : ''}`}</span>
+              {msg.aiGenerated && (
+                <span className="rounded-sm border border-prism-border-strong px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-prism-ink" data-testid="ai-generated-label">AI-generated</span>
+              )}
+            </span>
             <p className={msg.isUser
               ? 'max-w-[85%] whitespace-pre-wrap rounded-[var(--prism-radius-lg)] bg-prism-accent px-4 py-3 text-sm text-prism-accent-ink'
               : 'max-w-[85%] whitespace-pre-wrap rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface px-4 py-3 text-sm text-prism-ink'}

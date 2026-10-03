@@ -74,6 +74,7 @@ import { isVelocityEnabled, thetaFromReport, velocityView } from '../lib/velocit
 import { getScenarioByAssessmentId } from '../lib/scenarioBank.js'
 import { buildStudentReportV2, buildEmployeeReportV2 } from '../lib/reportV2.js'
 import evidenceGraph from '../lib/evidenceGraph.js'
+import { draftSegmentFor } from '../domain/assessments/draftSegments.js'
 
 const router = Router()
 
@@ -2094,7 +2095,12 @@ router.get('/velocity/:candidateId', async (req, res) => {
 })
 
 // ── Calibration prompt (shown before the live assessment) ────────────────────
-const CALIBRATION_PROMPT =
+// T21: difficulty calibration is a SEPARATE purpose from the formal assessment
+// context. Its label and payload say so; a Director-driven universal run has
+// no calibration step at all (the route refuses such sessions).
+export const CALIBRATION_PURPOSE = 'CALIBRATION'
+export const CALIBRATION_LABEL = 'Difficulty calibration (not part of your assessment context)'
+export const CALIBRATION_PROMPT =
   'In 3–5 sentences, describe a real situation where you had to make a difficult decision with incomplete information. What did you do, and what would you do differently now?'
 
 // Heuristic tier estimator — works without any AI keys so the flow never blocks.
@@ -2124,6 +2130,12 @@ router.post('/calibrate', async (req, res) => {
   const entitlement = await getEntitlement(sessionId)
   if (!entitlement && process.env.NODE_ENV === 'production') {
     return res.status(402).json({ error: 'Payment required.' })
+  }
+  // T21: a Director-driven universal (draft) run never receives a difficulty
+  // calibration payload; its context is the pinned form, not a tier.
+  const persistedForCalibration = await getSession(sessionId)
+  if (persistedForCalibration && draftSegmentFor(persistedForCalibration.scenarioId)) {
+    return res.status(409).json({ error: 'This assessment has no difficulty calibration step.', code: 'CALIBRATION_NOT_APPLICABLE', purpose: CALIBRATION_PURPOSE })
   }
 
   let tier = heuristicTier(answer)
@@ -2194,11 +2206,11 @@ router.post('/calibrate', async (req, res) => {
   }
 
   try {
-    await setCalibration(sessionId, { tier, gradedBy, prompt: CALIBRATION_PROMPT, theta0 })
+    await setCalibration(sessionId, { tier, gradedBy, prompt: CALIBRATION_PROMPT, theta0, purpose: CALIBRATION_PURPOSE })
     if (isExecutiveEnabled() && theta0) {
-      auditLog('entry_estimate', sessionId, { theta0_mean: theta0.theta0_mean, theta0_var: theta0.theta0_var, tier, gradedBy })
+      auditLog('entry_estimate', sessionId, { theta0_mean: theta0.theta0_mean, theta0_var: theta0.theta0_var, tier, gradedBy, purpose: CALIBRATION_PURPOSE })
     }
-    res.json({ ok: true, tier, prompt: CALIBRATION_PROMPT })
+    res.json({ ok: true, tier, prompt: CALIBRATION_PROMPT, purpose: CALIBRATION_PURPOSE, label: CALIBRATION_LABEL })
   } catch (err) {
     logger.captureException(err, { msg: 'assessment_calibrate_failed', requestId: req.requestId })
     res.status(500).json({ error: 'Failed to save calibration' })

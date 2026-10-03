@@ -31,6 +31,8 @@ export function useAssessmentSession(sessionId, { enabled = true } = {}) {
       ...c,
       messages: [...c.messages, { speaker: 'You', role: null, content: text, isUser: true }, ...result.messages.map((m) => ({ ...m, isUser: false }))],
       progress: { ...c.progress, exchanges: result.exchanges },
+      // P4.6: the server's task-only stage strip after the Director moved on.
+      ...(result.stages ? { stages: result.stages } : {}),
     }))
     return undefined
   }, [queryClient, key])

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch, adminHasPermission } from '../../lib/adminApi.js'
 import { PageHeader, ErrorNotice, Notice, Toolbar, DataTable, Pill, btn, btnDanger, field, when, actWithReason, askText, askConfirm } from './ui.jsx'
+import FormsTab from './AdminContentForms.jsx'
 
 // ── /admin/content — CMS (Phase 5): blog, careers, applications ──────────────
 
@@ -17,7 +18,7 @@ export default function AdminContent() {
         subtitle="Every edit is versioned; published material archives, never hard-deletes. Research/static pages remain code-rendered (a separate product decision)."
       />
       <nav className="flex gap-1.5 mb-4" aria-label="Content tabs">
-        {['Blog', 'Careers', 'Applications'].map((t) => (
+        {['Blog', 'Careers', 'Applications', 'Forms'].map((t) => (
           <button key={t} type="button" onClick={() => setTab(t)}
             className={`rounded-[6px] px-3 py-1.5 font-sans text-[13px] border ${
               tab === t ? 'border-[var(--prism-signal)] text-[var(--prism-ink)] bg-[var(--prism-surface)]'
@@ -29,6 +30,7 @@ export default function AdminContent() {
       {tab === 'Blog' && <BlogTab />}
       {tab === 'Careers' && <CareersTab />}
       {tab === 'Applications' && <ApplicationsTab />}
+      {tab === 'Forms' && <FormsTab />}
     </div>
   )
 }

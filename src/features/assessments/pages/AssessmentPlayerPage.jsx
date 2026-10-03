@@ -343,6 +343,14 @@ export default function AssessmentPlayerPage() {
     return frame(
       <div className="mx-auto w-full max-w-2xl p-6">
         <SubmissionProgress stage={contract.status === 'SCORING_FAILED' ? 'FAILED' : contract.status === 'COMPLETED' && contract.reportPath ? 'REPORT' : 'REVIEW'} />
+        {contract.coverage && (
+          <section aria-labelledby="coverage-title" className="mb-4 rounded-md border border-prism-border bg-prism-surface p-3 text-sm" data-testid="review-coverage">
+            <h2 id="coverage-title" className="font-semibold text-prism-ink">Review coverage</h2>
+            <ul className="mt-1 space-y-0.5 text-prism-ink-muted">
+              {contract.coverage.notes.map((n) => <li key={n}>{n}</li>)}
+            </ul>
+          </section>
+        )}
         {contract.status === 'COMPLETED' && (
           <Callout tone="positive" title={PLAYER_COPY.completeTitle}>
             <p>{PLAYER_COPY.completeBody}</p>

@@ -102,6 +102,25 @@ describe('artifact store (§39.3)', () => {
     expect(store.hasUnsaved()).toBe(false)
   })
 
+  it('P4: a stale contract (updated locally after a message) never rewinds a newer saved edit or its If-Match version', async () => {
+    const store = createArtifactStore({ save: async (_id, args) => ({ version: args.ifMatch + 1, data: { 'R2.due': args.updates['R2.due'] } }) })
+    const stale = [{ artifactId: 'B', type: 'PLAN_BOARD', title: 'Board', data: { 'R2.due': null }, version: 0 }]
+    store.load(stale)
+    store.edit('B', { 'R2.due': 'Day 2 morning' })
+    await store.flush('B')
+    expect(store.getSnapshot().items[0]).toMatchObject({ status: 'SAVED', local: { 'R2.due': 'Day 2 morning' }, server: { version: 1 } })
+    // The session contract is re-applied with the artifacts it fetched BEFORE the save.
+    store.load(stale)
+    expect(store.getSnapshot().items[0]).toMatchObject({ status: 'SAVED', local: { 'R2.due': 'Day 2 morning' }, server: { version: 1 } })
+    // A dirty edit keeps its newer server version too (next save still sends If-Match 1).
+    store.edit('B', { 'R2.due': 'Day 2 afternoon' })
+    store.load(stale)
+    expect(store.getSnapshot().items[0].server.version).toBe(1)
+    // A genuinely newer contract (after resume) is taken as usual.
+    store.load([{ ...stale[0], data: { 'R2.due': 'Day 2 afternoon' }, version: 2 }])
+    expect(store.getSnapshot().items[0].server.version).toBe(2)
+  })
+
   it('keeps the reasoning with the version: loaded on resume, recovered on a conflict, reset by "keep the saved version"', async () => {
     let conflict = false
     const sent = []

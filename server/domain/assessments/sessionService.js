@@ -10,7 +10,7 @@ import { reportPath } from './assignmentService.js'
 import { createMemorySessionLocks } from './sessionLocks.js'
 import { draftSegmentFor, buildRunPin, evaluateJobKey, DRAFT_EVALUATE_JOB_KIND, DRAFT_SEGMENT_ID, SLICE_METHOD_VERSION, isUniversalSnapshot, draftContentEnabled, answerSegmentQuestion } from './draftSegments.js'
 import { timingPolicyFor, legacyPolicy, isLegacyPolicy, deadlinesFor } from './timingPolicy.js'
-import { selectNext, stageStrip, parentOpportunityId } from './director.js'
+import { selectNext, stageStrip, coverageReport, parentOpportunityId } from './director.js'
 import { validateBoardPatch, worldStateFor } from './universalForm.js'
 import { answerFactQuestion } from './factBoundary.js'
 
@@ -39,6 +39,10 @@ export function createAssessmentSessionService({
   // allocated only when readiness is READY; null → no gate (legacy path and
   // fixture tests are unchanged).
   releaseGate = null,
+  // T33: called (best-effort) when an evaluation wrote HUMAN_REVIEW_REQUIRED
+  // units for JUDGE_DISAGREEMENT, so the existing human rating queue can be
+  // fed when PRISM_V3_RATING_QUEUE is on. Never changes the units.
+  onHumanReviewRequired = async () => {},
 }) {
   const localLocks = createMemorySessionLocks()
   const withLock = (resource, work) => {
@@ -225,6 +229,13 @@ export function createAssessmentSessionService({
       if (await io.hasErasureMarker(job.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
       const done = await io.completeJob(job.jobId, job.fencingToken, 'DONE')
       audit('assessment.evaluation_completed', job.sessionId, { sessionId: job.sessionId, jobId: job.jobId, attempt: job.attempts, units: units.length, requestId })
+      const disputed = units.filter((u) => (u?.provenance_json || u?.provenance || {}).reason === 'JUDGE_DISAGREEMENT')
+      if (disputed.length) {
+        audit('assessment.judge_disagreement', job.sessionId, { sessionId: job.sessionId, jobId: job.jobId, units: disputed.length, opportunityIds: disputed.map((u) => (u.provenance_json || u.provenance || {}).opportunityId).filter(Boolean), requestId })
+        try { await onHumanReviewRequired({ sessionId: job.sessionId, reason: 'JUDGE_DISAGREEMENT', units: disputed }) } catch (err) {
+          audit('assessment.human_review_enqueue_failed', job.sessionId, { sessionId: job.sessionId, code: err?.code || 'ENQUEUE_FAILED', requestId })
+        }
+      }
       return done
     } catch (err) {
       // Any failure (provider, malformed output, evidence write) is a
@@ -473,7 +484,10 @@ export function createAssessmentSessionService({
       let universal = null
       if (isUniversalRun(run)) {
         const ledger = await repos.sessionIo.listOpportunities(sessionId)
-        universal = { messages: universalTranscript(ledger, actions), stages: stageStrip(run.snapshot.form, ledger), exchanges: messageActions(actions).length }
+        // Coverage counts are shown to the owner only once input is closed
+        // (finished / reviewing / complete): never a hint during the run.
+        const closed = Boolean(report) || Boolean(processing)
+        universal = { messages: universalTranscript(ledger, actions), stages: stageStrip(run.snapshot.form, ledger), exchanges: messageActions(actions).length, coverage: closed ? coverageReport(run.snapshot.form, ledger) : null }
       }
       return buildSessionContract({
         session: { ...session, sessionId },
@@ -570,7 +584,11 @@ export function createAssessmentSessionService({
           const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
           await applied(action, { ...stored.response, revealedFactId })
           const shown = await presentNext(sessionId, run, { requestId })
-          return { ...stored.response, messages: [...stored.response.messages, ...shown], replayed: false }
+          // The task-only stage strip after the Director moved on (names and
+          // position only, as in the contract), so the player can update it
+          // without a second round trip.
+          const stages = stageStrip(run.snapshot.form, await repos.sessionIo.listOpportunities(sessionId))
+          return { ...stored.response, messages: [...stored.response.messages, ...shown], stages, replayed: false }
         }
         if (run?.snapshot) {
           // The handover segment: authored replies from pinned facts only.

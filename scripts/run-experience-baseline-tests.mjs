@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'p2', 'p3', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, p2, p3, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
+if (!['database', 'p2', 'p3', 'p4', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, p3, p4, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -86,6 +86,12 @@ try {
   if (mode === 'p3') {
     env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
     browserArgs.splice(2, browserArgs.length, 'p3-real-journey.spec.js', 'flow-player-layout.spec.js', 'flow-recovery.spec.js', 'campus-shell.spec.js')
+  }
+  // P4: the real-browser six-stage coverage proof (draft content on the 4174
+  // audit server only), desktop Chromium with 1440/390 viewport screenshots.
+  if (mode === 'p4') {
+    env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
+    browserArgs.splice(2, browserArgs.length, 'p4-six-stages.spec.js', '--project=chromium')
   }
   exitCode = await run(mode === 'database'
     ? ['--test', 'server/test/experienceBaseline.db.test.js']

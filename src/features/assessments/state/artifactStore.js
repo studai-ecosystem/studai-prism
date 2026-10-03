@@ -31,14 +31,19 @@ export function createArtifactStore({ save }) {
     getSnapshot: () => snapshot,
 
     // Load (or refresh after resume) from the session contract. Unsaved local
-    // work is kept; clean items take the server's state.
+    // work is kept; clean items take the server's state unless the store
+    // already holds a NEWER saved version than the contract carries (a
+    // contract updated locally after a message never rewinds a saved edit).
     load(artifacts = []) {
       const next = new Map()
       for (const a of artifacts) {
         const prev = items.get(a.artifactId)
         const serverNotes = typeof a.notes === 'string' ? a.notes : ''
         if (prev && UNSAVED.has(prev.status)) {
-          next.set(a.artifactId, { ...prev, server: { data: clone(a.data), version: a.version, notes: serverNotes } })
+          const newer = !(Number.isFinite(prev.server?.version) && prev.server.version > a.version)
+          next.set(a.artifactId, newer ? { ...prev, server: { data: clone(a.data), version: a.version, notes: serverNotes } } : prev)
+        } else if (prev && Number.isFinite(prev.server?.version) && prev.server.version > a.version) {
+          next.set(a.artifactId, prev)
         } else {
           next.set(a.artifactId, {
             artifactId: a.artifactId, type: a.type, title: a.title, schema: a.schema || null,

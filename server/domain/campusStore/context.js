@@ -160,6 +160,22 @@ export function createCampusContext({
         .sort((a, b) => String(a.startsOn).localeCompare(String(b.startsOn)))
     },
   }
+  // Blinded human double-rating of V3 evidence (identity tokenised).
+  const validation = createValidationService({
+    repos: storeView, evidence,
+    candidateNameFor: async (sessionId) => {
+      const s = await legacy.getSession(sessionId)
+      return s?.userId ? (await users.findById(s.userId))?.name || null : null
+    },
+    sessionState: async (sessionId) => (legacy.adminState ? legacy.adminState(sessionId) : null),
+  })
+  // T33: judge disagreement feeds the existing rating queue only when that
+  // queue is switched on; otherwise the HUMAN_REVIEW_REQUIRED units stand.
+  const ratingQueueOn = () => process.env.PRISM_V3_RATING_QUEUE === 'true'
+  const onHumanReviewRequired = async ({ sessionId, reason }) => {
+    if (!ratingQueueOn()) return { enqueued: 0, skipped: 'RATING_QUEUE_OFF' }
+    return validation.enqueueSession(sessionId, { enqueuedBy: `system:${String(reason).toLowerCase()}` })
+  }
   return {
     repos,
     campusAvailable,
@@ -189,7 +205,7 @@ export function createCampusContext({
     preview: createPreviewService({ repos: storeView, clock, telemetry: createTelemetryService({ repos: storeView, clock, ...(hashActor ? { hashActor } : {}) }) }),
     sessions: engine
       ? createAssessmentSessionService({
-        repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter, sliceEvaluator, releaseGate,
+        repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter, sliceEvaluator, releaseGate, onHumanReviewRequired,
         onSponsoredCompleted: ({ organizationId, assignmentId }) => admin.checkCompletionThresholds(organizationId, assignmentId),
       })
       : null,
@@ -204,15 +220,7 @@ export function createCampusContext({
     preparation,
     analytics,
     billing: createBillingService({ repos: storeView, clock }),
-    // Blinded human double-rating of V3 evidence (identity tokenised).
-    validation: createValidationService({
-      repos: storeView, evidence,
-      candidateNameFor: async (sessionId) => {
-        const s = await legacy.getSession(sessionId)
-        return s?.userId ? (await users.findById(s.userId))?.name || null : null
-      },
-      sessionState: async (sessionId) => (legacy.adminState ? legacy.adminState(sessionId) : null),
-    }),
+    validation,
     overviewExtras,
     // Effective scope of `permission` for an actor in an organization.
     scopeFor: (actor, organizationId, permission) => can(actor, permission, { organizationId }),

@@ -154,3 +154,30 @@ export function stageStrip(form, ledger = []) {
   }
   return form.stages.map((s) => ({ id: s.id, label: s.label, state: touched.get(s.id) === 'CURRENT' ? 'CURRENT' : touched.has(s.id) ? 'DONE' : 'UPCOMING' }))
 }
+
+// P4.5/P4.7 per-run coverage diagnostics: COUNTS only (never scores or
+// capability hints) over the REQUIRED planned opportunities of the pinned
+// form, plus the side-state reasons. Shown to the owner after finish and
+// carried into the report as a limitation. Pure.
+export const COVERAGE_SIDE_STATES = Object.freeze(['DELIVERY_FAILED', 'NOT_ACCESSIBLE', 'EXPIRED', 'SKIPPED_BY_POLICY', 'REVIEW_REQUIRED'])
+export function coverageReport(form, ledger = []) {
+  const states = new Map(ledger.map((r) => [r.opportunityId, r.state]))
+  const required = form.opportunities.filter((o) => o.required)
+  const stateOf = (o) => states.get(o.id) || 'PLANNED'
+  const presented = required.filter((o) => stateOf(o) !== 'PLANNED' && !['DELIVERY_FAILED', 'NOT_ACCESSIBLE', 'SKIPPED_BY_POLICY', 'REVIEW_REQUIRED'].includes(stateOf(o))).length
+  const answered = required.filter((o) => ANSWERED_STATES.has(stateOf(o))).length
+  const reasons = Object.fromEntries(COVERAGE_SIDE_STATES.map((s) => [s, ledger.filter((r) => r.state === s).length]))
+  const notPresented = required.length - presented - required.filter((o) => ['DELIVERY_FAILED', 'NOT_ACCESSIBLE', 'SKIPPED_BY_POLICY', 'REVIEW_REQUIRED'].includes(stateOf(o))).length
+  const stagesPresented = new Set(ledger.filter((r) => r.state !== 'PLANNED').map((r) => form.opportunities.find((o) => o.id === parentOpportunityId(r.opportunityId))?.stageId).filter(Boolean))
+  const notes = []
+  notes.push(`Review coverage: ${presented} of ${required.length} planned moments were presented.`)
+  if (reasons.REVIEW_REQUIRED > 0) notes.push(reasons.REVIEW_REQUIRED === 1 ? 'One moment was withheld for review.' : `${reasons.REVIEW_REQUIRED} moments were withheld for review.`)
+  if (notPresented > 0) notes.push(notPresented === 1 ? 'One planned moment was not reached before you finished.' : `${notPresented} planned moments were not reached before you finished.`)
+  if (reasons.EXPIRED > 0) notes.push(reasons.EXPIRED === 1 ? 'One moment expired before an answer was received.' : `${reasons.EXPIRED} moments expired before an answer was received.`)
+  if (reasons.DELIVERY_FAILED > 0 || reasons.NOT_ACCESSIBLE > 0) notes.push('Some moments could not be delivered; this is a technical limitation, not something you did.')
+  return {
+    planned: required.length, presented, answered, notPresented,
+    stagesPlanned: form.stages.length, stagesPresented: stagesPresented.size,
+    reasons, reviewRequired: reasons.REVIEW_REQUIRED > 0, notes,
+  }
+}

@@ -11,7 +11,8 @@ import { randomBytes, createHash } from 'node:crypto'
 import { ApiError } from '../../http/errors.js'
 import { candidateTurnsUnion } from '../claims.js'
 import { definitionForScenario } from '../../assessments/catalog.js'
-import { evaluateJobKey } from '../../assessments/draftSegments.js'
+import { evaluateJobKey, draftSegmentFor, isUniversalSnapshot } from '../../assessments/draftSegments.js'
+import { coverageReport } from '../../assessments/director.js'
 import { hashToken } from '../../memberships/inviteService.js'
 import { buildStudentReportV3, reportContentHash, REPORT_V3_BUILDER_VERSION } from './build.js'
 import { assertReportSafe } from './schema.js'
@@ -89,8 +90,12 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
       scope: sponsored ? 'SPONSORED' : 'PERSONAL',
       verification: { identityAssurance: report?.identityAssurance?.level || 'NOT_RECORDED', credentialId: report?.credential?.credentialId || null },
     }
+    // P4.5/P4.7: counts-only coverage of a Director-driven run (its pinned
+    // form's required opportunities against the ledger); null for legacy runs.
+    const pinnedSnapshot = draftSegmentFor(scenarioId)
+    const coverage = isUniversalSnapshot(pinnedSnapshot) && (opportunities || []).length ? coverageReport(pinnedSnapshot.form, opportunities) : null
     const render = (level) => assertReportSafe(buildStudentReportV3({
-      sessionId, definition, formId: form?.id || null, units, turns, header, disclosure: level, opportunities: opportunities || [],
+      sessionId, definition, formId: form?.id || null, units, turns, header, disclosure: level, opportunities: opportunities || [], coverage,
     }))
     let full
     let version

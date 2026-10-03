@@ -8,6 +8,10 @@
 //   valid unit with a level      → PROVISIONAL (single judge, no agreement)
 //   abstention                   → INSUFFICIENT_EVIDENCE with the reason
 //   quote mismatch / bad ids     → HUMAN_REVIEW_REQUIRED, no excerpt, no level
+//   ambiguity / contrary markers → ONE bounded second sample (N=2 total); two
+//                                  samples ≥ 2 anchor levels apart, or one
+//                                  rated and one not → HUMAN_REVIEW_REQUIRED
+//                                  (JUDGE_DISAGREEMENT), never an average (T33)
 //   malformed / missing output   → throws (the job records TECHNICAL_FAILURE)
 import { renderPrompt } from '../../engine/prompts.js'
 import { sanitizeCandidateText } from '../../lib/promptSecurity.js'
@@ -17,6 +21,29 @@ export const EVALUATOR_PROMPT = 'evidence_evaluator.v1'
 const ELIGIBLE_KINDS = new Set(['MESSAGE', 'ARTIFACT'])
 const ABSTAIN_REASONS = new Set(['NOT_ADDRESSED', 'TOO_SPARSE', 'NOT_JUDGEABLE'])
 const MAX_EXCERPT = 600
+// T33 bounds: a marker counts once it carries real content; at most one
+// extra sample per (opportunity, behaviour); levels this far apart disagree.
+export const AMBIGUITY_MARKER_MIN_CHARS = 12
+export const MAX_JUDGE_SAMPLES = 2
+export const DISAGREEMENT_LEVELS = 2
+export const JUDGE_DISAGREEMENT = 'JUDGE_DISAGREEMENT'
+
+export function hasAmbiguityMarker(decision) {
+  return [decision?.contraryEvidence, decision?.ambiguity].some((m) => typeof m === 'string' && m.trim().length >= AMBIGUITY_MARKER_MIN_CHARS)
+}
+
+// Combine two samples of the same action. Pure. Never averages.
+export function reconcileSamples(first, second) {
+  const samples = [first, second].map((d) => ({ outcome: d.outcome, level: d.level, reason: d.reason, ambiguityFlagged: hasAmbiguityMarker(d) }))
+  const bothRated = first.outcome === 'RATED' && second.outcome === 'RATED'
+  const disagree = bothRated ? Math.abs(first.level - second.level) >= DISAGREEMENT_LEVELS : (first.outcome === 'RATED') !== (second.outcome === 'RATED')
+  if (disagree) {
+    // Keep the verified excerpt (the learner's own words) so a human can rate it.
+    const quoted = first.outcome === 'RATED' ? first : second
+    return { ...first, outcome: 'REVIEW', reason: JUDGE_DISAGREEMENT, level: null, action: quoted.action, excerpt: quoted.excerpt || null, judgeSamples: samples }
+  }
+  return { ...first, judgeSamples: samples }
+}
 
 class EvaluatorOutputError extends Error {
   constructor(message) { super(message); this.name = 'EvaluatorOutputError'; this.code = 'EVALUATOR_OUTPUT_INVALID' }
@@ -122,6 +149,7 @@ function toEvidenceInput(decision, { sessionId, formId, pin, attempt, provenance
     reason: decision.reason,
     contraryEvidence: decision.contraryEvidence || null,
     ambiguity: decision.ambiguity || null,
+    ...(decision.judgeSamples ? { judgeSamples: decision.judgeSamples, judgeSampleCount: decision.judgeSamples.length } : {}),
   }
   const candidateAction = action ? {
     actionId: action.actionId,
@@ -172,6 +200,22 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
     const out = await Promise.race([call, timeout])
     return parseUnits(out?.choices?.[0]?.message?.content ?? out?.content ?? out)
   }
+  // One sample: ask, require exactly one unit for the target, classify.
+  async function sample(target, actions, snapshot, sessionId) {
+    const units = await ask(buildEvaluatorMessages({ snapshot, opportunity: target, actions }), sessionId)
+    const found = units.filter((u) => u && u.opportunityId === target.id)
+    if (found.length !== 1) throw new EvaluatorOutputError(`Evaluator returned ${found.length} units for ${target.id}`)
+    return classifyUnit(found[0], { opportunity: target, actions })
+  }
+  // T33: a rated unit carrying an ambiguity / contrary-evidence marker gets
+  // exactly one more sample (MAX_JUDGE_SAMPLES); the two are reconciled by
+  // policy, never averaged. Unflagged units stay single-judge PROVISIONAL.
+  async function judge(target, actions, snapshot, sessionId) {
+    const first = await sample(target, actions, snapshot, sessionId)
+    if (first.outcome !== 'RATED' || !hasAmbiguityMarker(first) || MAX_JUDGE_SAMPLES < 2) return first
+    const second = await sample(target, actions, snapshot, sessionId)
+    return reconcileSamples(first, second)
+  }
 
   return {
     promptVersion: EVALUATOR_PROMPT,
@@ -201,10 +245,7 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
             if (mine.length === 0) {
               decision = { opportunityId: target.id, capabilityId: target.capabilityId, behaviourId, outcome: 'ABSTAIN', reason: 'NOT_ADDRESSED', action: null, excerpt: null, level: null }
             } else {
-              const units = await ask(buildEvaluatorMessages({ snapshot, opportunity: target, actions: mine }), sessionId)
-              const found = units.filter((u) => u && u.opportunityId === target.id)
-              if (found.length !== 1) throw new EvaluatorOutputError(`Evaluator returned ${found.length} units for ${target.id}`)
-              decision = classifyUnit(found[0], { opportunity: target, actions: mine })
+              decision = await judge(target, mine, snapshot, sessionId)
             }
             inputs.push(toEvidenceInput({ ...decision, opportunityGroup: target.group, behaviourIds: def.behaviourIds || [behaviourId] }, { sessionId, formId, pin, attempt, provenanceBase }))
           }
@@ -218,10 +259,7 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
         if (eligible.length === 0) {
           decision = { opportunityId: opportunity.id, capabilityId: opportunity.capabilityId, behaviourId: opportunity.behaviourId, outcome: 'ABSTAIN', reason: 'NOT_ADDRESSED', action: null, excerpt: null, level: null }
         } else {
-          const units = await ask(buildEvaluatorMessages({ snapshot, opportunity, actions: eligible }), sessionId)
-          const mine = units.filter((u) => u && u.opportunityId === opportunity.id)
-          if (mine.length !== 1) throw new EvaluatorOutputError(`Evaluator returned ${mine.length} units for ${opportunity.id}`)
-          decision = classifyUnit(mine[0], { opportunity, actions: eligible })
+          decision = await judge(opportunity, eligible, snapshot, sessionId)
         }
         inputs.push(toEvidenceInput({ ...decision, opportunityGroup: opportunity.group || null }, { sessionId, formId, pin, attempt, provenanceBase }))
       }

@@ -195,12 +195,13 @@ export default function Briefing() {
         throw new Error(data.error || 'Could not record consent.')
       }
 
-      // Calibration is non-blocking — failures fall back to the default tier.
+      // Difficulty calibration is a separate purpose (not the assessment
+      // context) and non-blocking — failures fall back to the default tier.
       try {
         await fetch('/api/assessment/calibrate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId, answer: calibrationAnswer }),
+          body: JSON.stringify({ sessionId, answer: calibrationAnswer, purpose: 'CALIBRATION' }),
         })
       } catch {
         /* ignore — server defaults to intermediate tier */
@@ -520,8 +521,11 @@ export default function Briefing() {
               )}
               <div className="rounded-xl border border-[var(--prism-border)] bg-[var(--prism-surface)] p-5">
                 <span className="font-mono text-xs tracking-[0.08em] text-[var(--prism-signal)] uppercase">
-                  Quick calibration (optional)
+                  Difficulty calibration (optional)
                 </span>
+                <p className="font-sans text-[12px] text-[var(--prism-ink-muted)] leading-relaxed mt-1" data-testid="calibration-purpose">
+                  Not part of your assessment context: this short answer only helps choose a starting difficulty. It is not scored and does not appear in your report.
+                </p>
                 <p className="font-sans text-sm text-[var(--prism-ink)] leading-relaxed mt-2 mb-3">
                   {CALIBRATION_PROMPT}
                 </p>

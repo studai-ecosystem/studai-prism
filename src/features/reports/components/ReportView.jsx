@@ -73,6 +73,14 @@ export function ReportView({ report, versionNumber, visibilityText, actions = nu
         <p className="text-lg leading-relaxed text-prism-ink" data-testid="report-plain-statement">{report.plainStatement}</p>
       )}
       <CapabilityMap capabilities={report.summary.capabilities} onSelect={seeEvidence} headingLevel={2} collapseInsufficient />
+      {report.coverage?.notes?.length > 0 && (
+        <section aria-labelledby="report-coverage-title" className="rounded-md border border-prism-border bg-prism-surface p-3 text-sm" data-testid="report-coverage">
+          <h2 id="report-coverage-title" className="font-semibold text-prism-ink">What this report covers</h2>
+          <ul className="mt-1 space-y-0.5 text-prism-ink-muted">
+            {report.coverage.notes.map((n) => <li key={n}>{n}</li>)}
+          </ul>
+        </section>
+      )}
       {report.summary.describedCount === 0 && (
         <div data-testid="report-none-described">
           <Callout tone="insufficient" title="Not enough evidence yet">

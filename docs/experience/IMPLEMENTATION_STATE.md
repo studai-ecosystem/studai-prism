@@ -1,5 +1,40 @@
 # Experience programme - source traceability and execution checkpoints
 
+## P4 remaining gaps closed - 2026-10-03
+
+- P4.8 content review tooling: `domain/content/tooling.js` + `routes/admin/content.js`
+  (`createFormsRouter`): version package, structured diff (facts / stages / world changes /
+  opportunities / behaviours / anchors / board / director), synthetic preview (Director + fact
+  boundary over a canned script, `is_synthetic`, no session, no evidence), opportunity coverage
+  matrix, exemplar / counterexample / note attachments, comments, role-checked reviewer decisions
+  (`REVIEWER_ROLES` CONTENT / MEASUREMENT / ACCESSIBILITY by existing admin permissions), and draft
+  edits that always create a NEW version (zod `FormPackageSchema` + referential checks; existing
+  versions immutable). `APPROVED_FOR_PILOT` now needs recorded APPROVE decisions from a CONTENT and
+  a MEASUREMENT reviewer (distinct people) or the transition is 409. Migration 0050
+  (`content_attachments`, `content_comments`, `content_review_decisions`, `content_form_drafts`),
+  in-process store without a database. Every mutation audited. Admin UI: Forms tab on
+  `/admin/content` (`AdminContentForms.jsx`) with versions, diff, coverage, preview, attachments,
+  comments, decisions and transition buttons disabled unless permitted and gated.
+  **No content was approved: CORE-TEAMREADY-A stays DRAFT.**
+- T21: `/api/assessment/calibrate` answers `purpose: CALIBRATION` and the label "Difficulty
+  calibration (not part of your assessment context)"; a Director-driven universal run refuses it
+  (409 `CALIBRATION_NOT_APPLICABLE`); every session contract carries `purpose: FORMAL`. Legacy
+  Briefing copy relabelled. Legacy calibration behaviour and tiers unchanged.
+- T33: `sliceEvaluator` takes exactly one extra sample (N=2) for a rated unit with an ambiguity /
+  contrary-evidence marker; ≥ 2 anchor levels apart or rated-vs-abstain → `HUMAN_REVIEW_REQUIRED`
+  with reason `JUDGE_DISAGREEMENT`, the learner's verified words kept and no level (never an
+  average). Audit event `assessment.judge_disagreement`; `onHumanReviewRequired` feeds the existing
+  rating queue when `PRISM_V3_RATING_QUEUE` is on. Fault `PRISM_AUDIT_AI_FAULT=disagree`.
+- P4.5 / P4.7: `coverageReport` (counts only) on the owner contract once input is closed and on the
+  report (`coverage`, limitation notes "Review coverage: X of Y planned moments were presented.",
+  "One moment was withheld for review." for REVIEW_REQUIRED render mismatches); processing view and
+  Report V3 show the notes. Message responses of universal runs carry the task-only stage strip.
+- Browser proof `tests/e2e/p4-six-stages.spec.js` (runner mode `p4`); defects fixed: stage strip
+  not advancing, stale-contract rewind of a saved board edit (`artifactStore.load`).
+- Results: TEST_RESULTS.md "P4 remaining gaps closed". No scoring, psychometrics, legacy
+  stimulus / 35-minute timing, sufficiency floors, entitlement or authorization change. Open:
+  content / measurement / accessibility approvals (human), Layer C live model, manual AT/zoom.
+
 ## P3 acceptance gaps closed - 2026-10-03
 
 - Real-browser canonical journey `tests/e2e/p3-real-journey.spec.js` (runner mode `p3`, no route

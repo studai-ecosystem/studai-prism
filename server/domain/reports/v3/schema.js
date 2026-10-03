@@ -111,6 +111,8 @@ export const StudentReportV3Schema = z.object({
   boundedObservations: z.array(BoundedObservation).optional(),
   moments: z.array(Moment).max(3),
   development: z.object({ priorities: z.array(Priority).max(3), maxPriorities: z.literal(3) }).strict().nullable(),
+  // P4.5/P4.7 coverage diagnostics: counts and plain notes only.
+  coverage: z.object({ planned: z.number().int().min(0), presented: z.number().int().min(0), answered: z.number().int().min(0), withheld: z.number().int().min(0), notes: z.array(z.string().min(1)) }).strict().optional(),
   methodology: z.object({
     builderVersion: z.string(), sufficiencyRulesVersion: z.string(), levelLabelsStatus: z.string(), catalogVersion: z.string(),
     assessmentDefinitionId: z.string().nullable(), formId: z.string().nullable(),
@@ -124,7 +126,7 @@ export const StudentReportV3Schema = z.object({
 // Keys that would leak a single score, a ranking or false precision.
 export const FORBIDDEN_KEY = /composite|overall|percentile|score|rank|median|agreement|theta|confidence|weight/i
 // The only numeric fields a report may carry: counts and positions.
-const NUMERIC_KEYS = new Set(['turn', 'unitCount', 'opportunities', 'describedCount', 'insufficientCount', 'maxPriorities'])
+const NUMERIC_KEYS = new Set(['turn', 'unitCount', 'opportunities', 'describedCount', 'insufficientCount', 'maxPriorities', 'planned', 'presented', 'answered', 'withheld'])
 
 export function forbiddenPaths(value, path = '$') {
   const out = []

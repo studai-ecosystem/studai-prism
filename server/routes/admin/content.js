@@ -20,11 +20,12 @@
 import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
 import logger from '../../lib/logger.js'
-import { query } from '../../db/pool.js'
+import { query, isDbConfigured } from '../../db/pool.js'
 import { requirePermission } from '../../lib/adminAuth.js'
 import { adminAudit } from '../../lib/adminAudit.js'
 import { seedContentCms, isCmsDbEnabled } from '../../lib/contentCms.js'
-import { contentRegistry, CONTENT_STATES } from '../../domain/content/versions.js'
+import { contentRegistry, CONTENT_STATES, pilotApprovalGate } from '../../domain/content/versions.js'
+import { createContentTooling, createMemoryReviewStore, createPgReviewStore } from '../../domain/content/tooling.js'
 
 const router = Router()
 
@@ -382,42 +383,146 @@ router.delete('/applications/:id', requirePermission('content:applications'), as
   }
 })
 
-// ── P4.8 Assessment form governance ───────────────────────────────────────────
+
+// ── P4.8 Assessment form governance and review tooling ────────────────────────
 // Authored assessment forms carried by this build and their version states
 // (DRAFT → REVIEW → APPROVED_FOR_PILOT → APPROVED_FOR_INTENDED_USE → RETIRED).
 // Reading needs content:read; a transition needs a reviewer permission
-// (content:publish) AND a reason, and is written to the admin audit log.
-// Nothing is published by default.
-router.get('/forms', requirePermission('content:read'), (req, res) => {
-  res.json({ forms: contentRegistry.listForms(), states: CONTENT_STATES })
-})
+// (content:publish) AND a reason, and is written to the admin audit log; the
+// pilot transition additionally needs recorded APPROVE decisions from a
+// CONTENT and a MEASUREMENT reviewer. Nothing is published by default.
+// Review tooling (domain/content/tooling.js): version package, structured
+// diff, synthetic preview (no session, no evidence), coverage matrix,
+// attachments, comments, decisions and draft edits as NEW versions. Every
+// mutation is audited. Exported as a factory so tests inject the store/audit.
+function formError(res, err, msg, req) {
+  if (err?.code === 'NOT_FOUND') return res.status(404).json({ error: 'Form or version not found.', code: 'NOT_FOUND' })
+  if (err?.code === 'FORBIDDEN') return res.status(403).json({ error: err.message, code: 'FORBIDDEN' })
+  if (err?.code === 'CONFLICT') return res.status(409).json({ error: err.message, code: 'CONFLICT', details: err.details || null })
+  if (err?.code === 'VALIDATION_FAILED') return res.status(400).json({ error: err.message, code: 'VALIDATION_FAILED', details: err.details || null })
+  logger.captureException(err, { msg, requestId: req.requestId })
+  return res.status(500).json({ error: 'Internal server error' })
+}
 
-router.get('/forms/:id/versions', requirePermission('content:read'), (req, res) => {
-  try {
-    res.json({ contentId: req.params.id, versions: contentRegistry.listVersions(req.params.id) })
-  } catch (err) {
-    if (err?.code === 'NOT_FOUND') return res.status(404).json({ error: 'Form not found.' })
-    logger.captureException(err, { msg: 'admin_form_versions_failed', requestId: req.requestId })
-    res.status(500).json({ error: 'Internal server error' })
+// Form reads and reviewer decisions are open to content readers AND the
+// measurement/scenario reviewers (psychometric admins hold scenarios:read,
+// not content:read); writes keep the CMS permissions.
+const FORM_READ_PERMISSIONS = ['content:read', 'scenarios:read', 'validation:manage', '*']
+function requireFormRead(req, res, next) {
+  if (!req.admin) return res.status(401).json({ error: 'authentication required', code: 'NO_TOKEN' })
+  if (!FORM_READ_PERMISSIONS.some((p) => req.admin.permissions?.has(p))) {
+    return res.status(403).json({ error: 'missing permission: content:read', code: 'FORBIDDEN', explanation: 'This action requires a content or measurement reviewer role.' })
   }
-})
+  next()
+}
 
-router.post('/forms/:formId/transition', requirePermission('content:publish'), async (req, res) => {
-  const { to, reason } = req.body || {}
-  try {
-    const out = contentRegistry.transition({ formId: req.params.formId, to, actor: req.admin, reason })
-    await adminAudit(req, {
-      action: 'assessment_form_state_changed', entityType: 'assessment_form', entityId: req.params.formId,
-      before: { state: out.before }, after: { state: out.state }, reason,
-    })
-    res.json({ formId: out.formId, state: out.state, approvalHistory: out.approvalHistory })
-  } catch (err) {
-    if (err?.code === 'NOT_FOUND') return res.status(404).json({ error: 'Form not found.' })
-    if (err?.code === 'FORBIDDEN') return res.status(403).json({ error: err.message, code: 'FORBIDDEN' })
-    if (err?.code === 'VALIDATION_FAILED') return res.status(400).json({ error: err.message, code: 'VALIDATION_FAILED' })
-    logger.captureException(err, { msg: 'admin_form_transition_failed', requestId: req.requestId })
-    res.status(500).json({ error: 'Internal server error' })
-  }
-})
+export function createFormsRouter({
+  registry = contentRegistry,
+  tooling = createContentTooling({ registry, store: isDbConfigured() ? createPgReviewStore(query) : createMemoryReviewStore() }),
+  audit = adminAudit,
+} = {}) {
+  const forms = Router()
+
+  forms.get('/forms', requireFormRead, async (req, res) => {
+    try {
+      await tooling.hydrate()
+      res.json({ forms: registry.listForms(), states: CONTENT_STATES })
+    } catch (err) { formError(res, err, 'admin_forms_list_failed', req) }
+  })
+
+  forms.get('/forms/:id/versions', requireFormRead, async (req, res) => {
+    try {
+      await tooling.hydrate()
+      res.json({ contentId: req.params.id, versions: registry.listVersions(req.params.id) })
+    } catch (err) { formError(res, err, 'admin_form_versions_failed', req) }
+  })
+
+  forms.post('/forms/:formId/transition', requirePermission('content:publish'), async (req, res) => {
+    const { to, reason } = req.body || {}
+    const formId = req.params.formId
+    const contentId = formId.includes(':') ? formId.slice(0, formId.indexOf(':')) : formId
+    try {
+      const out = await tooling.transition(contentId, formId, { to, reason }, req.admin)
+      await audit(req, {
+        action: 'assessment_form_state_changed', entityType: 'assessment_form', entityId: formId,
+        before: { state: out.before }, after: { state: out.state }, reason,
+      })
+      res.json({ formId: out.formId, state: out.state, approvalHistory: out.approvalHistory })
+    } catch (err) { formError(res, err, 'admin_form_transition_failed', req) }
+  })
+
+  // Full authored package of one version (private rubric anchors included:
+  // this is the reviewer plane, never a learner surface).
+  forms.get('/forms/:id/versions/:v', requireFormRead, async (req, res) => {
+    try {
+      const v = await tooling.getVersion(req.params.id, req.params.v)
+      const [attachments, comments, decisions] = await Promise.all([
+        tooling.listAttachments(req.params.id, req.params.v), tooling.listComments(req.params.id, req.params.v), tooling.listDecisions(req.params.id, req.params.v),
+      ])
+      res.json({ ...v, attachments, comments, decisions, pilotGate: pilotApprovalGate(decisions) })
+    } catch (err) { formError(res, err, 'admin_form_version_failed', req) }
+  })
+
+  forms.get('/forms/:id/diff', requireFormRead, async (req, res) => {
+    try { res.json(await tooling.diff(req.params.id, String(req.query.from || ''), String(req.query.to || ''))) } catch (err) { formError(res, err, 'admin_form_diff_failed', req) }
+  })
+
+  forms.get('/forms/:id/coverage', requireFormRead, async (req, res) => {
+    try { res.json(await tooling.coverage(req.params.id, req.query.version ? String(req.query.version) : null)) } catch (err) { formError(res, err, 'admin_form_coverage_failed', req) }
+  })
+
+  // Synthetic preview: Director + fact boundary over a canned script. Reads
+  // only; audited so preview use is traceable.
+  forms.post('/forms/:id/preview', requireFormRead, async (req, res) => {
+    try {
+      const out = await tooling.preview(req.params.id, req.body?.version || null, { seed: req.body?.seed })
+      await audit(req, { action: 'assessment_form_preview_run', entityType: 'assessment_form', entityId: out.formId, after: { is_synthetic: true, seed: out.seed, requiredAnswered: out.requiredAnswered, reviewRequired: out.reviewRequired.length } })
+      res.json(out)
+    } catch (err) { formError(res, err, 'admin_form_preview_failed', req) }
+  })
+
+  forms.post('/forms/:id/attachments', requirePermission('content:write'), async (req, res) => {
+    const { version, kind, behaviourId, text } = req.body || {}
+    try {
+      const row = await tooling.addAttachment(req.params.id, String(version || ''), { kind, behaviourId, text }, req.admin)
+      await audit(req, { action: 'assessment_form_attachment_added', entityType: 'assessment_form', entityId: row.formId, after: { id: row.id, kind: row.kind, behaviourId: row.behaviourId } })
+      res.status(201).json(row)
+    } catch (err) { formError(res, err, 'admin_form_attachment_failed', req) }
+  })
+
+  forms.post('/forms/:id/comments', requirePermission('content:write'), async (req, res) => {
+    const { version, text } = req.body || {}
+    try {
+      const row = await tooling.addComment(req.params.id, String(version || ''), { text }, req.admin)
+      await audit(req, { action: 'assessment_form_comment_added', entityType: 'assessment_form', entityId: row.formId, after: { id: row.id } })
+      res.status(201).json(row)
+    } catch (err) { formError(res, err, 'admin_form_comment_failed', req) }
+  })
+
+  // A reviewer decision is role-checked against the admin's permissions; the
+  // pilot transition reads these rows (≥1 CONTENT and ≥1 MEASUREMENT APPROVE).
+  forms.post('/forms/:id/review-decisions', requireFormRead, async (req, res) => {
+    const { version, reviewerRole, decision, reason } = req.body || {}
+    try {
+      const row = await tooling.addDecision(req.params.id, String(version || ''), { reviewerRole, decision, reason }, req.admin)
+      await audit(req, { action: 'assessment_form_review_decision', entityType: 'assessment_form', entityId: row.formId, after: { id: row.id, reviewerRole: row.reviewerRole, decision: row.decision }, reason: row.reason })
+      res.status(201).json(row)
+    } catch (err) { formError(res, err, 'admin_form_decision_failed', req) }
+  })
+
+  // Draft edit: a validated full package becomes a NEW version; existing
+  // versions are immutable.
+  forms.post('/forms/:id/draft', requirePermission('content:write'), async (req, res) => {
+    try {
+      const created = await tooling.createDraft(req.params.id, req.body || {}, req.admin)
+      await audit(req, { action: 'assessment_form_draft_created', entityType: 'assessment_form', entityId: created.formId, after: { version: created.version, derivedFrom: created.derivedFrom, state: created.state } })
+      res.status(201).json(created)
+    } catch (err) { formError(res, err, 'admin_form_draft_failed', req) }
+  })
+
+  return forms
+}
+
+router.use(createFormsRouter())
 
 export default router

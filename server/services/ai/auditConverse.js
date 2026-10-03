@@ -6,13 +6,17 @@ const dimensions = ['criticalThinking', 'communication', 'collaboration', 'probl
 // Layer B fault injection for the evidence evaluator only. Read ONLY when
 // NODE_ENV=test (this provider itself is unreachable otherwise): 'throw'
 // (provider failure), 'malformed' (unparseable output), 'mismatch' (quote
-// the candidate never wrote), 'evidence-write' (a value the store rejects).
-const AUDIT_FAULTS = new Set(['throw', 'malformed', 'mismatch', 'evidence-write'])
+// the candidate never wrote), 'evidence-write' (a value the store rejects),
+// 'disagree' (T33: a rated unit with an ambiguity marker whose second sample
+// lands two anchor levels away).
+const AUDIT_FAULTS = new Set(['throw', 'malformed', 'mismatch', 'evidence-write', 'disagree'])
 export function auditFault() {
   if (process.env.NODE_ENV !== 'test') return null
   const mode = process.env.PRISM_AUDIT_AI_FAULT
   return AUDIT_FAULTS.has(mode) ? mode : null
 }
+// 'disagree' alternates per opportunity: sample 1 → level 2, sample 2 → level 4.
+const disagreeCalls = new Map()
 
 function textFor(task, request) {
   if (task === 'mission_evaluator') {
@@ -71,6 +75,13 @@ function textFor(task, request) {
     // candidate never wrote, or a value the evidence store must reject.
     if (fault === 'mismatch') unit.excerpt = 'words the candidate never wrote'
     if (fault === 'evidence-write') unit.observedBehavior = 'Rejected by the store:\u0000'
+    if (fault === 'disagree') {
+      const key = `${opp?.id}:${opp?.behaviourId}`
+      const n = (disagreeCalls.get(key) || 0) + 1
+      disagreeCalls.set(key, n)
+      unit.ambiguity = 'The answer could be read as a plan or as a question about the plan.'
+      unit.anchorLevel = n % 2 === 1 ? 2 : 4
+    }
     return JSON.stringify({ units: [unit] })
   }
   if (task === 'preparation_participant') {

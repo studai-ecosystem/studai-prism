@@ -67,7 +67,7 @@ function provenanceOf(unit) {
  * @param input.disclosure 'FULL' | 'SUMMARY' (share links may restrict)
  * @param input.opportunities opportunity ledger rows of THIS session (context for moments; optional)
  */
-export function buildStudentReportV3({ sessionId, definition = null, formId = null, units = [], turns = [], header = {}, disclosure = 'FULL', opportunities = [] }) {
+export function buildStudentReportV3({ sessionId, definition = null, formId = null, units = [], turns = [], header = {}, disclosure = 'FULL', opportunities = [], coverage = null }) {
   if (!DISCLOSURE_LEVELS.includes(disclosure)) throw new Error(`Unknown disclosure level: ${disclosure}`)
   const title = header.assessmentTitle || definition?.title || 'your assessment'
   const capabilityIds = definition?.measures?.length ? definition.measures : PRIMARY_CAPABILITY_IDS
@@ -318,6 +318,9 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
     // Moments carry verbatim quotes, so a summary disclosure never has them.
     moments: full ? moments : [],
     development: full ? { priorities, maxPriorities: MAX_PRIORITIES } : null,
+    // P4.5/P4.7: counts-only coverage of the run (never a capability hint).
+    // Absent for legacy runs and for stored versions that predate it.
+    ...(coverage ? { coverage: { planned: coverage.planned, presented: coverage.presented, answered: coverage.answered, withheld: coverage.reasons?.REVIEW_REQUIRED || 0, notes: [...(coverage.notes || [])] } } : {}),
     methodology: {
       builderVersion: REPORT_V3_BUILDER_VERSION,
       sufficiencyRulesVersion: SUFFICIENCY_RULES_VERSION,

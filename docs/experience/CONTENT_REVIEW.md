@@ -99,6 +99,37 @@ cannot close manual accessibility or real-pipeline gates.
 
 ## Appendix B: DRAFT reviewer intake
 
+### Reviewer workflow now available (P4.8, 2026-10-03) - still no approval
+
+The review tooling exists in code; **nothing has been approved**. `CORE-TEAMREADY-A`
+version `0.1.0-draft` remains `DRAFT` with a single self-recorded history entry
+("not self-approved"). Reviewers with an admin role can now, on `/admin/content` →
+Forms (API `/api/admin/content/forms/...`):
+
+- read the full authored package of a version (facts, stages, world changes,
+  opportunity matrix, behaviours, private rubric anchors, exemplars, confounds);
+- compare two versions with a structured diff, run a **synthetic preview** (Director
+  + fact boundary over a canned script, `is_synthetic: true`, no session, no learner,
+  no evidence written) and inspect the opportunity **coverage matrix** (counts only;
+  the authoring floor of two groups per family is not the governed sufficiency floor);
+- attach exemplars, counterexamples and notes to a behaviour, leave comments, and
+  record a **reviewer decision** (`APPROVE` / `REQUEST_CHANGES` / `REJECT` with a
+  reason) under the role their admin permissions grant: CONTENT (`content:publish`),
+  MEASUREMENT (`scenarios:manage` or `validation:manage`), ACCESSIBILITY
+  (`accommodations:manage`);
+- create a **new draft version** from a validated full package (existing versions
+  are never edited in place).
+
+Gate: `REVIEW → APPROVED_FOR_PILOT` is refused (409) until at least one CONTENT and one
+MEASUREMENT `APPROVE` are recorded by **different** reviewers with no outstanding
+`REQUEST_CHANGES` / `REJECT` from either role. A pilot approval is not broad
+validation; `APPROVED_FOR_INTENDED_USE` is a separate decision. Every mutation is in
+the admin audit trail. Items for the first review pass, found during the browser
+proof: the stage-3 fact text "The board the learner has built is unchanged" sits inside
+Sam's line (third person; consider "Your board is unchanged"); the fact-boundary
+trigger `room` on `F-VENUE` answered an unrelated question with the venue fact
+(trigger precision). Both are content/boundary review items, not changes made here.
+
 **All eleven records are DRAFT / NOT SUBMITTED / NOT APPROVED.** Titles and target
 families below are transcribed from the supplied plan, not newly authored scenarios
 or criteria. Intake revision is documentary only; it is not an executable content

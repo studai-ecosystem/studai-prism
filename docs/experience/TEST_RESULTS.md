@@ -1,5 +1,82 @@
 # P0 - Verification results
 
+## P4 remaining gaps closed - 2026-10-03
+
+Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider only; no
+live model, no production data):
+
+| Command | Layer | Result |
+| --- | --- | --- |
+| `npm --prefix server test` | A | 829: **803 pass, 0 fail**, 26 DB skips (new `contentTooling.test.js` 7, `judgeDisagreement.test.js` 3, `calibrationPurpose.test.js` 3; `commerce.test.js` P8.7 strengthened for the pilot gate) |
+| `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | A | 37 files, **495 pass, 0 fail** (new `src/pages/admin/AdminContentForms.test.jsx` 4, artifact-store stale-contract regression 1); one earlier run showed a 9.8 s load-time flake in `campusExperience.test.jsx` (passes alone in 1.1 s; unrelated file); final run clean |
+| `npm run build` | Build | PASS |
+| `npm run audit:static` | Static | PASS (1589 files scanned) |
+| `node scripts/run-experience-baseline-tests.mjs database` | B | 6/6; **50 migrations** applied (0050 `content_review`) |
+| `node scripts/run-experience-baseline-tests.mjs p4` | B in browser | **1 passed, 0 failed** (chromium, 15.9 s, final run); two earlier runs found defects 1-2 below |
+
+`p4` runner mode: embedded throwaway PostgreSQL for the 4174 campus audit server,
+`PRISM_AUDIT_DRAFT_CONTENT=true` for that process only, spec `tests/e2e/p4-six-stages.spec.js` on
+desktop Chromium with 1440/390 viewport screenshots. NO route fixtures: real register, two real
+`POST /api/payment/dev-session`, real consent, server-pinned DRAFT universal form, Begin, seven
+authored answers through the real player, one board edit, early Finish at stage 5, the in-process
+`EVALUATE_RUN` worker with the audit provider, published Report V3.
+
+Proven in the browser: the six stage labels appear in authored order and move `(now)` → `(done)`
+as each stage is answered (stage strip names tasks only); the stage-3 world change shows the
+"What changed: Sam is unavailable…Your board is unchanged" notice and the learner's earlier board
+edit (`R2.due`, "Your edit") survives it on screen and in the contract; the stage-4 recommendation
+carries the visible `AI-generated` label and the "AI-generated recommendation (not checked by a
+person)" wording; finishing early leaves `coverage { planned 11, presented 8, answered 7,
+notPresented 3, stagesPresented 5, reviewRequired false }` on the owner contract, "Review coverage:
+8 of 11 planned moments were presented." in the processing view and in the report, and no unit,
+quote or claim references any stage-5/6 opportunity; T19 unknown requested scenario id on the dev
+path → `422 SCENARIO_NOT_FOUND`, no substitution; T21 `/calibrate` answers `purpose: CALIBRATION`
+with the label "Difficulty calibration (not part of your assessment context)" while the session
+contract is `purpose: FORMAL` and never carries a tier.
+
+Screenshots inspected (`audit-results/ui/p4/`: `stage3-what-changed-{1440,390}.png`,
+`stage4-ai-label-{1440,390}.png`): change notice, preserved "Your edit" due value and AI label are
+legible at both widths; no horizontal overflow; axe serious/critical empty at both widths.
+
+Defects found and fixed during this run:
+
+1. The task stage strip did not advance after an answer (it came only from the session contract,
+   which the player does not refetch after a message). The message response of a universal run now
+   carries the task-only `stages` strip and the player merges it (`useAssessmentSession.applyTurn`).
+2. A board edit saved during the run visually disappeared after the next message: `applyTurn`
+   re-applied the contract's stale `artifacts` (fetched before the save) and `artifactStore.load`
+   replaced a SAVED newer item with the older data (and could rewind the `If-Match` version of a
+   dirty one). `load` now keeps an item whose known server version is newer than the contract's.
+   Regression test in `player.test.jsx`; the server data was always correct.
+3. The commerce P8.7 fixture approved a pilot with no reviewer decisions; the registry now refuses
+   that (409), and the test was strengthened to record a CONTENT and a MEASUREMENT approval first.
+
+Observations, not defects of this phase (content review items, CONTENT_REVIEW.md): the authored
+stage-3 fact text says "The board the learner has built is unchanged" inside Sam's line (third
+person); the fact boundary's neutral pointer answered a question containing "room" with the venue
+fact although the question was about covering the list (trigger precision, P4.7 review).
+
+| ID | Requirement | Covered by | Layer | Result |
+| --- | --- | --- | --- | --- |
+| T19 | Requested scenario | `p4-six-stages` (dev path unknown id → 422, no substitution); `p2Slice.db`; `player.test.jsx` | B browser, B, A | PASS |
+| T21 | Calibration vs context | `calibrationPurpose.test.js` (purpose fields, distinct label, universal run refuses calibration 409, contract carries no tier); `p4-six-stages` API; legacy Briefing copy | A server, B browser | PASS (legacy calibration behaviour unchanged) |
+| T22 | Opportunity coverage | `universalRun.test.js` (11 required, render hashes); `p4-six-stages` (stage strip order, counts-only coverage); `contentTooling` preview/coverage matrix | A, B browser | PASS |
+| T23 | Opportunity independence | `universalRun.test.js` clarification + group count; `sliceEvaluator.independentOpportunityCount` | A | PASS |
+| T24 | Candidate attribution | `universalRun.test.js` (engine text never shown); `p4-six-stages` ("Provided" vs "Your edit", AI label) | A, B browser | PASS |
+| T27 | Dialogue evidence | `universalRun.test.js`, `judgeDisagreement.test.js` (verified excerpt kept) | A | PASS |
+| T28 | Artifact evidence | `universalRun.test.js` board patch → unit; `p4-six-stages` board edit linked | A, B browser | PASS |
+| T29 | Missing/contradictory evidence | `universalRun.test.js` (no units for unanswered); `judgeDisagreement` (contrary/ambiguity → review, never consensus) | A | PASS |
+| T30 | Clear developing behaviour | audit provider level-2 units stay PROVISIONAL (`universalRun`, `p4-six-stages` Reasoning described, others insufficient) | A, B browser | PASS (deterministic provider) |
+| T31 | Evaluator/schema/write outage | `sliceEvaluator.test.js` faults throw/malformed/evidence-write → TECHNICAL_FAILURE | A | PASS |
+| T32 | Source quote mismatch | `sliceEvaluator.test.js` mismatch → HUMAN_REVIEW_REQUIRED, no excerpt | A | PASS |
+| T33 | Judge disagreement | `judgeDisagreement.test.js`: marker → exactly 2 samples; ≥2 levels apart or rated/abstain → `HUMAN_REVIEW_REQUIRED` `JUDGE_DISAGREEMENT`, no level, learner words kept; audited; queued to the rating queue when `PRISM_V3_RATING_QUEUE` on; report describes nothing | A (end to end over /api/v1) | PASS |
+| T34 | Malicious learner prompt | `factBoundary.test.js` validateGeneratedAction; `universalRun.test.js` board action outside schema → 422 | A | PASS |
+| P4.8 | Content review tooling | `contentTooling.test.js`: version package, diff, preview (no writes), coverage, attachments, comments, role-checked decisions, pilot gate 409, draft → NEW version, immutability, audit per mutation; `AdminContentForms.test.jsx` | A server, A UI | PASS (no content approved: CORE-TEAMREADY-A stays DRAFT) |
+
+Remaining: manual AT/zoom passes, T18 approved adjustments, Layer C live-model wording, content /
+measurement / accessibility approvals (human gates), firefox/webkit/mobile runs of `p4-six-stages`
+(chromium only in this runner mode).
+
 ## P3 acceptance gaps closed - 2026-10-03
 
 Commands (from `studai-prism/`, Windows, isolated processes; no live model, no production data):
