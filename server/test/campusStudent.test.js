@@ -396,7 +396,9 @@ test('C4.11: preferences persist per account; share grants list without secrets 
   const w = await world()
   try {
     const d = await w.call('student', 'GET', '/me/preferences')
-    assert.deepEqual(d.body.data, { reducedMotion: false, largerText: false, segment: null, intention: null, responseMode: null, updatedAt: null })
+    const { support, ...prefs } = d.body.data
+    assert.deepEqual(prefs, { reducedMotion: false, largerText: false, segment: null, intention: null, responseMode: null, displayName: null, researchPermission: null, researchPermissionAt: null, updatedAt: null })
+    assert.equal(support.responseModes.find((m) => m.code === 'TEXT').status, 'SUPPORTED')
     assert.equal((await w.call('student', 'PUT', '/me/preferences', { reducedMotion: 'yes', largerText: false })).status, 422)
     const put = await w.call('student', 'PUT', '/me/preferences', { reducedMotion: true, largerText: true })
     assert.equal(put.status, 200)

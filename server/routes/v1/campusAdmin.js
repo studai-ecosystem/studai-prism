@@ -53,6 +53,11 @@ const CreateAssignment = z.object({
   accommodationsRequestable: z.boolean().optional(),
   extraTimeAllowed: z.boolean().optional(),
   reminders: z.boolean().optional(),
+  // P8.7: how participation was shaped, recorded on the assignment so
+  // engagement is never read as voluntary demand. Defaults: participation
+  // UNKNOWN (not asked), no incentive.
+  participation: z.enum(['COMPULSORY', 'VOLUNTARY', 'UNKNOWN']).optional(),
+  incentive: z.string().trim().min(1).max(200).nullable().optional(),
   programId: uuidOrNull,
 }).strict()
 const Onboarding = z.object({

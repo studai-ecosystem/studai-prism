@@ -1,5 +1,84 @@
 # P0 - Verification results
 
+## P8 remaining gaps closed - 2026-10-03
+
+Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider only —
+NODE_ENV=test + PRISM_AUDIT_AI=true; provider TEST (dummy) payments only; no live model, no live
+charge, no production data):
+
+| Command | Layer | Result |
+| --- | --- | --- |
+| `cd server; npm test` | A/B (routes + memory repos) | 882: **856 pass, 0 fail**, 26 pre-existing DB skips (+14 new in `commerceGaps.test.js`) |
+| `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | A | 38 files, **516 pass, 0 fail** (+3: public FAQ/illustration, server-blocked offer row, P8.2 intent disclosure) |
+| `npm run build` | Build | PASS |
+| `npm run audit:static` | Static | PASS (`audit-results/static-audit.md`, 1617 files, 429 routes, 112 review leads) |
+| `node scripts/run-experience-baseline-tests.mjs database` | B | 6/6; **53 migrations** (new `0053_intent_display_and_research` + `.down.sql`; pre-existing `item_responses` FK log noise from the legacy path, not a failure) |
+| `node scripts/run-experience-baseline-tests.mjs p8` | B in browser | **1 passed, 0 failed** on the final run (chromium, 26.3 s): `tests/e2e/p8-commercial-journey.spec.js`; earlier runs found defects 1–4 below |
+
+`p8` runner mode: embedded throwaway PostgreSQL for the 4174 campus audit server with
+`PRISM_AUDIT_DRAFT_CONTENT=true` in that process only (payments stay in provider TEST/dummy mode as
+the audit server always does); desktop Chromium, screenshots at 1440 and 390 under
+`audit-results/ui/p8/` (`01-public-landing` … `08-history-no-package`, 16 files, gitignored), axe
+serious/critical clean and no horizontal overflow at both widths on every step; no console errors.
+The journey is REAL end to end: public page (h1 "Understand how you work. / Practise what matters
+next.", hero card labelled "Illustration, not a real result" with no two/three-digit number, primary
+"Try a short situation" → `/try`, secondary "See how Prism works", separate institution mailto, offer
+table with the exact allowance "Formal assessment ×1 · missions ×4, two attempts each · fresh
+challenge ×1", "Test price, pending approval", server-driven "Not yet purchasable" line, professional
+pack "Not yet available", privacy line; FAQ opened by keyboard Enter/Space with `aria-expanded` and
+`aria-controls`) → `/try` unauthenticated (briefing + prompt, no rubric/level/score text; weak answer
+→ "Not found yet" observation visible without any account; one retry → "Observed · practice"
+quoting the learner's own sentence; package explanation with the exact allowance and status "Not yet
+purchasable" from `/api/payment/config`; no token in the URL) → register → `/app/home` intent step
+(audience/intention/mode only; disclosure "Speaking (speech): not yet available", "English:
+supported", "No CV, grades, employer, photograph or college is needed"; research checkbox unchecked
+and separate; after Continue the API shows `researchPermission: null`, `displayName: null`) →
+explicit "Save it to my account" → `/me/previews` 1 PRACTICE item; a guessed attempt id → **404** →
+`/payment` (configured ₹499 labelled "Proposed test price, pending finance approval", "Tax: as
+configured by finance — not yet approved", 30-day window, policy proposed, three named blockers,
+"Not yet purchasable" disabled, unpaid test session clearly "not a purchase", test-mode notice;
+`POST /api/payment/create-order` → **409 OFFER_NOT_PURCHASABLE**) → Assessments › History tab
+readable with no active package (`/me/history` 200).
+
+Real defects found and fixed by this pass:
+
+1. **Concurrent Begin requests could double-reserve a seat.** `ledger.reserve` ignored the
+   repository's own idempotency replay flag after its async pre-check, so three simultaneous
+   reservations with one key each reported `replayed: false` (memory repo; the PG repo relies on
+   the same flag). It now returns the repository's verdict (T53/T55 test "concurrent starts take one
+   seat").
+2. **Razorpay keys were read once at import**, so a process that started without keys could never
+   verify a signature later (and the new verify tests could not run). `routes/payment.js` reads
+   `RAZORPAY_KEY_ID/SECRET` lazily; behaviour with keys present is unchanged.
+3. **Live offer counted zero reviewed missions** because `liveOfferAvailability` de-duplicated the
+   library by `id` while missions carry `mission_id`; checkout said "0 of 4". Fixed; the test now
+   asserts the live count equals the real published count (1 of 4).
+4. **FAQ question hover used brand green text on the surface** (fails contrast; axe flagged it on
+   hover) and the disclosure had no `aria-controls`/`type="button"`/focus ring/reduced-motion
+   handling. Hover is now an underline; panel is `role=region` referenced by `aria-controls`.
+5. Hero illustration: a long claim in `EvidenceThread`'s `max-content` column squeezed the quote
+   into a one-word-per-line sliver at 1440 and the label overlapped the caption at 390. Claim is a
+   bounded two-line block; the label is static on small screens.
+6. `/try` at 390: header link wrapped onto two lines and the board's Due column broke "Tuesda/y";
+   short label below `sm`, `whitespace-nowrap` on Due.
+7. A guessed preview attempt id (or a token with a wrong signature) answered 422 "not valid",
+   hinting at shape; it is now **404** like any unknown resource.
+
+### T07, T43, T47, T48, T53–T55, T57–T59 coverage (this phase)
+
+| Test ID | Requirement | Where it is proven | Layer | Outcome |
+| --- | --- | --- | --- | --- |
+| T07 | Personal/Campus history: no cross-scope rows, credits or cached results | `commerceGaps.test.js` P8.7 (sponsor → 404 on preparation/practice/previews/grants/exports paths); `commerce.test.js` P8.7 static scan of every Campus read surface; p8 journey (Personal shell; history 200 in PERSONAL only) | A/B, B-browser | PASS |
+| T43 | Preparation privacy; no Campus/raw analytics leakage | `commerceGaps.test.js` P8.9 serializer (transcript/preparation text/names/institution ids/JWT/payment secrets dropped; metrics `validateEvent` rejects them); P8.2 static scan: no scoring/evaluation/report/preparation module imports the preferences plane | A | PASS |
+| T47 | Report and evidence authorization at every read/export | existing `reportsV3.test.js` / `reports.test.js` owner/sponsor/share matrix (P5, green); `commerceGaps.test.js` T55 (report/history reads never consult grants); `commerce.test.js` (report service and history source contain no commerce reference) | A/B | PASS (unchanged surface; full audience/export acceptance remains P9/P10) |
+| T48 | Revoked/expired share stops hosted access | existing `campusStudent.test.js` C4.11 (owner-only revoke, no `tokenHash` in list) and P1/P5 share tests, all green this run | A/B | PASS (unchanged) |
+| T53 | Payment/webhook retries: exactly one grant, no duplicated consumption | `commerce.test.js` (replay/reorder/bad signature/unconfigured); `commerceGaps.test.js`: forged verify → 400 and **no grant**; abandoned checkout → no grant; correctly signed verify → one grant; verify retried after network loss → same grant id; webhook before verify (provider delay) → verify returns the webhook's grant; webhook-only (network loss) delivered twice → one grant with product version, policy version, funding source PAID, purchase ref, expiry; concurrent Begin ×3 → one reservation; repeated finish → `replayed: true`, `consumedQuantity` stays 1; `create-order` 409 when unpurchasable; p8 journey step 6 | A/B, B-browser | PASS (test mode / fixtures; live provider is a human gate) |
+| T54 | System failure credit policy consistent and auditable | `commerce.test.js` (release audited, policy PROPOSED, no refund, replay no-op); `commerceGaps.test.js` T54/finance (grants not in the erasure cascade; `payment_records` named in the retention registry) | A/B | PASS for the code path; **policy approval pending** (no issuance authorized) |
+| T55 | Package expiry gates NEW activity; issued history readable | `commerceGaps.test.js` T55 (window ends mid-run → completion still finalizes the reserved seat; new start → ENTITLEMENT_EXPIRED/PACKAGE_EXPIRED with "Reports you already received stay available"); `commerce.test.js` (history served after expiry); p8 journey step 7 (history readable with no package) | A/B, B-browser | PASS (expiry fixture is Layer A/B; the browser proves readability without a package) |
+| T57 | Existing direct and Campus regression | `commerceGaps.test.js` T57 snapshot: legacy `v1_payments` record keys/values byte-identical (`sessionId, paymentId, orderId, amount, mode, userId, userEmail, consumed, createdAt`); a Campus contract entitlement row JSON-identical before/after a grant; `commercial.test.js` §22 ₹499 pinned; full server suite 0 fail | A/B | PASS |
+| T58 | Cost and trace coverage without sensitive payloads | `commerce.test.js` P8.8 (tags: mode, hashed run id, method version, product code); `commerceGaps.test.js` T58 (soft budget: UNCONFIGURED/UNKNOWN_SPEND/OK/ALERT/NEW_STARTS_LIMITED; `interruptActiveRun` always false; evidence/evaluator unchanged; p50/p95 with unknowns counted; HYPOTHESIS vs ACTUAL basis) | A | PASS (unit economics are formulas over actual figures; no revenue exists yet) |
+| T59 | Synthetic data isolation | `commerceGaps.test.js` T59 (`previewMetrics()` memory + PG query count real rows only and report `syntheticExcluded`; synthetic previews emit no product events, `preview.test.js`) | A (PG query shape exercised in the isolated DB run via the same repository module) | PASS |
+
 ## P7 remaining gaps closed - 2026-10-03
 
 Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider

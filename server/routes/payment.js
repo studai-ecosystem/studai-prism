@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import logger from '../lib/logger.js'
 import { createEntitlement, getReportsByUser, getSessionIdsByUser, getReport, getSession } from '../lib/store.js'
 import { getJwtSecret } from '../lib/security.js'
-import { getCommerceService, offerView, PRODUCT_CODES } from '../domain/commerce/index.js'
+import { getCommerceService, liveOfferView, PRODUCT_CODES } from '../domain/commerce/index.js'
 
 const router = Router()
 
@@ -54,8 +54,11 @@ const isPhoneCamEnabled = () => process.env.PRISM_PROCTOR_PHONE_CAM === 'true'
 const isGazeEnabled = () => process.env.PRISM_PROCTOR_GAZE === 'true'
 
 // Validate env
-const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } = process.env
-if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+// Read lazily so test mode and operators can configure keys without a restart;
+// never cached at import time (P8.5 verify/webhook tests rely on this).
+const keyId = () => process.env.RAZORPAY_KEY_ID
+const keySecret = () => process.env.RAZORPAY_KEY_SECRET
+if (!keyId() || !keySecret()) {
   logger.warn('razorpay_keys_missing', { detail: 'RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET not set — payment routes will fail' })
 }
 
@@ -63,10 +66,10 @@ if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
 let razorpay = null
 function getRazorpay() {
   if (!razorpay) {
-    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+    if (!keyId() || !keySecret()) {
       throw new Error('Razorpay keys not configured')
     }
-    razorpay = new Razorpay({ key_id: RAZORPAY_KEY_ID, key_secret: RAZORPAY_KEY_SECRET })
+    razorpay = new Razorpay({ key_id: keyId(), key_secret: keySecret() })
   }
   return razorpay
 }
@@ -78,10 +81,10 @@ function getRazorpay() {
 // dev-session flow (non-production only).
 router.get('/config', (_req, res) => {
   const dummy = isDummyPayments()
-  const offer = offerView(PURCHASE_PRODUCT)
+  const offer = liveOfferView(PURCHASE_PRODUCT)
   res.json({
-    enabled: Boolean(!dummy && RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET),
-    keyId: dummy ? null : RAZORPAY_KEY_ID || null,
+    enabled: Boolean(!dummy && keyId() && keySecret()),
+    keyId: dummy ? null : keyId() || null,
     amount: PRICE_PAISE,
     currency: PRICE_CURRENCY,
     devSessionAvailable: dummy || process.env.NODE_ENV !== 'production',
@@ -95,7 +98,7 @@ router.get('/config', (_req, res) => {
     // tax treatment (null = to be confirmed), allowance, window, limits and
     // the PROPOSED recovery/review policy. No tax rate lives in the client.
     offer,
-    offers: PRODUCT_CODES.map((code) => offerView(code)),
+    offers: PRODUCT_CODES.map((code) => liveOfferView(code)),
   })
 })
 
@@ -103,6 +106,12 @@ router.get('/config', (_req, res) => {
 router.post('/create-order', async (req, res) => {
   const authUser = getAuthUser(req)
   if (!authUser) return res.status(401).json({ error: 'Sign in before starting checkout.' })
+  // P8.6: no order for a bundle whose reviewed content or price approval is
+  // missing — the blockers are the same ones the checkout page shows.
+  const offer = liveOfferView(PURCHASE_PRODUCT)
+  if (!offer.purchasable) {
+    return res.status(409).json({ error: 'This package is not available for purchase yet.', code: 'OFFER_NOT_PURCHASABLE', blockers: offer.availability?.blockers || [] })
+  }
   try {
     const order = await getRazorpay().orders.create({
       amount: PRICE_PAISE, // always use server-side amount
@@ -144,7 +153,7 @@ router.post('/verify', async (req, res) => {
 
   const body = `${razorpay_order_id}|${razorpay_payment_id}`
   const expectedSig = crypto
-    .createHmac('sha256', RAZORPAY_KEY_SECRET || '')
+    .createHmac('sha256', keySecret() || '')
     .update(body)
     .digest('hex')
 
@@ -324,7 +333,7 @@ router.get('/licence', async (req, res) => {
       pendingSessionId,
       canPurchase:
         isDummyPayments() ||
-        Boolean(RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) ||
+        Boolean(keyId() && keySecret()) ||
         process.env.NODE_ENV !== 'production',
       mode: isDummyPayments() ? 'dummy' : 'paid',
     })

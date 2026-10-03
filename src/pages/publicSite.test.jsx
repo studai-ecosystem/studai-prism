@@ -20,7 +20,8 @@ describe('Landing page', () => {
   it('leads with work-readiness and capability intelligence and closes the loop: measure, improve, prove', () => {
     mockFetch({ '/api/': notFound })
     renderApp(<LandingPage />)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('One conversation.')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Understand how you work.')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Practise what matters next.')
     expect(screen.getByText('Work-readiness and capability intelligence', { selector: 'p' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Measure. Improve. Prove.' })).toBeInTheDocument()
     expect(screen.getByText(/Growth is shown only after a comparable reassessment/)).toBeInTheDocument()
@@ -34,7 +35,37 @@ describe('Landing page', () => {
     expect(within(hero).getByRole('link', { name: /Try a short situation/ })).toHaveAttribute('href', '/try')
     expect(within(hero).getByRole('button', { name: 'See how Prism works' })).toBeInTheDocument()
     expect(within(hero).getByRole('link', { name: 'Bring Prism to your institution' }).getAttribute('href')).toMatch(/^mailto:/)
-    expect(within(hero).getByText(/Understand how you work\. Practise what matters next\./)).toBeInTheDocument()
+    expect(within(hero).getByRole('heading', { level: 1 })).toHaveTextContent(/Understand how you work\.\s*Practise what matters next\./)
+    // The illustrative moment is labelled as such and carries no fabricated number.
+    const illustration = within(hero).getByTestId('hero-illustration')
+    expect(illustration).toHaveTextContent('Illustration, not a real result')
+    expect(illustration.textContent).not.toMatch(/\b\d{2,3}\b/)
+  })
+
+  it('P8.1: the FAQ is a set of disclosure buttons with aria-expanded and aria-controls, keyboard operable, and answers carry no legacy score or marketplace claims', async () => {
+    mockFetch({ '/api/': notFound })
+    renderApp(<LandingPage />)
+    const faq = document.getElementById('faq')
+    const buttons = within(faq).getAllByRole('button', { expanded: false })
+    expect(buttons.length).toBeGreaterThanOrEqual(6)
+    const first = buttons[0]
+    first.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(first).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById(first.getAttribute('aria-controls'))).toBeInTheDocument()
+    for (const b of buttons.slice(1)) await userEvent.click(b)
+    const text = faq.textContent
+    expect(text).not.toMatch(/0.100|Prism Score|Hire Marketplace|filter candidates/i)
+    expect(text).toMatch(/one hour unless you choose to save/)
+    expect(text).toMatch(/cannot be bought while any of its included content is still under review/)
+  })
+
+  it('P8.6: when the server says the sprint is not purchasable, the offer table says so with the named reasons', async () => {
+    const offer = { code: 'PERSONAL_DEVELOPMENT_SPRINT', version: '0.1', title: 'Personal development sprint', status: 'TEST_HYPOTHESIS_PENDING_APPROVAL', purchasable: false, priceStatus: 'PROPOSED', availability: { purchasable: false, priceStatus: 'PROPOSED', blockers: [{ code: 'PRICE_NOT_APPROVED', message: 'x' }, { code: 'CONTENT_NOT_REVIEWED', message: 'y' }] }, amount: 49900, currency: 'INR', taxTreatment: null, taxLabel: 'Tax: as configured by finance \u2014 not yet approved', testMode: true, windowDays: 30, included: { formalAssessments: 1, missionsSelectable: 4, attemptsPerMission: 2, freshChallenges: 1 }, limits: [], policy: { status: 'PROPOSED' }, policyVersion: 'offer-policy.v0.1-proposed' }
+    mockFetch({ '/api/payment/config': { enabled: false, dummyMode: false, devSessionAvailable: true, offer, offers: [offer] }, '/api/': notFound })
+    renderApp(<LandingPage />)
+    const line = await screen.findByTestId('offer-sprint-availability')
+    expect(line).toHaveTextContent('Not yet purchasable: price pending finance approval; included missions still under review')
   })
 
   it('P8.1: no unsupported employability, placement-guarantee or percentage pitch anywhere on the public page', () => {
@@ -98,6 +129,7 @@ describe('Landing page', () => {
 
 describe('Pricing', () => {
   it('each plan has an action that does something', async () => {
+    mockFetch({ '/api/': notFound })
     const onGetAssessed = vi.fn()
     const onContactSales = vi.fn()
     renderApp(<Pricing onGetAssessed={onGetAssessed} onContactSales={onContactSales} />)

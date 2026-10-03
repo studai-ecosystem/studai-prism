@@ -31,14 +31,14 @@ export default function HeroThesis({ onGetAssessed, onSeeHow }) {
               Work-readiness and capability intelligence
             </p>
             <h1 className="text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-              One conversation.
+              Understand how you work.
               <br />
-              Capability you can <em className="not-italic text-brand-green-ink">see inside</em>.
+              Practise what <em className="not-italic text-brand-green-ink">matters next</em>.
             </h1>
             <p className="mt-5 max-w-[46ch] text-lg leading-relaxed text-prism-ink-muted">
-              Understand how you work. Practise what matters next. Thirty minutes in realistic
-              workplace situations with AI colleagues; Prism observes what you do, ties every
-              conclusion to the moment that earned it, and points to one useful next behaviour.
+              Realistic workplace situations, the actual evidence of what you did, one useful next
+              behaviour and short practice to try it. Prism ties every conclusion to the moment that
+              earned it and says so when the evidence is not there.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -79,31 +79,32 @@ export default function HeroThesis({ onGetAssessed, onSeeHow }) {
           </div>
 
           <motion.div
-            aria-label="Sample of a scored moment"
+            aria-label="Illustration of an observed moment, not a real result"
             variants={reduced ? undefined : cardStagger}
             initial={reduced ? false : 'hidden'}
             animate="show"
             className="relative rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface p-6 shadow-sm md:p-8"
+            data-testid="hero-illustration"
           >
-            <span className="absolute right-3 top-3 rounded-full border border-prism-border px-2 py-0.5 font-mono text-xs uppercase tracking-widest text-prism-ink-subtle">
-              Sample
+            <span className="mb-3 inline-block rounded-full border border-prism-border px-2 py-0.5 font-mono text-xs uppercase tracking-widest text-prism-ink-subtle sm:absolute sm:right-3 sm:top-3 sm:mb-0">
+              Illustration, not a real result
             </span>
-            <motion.p variants={reduced ? undefined : pieceIn} className="mb-4 font-mono text-xs uppercase tracking-widest text-prism-ink-subtle">
-              How a Prism score is built
+            <motion.p variants={reduced ? undefined : pieceIn} className="mb-4 font-mono text-xs uppercase tracking-widest text-prism-ink-subtle sm:pr-56">
+              How a Prism observation is built
             </motion.p>
             <motion.div variants={reduced ? undefined : pieceIn}>
               <EvidenceThread
                 id="hero-sample"
-                claim={<span className="text-2xl tabular-nums">Critical thinking &middot; 74</span>}
-                sourceLabel="Evidence · turn 3 of the conversation"
+                claim={<span className="block max-w-[16ch] text-lg leading-snug">Checked the facts before deciding<br /><span className="text-brand-green-ink">Observed</span></span>}
+                sourceLabel="Evidence · the learner's own words, turn 3 (illustrative)"
                 source={<>&ldquo;Before we decide, what did usage actually look like last term? If the data
                   says students stopped coming, that changes my answer completely.&rdquo;</>}
               />
             </motion.div>
             <motion.div variants={reduced ? undefined : pieceIn} className="mt-6 grid gap-2 border-t border-prism-border pt-4">
-              <EvidenceTick>scored by a panel of AI evaluators: median vote</EvidenceTick>
-              <EvidenceTick>every dimension carries its own evidence quote</EvidenceTick>
-              <EvidenceTick>verifiable by any employer at its public link</EvidenceTick>
+              <EvidenceTick>observed action, then the behaviour it shows, then the capability</EvidenceTick>
+              <EvidenceTick>every conclusion carries its own evidence quote</EvidenceTick>
+              <EvidenceTick>where evidence is missing, the report says so instead of guessing</EvidenceTick>
             </motion.div>
           </motion.div>
         </div>

@@ -123,13 +123,16 @@ export function mintPreviewToken(id, now = new Date()) {
 export function verifyPreviewToken(token, now = new Date()) {
   if (typeof token !== 'string' || token.length > 200) throw new ApiError('VALIDATION_FAILED', 'That preview link is not valid.')
   const parts = token.split('.')
-  if (parts.length !== 3) throw new ApiError('VALIDATION_FAILED', 'That preview link is not valid.')
+  // A bare (guessed) attempt id is not a capability: it identifies nothing.
+  if (parts.length !== 3) throw new ApiError(/^[0-9a-f-]{36}$/i.test(token) ? 'NOT_FOUND' : 'VALIDATION_FAILED', /^[0-9a-f-]{36}$/i.test(token) ? 'Not found' : 'That preview link is not valid.')
   const [id, expRaw, sig] = parts
   const exp = Number(expRaw)
   if (!/^[0-9a-f-]{36}$/i.test(id) || !Number.isFinite(exp)) throw new ApiError('VALIDATION_FAILED', 'That preview link is not valid.')
   const expected = Buffer.from(sign(id, exp))
   const provided = Buffer.from(String(sig))
-  if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) throw new ApiError('VALIDATION_FAILED', 'That preview link is not valid.')
+  // A wrong signature (another id, an extended expiry) is indistinguishable
+  // from a non-existent preview: 404, never a hint about what exists.
+  if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) throw new ApiError('NOT_FOUND', 'Not found')
   if (exp <= now.getTime()) throw new ApiError('INVITE_EXPIRED', 'This preview has expired. You can try the scene again.', { status: 410 })
   return { id, expiresAt: new Date(exp).toISOString() }
 }
@@ -196,5 +199,6 @@ export function createPreviewService({ repos, clock = () => new Date(), telemetr
       return (await store().listPreviewAttemptsForUser(user.id)).map((r) => ({ id: r.id, mode: PREVIEW_MODE, claimedAt: r.claimedAt, attempts: r.payload.attempts.map((a) => ({ at: a.at, observation: a.observation })) }))
     },
     purgeExpired: () => store().purgeExpiredPreviews(clock()),
+    metrics: () => store().previewMetrics(),
   }
 }

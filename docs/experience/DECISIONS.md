@@ -1,5 +1,54 @@
 # Experience programme - decision and external-gate register
 
+## P8 remaining-gap decisions - 2026-10-03
+
+1. **A bundle is purchasable only when the build can deliver it.** `offerAvailability` gates
+   the sprint on three facts: `PRISM_OFFER_PRICE_APPROVED=true` (finance), at least four
+   missions in a reviewed state (PUBLISHED / APPROVED_FOR_PILOT / APPROVED_FOR_INTENDED_USE,
+   latest version per `mission_id`), and a universal form approved at least for pilot. Each
+   failed gate is a named blocker returned by `/api/payment/config`, shown on the offer table
+   and the checkout, and enforced by `POST /api/payment/create-order` (409
+   `OFFER_NOT_PURCHASABLE`). Today's build has 1 of 4 reviewed missions, a DRAFT form and no
+   price approval, so the sprint is honestly unpurchasable. The ₹499 amount stays visible,
+   labelled "Proposed test price, pending finance approval"; no other amount exists.
+2. **Tax is never computed client-side.** The server publishes `taxLabel`: the
+   finance-configured `PRISM_TAX_TREATMENT` verbatim, or "Tax: as configured by finance — not
+   yet approved". `testMode: true` until a live activation decision exists.
+3. **Unpaid sessions stay available but are never called a purchase.** When the bundle is
+   blocked and the server allows a dev/dummy session, the checkout offers "Continue with an
+   unpaid test session (not a purchase)"; the legacy entitlement path and copy are unchanged.
+4. **Intent onboarding records two optional, separate things**: a display-only name (≤40
+   chars, own screens only; a static test proves no scoring/evaluation/report/preparation
+   module imports the preferences plane) and a research permission that is null until the
+   learner touches it, timestamped, revocable, and read by nothing in this phase. The step
+   discloses supported vs not-yet-available response modes and languages (English only
+   supported; speech not yet available) and states that no CV, grades, employer, photograph or
+   college is needed; the API rejects those fields.
+5. **Engagement shape is recorded on the assignment, not inferred.** `reminder_policy` JSONB
+   now carries `participation` (COMPULSORY / VOLUNTARY / UNKNOWN — "not asked" is UNKNOWN, never
+   assumed voluntary) and an optional `incentive` text; no new table, no new ranking.
+6. **Soft budgets limit new starts only.** `softBudget.js` returns alert / new-start-limit
+   states and always `interruptActiveRun: false`; it never touches evidence criteria or the
+   evaluator. Unknown spend is UNKNOWN_SPEND (alert, nothing limited), never zero.
+7. **Funnel events carry enums, never who.** `purchaseKind` (GENUINE / REFUND / INCENTIVE /
+   COMPULSORY / TEST) and `accountClass` (GENUINE / TEST / RESEARCH_PARTICIPANT / STAFF) are
+   enum props; new telemetry names fold to the P9 canonical events by alias
+   (`recommendation_viewed → practice_recommended`, `recommendation_followed → practice_started`,
+   `practice_completed / mission_completed → practice_feedback_seen`). No "return_visit" event
+   was invented; seven-day return is computed from existing events in P9.
+8. **A guessed preview id is 404.** Wrong signature or bare id answers NOT_FOUND like any
+   unknown resource; shape errors alone stay VALIDATION_FAILED. Linking remains an explicit
+   claim after sign-in.
+9. **Public copy says what exists.** Hero: "Understand how you work. / Practise what matters
+   next."; the sample card is "Illustration, not a real result" and carries no number. FAQ
+   answers describe observations, the free scene, one package / one payment, link-based
+   sharing and privacy; legacy "0–100 score", "Prism Score", employer filtering and the Hire
+   marketplace pitch were removed from the FAQ. Legacy report validity text keeps the existing
+   `SCORE_VALIDITY_MONTHS` constant; no scoring behaviour changed.
+10. **Finance records are retained, not cascaded.** `product_grants` is outside the session
+    erasure cascade; `payment_records` keeps its provisional 8-year registry entry pending
+    counsel. No refund, credit or invoice is issued by code in this phase.
+
 ## P7 remaining-gap decisions - 2026-10-03
 
 1. **Safety is a deterministic word-list gate, not a model judgement.** `safety.js`

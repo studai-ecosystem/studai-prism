@@ -14,6 +14,9 @@ export const STUDENT_EVENTS = Object.freeze([
   // enums and counts only; never answer text, prices typed by a person, or
   // payment identifiers.
   'preview_started', 'preview_completed', 'preview_claimed', 'offer_viewed', 'checkout_started', 'purchase_completed', 'purchase_failed',
+  // P8.9 report → recommendation → practice. Same payload rules; the return
+  // funnel is computed in P9 from report_opened / practice events, not a new name.
+  'recommendation_viewed', 'recommendation_followed', 'practice_started', 'practice_completed', 'practice_retried',
 ])
 export const CAMPUS_EVENTS = Object.freeze([
   'org_created', 'students_imported', 'program_created', 'assignment_created', 'assignment_launched',
@@ -39,9 +42,20 @@ export const PROP_RULES = Object.freeze({
   outcome: (v) => typeof v === 'string' && ENUM.test(v),
   productCode: (v) => typeof v === 'string' && ENUM.test(v),
   fundingSource: (v) => typeof v === 'string' && ENUM.test(v),
+  // P8.9: genuine purchases, refunds, researcher incentives, compulsory
+  // assignments and test accounts stay distinguishable in every funnel.
+  purchaseKind: (v) => PURCHASE_KINDS.includes(v),
+  accountClass: (v) => ACCOUNT_CLASSES.includes(v),
+  workspaceClass: (v) => v === 'PERSONAL' || v === 'CAMPUS',
+  mode: (v) => RUN_MODES.includes(v),
+  version: (v) => typeof v === 'string' && ID.test(v),
   count: isCount,
   at: (v) => typeof v === 'string' && ISO.test(v),
 })
+
+export const PURCHASE_KINDS = Object.freeze(['GENUINE', 'REFUND', 'INCENTIVE', 'COMPULSORY', 'TEST'])
+export const ACCOUNT_CLASSES = Object.freeze(['GENUINE', 'TEST', 'RESEARCH_PARTICIPANT', 'STAFF'])
+export const RUN_MODES = Object.freeze(['FORMAL', 'PRACTICE', 'PREPARATION', 'SELF_REPORT', 'PREVIEW'])
 
 export function sanitizeProps(raw) {
   const props = {}

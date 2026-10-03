@@ -46,6 +46,37 @@ Pure detectors in `server/domain/metrics/alerts.js` (tested by `server/test/metr
 
 80% unassisted comprehension; 40% voluntary relevant-practice activation; 25% seven-day voluntary return; at least 30 genuine purchases with refunds separately reported; a specific user-articulated advantage over a strong generic AI alternative; positive contribution under measured realistic use and recovery costs. These are the source plan's initial hypotheses for go/no-go discussion. None has been measured. Kill/redesign logic: misunderstood reports → explanation/UX work; understood but unused practice → relevance/effort investigation; same-script improvement without fresh-task transfer → learning-method revision; no willingness to pay → buyer/offer/distribution work. No additional dashboards compensate for a failed hypothesis.
 
+## Unit economics (P8.8, `server/domain/commerce/unitEconomics.js`, `softBudget.js`)
+
+Formulas are applied exactly as the source plan states, over ACTUAL figures only:
+
+```text
+Net collected revenue = collected amount - taxes payable - refunds/credits
+Direct delivery cost  = dialogue + evaluation + verification + audio
+                      + variable infrastructure + payment fees
+                      + allocated review/support + retry/recovery
+Contribution          = net collected revenue - direct delivery cost
+Contribution margin   = contribution / net collected revenue
+```
+
+Rules: one key per cost category (payment fees and support are never counted twice; an unknown
+key throws); any unknown component makes the total PARTIAL, never zero; margin is `null` for a
+zero or unknown denominator; `basis` is `ACTUAL` or `HYPOTHESIS` so price experiments never mix
+with historical revenue. Per-run costs carry `{ mode, runIdHash, methodVersion, productCode }`
+(`costTracker.usageTags`); `costPercentiles` reports p50/p95 over known runs and counts unknown
+runs separately. Soft budgets (`PRISM_SOFT_BUDGET_USD`) produce UNCONFIGURED / UNKNOWN_SPEND /
+OK / ALERT (≥80%) / NEW_STARTS_LIMITED (≥100%) and can only alert or limit NEW starts — never
+interrupt an active paid run, change evidence criteria or swap the evaluator.
+
+Funnel payload enums added in P8.9: `purchaseKind` (GENUINE / REFUND / INCENTIVE / COMPULSORY /
+TEST), `accountClass` (GENUINE / TEST / RESEARCH_PARTICIPANT / STAFF), `workspaceClass`,
+`version`. Telemetry aliases: `recommendation_viewed → practice_recommended`,
+`recommendation_followed → practice_started`, `practice_completed` / `mission_completed →
+practice_feedback_seen`. Preview metrics (`previewMetrics()`) count real rows only and report
+`syntheticExcluded` (T59).
+
 ## Version history
 
+- v1.1 (P8 gap pass, 2026-10-03): unit-economics and soft-budget section; purchase-kind /
+  account-class enums; recommendation/practice aliases. No metric definition changed.
 - v1 (P9, build c2a38dd): initial definitions, stored before any pilot analysis.

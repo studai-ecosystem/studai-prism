@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { SCORE_VALIDITY_MONTHS } from '../../server/lib/sharedConstants.js'
 import PricingCard from './ui/PricingCard.jsx'
+import { fetchOffers } from '../api/offers.js'
 
 // The offer explained before anyone pays (P8.1/P8.6). The only amount shown
 // is the one already in the product (Payment.jsx and the server config);
@@ -30,7 +32,7 @@ const OFFERS = [
   {
     id: 'free',
     name: 'Free first experience',
-    get: 'One short practice scene, one source-backed observation about your own words',
+    get: 'One short practice scene (a few minutes, typed; practice mode), one source-backed observation about your own words',
     allowance: 'One answer and one retry',
     window: 'Kept for one hour unless you save it to an account',
     limits: 'Not a formal assessment; no capability map, report or credential',
@@ -42,7 +44,7 @@ const OFFERS = [
   {
     id: 'sprint',
     name: 'Personal development sprint',
-    get: 'One formal assessment with its report, four selected missions, one fresh practice challenge',
+    get: 'One formal assessment (about 30 minutes, typed; formal mode) with its evidence-backed report, four selected missions (practice mode), one fresh practice challenge',
     allowance: 'Formal assessment ×1 · missions ×4, two attempts each · fresh challenge ×1',
     window: '30 days of activity; your report stays readable afterwards',
     limits: 'Four missions from the reviewed library, not the whole library; reassessment is not included until comparable forms are approved',
@@ -74,7 +76,26 @@ const COLUMNS = [
   ['policy', 'Recovery / review'],
 ]
 
+const SERVER_CODES = { free: 'FREE_FIRST_EXPERIENCE', sprint: 'PERSONAL_DEVELOPMENT_SPRINT', professional: 'PROFESSIONAL_PREPARATION_PACK' }
+const BLOCKER_COPY = {
+  PRICE_NOT_APPROVED: 'price pending finance approval',
+  CONTENT_NOT_REVIEWED: 'included missions still under review',
+  FORM_NOT_REVIEWED: 'assessment form pending approval',
+}
+
+// The server decides whether the sprint can be bought right now (P8.6). The
+// descriptive rows stay static; the amount label and purchasability come from
+// /api/payment/config when it answers, otherwise the static "pending" copy.
+function availabilityLine(serverOffer) {
+  if (!serverOffer || serverOffer.purchasable) return null
+  const blockers = serverOffer.availability?.blockers || []
+  if (!blockers.length) return 'Not yet purchasable'
+  return `Not yet purchasable: ${blockers.map((b) => BLOCKER_COPY[b.code] || b.message).join('; ')}`
+}
+
 export default function Pricing({ onGetAssessed, onContactSales }) {
+  const offers = useQuery({ queryKey: ['public', 'offers'], queryFn: fetchOffers, retry: false, staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false })
+  const serverOffer = (id) => offers.data?.offers?.find((o) => o.code === SERVER_CODES[id]) || null
   return (
     <section id="pricing" aria-labelledby="pricing-title" className="bg-prism-surface py-20 md:py-24">
       <div className="mx-auto max-w-6xl px-6">
@@ -105,24 +126,32 @@ export default function Pricing({ onGetAssessed, onContactSales }) {
               </tr>
             </thead>
             <tbody>
-              {OFFERS.map((o) => (
-                <tr key={o.id} className="border-b border-prism-border last:border-b-0 align-top" data-testid={`offer-${o.id}`}>
-                  <th scope="row" className="px-4 py-4 font-semibold text-prism-ink">
-                    <span className="block">{o.name}</span>
-                    <span className="mt-1 block text-base tabular-nums text-prism-ink">{o.amount}</span>
-                    {o.status && <span className="mt-1 block text-xs font-normal text-prism-ink-muted">{o.status}</span>}
-                  </th>
-                  {COLUMNS.map(([key]) => (
-                    <td key={key} className="px-4 py-4 text-prism-ink-muted">{o[key]}</td>
-                  ))}
-                </tr>
-              ))}
+              {OFFERS.map((o) => {
+                const live = serverOffer(o.id)
+                const unavailable = availabilityLine(live)
+                return (
+                  <tr key={o.id} className="border-b border-prism-border last:border-b-0 align-top" data-testid={`offer-${o.id}`}>
+                    <th scope="row" className="px-4 py-4 font-semibold text-prism-ink">
+                      <span className="block">{o.name}</span>
+                      <span className="mt-1 block text-base tabular-nums text-prism-ink">{o.amount}</span>
+                      {o.status && <span className="mt-1 block text-xs font-normal text-prism-ink-muted">{o.status}</span>}
+                      {unavailable && <span className="mt-1 block text-xs font-normal text-prism-ink-muted" data-testid={`offer-${o.id}-availability`}>{unavailable}</span>}
+                    </th>
+                    {COLUMNS.map(([key]) => (
+                      <td key={key} className="px-4 py-4 text-prism-ink-muted">{o[key]}</td>
+                    ))}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
         <p className="mt-3 text-xs text-prism-ink-muted">
           Tax treatment is confirmed at checkout from the server configuration. Prices and policies marked proposed are hypotheses under review, not published terms.{' '}
           <Link to="/try" className="font-medium text-brand-green-ink underline underline-offset-4">Try a short situation</Link> first.
+        </p>
+        <p className="mt-2 text-xs text-prism-ink-muted" data-testid="offer-privacy">
+          Privacy: your answers are processed to produce your own observations and report. Personal practice and preparation stay private to you; an institution sees only what it sponsors and what you choose to share. Unsaved previews are kept for one hour.
         </p>
 
         <div className="mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-6 md:grid-cols-2">

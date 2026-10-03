@@ -8,41 +8,46 @@ const faqs = [
   {
     question: 'Is Prism a multiple-choice test?',
     answer:
-      'No. Prism is a live 30-minute AI conversation — a scenario where multiple AI participants engage with you in real time. There are no predetermined answer choices.',
+      'No. Prism puts you in realistic workplace situations and looks at what you actually do and write. There are no predetermined answer choices. You can try a short practice situation for free before anything else.',
   },
   {
     question: 'What does a Prism report show?',
     answer:
-      'You receive a score between 0–100 with a breakdown across five dimensions: Critical Thinking, Collaboration, Communication, Problem Solving, and AI & Digital Fluency. Each dimension is tied to the evidence behind it, and where there is not enough evidence the report says so instead of guessing.',
+      'Observations about your work, each tied to the moment that earned it: what you did, the behaviour it shows and the capability it belongs to. Where there is not enough evidence the report says so instead of guessing, and it points to one useful next behaviour you can practise.',
   },
   {
-    question: 'How long is my score valid?',
-    answer: `Your Prism Score is valid for ${SCORE_VALIDITY_MONTHS} months from the date of assessment.`,
-  },
-  {
-    question: 'Can I retake the assessment?',
+    question: 'Is the free situation a real assessment?',
     answer:
-      `Yes. You can take a new assessment ${REASSESSMENT_DAYS} days after your last attempt. Each assessment uses a different scenario to ensure a fresh evaluation, and your most recent score is the one that counts.`,
+      'No. It is one short practice scene with one observation about your own words and one retry. It does not produce a capability map, a report or any kind of credential, and it is kept for one hour unless you choose to save it to an account.',
   },
   {
-    question: 'How does an employer verify my score?',
-    answer:
-      'Every Prism Score comes with a unique shareable verification link. Employers can verify your score directly without needing to contact you.',
+    question: 'How long is my report valid?',
+    answer: `Your formal assessment report stays readable under the published retention policy; its findings are dated and considered current for ${SCORE_VALIDITY_MONTHS} months from the date of assessment.`,
   },
   {
-    question: 'What is the Hire Marketplace?',
+    question: 'Can I take the assessment again?',
     answer:
-      "Hire is StudAI One's job marketplace where employers can filter candidates by Prism Score. A strong Prism Score gives you visibility with companies that have set score-based filters.",
+      `A new assessment is possible ${REASSESSMENT_DAYS} days after your last attempt. Growth is shown only after a comparable reassessment; a formal reassessment is not included in the personal development sprint until comparable forms are approved.`,
+  },
+  {
+    question: 'What do I pay, and when?',
+    answer:
+      'Nothing to try a short situation. The personal development sprint is one package with one payment and nothing recurring; its price, tax treatment and recovery policy are shown at checkout from the server configuration and are marked proposed until they are approved. The package cannot be bought while any of its included content is still under review.',
+  },
+  {
+    question: 'How does someone else see my report?',
+    answer:
+      'Only through a link you create, with the scope you choose, and you can revoke it at any time. Prism does not publish reports or scores anywhere on its own.',
   },
   {
     question: 'What does my university see?',
     answer:
-      'Only what your institution sponsors, and what you choose to share. Your personal practice, exploration and anything you have not shared stay private to you, and you can change what you share at any time.',
+      'Only what your institution sponsors, and what you choose to share. Your personal practice, preparation and anything you have not shared stay private to you, and you can change what you share at any time.',
   },
   {
     question: 'Is my conversation data private?',
     answer:
-      'Yes. Your assessment conversation is processed for scoring only and is not shared with employers or third parties without your consent.',
+      'Yes. What you write is processed to produce your own observations and report and is not shared with employers or third parties without your consent. Research use is a separate choice you can make or decline on its own.',
   },
 ]
 

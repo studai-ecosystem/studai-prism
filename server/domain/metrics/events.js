@@ -46,6 +46,11 @@ export const LEGACY_EVENT_ALIASES = Object.freeze({
   purchase_completed: 'purchase_verified',
   report_viewed: 'report_opened',
   mission_started: 'practice_started',
+  // P8.9 telemetry names for the recommendation → practice funnel.
+  recommendation_viewed: 'practice_recommended',
+  recommendation_followed: 'practice_started',
+  practice_completed: 'practice_feedback_seen',
+  mission_completed: 'practice_feedback_seen',
 })
 
 export function canonicalEventName(name) {
@@ -89,6 +94,11 @@ export const EVENT_PAYLOAD_SCHEMA = z.object({
   incentivised: z.boolean().optional(),
   refunded: z.boolean().optional(),
   isSynthetic: z.boolean().optional(),
+  // P8.9: who paid and what kind of account, as enums only.
+  purchaseKind: z.enum(['GENUINE', 'REFUND', 'INCENTIVE', 'COMPULSORY', 'TEST']).optional(),
+  accountClass: z.enum(['GENUINE', 'TEST', 'RESEARCH_PARTICIPANT', 'STAFF']).optional(),
+  workspaceClass: z.enum(['PERSONAL', 'CAMPUS']).optional(),
+  version: id.optional(),
   count: count.optional(),
   at: z.string().regex(ISO).optional(),
 }).strict()

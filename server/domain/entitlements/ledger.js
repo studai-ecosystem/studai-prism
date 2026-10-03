@@ -42,11 +42,13 @@ export function createEntitlementLedger({ repos, clock = () => new Date(), audit
       const at = clock()
       if (entitlement.validUntil && new Date(entitlement.validUntil) <= at) throw new ApiError('ENTITLEMENT_EXPIRED', 'This entitlement has expired.')
       if (entitlement.status !== 'ACTIVE') throw new ApiError('ENTITLEMENT_REQUIRED', 'This entitlement is not active.')
-      const { consumption } = await repos.entitlements.appendEvent({
+      // The repository's own idempotency check is the authority under a race:
+      // two concurrent Begins with one key return the same reservation.
+      const { consumption, replayed: raced } = await repos.entitlements.appendEvent({
         entitlementId: entitlement.id, userId: user.id, organizationId: entitlement.organizationId,
         sessionId, event: 'RESERVED', idempotencyKey: key,
       })
-      return { consumption, replayed: false }
+      return { consumption, replayed: Boolean(raced) }
     },
 
     // consume/release: the open-reservation check runs inside the repository's

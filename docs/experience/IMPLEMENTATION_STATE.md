@@ -286,6 +286,54 @@ HA-C004 form equivalence, HA-C005 counsel copy, HA-C006 pricing (₹499 is a tes
 professional pack has no quota), HA-C008 validation studies, HA-C012 security review, HA-C013 manual
 accessibility; live-model Layer C run; production migration/backfill operations; retention/backup policy.
 
+## P8 gap-closing pass - 2026-10-03
+
+Status: **IMPLEMENTED + FIXTURE_TESTED + INTEGRATION_VERIFIED (isolated PG, real browser, provider TEST
+mode).** Pricing, tax, recovery policy, content approval, professional-pack allowance, live payment
+activation and research use remain HUMAN_APPROVED gates (ROLLOUT.md, P8 table). Builds on c2a38dd.
+
+- P8.1: Hero "Understand how you work. / Practise what matters next."; sample card labelled
+  "Illustration, not a real result" with no number; FAQ rewritten (no 0-100 score, Prism Score, Hire
+  marketplace, employer filtering), items `type=button` + `aria-controls` + focus ring + reduced
+  motion; Pricing reads `/api/payment/config` and shows the server's "Not yet purchasable: ..." line
+  and a privacy line; `publicSite.test.jsx` +2 (FAQ keyboard/claims, server-blocked row).
+- P8.2: migration 0053 (`display_name`, `research_permission`, `research_permission_at`); route schema
+  + `support` disclosure (TEXT supported, SPEECH not yet available, English only; CV/grades/employer/
+  photograph/college not required and refused as fields); IntentStep shows the disclosure, an optional
+  display-only name and a SEPARATE research checkbox (null until touched). Static test: no scoring/
+  evaluation/report/preparation/AI module imports the preferences plane.
+- P8.3: guessed attempt id / wrong signature -> 404; `previewMetrics()` (memory + PG) counts real rows
+  only and reports `syntheticExcluded` (T59); TryPage package panel shows the exact allowance and the
+  server status; 390 polish (header label, Due column).
+- P8.4/P8.6: `offerAvailability` / `liveOfferView` gate `purchasable` on `PRISM_OFFER_PRICE_APPROVED`,
+  >= 4 reviewed missions (latest per `mission_id`) and an approved universal form; named blockers in
+  config, offer table, checkout; `create-order` -> 409 `OFFER_NOT_PURCHASABLE`; `taxLabel` "Tax: as
+  configured by finance - not yet approved" when unset; `testMode: true`; checkout shows price status,
+  blockers, "Not yet purchasable" (disabled) and an "unpaid test session (not a purchase)" path when the
+  server allows one. Razorpay keys read lazily (behaviour unchanged when set).
+- P8.5: `ledger.reserve` honours the repository replay flag under a race (real bug: concurrent Begin
+  could double-reserve). `server/test/commerceGaps.test.js` 14/14: forged verify -> 400 + no grant;
+  abandoned checkout; signed verify -> one grant; verify retry -> same grant; webhook-before-verify;
+  webhook-only x2; expiry during run finalizes, new start blocked; repeated finish no double consume;
+  T57 grandfathering snapshot (legacy `v1_payments` record + Campus contract row byte-identical);
+  finance records outside the erasure cascade.
+- P8.7: assignments record `participation` (COMPULSORY/VOLUNTARY/UNKNOWN) and `incentive` in
+  `reminder_policy` JSONB via `POST /organizations/:id/assignments`; sponsor -> 404 on preparation/
+  practice/previews/grants/export paths (test).
+- P8.8: `softBudget.js` (UNCONFIGURED/UNKNOWN_SPEND/OK/ALERT/NEW_STARTS_LIMITED; never interrupts an
+  active paid run); formulas unchanged and documented in METRICS.md.
+- P8.9: events `recommendation_viewed/followed`, `practice_started/completed/retried` (aliased to P9
+  canonical names); props `purchaseKind`, `accountClass`, `workspaceClass`, `mode`, `version`;
+  serializer test rejects transcript/preparation text/names/institution ids/JWT/payment secrets.
+- Browser: `tests/e2e/p8-commercial-journey.spec.js`, runner mode `p8`, screenshots
+  `audit-results/ui/p8/01..08-{1440,390}.png` (16, inspected; defects fixed: hero thread layout,
+  FAQ hover contrast, Try 390 wrapping, mission count "0 of 4").
+- Tests touched: `campusStudent.test.js` (preferences shape), `preview.test.js` (404 for guessed ids),
+  `experienceBaseline.db.test.js` (52 -> 53 migrations), `preview.test.jsx` (tax label, blockers, dev
+  path), `studentPages.test.jsx` (+1 P8.2). No copy-ceiling test was weakened.
+
+Verification: server 882 (856/0/26 skips); frontend 38 files 516/0; isolated PG 6/6 (53 migrations);
+`p8` browser 1/1; build + audit:static PASS. Details: TEST_RESULTS.md (P8 section, newest-first).
 ## Current P8 checkpoint - 2026-10-03
 
 Status: **IMPLEMENTED locally; pricing/tax/policy/live payment remain external gates.**

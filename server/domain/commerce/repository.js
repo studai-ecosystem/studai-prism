@@ -86,6 +86,13 @@ export function createCommerceRepoMemory(db) {
       }
       return n
     },
+    // T59: product metrics count REAL previews only; synthetic rows are
+    // reported as excluded, never folded into the numerator or denominator.
+    async previewMetrics() {
+      const rows = [...db.previewAttempts.values()]
+      const real = rows.filter((r) => !r.isSynthetic)
+      return { started: real.length, claimed: real.filter((r) => r.claimedUserId).length, retried: real.filter((r) => (r.payload?.attempts || []).length > 1).length, syntheticExcluded: rows.length - real.length }
+    },
   }
 }
 
@@ -177,6 +184,17 @@ export function createCommerceRepoPg({ query }) {
     async purgeExpiredPreviews(at) {
       const { rowCount } = await query('DELETE FROM preview_attempts WHERE claimed_user_id IS NULL AND expires_at <= $1', [at.toISOString()])
       return rowCount || 0
+    },
+    async previewMetrics() {
+      const { rows } = await query(
+        `SELECT
+           COUNT(*) FILTER (WHERE NOT is_synthetic)::int AS started,
+           COUNT(*) FILTER (WHERE NOT is_synthetic AND claimed_user_id IS NOT NULL)::int AS claimed,
+           COUNT(*) FILTER (WHERE NOT is_synthetic AND jsonb_array_length(COALESCE(payload_json->'attempts', '[]'::jsonb)) > 1)::int AS retried,
+           COUNT(*) FILTER (WHERE is_synthetic)::int AS synthetic_excluded
+         FROM preview_attempts`)
+      const r = rows[0] || {}
+      return { started: r.started || 0, claimed: r.claimed || 0, retried: r.retried || 0, syntheticExcluded: r.synthetic_excluded || 0 }
     },
   }
 }

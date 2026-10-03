@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, RotateCcw, Quote, Save } from 'lucide-react'
 import { fetchPreviewScene, startPreview, retryPreview, claimPreview } from '../../../api/preview.js'
+import { fetchOffers } from '../../../api/offers.js'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
 import { Card } from '../../../components/ui/Card.jsx'
 import { StatusChip } from '../../../components/ui/Badge.jsx'
@@ -50,6 +51,10 @@ function Observation({ observation }) {
 export default function TryPage() {
   const { status: authStatus } = useAuth()
   const scene = useQuery({ queryKey: ['public', 'preview', 'scene'], queryFn: fetchPreviewScene, staleTime: 5 * 60 * 1000 })
+  // The package explanation at the end reads the server's offer so the
+  // allowance and purchasability are exact, never a hard-coded promise.
+  const offers = useQuery({ queryKey: ['public', 'offers'], queryFn: fetchOffers, retry: false, staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false })
+  const sprint = offers.data?.offers?.find((o) => o.code === 'PERSONAL_DEVELOPMENT_SPRINT') || offers.data?.offer || null
   const [answer, setAnswer] = useState('')
   const [attempt, setAttempt] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -107,7 +112,7 @@ export default function TryPage() {
       <header className="flex h-16 items-center justify-between border-b border-prism-border px-6">
         <Link to="/" aria-label="Prism home"><PrismLogo size={32} /></Link>
         <nav aria-label="Try page" className="flex items-center gap-4 text-sm">
-          <Link to="/#pricing" className="underline underline-offset-4">What the full package includes</Link>
+          <Link to="/#pricing" className="underline underline-offset-4"><span className="sm:hidden">Full package</span><span className="hidden sm:inline">What the full package includes</span></Link>
           {!signedIn && <Link to="/login?next=%2Ftry" className="underline underline-offset-4">Sign in</Link>}
         </nav>
       </header>
@@ -152,7 +157,7 @@ export default function TryPage() {
                         <tr key={r.task} className="border-t border-prism-border">
                           <td className="py-1 pr-2">{r.task}</td>
                           <td className="py-1 pr-2">{r.owner || <span className="text-prism-ink-subtle">No owner</span>}</td>
-                          <td className="py-1">{r.due || '—'}</td>
+                          <td className="whitespace-nowrap py-1">{r.due || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -173,6 +178,24 @@ export default function TryPage() {
                 <p className="text-sm text-prism-ink-muted">
                   The preview includes one answer and one retry. The personal development sprint adds one formal assessment with its evidence-backed report, four development missions of your choice and one fresh practice challenge over 30 days. Pricing and limits are explained before any payment.
                 </p>
+                <dl className="grid gap-1 text-xs text-prism-ink-muted" data-testid="preview-package">
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-medium text-prism-ink">Exact allowance</dt>
+                    <dd>
+                      {sprint?.included
+                        ? `Formal assessment ×${sprint.included.formalAssessments} · missions ×${sprint.included.missionsSelectable} (${sprint.included.attemptsPerMission} attempts each) · fresh challenge ×${sprint.included.freshChallenges} · ${sprint.windowDays}-day activity window`
+                        : offers.isPending ? 'Loading the package terms…' : 'Shown at checkout from the server configuration'}
+                    </dd>
+                  </div>
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="font-medium text-prism-ink">Status</dt>
+                    <dd data-testid="preview-package-status">
+                      {!sprint ? (offers.isPending ? 'Loading…' : 'Explained at checkout')
+                        : sprint.purchasable ? (sprint.priceStatus === 'APPROVED' ? 'Available' : 'Available at a proposed test price, pending finance approval')
+                          : 'Not yet purchasable: the included content or price is still under review'}
+                    </dd>
+                  </div>
+                </dl>
                 <div className="flex flex-wrap gap-3">
                   {signedIn ? (
                     <Button onClick={save} loading={busy} loadingLabel="Saving…"><Save size={16} aria-hidden="true" /> Save this to my account</Button>

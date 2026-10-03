@@ -74,6 +74,7 @@ export default function Payment() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [dummyMode, setDummyMode] = useState(false)
+  const [devSessionAvailable, setDevSessionAvailable] = useState(false)
   // P8.6: amount, tax treatment, allowance, window and policy come from the
   // server config; null = not loaded yet (shown as pending, never guessed).
   const [offer, setOffer] = useState(null)
@@ -114,6 +115,7 @@ export default function Payment() {
       .then((cfg) => {
         if (cancelled) return
         setDummyMode(Boolean(cfg.dummyMode))
+        setDevSessionAvailable(Boolean(cfg.devSessionAvailable))
         setOffer(cfg.offer || { amount: cfg.amount, currency: cfg.currency, purchasable: true, taxTreatment: null, windowDays: null, included: null, limits: [], policy: null })
         setConfigState('ready')
       })
@@ -124,6 +126,25 @@ export default function Payment() {
   const amountLabel = formatInr(offer?.amount)
   const purchasable = Boolean(offer?.purchasable)
   const inc = offer?.included || null
+
+  // Development-only unpaid session (the server refuses it in production
+  // unless dummy payments are on). Labelled as such; never a purchase.
+  const handleDevSession = async () => {
+    if (loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      const token = getToken()
+      const cfg = await fetch('/api/payment/config').then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
+      const res = await fetch('/api/payment/dev-session', { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      if (!res.ok) throw new Error('Could not start a test session.')
+      const { sessionId } = await res.json()
+      navigate(cfg.skipVerification ? `/briefing?session=${sessionId}` : `/verify-identity?session=${sessionId}`)
+    } catch (err) {
+      setError(err.message)
+      setLoading(false)
+    }
+  }
 
   const handlePay = async () => {
     if (loading || !purchasable) return
@@ -231,7 +252,11 @@ export default function Payment() {
               </div>
               <div className="flex justify-between gap-4">
                 <dt>Tax treatment</dt>
-                <dd className="text-right text-[var(--prism-ink)]" data-testid="checkout-tax">{configState !== 'ready' ? 'Pending' : offer?.taxTreatment || 'Tax treatment to be confirmed'}</dd>
+                <dd className="text-right text-[var(--prism-ink)]" data-testid="checkout-tax">{configState !== 'ready' ? 'Pending' : offer?.taxLabel || offer?.taxTreatment || 'Tax: as configured by finance \u2014 not yet approved'}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt>Price status</dt>
+                <dd className="text-right text-[var(--prism-ink)]" data-testid="checkout-price-status">{configState !== 'ready' ? 'Pending' : offer?.priceStatus === 'APPROVED' ? 'Approved by finance' : 'Proposed test price, pending finance approval'}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt>Recovery / review</dt>
@@ -254,9 +279,14 @@ export default function Payment() {
             </p>
           )}
           {configState === 'ready' && !purchasable && (
-            <p className="font-sans text-sm text-[var(--prism-ink-muted)] text-center mt-4" role="status" data-testid="checkout-unavailable">
-              This package is not available for purchase yet.
-            </p>
+            <div className="font-sans text-sm text-[var(--prism-ink-muted)] text-center mt-4" role="status" data-testid="checkout-unavailable">
+              <p>This package is not available for purchase yet.</p>
+              {(offer?.availability?.blockers || []).length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs" data-testid="checkout-blockers">
+                  {offer.availability.blockers.map((b) => <li key={b.code}>{b.message}</li>)}
+                </ul>
+              )}
+            </div>
           )}
           {error && (
             <p className="font-sans text-sm text-[var(--status-blocked-ink)] text-center mt-4">{error}</p>
@@ -270,18 +300,26 @@ export default function Payment() {
             whileTap={loading ? {} : { scale: 0.98 }}
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Lock size={15} />}
-            {loading ? 'Starting…' : dummyMode ? 'Continue (free preview)' : amountLabel ? `Pay ${amountLabel} & Continue` : 'Checkout unavailable'}
+            {loading ? 'Starting…' : !purchasable && configState === 'ready' ? 'Not yet purchasable' : dummyMode ? 'Continue (free preview)' : amountLabel ? `Pay ${amountLabel} & Continue` : 'Checkout unavailable'}
           </motion.button>
 
-          {dummyMode ? (
-            <p className="text-center font-sans text-xs text-[var(--prism-ink-muted)] mt-4">
-              Payments are in test mode — you will not be charged. You’ll proceed straight to the assessment briefing.
-            </p>
-          ) : (
-            <p className="text-center font-sans text-xs text-[var(--prism-ink-muted)] mt-4">
-              Secure payment via Razorpay. You’ll proceed to the assessment briefing.
-            </p>
+          {configState === 'ready' && !purchasable && devSessionAvailable && (
+            <button
+              type="button"
+              onClick={handleDevSession}
+              disabled={loading}
+              data-testid="checkout-dev-session"
+              className="mt-3 w-full py-3 rounded-xl border border-[var(--prism-border)] bg-prism-surface font-sans text-sm text-[var(--prism-ink)] hover:bg-[var(--prism-canvas)] transition disabled:opacity-60"
+            >
+              Continue with an unpaid test session (not a purchase)
+            </button>
           )}
+
+          <p className="text-center font-sans text-xs text-[var(--prism-ink-muted)] mt-4" data-testid="checkout-mode">
+            {offer?.testMode !== false || dummyMode
+              ? 'Payments are in test mode: no live charge is taken here. Live payments open only after finance, tax and policy approval.'
+              : 'Secure payment via Razorpay. You’ll proceed to the assessment briefing.'}
+          </p>
 
           {/* Coupon / invite code */}
           <div className="mt-6 rounded-xl border border-[var(--prism-border)] bg-[var(--prism-canvas)] p-4">

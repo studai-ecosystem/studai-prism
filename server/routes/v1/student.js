@@ -13,7 +13,7 @@ import { z } from 'zod'
 import { asyncHandler } from '../../domain/http/asyncHandler.js'
 import { ApiError, ok } from '../../domain/http/errors.js'
 import { requireFlag } from '../../domain/flags/index.js'
-import { DEFAULT_PREFERENCES, SEGMENTS, INTENTIONS, RESPONSE_MODES } from '../../domain/preferences/repository.js'
+import { DEFAULT_PREFERENCES, SEGMENTS, INTENTIONS, RESPONSE_MODES, DISPLAY_NAME_MAX, SUPPORT_DISCLOSURE } from '../../domain/preferences/repository.js'
 import { studentScoped } from './studentScope.js'
 
 const ASSIGNMENT_ID = /^(pa_[0-9a-f]{32}|[0-9a-f-]{36})$/i
@@ -36,8 +36,15 @@ const Preferences = z.object({
   segment: z.enum(SEGMENTS).nullable().optional(),
   intention: z.enum(INTENTIONS).nullable().optional(),
   responseMode: z.enum(RESPONSE_MODES).nullable().optional(),
+  // Optional display-only name (own screens only); separate research choice.
+  displayName: z.string().trim().min(1).max(DISPLAY_NAME_MAX).nullable().optional(),
+  researchPermission: z.boolean().nullable().optional(),
 }).strict()
-const preferencesView = (p) => ({ reducedMotion: p.reducedMotion, largerText: p.largerText, segment: p.segment ?? null, intention: p.intention ?? null, responseMode: p.responseMode ?? null, updatedAt: p.updatedAt })
+const preferencesView = (p) => ({
+  reducedMotion: p.reducedMotion, largerText: p.largerText, segment: p.segment ?? null, intention: p.intention ?? null, responseMode: p.responseMode ?? null,
+  displayName: p.displayName ?? null, researchPermission: p.researchPermission ?? null, researchPermissionAt: p.researchPermissionAt ?? null,
+  updatedAt: p.updatedAt, support: SUPPORT_DISCLOSURE,
+})
 const Interests = z.object({ interests: z.record(z.number().min(0).max(1)).nullable() }).strict()
 const HistoryQuery = z.object({
   cursor: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/).optional(),
@@ -111,7 +118,7 @@ export function createStudentRouter({ requireUser, campus, clock = () => new Dat
 
   router.get('/me/preferences', shell, requireUser, requireStore, asyncHandler(async (req, res) => {
     const stored = await campus.store.preferences.getPreferences(req.user.id)
-    return ok(res, stored ? preferencesView(stored) : { ...DEFAULT_PREFERENCES, updatedAt: null })
+    return ok(res, stored ? preferencesView(stored) : preferencesView({ ...DEFAULT_PREFERENCES, updatedAt: null }))
   }))
 
   router.put('/me/preferences', shell, requireUser, requireStore, asyncHandler(async (req, res) => {

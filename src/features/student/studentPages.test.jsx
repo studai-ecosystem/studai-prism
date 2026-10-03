@@ -121,6 +121,32 @@ describe('Student Home (§9, P3.3)', () => {
     expect(JSON.parse(put[1].body)).toEqual({ reducedMotion: false, largerText: false, segment: 'STUDENT', intention: 'PRACTISE', responseMode: 'TEXT' })
   })
 
+  it('P8.2: the intent step discloses supported vs not-yet-available modes and languages, needs no CV/grades/employer/photo/college, and sends the research choice and display name only when the learner sets them', async () => {
+    const { spy } = render(<HomePage />)
+    const step = await screen.findByTestId('intent-step')
+    const support = within(step).getByTestId('intent-support')
+    expect(support).toHaveTextContent('Typing (text): supported')
+    expect(support).toHaveTextContent('Speaking (speech): not yet available')
+    expect(support).toHaveTextContent('English: supported')
+    expect(support).toHaveTextContent('No CV, grades, employer, photograph or college is needed')
+    for (const forbidden of [/CV/i, /grades/i, /employer/i, /photo/i, /college/i]) {
+      expect(within(step).queryByLabelText(forbidden)).not.toBeInTheDocument()
+    }
+    await userEvent.click(within(step).getByLabelText('Early career'))
+    await userEvent.click(within(step).getByLabelText(/Understand how I work/))
+    await userEvent.type(within(step).getByLabelText(/What should we call you/), 'Sam')
+    const research = within(step).getByRole('checkbox', { name: /use my pseudonymous practice data for research/ })
+    expect(research).not.toBeChecked()
+    await userEvent.click(research)
+    await userEvent.click(within(step).getByRole('button', { name: 'Continue' }))
+    await screen.findByTestId('intent-chooser')
+    const put = spy.mock.calls.find(([url, init]) => String(url).includes('/api/v1/me/preferences') && init?.method === 'PUT')
+    expect(JSON.parse(put[1].body)).toEqual({ reducedMotion: false, largerText: false, segment: 'EARLY_CAREER', intention: 'UNDERSTAND', responseMode: 'TEXT', displayName: 'Sam', researchPermission: true })
+    // The display name never travels to any assessment or practice endpoint.
+    const scoringCalls = spy.mock.calls.filter(([url]) => /assessment-sessions|development|preparation|reports/.test(String(url)))
+    for (const [, init] of scoringCalls) expect(String(init?.body || '')).not.toMatch(/Sam|displayName/)
+  })
+
   it('a new learner with a saved intent goes straight to the chooser', async () => {
     render(<HomePage />, { routes: { '/api/v1/me/preferences': preferences({ segment: 'OTHER', intention: 'UNDERSTAND', responseMode: 'TEXT' }) } })
     await screen.findByTestId('intent-chooser')

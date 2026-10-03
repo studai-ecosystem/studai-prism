@@ -299,6 +299,16 @@ const PreferencesSchema = z.object({
   segment: z.enum(['STUDENT', 'EARLY_CAREER', 'OTHER']).nullable().optional(),
   intention: z.enum(['UNDERSTAND', 'PRACTISE', 'PREPARE']).nullable().optional(),
   responseMode: z.enum(['TEXT']).nullable().optional(),
+  // P8.2: display-only name and a SEPARATE research choice (null = not asked).
+  displayName: z.string().nullable().optional(),
+  researchPermission: z.boolean().nullable().optional(),
+  researchPermissionAt: z.string().nullable().optional(),
+  support: z.object({
+    responseModes: z.array(z.object({ code: z.string(), label: z.string(), status: z.string() })),
+    languages: z.array(z.object({ code: z.string(), label: z.string(), status: z.string() })),
+    notRequired: z.array(z.string()),
+    researchPermission: z.string(),
+  }).optional(),
   updatedAt: z.string().nullable(),
 })
 

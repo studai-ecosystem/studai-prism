@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, p2, p3, p4, p5, p6, p7, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
+if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, p3, p4, p5, p6, p7, p8, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -117,6 +117,14 @@ try {
     env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
     env.PRISM_AUDIT_PREPARATION = 'true'
     browserArgs.splice(2, browserArgs.length, 'p7-preparation-journey.spec.js', '--project=chromium')
+  }
+  // P8: the real-browser commercial journey (public page → preview →
+  // onboarding → checkout blocked while content is draft → history), desktop
+  // Chromium with 1440/390 screenshots; draft content on the 4174 audit
+  // server only; payments stay in provider TEST (dummy) mode.
+  if (mode === 'p8') {
+    env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
+    browserArgs.splice(2, browserArgs.length, 'p8-commercial-journey.spec.js', '--project=chromium')
   }
   exitCode = await run(mode === 'database'
     ? ['--test', 'server/test/experienceBaseline.db.test.js']

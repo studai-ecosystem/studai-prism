@@ -1,5 +1,29 @@
 # P0 diagnostic recovery and operator handoff
 
+## P8 activation gates - 2026-10-03
+
+The free experience, intent onboarding, offer configuration, idempotent grants and checkout
+states are implemented and verified locally in provider TEST mode. Nothing here authorises a
+live price, a live charge, an invoice or a contract change.
+
+| Action | Owner / evidence needed | Status |
+| --- | --- | --- |
+| Approve the sprint price (₹499 is a test hypothesis) and set `PRISM_OFFER_PRICE_APPROVED=true` | Finance / owner; recorded approval | BLOCKED (PROPOSED) |
+| Configure tax treatment text `PRISM_TAX_TREATMENT` | Finance; checkout shows "Tax: as configured by finance — not yet approved" until set | BLOCKED |
+| Approve recovery / review / refund policy (`offer-policy.v0.1-proposed`) | Finance + support; `releaseForTechnicalFailure` issues no refund until then | BLOCKED (PROPOSED) |
+| Review and approve at least four missions and the universal form (CONTENT_REVIEW.md) — the bundle cannot be sold while `CONTENT_NOT_REVIEWED` / `FORM_NOT_REVIEWED` blockers stand | Content + measurement reviewers | BLOCKED (1 of 4 reviewed; form DRAFT) |
+| Define the professional preparation pack allowance before any sale | Owner | BLOCKED (UNAVAILABLE_PENDING_OWNER_QUOTA; INR 999 only after demand evidence) |
+| Live Razorpay keys + `RAZORPAY_WEBHOOK_SECRET`, one authorised live transaction test, then disable `PRISM_DUMMY_PAYMENTS` | Operator with finance authorisation; redacted evidence | BLOCKED (test mode only) |
+| Research-permission use: a reviewed research manifest before any read of `research_permission` | Research + privacy (HA-C005/008) | BLOCKED (recorded, unused) |
+| Soft budget `PRISM_SOFT_BUDGET_USD` value and alert routing | Operations | OPTIONAL (unconfigured = no limit; never interrupts a paid run) |
+| Migration 0053 on production (after 0052) | Operator; backup, reversible via `.down.sql` | Additive, tested on disposable PG (53 applied) |
+
+Rollback: unset `PRISM_OFFER_PRICE_APPROVED` (bundle returns to unpurchasable; existing grants
+and entitlements untouched); `0053_intent_display_and_research.down.sql` drops the three
+preference columns; the engagement keys in `reminder_policy` are ignored by older readers.
+Existing ₹499 entitlement rows and Campus contract rows are byte-identical before and after
+this phase (T57 snapshot test).
+
 ## P7 activation gates - 2026-10-03
 
 Private preparation is implemented and verified locally (DRAFT prompts, flag default OFF).

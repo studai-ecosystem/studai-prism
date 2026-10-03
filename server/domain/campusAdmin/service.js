@@ -623,7 +623,7 @@ export function createCampusAdminService({
         id: randomUUID(), definitionId: def.id, formPolicy: def.formPolicy, formId: form?.id || null, sponsorType: 'INSTITUTION', organizationId, programId,
         windowStart: windowStart.toISOString(), windowEnd: windowEnd.toISOString(), integrityPolicy: input.integrityPolicy || 'STANDARD',
         accommodationsPolicy: { requestable: input.accommodationsRequestable !== false, extraTimeAllowed: Boolean(input.extraTimeAllowed) },
-        reminderPolicy: { enabled: Boolean(input.reminders), daysBeforeDue: input.reminders ? 2 : null },
+        reminderPolicy: { enabled: Boolean(input.reminders), daysBeforeDue: input.reminders ? 2 : null, participation: ['COMPULSORY', 'VOLUNTARY'].includes(input.participation) ? input.participation : 'UNKNOWN', incentive: typeof input.incentive === 'string' && input.incentive.trim() ? input.incentive.trim().slice(0, 200) : null },
         createdBy: actor.userId, status, targets: cohorts.map((c) => ({ targetType: 'COHORT', targetId: c.id })),
       })
       if (programId) await store().linkProgramAssignment(programId, a.id)

@@ -10,6 +10,7 @@ export const TRACKED_EVENTS = Object.freeze([
   'org_created', 'students_imported', 'program_created', 'assignment_created', 'assignment_launched',
   'cohort_report_viewed', 'intervention_created', 'reassessment_created', 'renewal_intent_recorded',
   'preview_started', 'preview_completed', 'preview_claimed', 'offer_viewed', 'checkout_started', 'purchase_completed', 'purchase_failed',
+  'recommendation_viewed', 'recommendation_followed', 'practice_started', 'practice_completed', 'practice_retried',
 ])
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9:._-]{0,79}$/
@@ -27,6 +28,11 @@ const RULES = {
   outcome: (v) => typeof v === 'string' && ENUM.test(v),
   productCode: (v) => typeof v === 'string' && ENUM.test(v),
   fundingSource: (v) => typeof v === 'string' && ENUM.test(v),
+  purchaseKind: (v) => ['GENUINE', 'REFUND', 'INCENTIVE', 'COMPULSORY', 'TEST'].includes(v),
+  accountClass: (v) => ['GENUINE', 'TEST', 'RESEARCH_PARTICIPANT', 'STAFF'].includes(v),
+  workspaceClass: (v) => v === 'PERSONAL' || v === 'CAMPUS',
+  mode: (v) => ['FORMAL', 'PRACTICE', 'PREPARATION', 'SELF_REPORT', 'PREVIEW'].includes(v),
+  version: isId,
   count: (v) => Number.isInteger(v) && v >= 0 && v <= 100000,
 }
 
