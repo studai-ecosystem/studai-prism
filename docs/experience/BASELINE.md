@@ -1,5 +1,26 @@
 # P0 - Actual learner-path baseline
 
+## P9 integrated-validation baseline - 2026-10-03
+
+P9 code-safe closure was measured on branch `ui/prism-brand-transformation`
+from starting HEAD `92d5e3a`, with 53 migrations applied to fresh disposable
+PostgreSQL. The final full browser run exercised the configured Chromium,
+Firefox, WebKit and mobile Chromium projects: 805 passed, 81 intentionally
+skipped, 6 recovered on retry and 0 final failures. This is local engineering
+evidence, not pilot, participant, production or WCAG-conformance evidence.
+
+The validation source now has exactly T01-T60, with no inherited blanket pass:
+56 PASS, 3 BLOCKED and 1 UNVERIFIED. T46 is blocked on approved comparable
+forms, T54 on an approved recovery/refund policy, T58 on an authorised live
+model run, and T56 remains manually unverified for assistive technology and
+real devices. The six independent release gates remain OPEN and the release
+verdict remains NO-GO.
+
+The local load observation used loopback real HTTP, disposable PostgreSQL and
+the deterministic audit provider on Windows x64, AMD EPYC 7R13, 8 logical
+CPUs, 62.6 GiB RAM, Node v24.12.0, concurrency 5. It is not an SLA or Layer C
+result. Exact distributions and uncertainty are in `TEST_RESULTS.md`.
+
 ## P1 delta - current safe implementation checkpoint
 
 P1 starts from local P0 commit `ff6002c` with the same preserved dirty backend/

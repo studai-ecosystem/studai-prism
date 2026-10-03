@@ -32,8 +32,8 @@ test('CAMPUS-BASELINE-01 @critical @campus-baseline register (age confirm) → l
   await start.click()
   await expect(page).toHaveURL(/\/payment/)
 
-  // Dummy entitlement (PRISM_DUMMY_PAYMENTS=true in the audit server) → the start path.
-  await page.getByRole('button', { name: /Continue \(free preview\)/ }).click()
+  // Draft content stays unpurchasable; the isolated audit route issues an unpaid test session.
+  await page.getByRole('button', { name: 'Continue with an unpaid test session (not a purchase)' }).click()
   await expect(page).toHaveURL(/\/(briefing|verify-identity)\?session=/)
 })
 

@@ -1,5 +1,33 @@
 # Experience programme - decision and external-gate register
 
+## P9 integrated-validation decisions - 2026-10-03
+
+1. **The source event catalogue is authoritative.** It contains 21 events from
+   `intent_selected` through `share_created`; the implementation retains all 21
+   rather than truncating the list to an inconsistent count.
+2. **Telemetry purpose is part of validity.** Essential operational events may
+   be recorded for service operation; voluntary research events require
+   explicit research permission. Neither purpose permits learner response,
+   private context, name, institution, raw audio, token or payment-secret data.
+3. **A test reference is not an inherited pass.** T01-T60 each names concrete
+   evidence, layer and current outcome. Human/manual/Layer C dependencies remain
+   BLOCKED or UNVERIFIED with an owner even when automated suites are green.
+4. **Browser commands own their test database.** `test:e2e:critical` now routes
+   through the existing disposable-PostgreSQL runner instead of depending on a
+   stale external endpoint. This is test isolation, not a second validation
+   system.
+5. **Load evidence is narrowly labelled.** Loopback HTTP, disposable PG and the
+   deterministic provider measure the local controlled adapter only. Planning
+   targets are not converted to SLAs; the 150 ms client-delay observation is
+   not described as packet shaping or real-device evidence.
+6. **No green automation signs a release gate.** Engineering, Content,
+   Measurement, Security/Privacy, Product-Finance and Operations remain six
+   independent OPEN decisions. Overall remains NO-GO.
+7. **Layer C fails closed.** The run manifest requires authorization,
+   credentials, target, spend, consent/data class and independent content,
+   measurement and security/privacy approval references before execution. No
+   live call was made.
+
 ## P8 remaining-gap decisions - 2026-10-03
 
 1. **A bundle is purchasable only when the build can deliver it.** `offerAvailability` gates

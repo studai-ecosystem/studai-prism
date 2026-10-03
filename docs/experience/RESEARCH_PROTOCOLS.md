@@ -2,6 +2,12 @@
 
 Status: PREPARED, NOT EXECUTED. No interview, observation, payment or comprehension task has taken place. Nothing in this file is a finding. Results, when they exist, are recorded only after they happen, with permission, in a separate dated results file; a protocol is not research completion.
 
+Machine completeness check: `scripts/check-programme-validation.mjs` verifies
+the required interview, comparator, comprehension-task, incentive/compulsion and
+blank-form sections exist. It does not validate research quality or turn this
+protocol into a result. The planned sample is exactly 12 students and 12
+early-career professionals; these are proposed recruit counts, not actuals.
+
 Carries forward Appendix C (discovery interview guide) and Appendix D (five-second / two-minute comprehension protocol) of `CONTENT_REVIEW.md`; where they differ, this file is the executable version for P9 and the earlier appendices remain the provenance record.
 
 ## 0. Ethics, consent and data class

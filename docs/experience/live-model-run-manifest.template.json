@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "p9-live-model-run.v1",
+  "status": "NOT_RUN",
+  "authorization": {
+    "operator": null,
+    "authorizedAt": null,
+    "contentApprovalRef": null,
+    "measurementApprovalRef": null,
+    "securityPrivacyApprovalRef": null,
+    "productFinanceSpendApprovalRef": null
+  },
+  "build": {
+    "commitSha": null,
+    "branch": null,
+    "cleanTree": null
+  },
+  "schema": {
+    "migrationHead": null,
+    "databaseFingerprint": null
+  },
+  "administration": {
+    "formId": null,
+    "formVersion": null,
+    "rubricRef": null,
+    "methodVersion": null,
+    "promptVersions": [],
+    "modelProvider": null,
+    "modelVersions": []
+  },
+  "privacy": {
+    "consentVersion": null,
+    "dataClass": null,
+    "retentionPolicyRef": null
+  },
+  "spend": {
+    "approvedLimitUsd": null,
+    "actualUsd": null
+  },
+  "sameRunLineage": {
+    "runRef": null,
+    "actionRefs": [],
+    "opportunityRefs": [],
+    "evaluationAttemptRefs": [],
+    "evidenceUnitRefs": [],
+    "publicationVersionRef": null,
+    "practiceAttemptRefs": [],
+    "complete": false
+  },
+  "redaction": {
+    "containsLearnerContent": false,
+    "containsCredentials": false,
+    "containsPaymentSecrets": false
+  },
+  "results": []
+}

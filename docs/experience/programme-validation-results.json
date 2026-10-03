@@ -1,0 +1,1522 @@
+{
+  "schemaVersion": "p9.v1",
+  "generatedAt": "2026-10-03T09:39:55.254Z",
+  "sourceCommit": "92d5e3a553ca2d3126b425c634ba4d082bd0395c",
+  "status": "PASS",
+  "summary": {
+    "PASS": 56,
+    "BLOCKED": 3,
+    "UNVERIFIED": 1
+  },
+  "failures": [],
+  "testsAreEvidenceReferencesNotExecutedResults": true,
+  "entries": [
+    {
+      "id": "T01",
+      "requirement": "Returning login and registration",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "tests/e2e/p1-account-entry.spec.js",
+          "name": "P1/T01 bare registration opens the supported launcher, not checkout",
+          "layer": "B"
+        },
+        {
+          "path": "server/test/platform.test.js",
+          "name": "register/login platform contract",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T02",
+      "requirement": "Explicit deep link and expired auth",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "tests/e2e/p1-account-entry.spec.js",
+          "name": "P1/T02 malformed sign-in destinations show a safe recovery without exposing the input",
+          "layer": "B"
+        },
+        {
+          "path": "src/app/AppRouter.test.jsx",
+          "name": "safe destination and route aliases",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T03",
+      "requirement": "Dashboard/profile aliases",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "tests/e2e/flow-entry.spec.js",
+          "name": "legacy aliases resolve without loops",
+          "layer": "B"
+        },
+        {
+          "path": "src/app/AppRouter.test.jsx",
+          "name": "dashboard and profile aliases",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T04",
+      "requirement": "Feature flags loading/failure/off",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/telemetry.flag.test.js",
+          "name": "flag default and off contract",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/flow-recovery.spec.js",
+          "name": "flag-off supported recovery",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T05",
+      "requirement": "Legacy owned report",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "tests/e2e/p1-legacy-report.spec.js",
+          "name": "P1.4/T05 legacy reports remain readable",
+          "layer": "B"
+        },
+        {
+          "path": "server/test/legacyReadersRetained.test.js",
+          "name": "legacy readers retained",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T06",
+      "requirement": "Unclaimed/conflicting ownership",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/ownershipReconciliation.test.js",
+          "name": "P1/T06 conflicting references are never auto-assigned",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/experienceBaseline.db.test.js",
+          "name": "T06 conflict diagnostic on real PostgreSQL",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T07",
+      "requirement": "Personal/Campus history isolation",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/commerceGaps.test.js",
+          "name": "P8.7 cross-scope resources return NOT_FOUND",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p7-preparation-journey.spec.js",
+          "name": "T07 campus cannot read personal preparation",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T08",
+      "requirement": "Two users on one browser",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "tests/e2e/p1-account-entry.spec.js",
+          "name": "P1/T08 second account cannot see prior state",
+          "layer": "B"
+        },
+        {
+          "path": "src/app/AppRouter.test.jsx",
+          "name": "account route state is scoped",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T09",
+      "requirement": "Canonical new-run player",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/campusSessions.test.js",
+          "name": "session contract selects the pinned handler",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p3-real-journey.spec.js",
+          "name": "P3 canonical V3 journey",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T10",
+      "requirement": "Conversation-only layout",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "src/features/assessments/player.test.jsx",
+          "name": "conversation-only frame has no empty work pane",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/flow-player-layout.spec.js",
+          "name": "conversation-only responsive layout",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T11",
+      "requirement": "Required material unavailable",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "src/pages/failClosedPages.test.jsx",
+          "name": "required artifact failure is a recovery state",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/flow-recovery.spec.js",
+          "name": "required material recovery",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T12",
+      "requirement": "Long transcript scrolling",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "src/features/assessments/player.test.jsx",
+          "name": "long transcript keeps composer usable",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/flow-player-layout.spec.js",
+          "name": "independent transcript scrolling",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T13",
+      "requirement": "Long artifact and mobile keyboard",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "src/features/assessments/p3Player.test.jsx",
+          "name": "artifact tabs preserve controls",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/flow-player-layout.spec.js",
+          "name": "mobile work switch and independent scrolling",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T14",
+      "requirement": "Scenario intro and explicit begin",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/campusSessions.test.js",
+          "name": "start returns pinned scenario facts",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p3-real-journey.spec.js",
+          "name": "actual intro precedes explicit Begin",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T15",
+      "requirement": "Begin replay and concurrency",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T15/T50 concurrent begins share one start",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/commerceGaps.test.js",
+          "name": "concurrent starts reserve one seat",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T16",
+      "requirement": "Timer refresh and reconnect",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/runTiming.test.js",
+          "name": "server deadline survives refresh",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p3-real-journey.spec.js",
+          "name": "refresh keeps authoritative deadline",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T17",
+      "requirement": "Deadline versus grace",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/runTiming.test.js",
+          "name": "client timestamp cannot admit a late action",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/campusSessions.test.js",
+          "name": "server deadline gates messages",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T18",
+      "requirement": "Approved timing adjustment",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/runTiming.test.js",
+          "name": "timing adjustment carries policy version",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/universalForm.test.js",
+          "name": "form timing contract",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T19",
+      "requirement": "Requested scenario",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/universalRun.test.js",
+          "name": "unknown scenario fails without substitution",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p4-six-stages.spec.js",
+          "name": "T19 unknown scenario fails closed",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T20",
+      "requirement": "Resume existing session",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/campusSessions.test.js",
+          "name": "session replay retains state and versions",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p3-real-journey.spec.js",
+          "name": "refresh resumes the same run",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T21",
+      "requirement": "Calibration versus context",
+      "outcome": "PASS",
+      "layers": [
+        "A"
+      ],
+      "tests": [
+        {
+          "path": "server/test/calibrationPurpose.test.js",
+          "name": "T21 calibration and candidate context stay separate",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/campusSessions.test.js",
+          "name": "player contract reveals no calibration payload",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T22",
+      "requirement": "Opportunity coverage",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/director.test.js",
+          "name": "required opportunity stages are emitted",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p4-six-stages.spec.js",
+          "name": "six-stage browser coverage",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T23",
+      "requirement": "Opportunity independence",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/evidenceSufficiency.test.js",
+          "name": "duplicate probes cannot inflate evidence",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "real PostgreSQL opportunity/evidence ledger",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T24",
+      "requirement": "Candidate attribution",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/evidenceLedger.test.js",
+          "name": "system/template content is excluded",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "strict units quote candidate work only",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T25",
+      "requirement": "Save before evaluate",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T31 provider faults preserve acknowledged actions",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/experienceBaseline.db.test.js",
+          "name": "P1/T25 accepted actions durable on PostgreSQL",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T26",
+      "requirement": "Duplicate action idempotency and conflict",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T25/T26 duplicate key replays and changed payload conflicts",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "action idempotency on PostgreSQL",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T27",
+      "requirement": "Dialogue evidence",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/sliceEvaluator.test.js",
+          "name": "accepted dialogue yields linked governed units",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "dialogue to strict evidence on PostgreSQL",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T28",
+      "requirement": "Artifact evidence",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/sliceEvaluator.test.js",
+          "name": "artifact patches link to opportunities",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "artifact evidence on PostgreSQL",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T29",
+      "requirement": "Missing or contradictory evidence",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T29/T30 sparse early-ended run remains limited",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p5-report-states.spec.js",
+          "name": "partial and under-review states",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T30",
+      "requirement": "Clear developing behaviour",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T29/T30 sparse run distinguishes observed from missing",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "partial work produces bounded decisions",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T31",
+      "requirement": "Evaluator/schema/write outage",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T31 timeout and malformed output remain technical",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p5-report-states.spec.js",
+          "name": "technical report states are not learner weakness",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T32",
+      "requirement": "Source quote mismatch",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T32 quote mismatch is withheld for review",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "strict quote verification on PostgreSQL",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T33",
+      "requirement": "Judge disagreement",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/judgeDisagreement.test.js",
+          "name": "disagreement follows review policy",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p5-report-states.spec.js",
+          "name": "under-review report has no unsupported precision",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T34",
+      "requirement": "Malicious learner prompt",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/factBoundary.test.js",
+          "name": "learner text cannot change governed facts",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "real HTTP rejects form swapping",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T35",
+      "requirement": "Publish without legacy report",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/reportClaims.test.js",
+          "name": "V3 claims do not require a legacy score",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "worker publishes V3 directly on PostgreSQL",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T36",
+      "requirement": "Historical snapshot and correction",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/reportReviewCorrection.test.js",
+          "name": "correction creates a new immutable version",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p5-report-states.spec.js",
+          "name": "T36 correction version UI",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T37",
+      "requirement": "Report map semantics",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "src/features/reports/reports.test.jsx",
+          "name": "missing is not zero and labels are ordinal",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p5-report-states.spec.js",
+          "name": "map/list report semantics",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T38",
+      "requirement": "Single insufficient state",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "src/features/reports/reports.test.jsx",
+          "name": "insufficient state is not duplicated",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p5-report-states.spec.js",
+          "name": "P5.9/T38 one neutral state",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T39",
+      "requirement": "Governed development recommendation",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/campusDevelopment.test.js",
+          "name": "only reviewed reachable missions are recommended",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p6-practice-journey.spec.js",
+          "name": "recommendation reaches a governed mission",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T40",
+      "requirement": "Mission meaningfulness",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/campusDevelopment.test.js",
+          "name": "paraphrase accepted and keywords alone fail",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p6-practice-journey.spec.js",
+          "name": "meaningful practice evaluation",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T41",
+      "requirement": "Practice retry isolation",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/practiceReplay.test.js",
+          "name": "retry creates a new practice attempt",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p6-practice-journey.spec.js",
+          "name": "formal snapshot unchanged after retry",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T42",
+      "requirement": "Fresh challenge",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/practiceReplay.test.js",
+          "name": "fresh challenge hides coaching and records exposure",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p6-practice-journey.spec.js",
+          "name": "fresh challenge journey",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T43",
+      "requirement": "Preparation privacy",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/preparation.test.js",
+          "name": "preparation is personal and excluded from analytics",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p7-preparation-journey.spec.js",
+          "name": "campus disclosure cannot read preparation",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T44",
+      "requirement": "Preparation attribution",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/preparation.test.js",
+          "name": "assistant suggestions never enter learner transcript",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p7-preparation-journey.spec.js",
+          "name": "suggestion attribution remains visible",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T45",
+      "requirement": "Application check-in isolation",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/preparation.test.js",
+          "name": "SELF_REPORT cannot enter formal evidence",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p7-preparation-journey.spec.js",
+          "name": "self-report history is separate",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T46",
+      "requirement": "Growth comparison approval",
+      "outcome": "BLOCKED",
+      "layers": [
+        "A",
+        "MANUAL"
+      ],
+      "tests": [
+        {
+          "path": "server/test/growthEligibility.test.js",
+          "name": "unapproved, retired or corrected pairs show separate snapshots",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/ROLLOUT.md"
+      ],
+      "blocker": {
+        "owner": "measurement owner",
+        "dependency": "written approval for a real comparable form pair and method",
+        "evidenceNeeded": "approved form-pair record with version and comparability rationale"
+      }
+    },
+    {
+      "id": "T47",
+      "requirement": "Report/evidence authorization",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/reportAudiences.test.js",
+          "name": "owner sponsor and share audience matrix",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "cross-owner run reads and writes return NOT_FOUND",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T48",
+      "requirement": "Revoked or expired share",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/campusStudent.test.js",
+          "name": "owner-only revoke and expiry",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p5-report-states.spec.js",
+          "name": "T48 expired share reveals nothing",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T49",
+      "requirement": "Worker crash and lease expiry",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T49 expired lease reclaims with fencing",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/p2Slice.db.test.js",
+          "name": "leased worker uses real PostgreSQL",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T50",
+      "requirement": "Start/send/finish race",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T15/T50 racing actions stay coherent",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/campusSessions.test.js",
+          "name": "finish prevents late overwrite",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T51",
+      "requirement": "Report version race",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/faultInjection.test.js",
+          "name": "T51 concurrent first reads publish one version",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/reportReviewCorrection.test.js",
+          "name": "version sequence is immutable",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T52",
+      "requirement": "Deletion with active worker",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/rollback.test.js",
+          "name": "late model result after erasure is discarded",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/experienceBaseline.db.test.js",
+          "name": "P1/T52 erasure cascade blocks redrive",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T53",
+      "requirement": "Payment and webhook retries",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/commerceGaps.test.js",
+          "name": "signed verify and webhook retries grant once",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p8-commercial-journey.spec.js",
+          "name": "blocked offer and test checkout journey",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T54",
+      "requirement": "System-failure credit policy",
+      "outcome": "BLOCKED",
+      "layers": [
+        "A",
+        "MANUAL"
+      ],
+      "tests": [
+        {
+          "path": "server/test/commerce.test.js",
+          "name": "proposed recovery is idempotent and audited without issuing a refund",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/ROLLOUT.md"
+      ],
+      "blocker": {
+        "owner": "product/finance and support owners",
+        "dependency": "approve recovery, reissue and refund policy",
+        "evidenceNeeded": "signed policy version and operator evidence for one authorized dry run"
+      }
+    },
+    {
+      "id": "T55",
+      "requirement": "Package expiry",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/commerceGaps.test.js",
+          "name": "expiry gates new starts and preserves issued history",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/p8-commercial-journey.spec.js",
+          "name": "history remains readable without an active package",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T56",
+      "requirement": "Keyboard, screen reader and zoom",
+      "outcome": "UNVERIFIED",
+      "layers": [
+        "A",
+        "B",
+        "MANUAL"
+      ],
+      "tests": [
+        {
+          "path": "tests/e2e/ui-matrix.spec.js",
+          "name": "width, axe, large-text and keyboard matrix",
+          "layer": "B"
+        },
+        {
+          "path": "tests/e2e/campus-keyboard.spec.js",
+          "name": "keyboard journeys",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": {
+        "owner": "accessibility lead and representative users",
+        "dependency": "manual screen-reader, forced-colour, voice-control and real-device sessions",
+        "evidenceNeeded": "dated device/AT matrix with observed results; automated axe is not WCAG conformance"
+      }
+    },
+    {
+      "id": "T57",
+      "requirement": "Direct and Campus regression",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/platform.test.js",
+          "name": "direct platform contracts remain available",
+          "layer": "A"
+        },
+        {
+          "path": "tests/e2e/campus-journey-a.spec.js",
+          "name": "Campus journey regression",
+          "layer": "B"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T58",
+      "requirement": "Cost and trace coverage",
+      "outcome": "BLOCKED",
+      "layers": [
+        "A",
+        "B",
+        "C"
+      ],
+      "tests": [
+        {
+          "path": "server/test/aiGateway.test.js",
+          "name": "model usage carries bounded trace metadata",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/metricsDefinitions.test.js",
+          "name": "strict event payload and purpose permissions",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/TEST_RESULTS.md",
+        "docs/experience/live-model-run-manifest.template.json"
+      ],
+      "blocker": {
+        "owner": "operations and product/finance",
+        "dependency": "authorized Layer C credentials, approved spend and staging target",
+        "evidenceNeeded": "same-run model usage and lineage rows from an authorized live run; no transcript in analytics"
+      }
+    },
+    {
+      "id": "T59",
+      "requirement": "Synthetic data isolation",
+      "outcome": "PASS",
+      "layers": [
+        "A",
+        "B"
+      ],
+      "tests": [
+        {
+          "path": "server/test/metricsDefinitions.test.js",
+          "name": "synthetic and DEV rows leave every denominator",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/commerceGaps.test.js",
+          "name": "test/research account classes remain distinct",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/METRICS.md"
+      ],
+      "blocker": null
+    },
+    {
+      "id": "T60",
+      "requirement": "Rollback during active run",
+      "outcome": "PASS",
+      "layers": [
+        "A"
+      ],
+      "tests": [
+        {
+          "path": "server/test/rollback.test.js",
+          "name": "T60 pinned compatible handler drains active run before flags disable",
+          "layer": "A"
+        },
+        {
+          "path": "server/test/release.test.js",
+          "name": "NO_GO prevents new allocation when gates are open",
+          "layer": "A"
+        }
+      ],
+      "evidence": [
+        "docs/experience/ROLLOUT.md"
+      ],
+      "blocker": null
+    }
+  ]
+}

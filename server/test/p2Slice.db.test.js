@@ -10,6 +10,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import os from 'node:os'
 
 const isolated = process.env.PRISM_P0_ISOLATED_DATABASE === 'true'
 const skip = !isolated || !process.env.TEST_DATABASE_URL
@@ -75,13 +76,31 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
   await new Promise((resolve) => server.once('listening', resolve))
   t.after(() => new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())))
   const base = `http://127.0.0.1:${server.address().port}`
+  const loadSamples = { actionAck: [], providerReply: [], publication: [] }
+  const finishStartedAt = new Map()
+  const firstPublicationSeen = new Set()
   async function request(method, path, token, body, headers = {}) {
+    const startedWall = Date.now()
+    const started = performance.now()
     const response = await fetch(`${base}${path}`, {
       method,
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
-    return { status: response.status, payload: await response.json().catch(() => null) }
+    const payload = await response.json().catch(() => null)
+    const elapsed = performance.now() - started
+    const message = path.match(/^\/api\/v1\/assessment-sessions\/([^/]+)\/messages$/)
+    if (message && body?.clientEventId && response.status >= 200 && response.status < 300) {
+      const accepted = await query('SELECT accepted_at FROM assessment_candidate_actions WHERE session_id=$1 AND client_event_id=$2', [message[1], body.clientEventId])
+      if (accepted.rows[0]?.accepted_at) loadSamples.actionAck.push(Math.max(0, new Date(accepted.rows[0].accepted_at).getTime() - startedWall))
+      loadSamples.providerReply.push(elapsed)
+    }
+    const report = path.match(/^\/api\/v1\/assessment-sessions\/([^/]+)\/report$/)
+    if (report && response.status === 200 && finishStartedAt.has(report[1]) && !firstPublicationSeen.has(report[1])) {
+      firstPublicationSeen.add(report[1])
+      loadSamples.publication.push(Date.now() - finishStartedAt.get(report[1]))
+    }
+    return { status: response.status, payload, elapsed }
   }
   const fault = (mode) => { if (mode) process.env.PRISM_AUDIT_AI_FAULT = mode; else delete process.env.PRISM_AUDIT_AI_FAULT }
   t.after(() => fault(null))
@@ -130,7 +149,10 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     return r
   }
   const begin = (sid, key) => request('POST', `/api/v1/assessment-sessions/${sid}/begin`, token, {}, { 'Idempotency-Key': key })
-  const finish = (sid) => request('POST', `/api/v1/assessment-sessions/${sid}/finish`, token, { early: true })
+  const finish = (sid) => {
+    if (!finishStartedAt.has(sid)) finishStartedAt.set(sid, Date.now())
+    return request('POST', `/api/v1/assessment-sessions/${sid}/finish`, token, { early: true })
+  }
   // Begin, then answer until the learner has written a board owner change and one more message.
   async function act(sid) {
     assert.equal((await begin(sid, `p2-begin-${sid}`)).status, 200)
@@ -448,6 +470,102 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     const late = await request('POST', `/api/v1/assessment-sessions/${s}/messages`, token, { clientEventId: 'p2-late-after-erasure', text: 'Synthetic late write after erasure' })
     assert.equal(late.status, 404)
     evidence.checks.push({ id: 'T52', status: 'PASS', leasedCompletionRejected: true, noResurrection: true })
+  })
+
+  await t.test('P9.6 deterministic local pilot load: real HTTP/PostgreSQL with controlled provider', async () => {
+    const concurrency = 5
+    const iterations = 20
+    const timed = async (fn) => {
+      const start = performance.now()
+      const result = await fn()
+      return { elapsed: performance.now() - start, result }
+    }
+    const pool = async (items, worker) => {
+      let index = 0
+      await Promise.all(Array.from({ length: concurrency }, async () => {
+        while (index < items.length) {
+          const current = index
+          index += 1
+          await worker(items[current], current)
+        }
+      }))
+    }
+    const percentile = (values, p) => {
+      const sorted = [...values].sort((a, b) => a - b)
+      return sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))]
+    }
+    const summarize = (values) => ({
+      samples: values.length,
+      p50Ms: Number(percentile(values, 50).toFixed(2)),
+      p95Ms: Number(percentile(values, 95).toFixed(2)),
+      maxMs: Number(Math.max(...values).toFixed(2)),
+    })
+    const history = []
+    const report = []
+    await pool(Array.from({ length: iterations }), async () => {
+      const h = await timed(() => request('GET', '/api/v1/me/history', token))
+      assert.equal(h.result.status, 200)
+      history.push(h.elapsed)
+      const r = await timed(() => request('GET', `/api/v1/assessment-sessions/${sid}/report`, token))
+      assert.equal(r.result.status, 200)
+      report.push(r.elapsed)
+    })
+    const lowBandwidth = []
+    for (let i = 0; i < 5; i += 1) {
+      const sample = await timed(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150))
+        return request('GET', '/api/v1/me/history', token)
+      })
+      assert.equal(sample.result.status, 200)
+      lowBandwidth.push(sample.elapsed)
+    }
+    const measurements = {
+      historyRead: summarize(history),
+      reportRead: summarize(report),
+      durableActionAcknowledgement: summarize(loadSamples.actionAck),
+      controlledProviderReply: summarize(loadSamples.providerReply),
+      reportPublication: summarize(loadSamples.publication),
+      lowBandwidthHistory: summarize(lowBandwidth),
+    }
+    assert.ok(measurements.historyRead.p95Ms < 1500)
+    assert.ok(measurements.reportRead.p95Ms < 1500)
+    assert.ok(measurements.durableActionAcknowledgement.p95Ms < 1000)
+    assert.ok(measurements.controlledProviderReply.p95Ms < 8000)
+    assert.ok(measurements.reportPublication.p95Ms < 180000)
+    const loadEvidence = {
+      status: 'MEASURED',
+      label: 'LOCAL CONTROLLED-ADAPTER MEASUREMENT — NOT AN SLA OR LAYER C RESULT',
+      target: 'loopback real buildApp HTTP + disposable PostgreSQL + deterministic audit provider',
+      hardware: {
+        platform: os.platform(),
+        arch: os.arch(),
+        cpuModel: os.cpus()[0]?.model || null,
+        logicalCpus: os.cpus().length,
+        totalMemoryGb: Number((os.totalmem() / 2 ** 30).toFixed(1)),
+        node: process.version,
+      },
+      concurrency,
+      dataset: {
+        reportAndHistoryRequests: iterations,
+        actionSamples: loadSamples.actionAck.length,
+        providerReplySamples: loadSamples.providerReply.length,
+        publicationSamples: loadSamples.publication.length,
+        syntheticRuns: runs,
+      },
+      provider: 'DETERMINISTIC_AUDIT_PROVIDER',
+      uncertainty: 'Single Windows host and loopback HTTP; warm process/cache; no real provider or internet variance. Repeat on authorized pilot hardware before operational use.',
+      lowBandwidth: 'Separate controlled 150 ms client-delay observation; not packet shaping, a real device, or a network SLA.',
+      planningTargets: {
+        historyAndReportReadP95Ms: 1500,
+        durableActionAcknowledgementP95Ms: 1000,
+        controlledProviderReplyP95Ms: 8000,
+        reportPublicationP95Ms: 180000,
+      },
+      measurements,
+    }
+    await mkdir(join('audit-results', 'ui', 'p9'), { recursive: true })
+    await writeFile(join('audit-results', 'ui', 'p9', 'pilot-load-results.json'), `${JSON.stringify(loadEvidence, null, 2)}\n`)
+    console.log(`P9_LOAD_RESULTS ${JSON.stringify(loadEvidence)}`)
   })
 
   await t.test('sparse input → honest insufficient (not technical, not fake complete) (T29)', async () => {

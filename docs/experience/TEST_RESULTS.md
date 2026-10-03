@@ -1,5 +1,64 @@
 # P0 - Verification results
 
+## P9 programme validation and integrated reliability - 2026-10-03
+
+Final commands were run from `studai-prism/` against local isolated processes.
+No live model, live payment, production database, deployment or participant
+session was used.
+
+| Command | Result |
+| --- | --- |
+| `npm run build` | PASS in 14.98 s; existing >500 kB chunk advisory only |
+| `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | 38 files; **516 passed, 0 failed** |
+| `npm --prefix server test` | **858 passed, 26 skipped, 0 failed** (884 total) |
+| `npm run audit:static` | PASS; 1,623 files scanned, 113 review leads; leads are not vulnerability findings |
+| `npm run test:e2e:critical` | **217 passed, 3 recovered on retry, 0 final failures** across Chromium, Firefox, WebKit and mobile Chromium |
+| `node scripts/run-experience-baseline-tests.mjs database` | **21 passed, 0 failed, 0 skipped**; real HTTP + disposable PostgreSQL + workers/evidence/publication/report/practice |
+| `C:\Users\studaione\AppData\Local\Programs\Python\Python312\python.exe -m pytest calibration\tests` | **64 passed, 0 failed**; Python 3.12.10, pytest 8.4.2 |
+| `CI=1 node scripts/run-experience-baseline-tests.mjs browser-all` | **805 passed, 81 intentional skips, 6 recovered on retry, 0 final failures**; one full run only, all four configured projects |
+| `node scripts/check-programme-validation.mjs` | PASS; T01-T60 = **56 PASS / 3 BLOCKED / 1 UNVERIFIED** |
+
+The first direct critical invocation exposed that the old npm command did not
+own a database and tried the unavailable `127.0.0.1:55433`. The command now
+uses the existing isolated runner (`browser-critical`) and therefore owns its
+throwaway PostgreSQL lifecycle. Its first isolated attempt then exposed a real
+stale test selector: the protected draft offer correctly says “Continue with
+an unpaid test session (not a purchase)”, not the old “Continue (free
+preview)”. The test was corrected without changing product behaviour.
+
+### Local controlled-adapter load observation
+
+Hardware: Windows x64, AMD EPYC 7R13, 8 logical CPUs, 62.6 GiB RAM, Node
+v24.12.0. Concurrency 5. Dataset: 20 history/report requests, 25 action and
+provider-reply samples, 3 publication samples and 8 synthetic runs.
+
+| Observation | p50 | p95 | Planning target |
+| --- | ---: | ---: | ---: |
+| History read | 62.15 ms | 82.14 ms | <1,500 ms |
+| Report read | 44.53 ms | 57.59 ms | <1,500 ms |
+| Durable action acknowledgement (persisted `accepted_at`; network completion excluded) | 5 ms | 13 ms | <1,000 ms |
+| Controlled-provider reply | 23.09 ms | 33.06 ms | <8,000 ms |
+| Report publication | 190 ms | 197 ms | <180,000 ms |
+| Controlled 150 ms client-delay history observation | 177.98 ms | 185.55 ms | reported separately |
+
+These are single-host, warm-process, loopback observations with a deterministic
+provider. The low-bandwidth row is a controlled client delay, not packet
+shaping or a real-device result. None is an SLA, real-provider or Layer C claim.
+
+### Visual/accessibility evidence
+
+Focused P9 matrix: 5 passed, 3 intentional project skips, 0 failed. It covered
+1440, 1280, 1024, 768, 430, 390, 360 and 320 widths, all four projects, axe,
+keyboard skip navigation and overflow checks. All 18 screenshots under
+`audit-results/ui/p9/` were inspected. Repeated fixed navigation in stitched
+mobile full-page captures is a Playwright capture artifact; runtime DOM,
+keyboard, axe and overflow assertions passed. Screen-reader, forced-colour,
+voice-control and real-device checks remain MANUAL UNVERIFIED; no WCAG
+conformance is claimed.
+
+Layer C remains BLOCKED and was not executed. Participant, payment, refund,
+comprehension, transfer and human-rating result sets remain NOT RUN / empty.
+
 ## P8 remaining gaps closed - 2026-10-03
 
 Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider only —

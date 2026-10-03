@@ -2,6 +2,12 @@
 
 Status: PREPARED, NOT EXECUTED. No rater has been recruited, trained or has rated anything under this plan. No study has started. No agreement, reliability, validity or fairness figure exists. A coding agent cannot self-certify independent review; every gate below is signed by the named human role or stays open.
 
+The machine completeness check validates required headings and the T01-T60
+ledger only. It cannot approve intended use, constructs, tasks, timing,
+accessibility, confounds, rater independence, blinding, thresholds or study
+interpretation. Studies A-E below are complete as blank executable plans, not
+as executed studies; suggested counts remain proposals.
+
 Carries forward the human-action register (`docs/campus/CAMPUS_HUMAN_ACTIONS.md`, HA-C items) and the existing blinded double-rating queue (`/api/admin/validation`, dark behind `PRISM_V3_RATING_QUEUE`). This file adds the study designs, rater programme and pre-registered thresholds; it does not replace the register.
 
 ## 1. Measurement-lead review (precondition for everything below)

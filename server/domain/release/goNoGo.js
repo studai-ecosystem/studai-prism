@@ -10,6 +10,14 @@ export const HUMAN_GATES = Object.freeze([
 ])
 export const GATE_STATES = Object.freeze(['OPEN', 'APPROVED', 'NOT_APPLICABLE'])
 export const VERDICTS = Object.freeze(['GO', 'NO_GO'])
+export const INDEPENDENT_SIGNOFF_GATES = Object.freeze([
+  'ENGINEERING',
+  'CONTENT',
+  'MEASUREMENT',
+  'SECURITY_PRIVACY',
+  'PRODUCT_FINANCE',
+  'OPERATIONS',
+])
 
 // Checklist areas from P10.9; each maps to the readiness checks and human
 // gates that evidence it. Areas without automated coverage stay human-owned.
@@ -27,14 +35,19 @@ export function defaultHumanGates() {
   return Object.fromEntries(HUMAN_GATES.map((id) => [id, 'OPEN']))
 }
 
+export function defaultIndependentSignoffs() {
+  return Object.fromEntries(INDEPENDENT_SIGNOFF_GATES.map((id) => [id, 'OPEN']))
+}
+
 /**
  * goNoGo({ readiness, humanGates, stage }) → { verdict, reasons, areas }.
  * `readiness` is the output of release/config.js readiness(); `humanGates`
  * maps HA-C ids to OPEN | APPROVED | NOT_APPLICABLE (missing → OPEN).
  */
-export function goNoGo({ readiness, humanGates = {}, stage = readiness?.stage || 'LOCAL' } = {}) {
+export function goNoGo({ readiness, humanGates = {}, independentSignoffs = {}, stage = readiness?.stage || 'LOCAL' } = {}) {
   const cfg = stageConfig(stage) || stageConfig('LOCAL')
   const gates = { ...defaultHumanGates(), ...Object.fromEntries(Object.entries(humanGates).filter(([k, v]) => HUMAN_GATES.includes(k) && GATE_STATES.includes(v))) }
+  const signoffs = { ...defaultIndependentSignoffs(), ...Object.fromEntries(Object.entries(independentSignoffs).filter(([k, v]) => INDEPENDENT_SIGNOFF_GATES.includes(k) && GATE_STATES.includes(v))) }
   const reasons = []
   if (!readiness || typeof readiness !== 'object') reasons.push('READINESS_UNVERIFIED')
   else {
@@ -45,6 +58,9 @@ export function goNoGo({ readiness, humanGates = {}, stage = readiness?.stage ||
     }
   }
   for (const id of cfg.humanGates) if (gates[id] === 'OPEN') reasons.push(`HUMAN_GATE_OPEN:${id}`)
+  if (cfg.stage !== 'LOCAL') {
+    for (const id of INDEPENDENT_SIGNOFF_GATES) if (signoffs[id] === 'OPEN') reasons.push(`INDEPENDENT_SIGNOFF_OPEN:${id}`)
+  }
   const areas = CHECKLIST.map((area) => {
     const openGates = area.gates.filter((id) => cfg.humanGates.includes(id) && gates[id] === 'OPEN')
     const failing = area.checks.filter((c) => (readiness?.requiredChecks || []).includes(c) && readiness?.checks?.[c]?.state !== 'READY')
@@ -56,6 +72,7 @@ export function goNoGo({ readiness, humanGates = {}, stage = readiness?.stage ||
     verdict: reasons.length ? 'NO_GO' : 'GO',
     reasons,
     humanGates: gates,
+    independentSignoffs: signoffs,
     areas,
   }
 }

@@ -4,6 +4,17 @@ Status: DEFINED and FIXTURE_TESTED. No pilot result has been analysed with these
 
 Rule: denominators are not redefined after seeing results. The compute functions accept rows and an optional options bag; no helper exists to override a population.
 
+## P9 local reliability observation - 2026-10-03
+
+The final disposable-database run produced local controlled-adapter timing
+evidence only: history p50/p95 62.15/82.14 ms; report 44.53/57.59 ms; durable
+acknowledgement 5/13 ms; controlled-provider reply 23.09/33.06 ms; publication
+190/197 ms; controlled 150 ms client-delay history 177.98/185.55 ms. Host:
+Windows x64, AMD EPYC 7R13, 8 logical CPUs, 62.6 GiB RAM, Node v24.12.0;
+concurrency 5. Exact sample counts and uncertainty are in `TEST_RESULTS.md`.
+These values are not business outcomes, benchmarks, SLAs, real-provider
+measurements or Layer C evidence.
+
 ## Event catalogue (`server/domain/metrics/events.js`, schema v1)
 
 Canonical events (source plan order): `intent_selected`, `preview_started`, `preview_feedback_seen`, `package_viewed`, `purchase_verified`, `formal_begin_acknowledged`, `candidate_action_saved`, `opportunity_presented`, `evaluation_completed`, `evaluation_failed`, `report_published`, `report_opened`, `moment_opened`, `practice_recommended`, `practice_started`, `practice_feedback_seen`, `practice_retried`, `fresh_challenge_completed`, `application_self_reported`, `review_requested`, `share_created`.
@@ -42,7 +53,7 @@ One attractive number is not a substitute for the three views.
 
 Pure detectors in `server/domain/metrics/alerts.js` (tested by `server/test/metricsAlerts.test.js`): zero-evidence clusters, accepted FINISH without a job, DONE jobs without publication, claim-rejection spikes, expired leases, repeated Begin, history ownership conflicts, cross-scope denials. Alerts carry request/run/job references and counts under approved access, never learner content. Thresholds are planning defaults (`DEFAULT_THRESHOLDS`) and are printed with each quality view.
 
-## Initial business hypotheses (P9.9) — labels, not benchmarks
+## INITIAL HYPOTHESES, NOT BENCHMARKS (P9.9)
 
 80% unassisted comprehension; 40% voluntary relevant-practice activation; 25% seven-day voluntary return; at least 30 genuine purchases with refunds separately reported; a specific user-articulated advantage over a strong generic AI alternative; positive contribution under measured realistic use and recovery costs. These are the source plan's initial hypotheses for go/no-go discussion. None has been measured. Kill/redesign logic: misunderstood reports → explanation/UX work; understood but unused practice → relevance/effort investigation; same-script improvement without fresh-task transfer → learning-method revision; no willingness to pay → buyer/offer/distribution work. No additional dashboards compensate for a failed hypothesis.
 

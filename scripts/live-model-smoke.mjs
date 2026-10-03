@@ -43,6 +43,11 @@ const manifest = {
   form: { segmentId: DRAFT_SEGMENT_ID, version: DRAFT_CORE_TEAMREADY_A_HANDOVER.version, status: DRAFT_CORE_TEAMREADY_A_HANDOVER.status, rubricRef: DRAFT_CORE_TEAMREADY_A_HANDOVER.rubricRef, methodVersion: SLICE_METHOD_VERSION },
   models: { provider: safe(aiProvider), conversation: safe(conversationModel), judge: safe(judgeModel), fast: safe(fastModel), promptVersions: 'from prompt registry at run time (server/lib/credentials.js activePromptVersions)' },
   consent: { dataClass: env.PRISM_LIVE_MODEL_DATA_CLASS || null, consentVersion: env.PRISM_LIVE_MODEL_CONSENT_VERSION || null, participants: 'operator/staff synthetic persona only; no learner until HA gate is signed' },
+  approvals: {
+    content: env.PRISM_LIVE_MODEL_CONTENT_APPROVAL_REF || null,
+    measurement: env.PRISM_LIVE_MODEL_MEASUREMENT_APPROVAL_REF || null,
+    securityPrivacy: env.PRISM_LIVE_MODEL_SECURITY_PRIVACY_APPROVAL_REF || null,
+  },
   spend: { limitUsd: env.PRISM_LIVE_MODEL_SPEND_LIMIT_USD ? Number(env.PRISM_LIVE_MODEL_SPEND_LIMIT_USD) : null, costTags: 'services/ai/costTracker.js tags per call' },
   target: { url: env.PRISM_LIVE_MODEL_TARGET_URL || null },
 }
@@ -65,6 +70,9 @@ const hasCreds = Boolean(env.AWS_ACCESS_KEY_ID || env.AWS_PROFILE || env.AWS_ROL
 if (!hasCreds) blockers.push({ code: 'NO_PROVIDER_CREDENTIALS', dependency: 'provider credentials in the operator environment (never in files)', owner: 'operations lead' })
 if (!manifest.spend.limitUsd || !(manifest.spend.limitUsd > 0)) blockers.push({ code: 'NO_SPEND_LIMIT', dependency: 'PRISM_LIVE_MODEL_SPEND_LIMIT_USD approved amount', owner: 'product/finance' })
 if (!manifest.consent.dataClass || !manifest.consent.consentVersion) blockers.push({ code: 'NO_CONSENT_DATA_CLASS', dependency: 'PRISM_LIVE_MODEL_DATA_CLASS and PRISM_LIVE_MODEL_CONSENT_VERSION from the privacy owner', owner: 'security/privacy' })
+if (!manifest.approvals.content) blockers.push({ code: 'NO_CONTENT_APPROVAL', dependency: 'PRISM_LIVE_MODEL_CONTENT_APPROVAL_REF for the exact form/rubric/prompt package', owner: 'content owner' })
+if (!manifest.approvals.measurement) blockers.push({ code: 'NO_MEASUREMENT_APPROVAL', dependency: 'PRISM_LIVE_MODEL_MEASUREMENT_APPROVAL_REF for intended use, method and interpretation', owner: 'measurement lead' })
+if (!manifest.approvals.securityPrivacy) blockers.push({ code: 'NO_SECURITY_PRIVACY_APPROVAL', dependency: 'PRISM_LIVE_MODEL_SECURITY_PRIVACY_APPROVAL_REF for consent, data class, retention and access', owner: 'security/privacy owner' })
 if (!manifest.target.url) blockers.push({ code: 'NO_TARGET', dependency: 'PRISM_LIVE_MODEL_TARGET_URL of the staging deployment with the real model stack', owner: 'engineering lead' })
 if (manifest.form.status !== 'APPROVED') blockers.push({ code: 'FORM_NOT_APPROVED', dependency: `pilot form ${manifest.form.segmentId} is ${manifest.form.status}; content review sign-off required (HA register)`, owner: 'content owner / measurement lead' })
 

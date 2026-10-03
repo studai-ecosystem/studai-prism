@@ -1,5 +1,41 @@
 # Programme handoff - P0 to P10 (code-safe)
 
+## P9 post-P8 integrated validation checkpoint - 2026-10-03
+
+Verdict remains **NO-GO**. The source hypotheses (80% comprehension, 40%
+voluntary relevant-practice activation, 25% seven-day voluntary return, at
+least 30 genuine non-refunded purchases, a user-articulated advantage over a
+strong matched-effort generic-AI comparator, and positive contribution under
+measured use/recovery costs) are **INITIAL HYPOTHESES, NOT BENCHMARKS**. No
+participant, payment, refund, transfer or live-model outcome has been entered.
+
+Engineering, Content, Measurement, Security / privacy, Product-finance and
+Operations are separate gates and are all **OPEN** pending human sign-off.
+Machine validation is recorded in
+`docs/experience/programme-validation-results.json`; BLOCKED and UNVERIFIED
+entries are not converted to PASS by a green build or fixture.
+
+Code-safe P9 closure is complete. Final evidence: build PASS; unit 516 passed;
+server 858 passed / 26 skipped; static audit PASS (1,623 files, 113 review
+leads); critical browser 217 passed / 3 recovered retries; real isolated
+database 21 passed; calibration 64 passed; full four-project browser run 805
+passed / 81 intentional skips / 6 recovered retries. T01-T60: **56 PASS / 3
+BLOCKED / 1 UNVERIFIED**. All 18 new P9 screenshots were inspected. The
+initial critical run found and fixed a non-self-contained database command and
+a stale payment CTA test; no product entitlement or purchase behaviour changed.
+
+Local load evidence met every planning target on the recorded host:
+history 62.15/82.14 ms p50/p95, report 44.53/57.59 ms, durable acknowledgement
+5/13 ms, controlled-provider reply 23.09/33.06 ms, publication 190/197 ms, and
+controlled 150 ms client-delay history 177.98/185.55 ms. This is a
+controlled-adapter observation, not an SLA or Layer C result.
+
+Kill/redesign logic is fixed before results: misunderstood reports require
+explanation/UX work; understood but unused practice requires a
+relevance/effort investigation; same-script improvement without fresh-task
+transfer requires learning-method revision; no willingness to pay requires
+buyer/offer/distribution work. More dashboards do not compensate.
+
 **Local implementation of P0-P10 is complete and verified at Layers A and B. Release verdict: NO-GO**
 (`domain/release/goNoGo.js`) until the human gates listed in IMPLEMENTATION_STATE close. No deployment,
 flag flip, push, live-model spend, production migration, pricing activation or participant contact occurred.

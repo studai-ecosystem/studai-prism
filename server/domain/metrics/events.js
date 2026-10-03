@@ -12,6 +12,7 @@
 import { z } from 'zod'
 
 export const EVENT_SCHEMA_VERSION = 'v1'
+export const EVENT_PURPOSES = Object.freeze(['ESSENTIAL_OPERATIONAL', 'VOLUNTARY_RESEARCH'])
 
 export const CANONICAL_EVENTS = Object.freeze([
   'intent_selected',
@@ -109,22 +110,28 @@ export const ALLOWED_PAYLOAD_KEYS = Object.freeze(Object.keys(EVENT_PAYLOAD_SCHE
 // them (and every other unknown key); this list exists for tests and docs.
 export const FORBIDDEN_PAYLOAD_KEYS = Object.freeze([
   'text', 'message', 'transcript', 'answer', 'response', 'excerpt', 'quote', 'notes',
-  'name', 'email', 'phone', 'userId', 'institution', 'organizationName',
-  'audio', 'recording', 'token', 'accessToken', 'authorization', 'card', 'paymentId', 'orderId', 'amount', 'price',
+  'privateContext', 'name', 'email', 'phone', 'userId', 'institution', 'institutionId', 'organizationName',
+  'audio', 'rawAudio', 'recording', 'token', 'accessToken', 'refreshToken', 'authorization',
+  'card', 'paymentId', 'paymentSecret', 'orderId', 'amount', 'price',
 ])
 
 export const EVENT_SCHEMA = z.object({
   event: z.string().min(1).max(60).refine(isKnownEvent, { message: 'Unknown event.' }),
   props: EVENT_PAYLOAD_SCHEMA.optional(),
   occurredAt: z.string().regex(ISO).optional(),
+  purpose: z.enum(EVENT_PURPOSES).optional(),
 }).strict()
 
 // Validate one event. Returns { ok, event (canonical), props, occurredAt } or
 // { ok: false, issues }. Nothing is dropped silently: unknown keys fail.
-export function validateEvent(input) {
+export function validateEvent(input, permissions = {}) {
   const parsed = EVENT_SCHEMA.safeParse(input)
   if (!parsed.success) {
     return { ok: false, issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) }
+  }
+  const purpose = parsed.data.purpose || 'ESSENTIAL_OPERATIONAL'
+  if (purpose === 'VOLUNTARY_RESEARCH' && permissions.researchPermission !== true) {
+    return { ok: false, issues: [{ path: 'purpose', message: 'Voluntary research permission is required.' }] }
   }
   return {
     ok: true,
@@ -132,5 +139,6 @@ export function validateEvent(input) {
     rawEvent: parsed.data.event,
     props: parsed.data.props || {},
     occurredAt: parsed.data.occurredAt || null,
+    purpose,
   }
 }

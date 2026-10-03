@@ -5,7 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { RELEASE_CONFIG, RELEASE_STAGES, READINESS_CHECKS, readiness, assertAllocatable, createReleaseGate, summarize, stageConfig } from '../domain/release/config.js'
-import { goNoGo, HUMAN_GATES, defaultHumanGates } from '../domain/release/goNoGo.js'
+import { goNoGo, HUMAN_GATES, INDEPENDENT_SIGNOFF_GATES, defaultHumanGates, defaultIndependentSignoffs } from '../domain/release/goNoGo.js'
 import { ALERTS, ALERT_IDS, alertsByTriage } from '../domain/release/alerts.js'
 import { ERROR_STATUS } from '../domain/http/errors.js'
 import { FLAG_CATALOGUE } from '../lib/flagRegistry.js'
@@ -130,20 +130,26 @@ test('P10.2: the same start proceeds when readiness is READY (gate is a pre-chec
 })
 
 // ── go/no-go ─────────────────────────────────────────────────────────────────
-test('P10.9: every human gate defaults to OPEN and any OPEN gate of the stage yields NO_GO even with full readiness', () => {
+test('P9.9/P10.9: human gates and six independent sign-offs default OPEN and each preserves NO_GO', () => {
   assert.deepEqual(Object.values(defaultHumanGates()), HUMAN_GATES.map(() => 'OPEN'))
+  assert.deepEqual(Object.values(defaultIndependentSignoffs()), INDEPENDENT_SIGNOFF_GATES.map(() => 'OPEN'))
   const ready = readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: ALL_READY })
   const verdict = goNoGo({ readiness: ready })
   assert.equal(verdict.verdict, 'NO_GO')
-  assert.ok(verdict.reasons.every((r) => r.startsWith('HUMAN_GATE_OPEN:')))
+  assert.ok(verdict.reasons.some((r) => r.startsWith('HUMAN_GATE_OPEN:')))
+  assert.ok(verdict.reasons.some((r) => r.startsWith('INDEPENDENT_SIGNOFF_OPEN:')))
   const approved = Object.fromEntries(HUMAN_GATES.map((id) => [id, 'APPROVED']))
-  assert.equal(goNoGo({ readiness: ready, humanGates: approved }).verdict, 'GO')
+  const signed = Object.fromEntries(INDEPENDENT_SIGNOFF_GATES.map((id) => [id, 'APPROVED']))
+  assert.equal(goNoGo({ readiness: ready, humanGates: approved, independentSignoffs: signed }).verdict, 'GO')
   for (const id of stageConfig('WIDER').humanGates) {
-    assert.equal(goNoGo({ readiness: ready, humanGates: { ...approved, [id]: 'OPEN' } }).verdict, 'NO_GO', `${id} OPEN must be NO_GO`)
+    assert.equal(goNoGo({ readiness: ready, humanGates: { ...approved, [id]: 'OPEN' }, independentSignoffs: signed }).verdict, 'NO_GO', `${id} OPEN must be NO_GO`)
+  }
+  for (const id of INDEPENDENT_SIGNOFF_GATES) {
+    assert.equal(goNoGo({ readiness: ready, humanGates: approved, independentSignoffs: { ...signed, [id]: 'OPEN' } }).verdict, 'NO_GO', `${id} sign-off OPEN must be NO_GO`)
   }
   // Unknown gate values are ignored (treated as OPEN), readiness gaps are reasons too.
-  assert.equal(goNoGo({ readiness: ready, humanGates: { ...approved, 'HA-C001': 'yes please' } }).verdict, 'NO_GO')
-  const partial = goNoGo({ readiness: readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: { ...ALL_READY, worker: null } }), humanGates: approved })
+  assert.equal(goNoGo({ readiness: ready, humanGates: { ...approved, 'HA-C001': 'yes please' }, independentSignoffs: signed }).verdict, 'NO_GO')
+  const partial = goNoGo({ readiness: readiness({ env: ALL_FLAGS, stage: 'WIDER', checks: { ...ALL_READY, worker: null } }), humanGates: approved, independentSignoffs: signed })
   assert.deepEqual(partial.reasons, ['UNVERIFIED:WORKER_REACHABILITY'])
   assert.equal(goNoGo({}).verdict, 'NO_GO')
   assert.equal(goNoGo({ readiness: readiness({ env: {}, stage: 'LOCAL', checks: { ...ALL_READY, contentState: 'DRAFT' } }), humanGates: {} }).verdict, 'GO', 'LOCAL has no human gates')

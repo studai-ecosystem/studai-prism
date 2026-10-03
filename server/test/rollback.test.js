@@ -52,7 +52,7 @@ const setup = () => {
 const user = { id: 'u1' }
 const draftSession = { userId: user.id, exchangeCount: 0, scenarioId: DRAFT_SEGMENT_ID, artifacts: [] }
 
-test('P10.5: a universal run pinned to a method this build does not carry → RUN_VERSION_UNSUPPORTED, never the legacy engine', async () => {
+test('T60/P10.5: active runs use a pinned compatible handler; unsupported pins fail closed instead of falling back', async () => {
   assert.equal(ERROR_STATUS.RUN_VERSION_UNSUPPORTED, 409)
   const { io } = setup()
   let engineCalls = 0

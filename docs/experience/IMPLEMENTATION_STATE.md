@@ -1,5 +1,48 @@
 # Experience programme - source traceability and execution checkpoints
 
+## P9 code-safe gap closure - 2026-10-03
+
+State: CODE-SAFE COMPLETE and AUTOMATED LAYERS VERIFIED from starting HEAD
+`92d5e3a` on `ui/prism-brand-transformation`. Release remains **NO-GO**.
+Human, manual and Layer C gates remain OPEN/BLOCKED/UNVERIFIED.
+
+- CH-44/CH-45 and P9.1-P9.2: metric definitions v1 were stored before results,
+  with exact denominators/exclusions and independent operational, measurement
+  and customer views. All 21 source events are allowlisted. Essential
+  operational and voluntary research purposes are separate; research events
+  require explicit permission. Payloads fail closed for response/private
+  context/name/institution/raw-audio/token/payment-secret keys.
+- T01-T60: `scripts/programme-validation-ledger.mjs` is the machine-readable
+  source and `scripts/check-programme-validation.mjs` validates exact IDs,
+  outcomes, layers, evidence paths and blocker ownership. Current result:
+  **56 PASS / 3 BLOCKED / 1 UNVERIFIED**. There is no inherited blanket pass.
+- T60: executable rollback proof covers a pinned compatible active-run handler
+  and safe new-run disablement. T49-T52 fault/race coverage remains executable.
+- Layer B: the existing isolated runner proves real HTTP, disposable PostgreSQL,
+  workers, evidence, publication, report and practice, including meaningful and
+  sparse/early-ended runs. Final database result: 21/21.
+- P9 visual matrix: all required widths and four projects, axe, keyboard and
+  overflow; 5 passed / 3 intentional skips, 18 screenshots inspected. Manual
+  assistive-technology/real-device checks are not claimed.
+- Layer C: redacted manifest template and fail-closed command are ready, but no
+  live model was called. T58 remains BLOCKED on authorization, credentials,
+  spend, approved target/form and content/measurement/security approval.
+- Load: local controlled-adapter results met the stated planning targets on this
+  host. They are not an SLA, real-provider or Layer C result.
+- Human studies: research forms, 12+12 interview guide, matched-effort generic-AI
+  comparator, map/list tasks, rater programme and Studies A-E are prepared but
+  NOT RUN. No participant or payment outcome exists.
+- Final verification: build PASS; unit 516/516; server 858 pass / 26 skip;
+  static PASS; critical browser 217 pass / 3 recovered retries; database 21/21;
+  calibration 64/64; full browser 805 pass / 81 intentional skips / 6 recovered
+  retries; programme ledger PASS. Exact evidence is in `TEST_RESULTS.md`.
+
+Remaining blockers: T46 measurement-owner comparable-form approval; T54
+product/finance/support recovery and refund policy; T58 authorised Layer C
+evidence; T56 screen-reader, forced-colour, voice-control and real-device
+evidence. Engineering, Content, Measurement, Security/Privacy, Product-Finance
+and Operations sign-offs remain independently OPEN.
+
 ## P7 remaining gaps closed - 2026-10-03
 
 State: P7 code-safe work IMPLEMENTED and INTEGRATION_VERIFIED (Layer B: real `/api/v1` router with

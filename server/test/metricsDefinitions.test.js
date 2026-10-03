@@ -3,7 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  CANONICAL_EVENTS, LEGACY_EVENT_ALIASES, ALLOWED_PAYLOAD_KEYS, FORBIDDEN_PAYLOAD_KEYS, EVENT_SCHEMA_VERSION,
+  CANONICAL_EVENTS, LEGACY_EVENT_ALIASES, ALLOWED_PAYLOAD_KEYS, FORBIDDEN_PAYLOAD_KEYS, EVENT_SCHEMA_VERSION, EVENT_PURPOSES,
   canonicalEventName, validateEvent,
 } from '../domain/metrics/events.js'
 import { PRODUCT_EVENTS, PROP_RULES } from '../domain/telemetry/events.js'
@@ -52,6 +52,27 @@ test('P9.2 payload: any key outside the allow-list is a hard rejection; forbidde
     if (['cohortId', 'programId'].includes(key)) continue // campus-admin funnel props, out of scope for learner metrics
     assert.ok(ALLOWED_PAYLOAD_KEYS.includes(key), `existing prop ${key} remains allow-listed`)
   }
+})
+
+test('P9.2 purpose: essential operations and voluntary research have separate permissions', () => {
+  assert.deepEqual(EVENT_PURPOSES, ['ESSENTIAL_OPERATIONAL', 'VOLUNTARY_RESEARCH'])
+  const essential = validateEvent({ event: 'candidate_action_saved', props: { sessionId: 's-1' } })
+  assert.equal(essential.ok, true)
+  assert.equal(essential.purpose, 'ESSENTIAL_OPERATIONAL')
+  const deniedResearch = validateEvent({
+    event: 'practice_started',
+    purpose: 'VOLUNTARY_RESEARCH',
+    props: { missionId: 'm-1', channel: 'VOLUNTARY' },
+  })
+  assert.equal(deniedResearch.ok, false)
+  assert.match(deniedResearch.issues[0].message, /permission/i)
+  const permittedResearch = validateEvent({
+    event: 'practice_started',
+    purpose: 'VOLUNTARY_RESEARCH',
+    props: { missionId: 'm-1', channel: 'VOLUNTARY' },
+  }, { researchPermission: true })
+  assert.equal(permittedResearch.ok, true)
+  assert.equal(permittedResearch.purpose, 'VOLUNTARY_RESEARCH')
 })
 
 test('P9.2 definitions: v1, frozen, each with numerator/denominator/exclusions text; transfer is manual-only', () => {

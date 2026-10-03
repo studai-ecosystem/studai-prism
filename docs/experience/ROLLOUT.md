@@ -1,5 +1,33 @@
 # P0 diagnostic recovery and operator handoff
 
+## P9 independent go/no-go gates - 2026-10-03
+
+Overall verdict: **NO-GO**. These six gates are independent and remain **OPEN**
+until the named human owner signs the evidence. An engineering test result does
+not sign a content, measurement, security/privacy, product-finance or operations
+gate. `server/domain/release/goNoGo.js` enforces the same default.
+
+| Gate | Owner / evidence needed | Status |
+| --- | --- | --- |
+| Engineering | Engineering lead; final deterministic, disposable-PostgreSQL, browser, load and recovery records with failures dispositioned | OPEN |
+| Content | Content owner with measurement lead; approved pilot form, rubric and enough reviewed missions for the offer | OPEN |
+| Measurement | Qualified measurement lead; intended-use/construct/task/timing/accessibility/confounds review, rater plan, preregistered thresholds | OPEN |
+| Security / privacy | Security/privacy owner; research consent/data class/retention/rater access and live-run manifest review | OPEN |
+| Product-finance | Product/finance owner; spend limit, incentives, price, refund/reissue and contribution decision | OPEN |
+| Operations | Operations lead; staging target, credentials, live-model authorization, alert routing and active-run rollback rehearsal | OPEN |
+
+Actual participant interviews, observed sessions, payments, refunds, live-model
+runs and manual accessibility sessions: **NOT RUN**. Their result stores are
+empty; the prepared templates and protocols are not outcome evidence.
+
+Local engineering evidence is complete for this code-safe checkpoint: build,
+516 unit tests, 858 passing server tests (26 skipped), 21 disposable-database
+tests, 64 calibration tests, critical browser 217 passes, and full browser 805
+passes with 81 intentional skips. This evidence is available for the
+Engineering owner to review but does not self-sign that gate. Layer C remains
+fail-closed; rollback, alert routing and live target authorization remain
+Operations decisions.
+
 ## P8 activation gates - 2026-10-03
 
 The free experience, intent onboarding, offer configuration, idempotent grants and checkout
