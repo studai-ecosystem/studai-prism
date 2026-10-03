@@ -43,7 +43,7 @@ export function MomentCard({ moment, sessionId, onOpen, audience = 'OWNER', head
       <H className="text-base font-semibold text-prism-ink">{moment.observedBehavior}</H>
       <p className="text-sm text-prism-ink-muted"><span className="font-medium text-prism-ink">Where: </span>{moment.context}</p>
       <EvidenceQuote quote={moment.quote} caption={owner ? 'Your words' : 'The student\u2019s words'} />
-      {moment.rubricAnchor?.criteria && <p className="text-sm text-prism-ink-muted"><span className="font-medium text-prism-ink">What it showed: </span>{moment.rubricAnchor.criteria}</p>}
+      {moment.rubricAnchor?.criteria && <p className="text-sm text-prism-ink-muted"><span className="font-medium text-prism-ink">The level this matched: </span>{moment.rubricAnchor.criteria}</p>}
       {moment.nextBehavior && <p className="text-sm text-prism-ink-muted"><span className="font-medium text-prism-ink">A next behaviour: </span>{moment.nextBehavior}</p>}
       <div className="mt-auto flex flex-wrap gap-2 pt-1">
         {onOpen && <Button size="sm" variant="secondary" onClick={() => onOpen(momentAsEvidence(moment))} aria-label={`${REPORT_COPY.seeMoment}: ${moment.observedBehavior}`}>{REPORT_COPY.seeMoment}</Button>}

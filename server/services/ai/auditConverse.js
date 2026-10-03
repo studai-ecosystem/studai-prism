@@ -70,7 +70,9 @@ function textFor(task, request) {
     const text = typeof chosen?.text === 'string' ? (chosen.kind === 'ARTIFACT' ? chosen.text.split('\n').reduce((a, b) => (b.length > a.length ? b : a), '') : chosen.text) : ''
     if (!chosen) return JSON.stringify({ units: [{ ...base, sourceActionId: null, excerpt: '', observedBehavior: '', anchorLevel: null, abstainReason: 'NOT_ADDRESSED' }] })
     if (text.length < 20) return JSON.stringify({ units: [{ ...base, sourceActionId: chosen.actionId, excerpt: '', observedBehavior: '', anchorLevel: null, abstainReason: 'TOO_SPARSE' }] })
-    const unit = { ...base, sourceActionId: chosen.actionId, excerpt: text.slice(0, 40), observedBehavior: 'The candidate addressed the opportunity in their own words.', anchorLevel: 2, abstainReason: '' }
+    // Quote a whole phrase, as a real evaluator is instructed to: cut only on a word boundary.
+    const cut = text.length <= 60 ? text : text.slice(0, text.lastIndexOf(' ', 60) > 20 ? text.lastIndexOf(' ', 60) : 60)
+    const unit = { ...base, sourceActionId: chosen.actionId, excerpt: cut, observedBehavior: 'The candidate addressed the opportunity in their own words.', anchorLevel: 2, abstainReason: '' }
     // Layer B fault hooks (test-only, see auditFault()): a quotation the
     // candidate never wrote, or a value the evidence store must reject.
     if (fault === 'mismatch') unit.excerpt = 'words the candidate never wrote'
