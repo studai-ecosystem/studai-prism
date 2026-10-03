@@ -19,7 +19,7 @@ import { CAMPUS_BASE_URL, api, signInSynthetic, expectNoSeriousAxe, expectNoHori
 const WIDTHS = [1440, 390]
 const SHOTS = join('audit-results', 'ui', 'p8')
 const WEAK = 'Good luck with the event, I am sure it will be fine.'
-const GOOD = 'Nia, can you take the room booking by Friday? Dev, please hand the invitations list to Nia before you leave tomorrow. What else do we still need to know?'
+const GOOD = 'Nia, can you take the invitation list by Tuesday and the printed handouts by Thursday? Dev, please hand the invitation list to Nia before you leave tomorrow. What else do we still need to know?'
 
 test.skip(process.env.PRISM_AUDIT_DRAFT_CONTENT !== 'true' || !process.env.PRISM_E2E_DATABASE_URL,
   'Needs the p8 runner mode: node scripts/run-experience-baseline-tests.mjs p8 (draft content + throwaway PostgreSQL for the 4174 audit server).')
