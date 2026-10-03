@@ -1,5 +1,68 @@
 # Experience programme - source traceability and execution checkpoints
 
+## P6 remaining gaps closed - 2026-10-03
+
+State: P6 code-safe work IMPLEMENTED and INTEGRATION_VERIFIED (Layer B: real `/api/v1` router per
+mission M01–M10 with the deterministic provider; real browser journey on the 4174 audit server with
+throwaway PostgreSQL). Human gates stay BLOCKED: content / measurement / accessibility review and
+publication of M01–M10 (all `DRAFT`, `review_record.approval = NOT_APPROVED`), live-model (Layer C)
+meaning wording. Source ids: CH-30, CH-31, CH-32, CH-33; T39–T42, T55 (slice), T57.
+
+- P6.2 reviewer package (`missionSchema.js`, `missionLibrary.p6.js`): every mission now carries
+  `situation_facts`, `learner_actions`, `clarifications`, `examples` (≥ 1 EXAMPLE and ≥ 1
+  COUNTEREXAMPLE, each bound to criterion ids), `first_attempt_feedback` (completed / next-change
+  priority), `transfer` (unfamiliar-setting version: new setting, objective, facts, optional
+  artifact starting state, fact-bound `rule_overrides` and `meaning_overrides`; same behaviour and
+  criterion ids), `accessibility_note`, `confounds`, `review_record` (DRAFT-only, never an
+  approval). `missionPackageGaps()` / `P6_PACKAGE_FIELDS` (17) report completeness; all ten are
+  complete. `applyVariant(mission, 'BASE'|'TRANSFER')` is the single place a scene is swapped.
+  DRAFT v1 content was revised in place (never seeded into a persistent store; disposable DBs
+  reseed); `MIS-MKT-EXP-01` v1 and handover v1 are byte-identical.
+- P6.3 M09 escalation: "I cannot assign X; escalating to Priya because …" is a defensible answer
+  (`C-REALISTIC` / M10 `C-DEFER` phrasings and guidance), never forced assignment; a missing owner
+  fails exactly `C-OWNERS` and is the next change.
+- P6.4 evaluator and assistance (`feedback.js`, `evaluate.js` v3, `service.js`): copy detection
+  (≥ 80 % of the word pairs of a shown example/hint sentence of ≥ 6 words reproduced in the
+  criterion's artifacts → `COPIED_ASSISTANCE`, shown as "This matches the example you were shown,
+  so it is not counted as your own", never quoted, never a practice unit, behaviour not
+  demonstrated); exposure spans every attempt of the mission in the workspace. Provenance persisted
+  in `assistance_json` (no new table): `hintsExposed[]`, `examplesExposed[]`, `coachedRevision`,
+  `retryOrigin {kind FIRST|RETRY|REPLAY|CHALLENGE, previousAttemptId, reissued}`, `variant`,
+  `copyCheck {sources, flagged}`, `feedbackVersion`, `evaluatorVersion`, `promptVersion`; exposed
+  as `attempt.provenance`. New `POST /mission-attempts/:id/examples` (explicit request, also after
+  feedback; 409 when uncoached; audited). Criterion views carry `reason`. Summary no longer says
+  "Mission completed" when nothing was shown.
+- P6.5 focus feedback: `result.focus = {completed {criterionId, description, quote, source},
+  nextChange {criterionId, description, because, yourWords}, allMet, reviewIncomplete, note}` from
+  the mission's first-attempt logic; all-met acknowledges without inventing a flaw; a failed review
+  says the review failed. Reissue: a retry after `EVALUATION_UNAVAILABLE` charges no allowance unit
+  even when exhausted. Retry dedupe: key `retry:<mission>:<previousAttemptId>` — same client key or
+  two simultaneous retries yield one attempt; the chain tip is followed, not timestamps.
+- P6.6 replay and comparison: `stimulusFor` uses only a PRESENTED opportunity's own stimulus (a
+  never-presented later stage falls back to the mission briefing); `result.comparison =
+  {previousAttemptId, newlyMet[], noLongerMet[], notCompared[], note}` on a retry, criterion ids
+  only, UNCERTAIN excluded, no percentage.
+- P6.7 fresh challenge: candidates are the transfer version of a practised mission (same behaviour
+  ids, different setting) first, then an unmet mission of the capability; base/transfer exposure
+  tags, replayed opportunity ids and attempted variants are excluded and recorded
+  (`exposureTags`, `excludedExposure`); hints AND examples refused (409). Reachable from a
+  completed guided attempt (`MissionNextSteps`) and from History (`item.practice`
+  {capabilityId, assistanceMode, variant}; finished practice `permittedAction = VIEW` to
+  `?attempt=`).
+- P6.1 UI: catalogue cards state target behaviour / family, situation, "About N minutes, untimed",
+  "Text, English", Reviewed / Draft availability and Open mission; "Choose a different goal"
+  (family filter, `?goal=`); exact bounded allowance. Player: first view (focus, duration, mode,
+  allowance, scene, What to do, What you know) with "What will be checked" folded; the attempt's
+  own scene (transfer note when applicable); feedback = focus → comparison → folded "All checks";
+  tips/examples drawer only on request (`Show examples`, after submission or during the attempt);
+  copied text labelled "Matches an example". Catalogue cards and the scene use API data only.
+- Verification: `missionsEndToEnd.test.js` (16), `practiceReplay.test.js` updated,
+  `development.test.jsx` +4, `history.test.jsx` +1, `tests/e2e/p6-practice-journey.spec.js` +
+  runner mode `p6`; results and the per-mission matrix in `TEST_RESULTS.md`. Five defects found
+  and fixed during the run (listed there).
+- Next unfinished task: human review packets for M01–M10 (CONTENT_REVIEW.md Appendix B), Layer C
+  live-model wording check, firefox/webkit pass of the p6 spec; then P7 remaining gaps.
+
 ## P5 remaining gaps closed - 2026-10-03
 
 State: P5 code-safe work IMPLEMENTED and INTEGRATION_VERIFIED (Layer B browser run of the real

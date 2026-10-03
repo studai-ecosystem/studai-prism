@@ -141,45 +141,65 @@ test('P6.6: replay creates a separate PRACTICE attempt that copies only the pres
   } finally { w.close() }
 })
 
-test('P6.7: a fresh challenge picks an unexposed mission for the capability, runs uncoached (hints refused), and records exposure', async () => {
+test('P6.7: a fresh challenge picks the unfamiliar-transfer version of a practised mission first (same behaviours, different setting), then an unexposed mission; runs uncoached (hints and examples refused) and records exposure', async () => {
   const w = await world()
   try {
     assert.equal((await w.call('s1', 'POST', '/development/challenge', { capabilityId: 'CAP-NOPE' }, key('c-bad'))).status, 422)
-    // Practising M01 (exposure OPP-REASON-FACTS-ASSUMPTIONS) leaves M02 as the only unexposed Reasoning setting.
+    // Practising M01 (exposure OPP-REASON-FACTS-ASSUMPTIONS) makes M01's transfer version the fresh setting for the same behaviours.
     const guided = await w.call('s1', 'POST', '/missions/MIS-CORE-MISSING-FACT-01/attempts', {}, key('g-1'))
     assert.equal(guided.status, 201)
     assert.equal(guided.body.data.assistance.mode, 'GUIDED')
+    assert.equal(guided.body.data.variant, 'BASE')
     const c = await w.call('s1', 'POST', '/development/challenge', { capabilityId: FAMILY.REASONING }, key('c-1'))
     assert.equal(c.status, 201, JSON.stringify(c.body))
-    assert.equal(c.body.data.missionId, 'MIS-CORE-CHECK-RECOMMENDATION-01')
+    assert.equal(c.body.data.missionId, 'MIS-CORE-MISSING-FACT-01')
     const a = c.body.data.attempt
+    assert.equal(a.variant, 'TRANSFER')
+    assert.notEqual(a.scene.setting, guided.body.data.scene.setting, 'a different setting, not the same story')
+    assert.ok(!/Room 2|Dev/.test(a.scene.setting), 'the transfer scene does not reuse the base scene\'s facts')
     assert.deepEqual(a.assistance, { mode: 'UNCOACHED', hintsUsed: 0, scaffoldRequested: false })
     assert.deepEqual(a.hints, [])
     assert.equal(a.hintsRemaining, 0)
+    assert.deepEqual(a.examples, [])
+    assert.equal(a.examplesAvailable, 0, 'examples are not offered in an uncoached challenge')
     assert.equal(a.stimulus, null)
     const hint = await w.call('s1', 'POST', `/mission-attempts/${a.id}/hints`, undefined, { 'If-Match': '"1"' })
     assert.equal(hint.status, 409, 'hints are off for the whole challenge attempt')
+    assert.equal((await w.call('s1', 'POST', `/mission-attempts/${a.id}/examples`)).status, 409, 'examples are off too')
     assert.equal((await w.call('s1', 'GET', `/mission-attempts/${a.id}`)).body.data.assistance.mode, 'UNCOACHED')
     const started = w.audits.find((x) => x.type === 'development.challenge.started')
-    assert.deepEqual(started.payload.exposureTags, ['OPP-REASON-CHECK-RECOMMENDATION'])
-    // Same key → same attempt. A new key → nothing unexposed is left for this capability.
+    assert.equal(started.payload.variant, 'TRANSFER')
+    assert.ok(started.payload.exposureTags.length === 0 || started.payload.exposureTags.every((t) => t !== 'OPP-REASON-FACTS-ASSUMPTIONS'), 'the chosen setting carries no exposed tag')
+    // Same key → same attempt. New keys → the other Reasoning mission (base, then transfer), then nothing unexposed is left.
     assert.equal((await w.call('s1', 'POST', '/development/challenge', { capabilityId: FAMILY.REASONING }, key('c-1'))).body.data.attempt.id, a.id)
-    const none = await w.call('s1', 'POST', '/development/challenge', { capabilityId: FAMILY.REASONING }, key('c-2'))
+    const second = await w.call('s1', 'POST', '/development/challenge', { capabilityId: FAMILY.REASONING }, key('c-2'))
+    assert.equal(second.status, 201)
+    assert.equal(second.body.data.missionId, 'MIS-CORE-CHECK-RECOMMENDATION-01')
+    assert.equal(second.body.data.attempt.variant, 'BASE')
+    const third = await w.call('s1', 'POST', '/development/challenge', { capabilityId: FAMILY.REASONING }, key('c-2b'))
+    assert.equal(third.status, 201)
+    assert.equal(third.body.data.missionId, 'MIS-CORE-CHECK-RECOMMENDATION-01')
+    assert.equal(third.body.data.attempt.variant, 'TRANSFER')
+    const none = await w.call('s1', 'POST', '/development/challenge', { capabilityId: FAMILY.REASONING }, key('c-2c'))
     assert.equal(none.status, 409)
     assert.equal(none.body.error.code, 'NO_FRESH_CHALLENGE')
-    // A replayed moment counts as exposure too: replaying the handover moment rules out M04 for Communication → M03.
+    // A replayed moment counts as exposure too: replaying the handover moment (M04 base) → the fresh Communication setting is M04's transfer version.
     await w.call('s1', 'POST', '/development/replay', { sessionId: SESSION, opportunityId: OPP }, key('r-x'))
     const comm = await w.call('s1', 'POST', '/development/challenge', { capabilityId: FAMILY.COMMUNICATION }, key('c-3'))
     assert.equal(comm.status, 201)
-    assert.equal(comm.body.data.missionId, 'MIS-CORE-EXPLAIN-DECISION-01')
+    assert.equal(comm.body.data.missionId, 'MIS-CORE-HANDOVER-01')
+    assert.equal(comm.body.data.attempt.variant, 'TRANSFER')
+    assert.ok(/comms pack/i.test(comm.body.data.attempt.scene.setting))
+    assert.equal(comm.body.data.attempt.work.BOARD.rows[0].task, 'Venue contract', 'the transfer version starts from its own artifact state')
     // Submitting an uncoached attempt is ordinary practice: PRACTICE evidence only, no formal write.
     const sub = await w.call('s1', 'POST', `/mission-attempts/${a.id}/submit`)
     assert.equal(sub.status, 201)
     assert.equal(sub.body.data.evidenceType, 'PRACTICE')
     const ev = w.audits.find((x) => x.type === 'development.mission.evaluated' && x.payload.attemptId === a.id)
     assert.equal(ev.payload.assistance.mode, 'UNCOACHED')
+    assert.equal(ev.payload.variant, 'TRANSFER')
     const history = await w.campus.development.listAttemptHistory(USERS.s1, { id: 'personal', type: 'PERSONAL' })
-    assert.ok(history.some((h) => h.id === a.id && h.assistance.mode === 'UNCOACHED'))
+    assert.ok(history.some((h) => h.id === a.id && h.assistance.mode === 'UNCOACHED' && h.variant === 'TRANSFER'))
   } finally { w.close() }
 })
 

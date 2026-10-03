@@ -8,10 +8,11 @@ import { ApiError } from '../http/errors.js'
 import { can } from '../permissions/can.js'
 import { capabilityInfo } from '../assessments/catalog.js'
 import { CORE_TEAMREADY_A, opportunityById } from '../assessments/universalForm.js'
-import { parseMission, MISSION_SCHEMA_VERSION } from './missionSchema.js'
+import { parseMission, applyVariant, MISSION_SCHEMA_VERSION } from './missionSchema.js'
 import { MISSION_LIBRARY, draftContentEnabled } from './missionLibrary.js'
 import { normaliseWork, initialWork, runDeterministicChecks, candidateTextFor } from './validators.js'
 import { evaluateMissionWork, practiceUnitsFrom } from './evaluate.js'
+import { compareAttempts, FEEDBACK_VERSION } from './feedback.js'
 import { resolveRecommendations } from './recommendations.js'
 
 const hash = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex')
@@ -25,6 +26,34 @@ export const ASSISTANCE_MODES = Object.freeze(['GUIDED', 'UNCOACHED'])
 export const assistanceOf = (attempt) => {
   const mode = ASSISTANCE_MODES.includes(attempt.assistance?.mode) ? attempt.assistance.mode : 'GUIDED'
   return { mode, hintsUsed: attempt.hintsUsed || 0, scaffoldRequested: (attempt.hintsUsed || 0) > 0 }
+}
+// Which version of the mission an attempt runs: the base scene or its
+// unfamiliar-transfer version (P6.7).
+export const variantOf = (attempt) => (attempt.assistance?.variant === 'TRANSFER' ? 'TRANSFER' : 'BASE')
+// P6.4 provenance: what assistance the learner was shown, whether this is a
+// coached revision, why the attempt was started and which feedback /
+// evaluator versions produced its result. Stored in assistance_json.
+export const provenanceOf = (attempt) => {
+  const a = attempt.assistance || {}
+  return {
+    hintsExposed: Array.isArray(a.hintsExposed) ? a.hintsExposed : Array.from({ length: attempt.hintsUsed || 0 }, (_, i) => i),
+    examplesExposed: Array.isArray(a.examplesExposed) ? a.examplesExposed : [],
+    coachedRevision: Boolean(a.coachedRevision),
+    retryOrigin: a.retryOrigin || { kind: 'FIRST', previousAttemptId: null },
+    feedbackVersion: a.feedbackVersion || null,
+    evaluatorVersion: a.evaluatorVersion || null,
+    promptVersion: a.promptVersion || null,
+  }
+}
+// Text, English is the only supported practice mode today; stated on every
+// card so availability is never implied for a mode the player cannot run.
+const PRACTICE_MODE = Object.freeze({ input: 'TEXT', language: 'en', label: 'Text, English' })
+// The finished attempt a retry follows: the newest finished attempt that no
+// other attempt already retries (the tip of the retry chain), so a chain of
+// retries is linear even when timestamps tie.
+const tipOf = (attempts) => {
+  const retried = new Set(attempts.map((a) => a.assistance?.retryOrigin?.previousAttemptId).filter(Boolean))
+  return attempts.find((a) => a.status !== 'IN_PROGRESS' && !retried.has(a.id)) || attempts.find((a) => a.status !== 'IN_PROGRESS') || null
 }
 const MAX_STIMULUS_CHARS = 2000
 
@@ -115,19 +144,28 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
   function card(m, attempts, intervention = null) {
     const mine = attempts.filter((a) => a.missionId === m.mission_id)
     const latest = mine[0] || null
+    const situation = m.situation_facts?.[0] || m.scenario_context.setting.split(/(?<=[.!?])\s+/)[0]
     return {
       id: m.mission_id,
       version: m.version,
       status: m.status,
+      // Catalogue availability (P6.1/P6.8): REVIEWED only for published
+      // content; DRAFT is test content behind the flag and says so.
+      availability: m.status === 'PUBLISHED' ? 'REVIEWED' : 'DRAFT',
       displayCode: m.display_code || null,
       title: m.title,
       targetCapabilityId: m.target_capability_id,
       targetCapabilityName: capabilityInfo(m.target_capability_id)?.name || null,
+      behaviourIds: m.target_behavior_ids,
+      situation,
       estimatedMinutes: m.estimated_duration.minutes,
+      untimed: Boolean(m.accessibility_mode.untimed),
+      mode: PRACTICE_MODE,
       behaviorCount: m.target_behavior_ids.length,
       // GUIDED: hints on request. A fresh (UNCOACHED) challenge is started
       // per capability, not per card, so it is not listed as a card mode.
       modes: ['GUIDED'],
+      hasTransfer: Boolean(m.transfer),
       intervention: intervention ? { id: intervention.id, name: intervention.name, endsOn: intervention.endsOn } : null,
       latestAttempt: latest ? { id: latest.id, status: latest.status, summary: latest.evaluation?.summary || null, submittedAt: latest.submittedAt } : null,
     }
@@ -139,10 +177,12 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       id: m.mission_id,
       version: m.version,
       status: m.status,
+      availability: m.status === 'PUBLISHED' ? 'REVIEWED' : 'DRAFT',
       displayCode: m.display_code || null,
       title: m.title,
       targetCapability: { id: m.target_capability_id, name: capabilityInfo(m.target_capability_id)?.name || null },
       scenario: m.scenario_context,
+      situationFacts: m.situation_facts || [],
       whyItMatters: m.why_it_matters || null,
       reflectionPrompt: m.reflection_prompt || null,
       instructions: m.instructions,
@@ -150,7 +190,10 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       constraints: m.constraints.notes,
       whatIsChecked: m.rubric.criteria.map((c) => ({ criterionId: c.criterion_id, description: c.description })),
       hintCount: m.scaffolding_policy.hints.length,
+      examplesAvailable: (m.examples || []).length,
       estimatedMinutes: m.estimated_duration.minutes,
+      untimed: Boolean(m.accessibility_mode.untimed),
+      mode: PRACTICE_MODE,
       accessibility: m.accessibility_mode,
       evidenceType: 'PRACTICE',
     }
@@ -164,7 +207,8 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
   }
 
   // `write`: a campus attempt can be changed or submitted only while its
-  // intervention is open; afterwards the work stays readable.
+  // intervention is open; afterwards the work stays readable. The mission is
+  // returned as the attempt runs it (base or transfer version).
   async function attemptFor(user, workspace, attemptId, { write = false } = {}) {
     const a = await store().getAttempt(attemptId)
     if (!a || a.userId !== user.id || (a.organizationId || null) !== orgOf(workspace)) throw new ApiError('NOT_FOUND', 'Not found')
@@ -173,12 +217,15 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       if (!i || !isOpen(i)) throw new ApiError('CONFLICT', 'This intervention has ended. Your work is kept, but it can no longer be changed or submitted.')
     }
     const v = await store().getMissionVersion(a.missionId, a.missionVersion)
-    return { attempt: a, mission: parseMission(v.content) }
+    return { attempt: a, mission: applyVariant(parseMission(v.content), variantOf(a)) }
   }
+  const missionOfAttempt = async (a) => applyVariant(parseMission((await store().getMissionVersion(a.missionId, a.missionVersion)).content), variantOf(a))
 
+  const exampleView = (e) => ({ id: e.example_id, kind: e.kind, criterionIds: e.criterion_ids, text: e.text, note: e.note })
   function attemptView(a, mission) {
     const assistance = assistanceOf(a)
     const coached = assistance.mode === 'GUIDED'
+    const examplesExposed = Array.isArray(a.assistance?.examplesExposed) && a.assistance.examplesExposed.length > 0
     return {
       id: a.id,
       missionId: a.missionId,
@@ -186,10 +233,19 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       status: a.status,
       version: a.version,
       work: a.work,
+      variant: variantOf(a),
+      // The scene this attempt runs (differs from the mission's base scene
+      // for a transfer version).
+      scene: { setting: mission.scenario_context.setting, objective: mission.scenario_context.objective, constraints: mission.constraints.notes, situationFacts: mission.situation_facts || [] },
       hints: coached ? mission.scaffolding_policy.hints.slice(0, a.hintsUsed) : [],
       hintsRemaining: coached ? Math.max(0, mission.scaffolding_policy.hints.length - a.hintsUsed) : 0,
+      // Examples / counterexamples are teaching support: shown only after an
+      // explicit request (never in an uncoached challenge).
+      examples: coached && examplesExposed ? (mission.examples || []).filter((e) => a.assistance.examplesExposed.includes(e.example_id)).map(exampleView) : [],
+      examplesAvailable: coached ? (mission.examples || []).length : 0,
       origin: a.origin || { kind: 'GOAL' },
       assistance,
+      provenance: provenanceOf(a),
       stimulus: a.stimulus || null,
       result: a.evaluation ? feedbackView(a.evaluation, mission) : null,
       submittedAt: a.submittedAt,
@@ -197,22 +253,28 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
     }
   }
 
-  // Criterion feedback that references only what was checked (spec §16.4).
+  // Criterion feedback that references only what was checked (spec §16.4),
+  // plus the P6.5 focus (one completed criterion, one next change) and, for
+  // a retry, the criterion-level comparison with the earlier attempt.
   function feedbackView(ev, mission) {
     return {
       status: ev.status,
       verified: ev.verified,
       summary: ev.summary,
       counts: ev.counts,
+      focus: ev.focus || null,
+      comparison: ev.comparison || null,
       criteria: ev.criteria.map((c) => ({
         criterionId: c.criterionId,
         description: c.description,
         result: c.result,
+        reason: c.reason || null,
         quote: c.result === 'OBSERVED' ? c.quote : null,
         checks: c.rules.map((r) => ({ description: r.description, passed: r.passed })),
         note: c.result === 'OBSERVED' ? 'Shown in this attempt.'
-          : c.result === 'NOT_OBSERVED' ? (mission.feedback_policy.show_unobserved ? 'Not shown yet in this attempt.' : null)
-            : 'Could not be checked reliably this time. It is not counted either way.',
+          : c.result === 'COPIED_ASSISTANCE' ? 'This matches the example you were shown, so it is not counted as your own.'
+            : c.result === 'NOT_OBSERVED' ? (mission.feedback_policy.show_unobserved ? 'Not shown yet in this attempt.' : null)
+              : 'Could not be checked reliably this time. It is not counted either way.',
       })),
     }
   }
@@ -232,17 +294,19 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
 
   // Every NEW practice attempt goes through here: allowance first, then the
   // idempotent create. One unit is consumed only when a row was actually
-  // created, so a repeated request never charges twice.
-  async function newAttempt(user, workspace, { mission, intervention, idempotencyKey, origin, assistance, stimulus = null }) {
+  // created, so a repeated request never charges twice. `charge: false` is
+  // the reissue after a technical review failure (P6.5): a failed model
+  // request never costs another attempt, even when the allowance is used up.
+  async function newAttempt(user, workspace, { mission, intervention, idempotencyKey, origin, assistance, stimulus = null, charge = true }) {
     const allowance = await allowanceFor(user, workspace)
-    if (allowance.kind === 'BOUNDED' && allowance.exhausted) throw new ApiError('ALLOWANCE_EXHAUSTED', 'Your practice allowance is used up. Finished attempts stay readable.')
+    if (charge && allowance.kind === 'BOUNDED' && allowance.exhausted) throw new ApiError('ALLOWANCE_EXHAUSTED', 'Your practice allowance is used up. Finished attempts stay readable.')
     const organizationId = orgOf(workspace)
     const { attempt, replayed } = await store().createAttempt({
       userId: user.id, missionId: mission.mission_id, missionVersion: mission.version, organizationId, interventionId: intervention?.id || null,
       work: initialWork(mission), idempotencyKey, origin, assistance, stimulus,
     })
     if (attempt.missionId !== mission.mission_id || (attempt.organizationId || null) !== organizationId || !sameIntervention(attempt, intervention)) throw new ApiError('CONFLICT', 'This request was already used for another mission.')
-    if (!replayed && allowance.row && typeof store().consumePracticeAllowance === 'function') await store().consumePracticeAllowance(allowance.row.id)
+    if (!replayed && charge && allowance.row && typeof store().consumePracticeAllowance === 'function') await store().consumePracticeAllowance(allowance.row.id)
     return { attempt, replayed }
   }
 
@@ -261,14 +325,37 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
     if (typeof repos.sessionIo?.listOpportunities !== 'function') return null
     return (await repos.sessionIo.listOpportunities(sessionId)).find((o) => o.opportunityId === opportunityId) || null
   }
-  // ONLY the stimulus the learner was shown (speaker + content), never their
-  // own actions, scores or evidence. Without a ledger row the mission's own
+  // ONLY the stimulus the learner was actually shown (speaker + content) for
+  // THIS opportunity — never their own actions, scores, evidence, rubric
+  // anchors or any later-stage stimulus. An opportunity that was never
+  // presented (a future prompt) has nothing to replay: the mission's own
   // briefing is the teaching situation.
   function stimulusFor(row, mission, opportunityId) {
-    const messages = Array.isArray(row?.stimulus?.messages) ? row.stimulus.messages : []
+    const presented = Boolean(row?.presentedAt) && row?.state !== 'PLANNED'
+    const messages = presented && Array.isArray(row?.stimulus?.messages) ? row.stimulus.messages : []
     const text = messages.map((m) => `${m?.speaker ? `${m.speaker}: ` : ''}${typeof m?.content === 'string' ? m.content : ''}`.trim()).filter(Boolean).join('\n').slice(0, MAX_STIMULUS_CHARS)
     if (row && text) return { source: 'ASSESSMENT_MOMENT', opportunityId, text, presentedAt: row.presentedAt || null }
     return { source: 'MISSION_BRIEFING', opportunityId, text: mission.scenario_context.setting, presentedAt: null }
+  }
+
+  // P6.4 — everything the learner was SHOWN for this mission before (and in)
+  // this attempt: scaffold hints and examples, across all of their attempts
+  // of the mission in this workspace. Used for copy detection and provenance.
+  async function exposedAssistanceFor(user, workspace, attempt, mission) {
+    const mine = (await store().listAttempts({ userId: user.id, organizationId: orgOf(workspace) }))
+      .filter((a) => a.missionId === attempt.missionId && (a.id === attempt.id || String(a.createdAt) <= String(attempt.createdAt)))
+    const hints = new Set()
+    const examples = new Set()
+    for (const a of mine) {
+      const used = a.id === attempt.id ? (attempt.hintsUsed || 0) : (a.hintsUsed || 0)
+      for (let i = 0; i < used; i += 1) hints.add(i)
+      for (const id of a.assistance?.examplesExposed || []) examples.add(id)
+    }
+    const list = [
+      ...[...hints].sort((x, y) => x - y).map((i) => ({ source: 'HINT', id: `H${i + 1}`, text: mission.scaffolding_policy.hints[i] })).filter((h) => h.text),
+      ...(mission.examples || []).filter((e) => examples.has(e.example_id)).map((e) => ({ source: 'EXAMPLE', id: e.example_id, text: e.text })),
+    ]
+    return { list, hints: [...hints].sort((x, y) => x - y), examples: [...examples], priorAttempts: mine.filter((a) => a.id !== attempt.id).length }
   }
 
   return {
@@ -302,17 +389,39 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
     // unless `retry`; an attempt left open in an ended intervention is not
     // resumed into a new one. A retry is always a NEW attempt: the previous
     // one is never changed. `origin` says why this practice was started.
+    //
+    // Retry semantics (P6.5/P6.6): the new attempt records which finished
+    // attempt it follows (`retryOrigin`), keeps that attempt's scene version,
+    // and is deduplicated on that link — two simultaneous "Try again"
+    // requests, or a repeat with the same key, yield one new attempt. A
+    // retry after a technical review failure is a reissue: it never costs
+    // an allowance unit.
     async startAttempt(user, workspace, missionId, { idempotencyKey, retry = false, origin = null }) {
       if (!idempotencyKey) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
       const { mission, intervention } = await missionFor(user, workspace, missionId)
       const organizationId = orgOf(workspace)
       const normalisedOrigin = normaliseOrigin(origin)
+      const attempts = (await store().listAttempts({ userId: user.id, organizationId })).filter((a) => a.missionId === missionId && sameIntervention(a, intervention))
       if (!retry) {
-        const open = (await store().listAttempts({ userId: user.id, organizationId })).find((a) => a.missionId === missionId && a.status === 'IN_PROGRESS' && sameIntervention(a, intervention))
+        const open = attempts.find((a) => a.status === 'IN_PROGRESS')
         if (open) return { attempt: attemptView(open, mission), resumed: true }
       }
-      const { attempt, replayed } = await newAttempt(user, workspace, { mission, intervention, idempotencyKey: `start:${idempotencyKey}`, origin: normalisedOrigin, assistance: { mode: 'GUIDED' } })
-      return { attempt: attemptView(attempt, mission), resumed: replayed }
+      const previous = retry ? tipOf(attempts) : null
+      if (previous) {
+        const openRetry = attempts.find((a) => a.status === 'IN_PROGRESS' && a.assistance?.retryOrigin?.previousAttemptId === previous.id)
+        if (openRetry) return { attempt: attemptView(openRetry, await missionOfAttempt(openRetry)), resumed: true }
+      }
+      const variant = previous ? variantOf(previous) : 'BASE'
+      const runMission = applyVariant(mission, variant)
+      const reissued = previous?.status === 'EVALUATION_UNAVAILABLE'
+      const assistance = {
+        mode: 'GUIDED', variant,
+        retryOrigin: previous ? { kind: 'RETRY', previousAttemptId: previous.id, reissued } : { kind: 'FIRST', previousAttemptId: null },
+      }
+      const key = previous ? `retry:${missionId}:${previous.id}` : `start:${idempotencyKey}`
+      const { attempt, replayed } = await newAttempt(user, workspace, { mission: runMission, intervention, idempotencyKey: key, origin: previous?.origin && normalisedOrigin.kind === 'GOAL' ? previous.origin : normalisedOrigin, assistance, charge: !reissued })
+      if (!replayed && previous) audit('development.retry.started', null, { attemptId: attempt.id, missionId, previousAttemptId: previous.id, reissued, variant, evidenceType: 'PRACTICE' })
+      return { attempt: attemptView(attempt, runMission), resumed: replayed }
     },
 
     // P6.6 "Try that moment again": a separate PRACTICE attempt from one
@@ -331,16 +440,21 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       if (!mission) throw new ApiError('NOT_FOUND', 'No practice mission matches this moment yet.')
       const stimulus = stimulusFor(row, mission, origin.opportunityId)
       const intervention = interventionFor.get(mission.mission_id) || null
-      const { attempt, replayed } = await newAttempt(user, workspace, { mission, intervention, idempotencyKey: `replay:${idempotencyKey}`, origin, assistance: { mode: 'GUIDED' }, stimulus })
+      const assistance = { mode: 'GUIDED', variant: 'BASE', retryOrigin: { kind: 'REPLAY', previousAttemptId: null } }
+      const { attempt, replayed } = await newAttempt(user, workspace, { mission, intervention, idempotencyKey: `replay:${idempotencyKey}`, origin, assistance, stimulus })
       if (!replayed) audit('development.replay.started', null, { attemptId: attempt.id, missionId: mission.mission_id, sessionId: origin.sessionId, opportunityId: origin.opportunityId, stimulusSource: stimulus.source, evidenceType: 'PRACTICE' })
       return { attempt: attemptView(attempt, mission), resumed: replayed, missionId: mission.mission_id }
     },
 
-    // P6.7 fresh challenge: a different practice setting for the same
-    // capability — a mission the learner has not attempted whose exposure
-    // tags do not overlap anything they have practised or replayed — with
-    // hints off for the whole attempt (UNCOACHED). The outcome is an observed
-    // practice behaviour in a fresh situation, not growth or a retest.
+    // P6.7 fresh challenge: a different practice SETTING for the same
+    // behaviours, with hints and examples off for the whole attempt
+    // (UNCOACHED). Candidates are the unfamiliar-transfer version of a
+    // mission the learner has practised (same behaviour ids, different
+    // setting) or another mission of the capability they have not met, in
+    // that order; anything whose exposure tags the learner has already met
+    // (practised, replayed or formally seen) is excluded. The outcome is an
+    // observed practice behaviour in a fresh situation, not growth or a
+    // retest.
     async startChallenge(user, workspace, { capabilityId, idempotencyKey }) {
       if (!idempotencyKey) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
       if (!capabilityInfo(capabilityId)) throw new ApiError('VALIDATION_FAILED', 'Choose a capability from the framework.')
@@ -349,25 +463,38 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       // A repeated request returns the attempt it already created, even
       // though that attempt has since made its own setting "exposed".
       const prior = attempts.find((a) => a.idempotencyKey === `challenge:${idempotencyKey}`)
-      if (prior) {
-        const v = await store().getMissionVersion(prior.missionId, prior.missionVersion)
-        return { attempt: attemptView(prior, parseMission(v.content)), resumed: true, missionId: prior.missionId }
-      }
-      const attempted = new Set(attempts.map((a) => a.missionId))
+      if (prior) return { attempt: attemptView(prior, await missionOfAttempt(prior)), resumed: true, missionId: prior.missionId }
+      const attemptedVariants = new Set()
       const exposed = new Set()
+      let recent = null
       for (const a of attempts) {
         if (a.origin?.kind === 'ASSESSMENT_MOMENT') exposed.add(a.origin.opportunityId)
         const v = await store().getMissionVersion(a.missionId, a.missionVersion)
-        for (const t of v?.content?.exposure_tags || []) exposed.add(t)
+        if (!v) continue
+        const base = parseMission(v.content)
+        const run = applyVariant(base, variantOf(a))
+        attemptedVariants.add(`${a.missionId}:${variantOf(a)}`)
+        for (const t of run.exposure_tags || []) exposed.add(t)
+        if (!recent && base.target_capability_id === capabilityId) recent = { missionId: base.mission_id, behaviours: new Set(base.target_behavior_ids) }
       }
-      const fresh = missions.filter((m) => m.target_capability_id === capabilityId && !attempted.has(m.mission_id) && !(m.exposure_tags || []).some((t) => exposed.has(t)))
-      if (!fresh.length) throw new ApiError('NO_FRESH_CHALLENGE', 'No unfamiliar practice setting is available for this capability yet.')
-      const mission = fresh[0]
-      const intervention = interventionFor.get(mission.mission_id) || null
-      const assistance = { mode: 'UNCOACHED', exposureTags: mission.exposure_tags || [] }
-      const { attempt, replayed } = await newAttempt(user, workspace, { mission, intervention, idempotencyKey: `challenge:${idempotencyKey}`, origin: { kind: 'GOAL' }, assistance })
-      if (!replayed) audit('development.challenge.started', null, { attemptId: attempt.id, missionId: mission.mission_id, capabilityId, exposureTags: assistance.exposureTags, evidenceType: 'PRACTICE' })
-      return { attempt: attemptView(attempt, mission), resumed: replayed, missionId: mission.mission_id }
+      const candidates = []
+      for (const m of missions.filter((x) => x.target_capability_id === capabilityId)) {
+        if (!attemptedVariants.has(`${m.mission_id}:BASE`) && !(m.exposure_tags || []).some((t) => exposed.has(t))) candidates.push({ mission: m, variant: 'BASE' })
+        if (m.transfer && !attemptedVariants.has(`${m.mission_id}:TRANSFER`) && !(m.transfer.exposure_tags || []).some((t) => exposed.has(t))) candidates.push({ mission: m, variant: 'TRANSFER' })
+      }
+      const shared = (m) => (recent ? m.target_behavior_ids.filter((b) => recent.behaviours.has(b)).length : 0)
+      const sameSet = (m) => recent && m.target_behavior_ids.length === recent.behaviours.size && shared(m) === recent.behaviours.size
+      const practised = (m) => attemptedVariants.has(`${m.mission_id}:BASE`)
+      const score = (c) => (sameSet(c.mission) ? 2 : shared(c.mission) > 0 ? 1 : 0) * 10 + (c.variant === 'TRANSFER' && practised(c.mission) ? 1 : c.variant === 'BASE' ? 1 : 0)
+      candidates.sort((x, y) => score(y) - score(x))
+      const chosen = candidates[0]
+      if (!chosen) throw new ApiError('NO_FRESH_CHALLENGE', 'No unfamiliar practice setting is available for this capability yet.')
+      const runMission = applyVariant(chosen.mission, chosen.variant)
+      const intervention = interventionFor.get(chosen.mission.mission_id) || null
+      const assistance = { mode: 'UNCOACHED', variant: chosen.variant, exposureTags: runMission.exposure_tags || [], excludedExposure: [...exposed], retryOrigin: { kind: 'CHALLENGE', previousAttemptId: null } }
+      const { attempt, replayed } = await newAttempt(user, workspace, { mission: runMission, intervention, idempotencyKey: `challenge:${idempotencyKey}`, origin: { kind: 'GOAL' }, assistance })
+      if (!replayed) audit('development.challenge.started', null, { attemptId: attempt.id, missionId: chosen.mission.mission_id, variant: chosen.variant, capabilityId, exposureTags: assistance.exposureTags, evidenceType: 'PRACTICE' })
+      return { attempt: attemptView(attempt, runMission), resumed: replayed, missionId: chosen.mission.mission_id }
     },
 
     async getAttempt(user, workspace, attemptId) {
@@ -393,6 +520,21 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       return attemptView(out.attempt, mission)
     },
 
+    // P6.5 examples and counterexamples on explicit request (or after
+    // feedback). Never in an uncoached challenge. Exposure is recorded so a
+    // copied example is detected and never counted as the learner's own.
+    async revealExamples(user, workspace, attemptId) {
+      const { attempt, mission } = await attemptFor(user, workspace, attemptId)
+      if (assistanceOf(attempt).mode === 'UNCOACHED') throw new ApiError('CONFLICT', 'Examples are off for a fresh challenge, so the feedback shows what you do without coaching.')
+      const ids = (mission.examples || []).map((e) => e.example_id)
+      const already = new Set(attempt.assistance?.examplesExposed || [])
+      if (!ids.length || ids.every((id) => already.has(id))) return attemptView(attempt, mission)
+      if (typeof store().recordAssistance !== 'function') throw new ApiError('CAMPUS_STORE_UNAVAILABLE', 'Examples are temporarily unavailable.')
+      const updated = await store().recordAssistance(attempt.id, { ...(attempt.assistance || { mode: 'GUIDED' }), examplesExposed: [...new Set([...already, ...ids])] })
+      audit('development.examples.revealed', null, { attemptId: attempt.id, missionId: mission.mission_id, exampleIds: ids, afterSubmit: attempt.status !== 'IN_PROGRESS', evidenceType: 'PRACTICE' })
+      return attemptView(updated, mission)
+    },
+
     // Runs the §16.3 pipeline once; a repeated submit returns the stored result.
     async submit(user, workspace, attemptId) {
       const { attempt, mission } = await attemptFor(user, workspace, attemptId, { write: true })
@@ -401,15 +543,30 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       const settle = (a) => (a.evaluation ? store().appendPracticeUnits(practiceUnitsFrom({ evaluation: a.evaluation, mission, attempt: a })) : null)
       if (attempt.status !== 'IN_PROGRESS') { await settle(attempt); return { attempt: attemptView(attempt, mission), replayed: true } }
       const work = normaliseWork(mission, attempt.work)
-      const evaluation = await evaluateMissionWork({ mission, work, evaluator, candidateName: user.name || null })
-      const done = await store().completeAttempt(attempt.id, { status: evaluation.status, evaluation, submittedAt: clock().toISOString() })
+      const exposure = await exposedAssistanceFor(user, workspace, attempt, mission)
+      const evaluation = await evaluateMissionWork({ mission, work, evaluator, candidateName: user.name || null, exposed: exposure.list })
+      // P6.6 criterion-level comparison with the attempt this one retries.
+      const previousId = attempt.assistance?.retryOrigin?.previousAttemptId || null
+      const previous = previousId ? await store().getAttempt(previousId) : null
+      if (previous?.evaluation && previous.userId === user.id) evaluation.comparison = compareAttempts({ ...previous.evaluation, attemptId: previous.id }, evaluation)
+      const assistance = {
+        ...(attempt.assistance || { mode: 'GUIDED' }),
+        hintsExposed: Array.from({ length: attempt.hintsUsed || 0 }, (_, i) => i),
+        examplesExposed: attempt.assistance?.examplesExposed || [],
+        coachedRevision: Boolean(previousId) && exposure.list.length > 0,
+        copyCheck: { sources: exposure.list.map((e) => `${e.source}:${e.id}`), flagged: evaluation.criteria.filter((c) => c.result === 'COPIED_ASSISTANCE').map((c) => c.criterionId) },
+        feedbackVersion: FEEDBACK_VERSION,
+        evaluatorVersion: evaluation.evaluator.available ? (evaluation.evaluator.promptVersion || 'deterministic-only') : null,
+        promptVersion: { evaluator: evaluation.evaluator.promptVersion, meaning: evaluation.evaluator.meaningPromptVersion, pipeline: evaluation.versions.pipeline },
+      }
+      const done = await store().completeAttempt(attempt.id, { status: evaluation.status, evaluation, submittedAt: clock().toISOString(), assistance })
       if (done.replayed) { await settle(done.attempt); return { attempt: attemptView(done.attempt, mission), replayed: true } }
       await settle(done.attempt)
       audit('development.mission.evaluated', null, {
-        attemptId: attempt.id, missionId: mission.mission_id, missionVersion: mission.version, status: evaluation.status,
-        demonstrated: evaluation.counts.demonstrated, uncertain: evaluation.counts.uncertain, total: evaluation.counts.total,
+        attemptId: attempt.id, missionId: mission.mission_id, missionVersion: mission.version, variant: variantOf(done.attempt), status: evaluation.status,
+        demonstrated: evaluation.counts.demonstrated, uncertain: evaluation.counts.uncertain, copied: evaluation.counts.copied, total: evaluation.counts.total,
         evaluator: evaluation.evaluator.available ? evaluation.evaluator.promptVersion : evaluation.evaluator.reason, evidenceType: 'PRACTICE',
-        assistance: assistanceOf(done.attempt), origin: done.attempt.origin?.kind || 'GOAL',
+        assistance: assistanceOf(done.attempt), origin: done.attempt.origin?.kind || 'GOAL', retryOrigin: assistance.retryOrigin?.kind || 'FIRST',
       })
       return { attempt: attemptView(done.attempt, mission), replayed: false }
     },
@@ -452,9 +609,11 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
           id: a.id,
           missionId: a.missionId,
           title: v?.content?.title || null,
+          capabilityId: v?.content?.target_capability_id || null,
           status: a.status,
           origin: a.origin || { kind: 'GOAL' },
           assistance: assistanceOf(a),
+          variant: variantOf(a),
           startedAt: a.createdAt || null,
           submittedAt: a.submittedAt || null,
         })

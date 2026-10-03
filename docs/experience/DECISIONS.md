@@ -1,5 +1,38 @@
 # Experience programme - decision and external-gate register
 
+## P6 remaining-gap decisions - 2026-10-03
+
+1. **A retry is deduplicated on the attempt it follows, not on the client key.**
+   The server derives `retry:<mission>:<previousAttemptId>` so a double click, two
+   simultaneous "Try again" requests or a repeat with the same client key all yield
+   one new attempt; the client key is still required (API contract) and the chain
+   tip is followed rather than timestamps (fixed test clocks tie `createdAt`).
+2. **A failed review never costs an attempt.** A retry after
+   `EVALUATION_UNAVAILABLE` is a reissue (`retryOrigin.reissued = true`): no
+   allowance unit is consumed, even when the allowance is exhausted. Finished
+   attempts stay readable regardless.
+3. **Copied assistance is labelled, never praised, and never counted.** ≥ 80 % of the
+   word pairs of a shown example/hint sentence (≥ 6 words) reproduced in a
+   criterion's artifacts marks the criterion `COPIED_ASSISTANCE` whether the check
+   would otherwise have passed or not; exposure spans every attempt of that mission in
+   the workspace. The threshold is a product rule for assistance provenance, not a
+   measurement claim; a live-model review of false positives is a Layer C item.
+4. **Fresh challenges prefer the practised mission's transfer version.** The
+   unfamiliar-setting version of a mission the learner has practised (same behaviour
+   ids, different setting) ranks before another mission of the capability; anything
+   whose exposure tags the learner has met is excluded. `practiceReplay.test.js` P6.7
+   was updated to this rule (requirement change, every earlier guarantee retained).
+5. **DRAFT v1 mission content was revised in place.** The P6 missions have never been
+   seeded into a persistent store (DRAFT is dark in production; test DBs are
+   disposable), so the reviewer-package fields were added to the existing v1 bodies
+   rather than minting v2s. `MIS-MKT-EXP-01` v1 and handover v1 stay byte-identical;
+   once any DRAFT mission is seeded into a durable environment, further content
+   changes must be new versions.
+6. **Provenance lives in `assistance_json`, not a new table.** Hints/examples
+   exposed, coached revision, retry origin, variant, copy-check sources and the
+   feedback/evaluator/prompt versions are additive keys on the existing column
+   (0046); no migration was needed.
+
 ## P5 remaining-gap decisions - 2026-10-03
 
 1. **Recommendations are a read-time projection, never part of the stored

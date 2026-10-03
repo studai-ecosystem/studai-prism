@@ -40,6 +40,13 @@ export const HistoryItemSchema = z.object({
   // Practice only (P2.8): the formal session this practice was started from,
   // by id. The two records stay separately typed; this is the link between them.
   linkedSessionId: z.string().nullable().optional(),
+  // Practice only (P6.7): enough to offer a fresh challenge for the same
+  // capability from history, and to say whether this attempt was uncoached.
+  practice: z.object({
+    capabilityId: z.string().nullable(),
+    assistanceMode: z.enum(['GUIDED', 'UNCOACHED']),
+    variant: z.enum(['BASE', 'TRANSFER']),
+  }).strict().optional(),
 }).strict()
 
 export const HistoryPageSchema = z.object({ items: z.array(HistoryItemSchema), nextCursor: z.string().nullable() }).strict()
@@ -133,9 +140,12 @@ export function createStudentHistory({ directory, catalog, legacy, practice = { 
       sponsorOrganizationId: sponsored ? workspace.organizationId : null,
       status: open ? 'ACTIVE' : 'COMPLETED',
       reportFormat: null,
-      permittedAction: open ? { kind: 'RESUME', to: missionTo } : { kind: 'NONE', to: null },
+      // A finished practice attempt stays readable (P6.5): VIEW opens the
+      // player on that attempt's feedback.
+      permittedAction: open ? { kind: 'RESUME', to: missionTo } : { kind: 'VIEW', to: `${missionTo}?attempt=${encodeURIComponent(a.id)}` },
       recoveryState: open ? 'RESUMABLE' : 'NONE',
       linkedSessionId: a.origin?.kind === 'ASSESSMENT_MOMENT' ? a.origin.sessionId : null,
+      practice: { capabilityId: a.capabilityId || null, assistanceMode: a.assistance?.mode === 'UNCOACHED' ? 'UNCOACHED' : 'GUIDED', variant: a.variant === 'TRANSFER' ? 'TRANSFER' : 'BASE' },
     }
   }
 

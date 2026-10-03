@@ -109,4 +109,31 @@ describe('Assessment history (P1.2)', () => {
     expect(await screen.findByText('Second Simulation')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument())
   })
+
+  // P6.5 / P6.7: a finished practice record stays readable and offers a
+  // fresh challenge for the same capability; formal records offer neither.
+  it('a finished practice attempt opens read-only and can start a fresh challenge; the formal record is unchanged', async () => {
+    const done = item({
+      id: 'PRACTICE_ATTEMPT:a2', sourceType: 'PRACTICE_ATTEMPT', sourceId: 'a2', mode: 'PRACTICE', title: 'Make the handover usable', status: 'COMPLETED', issuedAt: null, reportFormat: null,
+      permittedAction: { kind: 'VIEW', to: '/app/development/missions/MIS-CORE-USABLE-HANDOVER-01?attempt=a2' }, recoveryState: 'NONE',
+      practice: { capabilityId: 'CAP-L1-EXECUTION', assistanceMode: 'UNCOACHED', variant: 'TRANSFER' },
+    })
+    const { spy, user } = await render({ data: { items: [item(), done], nextCursor: null } })
+    const practice = await screen.findByRole('region', { name: 'Practice' })
+    expect(within(practice).getByRole('link', { name: /^Open\s*:\s*Make the handover usable$/ })).toHaveAttribute('href', '/app/development/missions/MIS-CORE-USABLE-HANDOVER-01?attempt=a2')
+    expect(within(practice).getByTestId('history-uncoached')).toHaveTextContent('completed uncoached, in an unfamiliar setting')
+    const formal = screen.getByRole('region', { name: 'Formal assessment' })
+    expect(within(formal).queryByTestId('history-fresh-challenge')).not.toBeInTheDocument()
+    spy.mockImplementation(async (url, init = {}) => {
+      if (String(url).endsWith('/api/v1/development/challenge')) {
+        expect(JSON.parse(init.body)).toEqual({ capabilityId: 'CAP-L1-EXECUTION' })
+        expect(init.headers['Idempotency-Key'] || init.headers['idempotency-key']).toBeTruthy()
+        return jsonResponse(201, { data: { attempt: { id: 'a3', missionId: 'MIS-CORE-NOT-TO-DO-01', missionVersion: 1, status: 'IN_PROGRESS', version: 1, work: {}, hints: [], hintsRemaining: 0, result: null, submittedAt: null, evidenceType: 'PRACTICE', assistance: { mode: 'UNCOACHED', hintsUsed: 0, scaffoldRequested: false } }, missionId: 'MIS-CORE-NOT-TO-DO-01' } })
+      }
+      return jsonResponse(200, { data: { items: [], nextCursor: null } })
+    })
+    await user.click(within(practice).getByTestId('history-fresh-challenge'))
+    await waitFor(() => expect(spy.mock.calls.some(([u]) => String(u).endsWith('/api/v1/development/challenge'))).toBe(true))
+    noPercent()
+  })
 })

@@ -2,22 +2,42 @@
 // mode (formal assessments first, then practice), newest first. Statuses,
 // dates and actions come from the server; an unknown date is said to be
 // unknown, a failed run offers recovery, a legacy report opens as written.
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Card } from '../../../components/ui/Card.jsx'
 import { Badge, StatusChip } from '../../../components/ui/Badge.jsx'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
 import { EmptyState, ErrorState } from '../../../components/states/index.js'
 import { Skeleton } from '../../../components/ui/Skeleton.jsx'
+import { InlineNotice } from '../../../components/ui/Notice.jsx'
 import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useStudentHistory } from '../../student/hooks.js'
+import { usePracticeStarters } from '../../development/hooks.js'
 import { formatDate } from '../../student/QueryState.jsx'
 import {
-  HISTORY_ACTION_COPY, HISTORY_DATE_UNKNOWN, HISTORY_EMPTY, HISTORY_LEGACY_ACTION, HISTORY_MODE_LABEL, HISTORY_STATUS_COPY, SCOPE_LABEL,
+  DEVELOPMENT_COPY, HISTORY_ACTION_COPY, HISTORY_DATE_UNKNOWN, HISTORY_EMPTY, HISTORY_LEGACY_ACTION, HISTORY_MODE_LABEL, HISTORY_STATUS_COPY, SCOPE_LABEL,
 } from '../../../lib/copy/student.js'
 
 const UNTITLED = { FORMAL: 'Assessment', PRACTICE: 'Practice mission', PREPARATION: 'Preparation', SELF_REPORT: 'Your own note' }
 const MODE_TONE = { FORMAL: 'neutral', PRACTICE: 'accent', PREPARATION: 'neutral', SELF_REPORT: 'insufficient' }
 const DONE_VERB = { FORMAL: 'Completed', PRACTICE: 'Submitted', PREPARATION: 'Finished', SELF_REPORT: 'Noted' }
+
+// P6.7: a fresh, uncoached challenge for the same capability is reachable
+// from a finished practice record. Practice only; never from a formal item.
+function FreshChallenge({ item }) {
+  const { active } = useWorkspace()
+  const starters = usePracticeStarters()
+  const navigate = useNavigate()
+  const devPath = active.type === 'CAMPUS_STUDENT' ? `/app/campus/${active.organizationId}/development` : '/app/development'
+  const start = () => starters.challenge.mutate({ capabilityId: item.practice.capabilityId }, {
+    onSuccess: ({ attempt, missionId }) => navigate(`${devPath}/missions/${missionId}?attempt=${encodeURIComponent(attempt.id)}`),
+  })
+  return (
+    <div className="space-y-1">
+      <Button variant="secondary" size="sm" onClick={start} loading={starters.challenge.isPending} data-testid="history-fresh-challenge">{DEVELOPMENT_COPY.player.freshChallengeNext}</Button>
+      {starters.challenge.error && <div role="alert"><InlineNotice tone="blocked">{starters.challenge.error.message}</InlineNotice></div>}
+    </div>
+  )
+}
 
 function dateLine(item) {
   const when = formatDate(item.completedAt || item.issuedAt)
@@ -57,6 +77,12 @@ export function HistoryItemCard({ item, headingLevel = 3 }) {
         <LinkButton to={action.to} variant={action.kind === 'VIEW_REPORT' ? 'secondary' : 'primary'}>
           {actionLabel}<span className="sr-only">: {title}</span>
         </LinkButton>
+      )}
+      {item.mode === 'PRACTICE' && item.status === 'COMPLETED' && item.practice?.capabilityId && (
+        <>
+          {item.practice.assistanceMode === 'UNCOACHED' && <p className="text-xs text-prism-ink-subtle" data-testid="history-uncoached">Fresh challenge: completed uncoached, in an unfamiliar setting.</p>}
+          <FreshChallenge item={item} />
+        </>
       )}
     </Card>
   )

@@ -20,7 +20,7 @@ export function MissionArtifactEditor({ artifact, value, onChange, disabled }) {
   if (artifact.type === 'FIELD_SHEET') {
     const fields = value?.fields || {}
     return (
-      <fieldset className="space-y-3">
+      <fieldset className="min-w-0 space-y-3">
         <legend className="text-sm font-semibold text-prism-ink">{artifact.title}</legend>
         <p className="text-sm text-prism-ink-muted">{artifact.prompt}</p>
         {(artifact.fields || []).map((f) => (
@@ -34,11 +34,11 @@ export function MissionArtifactEditor({ artifact, value, onChange, disabled }) {
   const rows = value?.rows || []
   const columns = artifact.columns || []
   return (
-    <fieldset className="space-y-2">
+    <fieldset className="min-w-0 max-w-full space-y-2">
       <legend className="text-sm font-semibold text-prism-ink">{artifact.title}</legend>
       <p className="text-sm text-prism-ink-muted">{artifact.prompt}</p>
-      <div className="overflow-x-auto rounded-[var(--prism-radius-md)] border border-prism-border" role="region" aria-label={artifact.title} tabIndex={0}>
-        <table className="min-w-full text-left text-sm">
+      <div className="max-w-full overflow-x-auto rounded-[var(--prism-radius-md)] border border-prism-border" role="region" aria-label={artifact.title} tabIndex={0}>
+        <table className="w-max min-w-full text-left text-sm">
           <caption className="sr-only">{artifact.title}</caption>
           <thead className="bg-prism-subtle text-prism-ink-muted">
             <tr>{columns.map((c) => <th key={c.key} scope="col" className="px-3 py-2 font-semibold">{c.label}</th>)}</tr>
@@ -48,7 +48,7 @@ export function MissionArtifactEditor({ artifact, value, onChange, disabled }) {
               <tr key={r.id} className="border-t border-prism-border">
                 {columns.map((c) => {
                   const label = `${c.label} for ${rows[i][columns.find((x) => !x.editable)?.key] || `row ${i + 1}`}`
-                  if (!c.editable) return <th key={c.key} scope="row" className="px-3 py-2 font-medium text-prism-ink">{r[c.key]}</th>
+                  if (!c.editable) return <th key={c.key} scope="row" className="min-w-[9rem] max-w-[16rem] px-3 py-2 align-top font-medium text-prism-ink">{r[c.key]}</th>
                   return (
                     <td key={c.key} className="px-3 py-2">
                       <input

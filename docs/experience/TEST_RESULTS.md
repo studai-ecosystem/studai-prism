@@ -1,5 +1,106 @@
 # P0 - Verification results
 
+## P6 remaining gaps closed - 2026-10-03
+
+Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider
+`auditConverse` only — NODE_ENV=test + PRISM_AUDIT_AI=true; no live model, no production data):
+
+| Command | Layer | Result |
+| --- | --- | --- |
+| `cd server; npm test` | A/B (routes + memory repos) | 856: **830 pass, 0 fail**, 26 pre-existing DB skips (new `missionsEndToEnd.test.js` 16 — one acceptance test per mission M01–M10 plus M09/M10 escalation, unsupported quote, provider failure, replay/history, copy/compare units; `practiceReplay.test.js` P6.7 updated to the transfer-first rule) |
+| `npm run test:unit -- --maxWorkers=2 --minWorkers=1` | A | 38 files, **508 pass, 0 fail** (`development.test.jsx` +4 → 18: catalogue card facts + goal filter, first view + focus + examples drawer, comparison + copied label, transfer scene; `history.test.jsx` +1 → 7: finished practice opens read-only, fresh challenge from history) |
+| `npm run build` | Build | PASS |
+| `npm run audit:static` | Static | PASS |
+| `node scripts/run-experience-baseline-tests.mjs database` | B | 6/6; 51 migrations (no new migration: provenance extends `assistance_json` from 0046) |
+| `node scripts/run-experience-baseline-tests.mjs p6` | B in browser | **1 passed, 0 failed** (chromium, 29.8 s): spec `tests/e2e/p6-practice-journey.spec.js`; the first two runs found defects 2 and 3 below |
+
+`p6` runner mode: embedded throwaway PostgreSQL for the 4174 campus audit server (campus +
+development flags on in that process only, `PRISM_AUDIT_DRAFT_CONTENT=true` for that process
+only), desktop Chromium, screenshots at 1440 and 390. The journey is REAL end to end: a synthetic
+learner registers, chooses the Execution goal, opens M09 from the first view, edits the board and
+writes the handover (one owner left empty), submits through the real evaluator pipeline
+(deterministic rules + meaning harness), reads the focused feedback, opens the examples drawer,
+retries with the scaffold hint, submits a complete handover, reads the criterion comparison, starts
+a fresh uncoached challenge (M09's transfer setting — the client-call follow-up — not the demo
+script), and finds the three practice records in History, apart from formal ones. No formal run
+exists for this learner: `assessedCount` 0, every evidence item `PRACTICE`, every history item
+`PRACTICE`, finished attempts `permittedAction.kind = VIEW`.
+
+### T39–T42 coverage (this phase)
+
+| Test ID | Requirement | Where it is proven | Layer | Outcome |
+| --- | --- | --- | --- | --- |
+| T39 | Development recommendation: reviewed, relevant, reachable; no invented deficit | `recommendations.test`/P5 (unchanged); `development.test.jsx` "Choose a different goal" filters by family and the catalogue infers nothing from the choice; p6 journey step 1 | A, B-browser | PASS |
+| T40 | Mission meaningfulness: paraphrase accepted, keywords alone do not prove behaviour | `missionsEndToEnd.test.js` per-mission step 2 (paraphrase keeps every meaning criterion), step 3 (300-char filler → `MEANING_NOT_EXPRESSED` / `RULES_NOT_MET`, no praise), `evaluatorMeaning.test.js` (keyword stuffing → `KEYWORDS_ONLY`) | A/B | PASS (harness semantics; live-model wording is Layer C, not run) |
+| T41 | Practice retry: new practice attempt; original formal snapshot unchanged | `missionsEndToEnd.test.js` (retry → new attempt with `retryOrigin`, earlier attempt byte-identical, formal snapshot + ledger unchanged), `practiceHandover.test.js`, p6 journey steps 5 and 7 | A/B, B-browser | PASS |
+| T42 | Fresh challenge: no hidden coaching; exposure metadata recorded | `practiceReplay.test.js` (hints and examples 409, transfer setting, `exposureTags`/`excludedExposure` recorded), `missionsEndToEnd.test.js` replay/history test, p6 journey step 6 | A/B, B-browser | PASS |
+| T55 | Package expiry gates new activity; issued history readable | `practiceReplay.test.js` P6.8, `missionsEndToEnd.test.js` provider-failure test (finished attempt readable after the allowance is spent) | A/B | PASS (slice) |
+| T57 | Direct and Campus regression | `campusDevelopment.test.js`, `campusPermissions.test.js` unchanged and green | A/B | PASS |
+
+### Per-mission acceptance matrix (`server/test/missionsEndToEnd.test.js`, real `/api/v1` router, memory repos, deterministic provider)
+
+Fixtures: `server/test/fixtures/p6Missions.js` (synthetic learner work only). Each row is one test
+that runs start → valid → paraphrase → filler → examples → copied example, through the stored
+attempt and the evaluator boundary.
+
+| Mission | Valid: ≥1 behaviour, focus quotes learner | Paraphrase accepted | 300-char filler not met, no praise | Copied example → `COPIED_ASSISTANCE`, not counted | Package complete (17 fields) | Transfer: different setting, same behaviours, empty start |
+| --- | --- | --- | --- | --- | --- | --- |
+| M01 Find the missing fact | PASS (4/4 criteria) | PASS | PASS | PASS | PASS | PASS |
+| M02 Check the confident recommendation | PASS (4/4) | PASS | PASS | PASS | PASS | PASS |
+| M03 Explain your recommendation | PASS (4/4) | PASS | PASS | PASS | PASS | PASS |
+| M04 Make the brief clear (handover v2) | PASS (3/4; `C-FIRST-STEP` is BOTH → UNCERTAIN under the harness, as designed) | PASS | PASS | PASS | PASS | PASS |
+| M05 Disagree without giving up | PASS (4/4) | PASS | PASS (filler passes only the literal length check; no behaviour demonstrated) | PASS | PASS | PASS |
+| M06 Negotiate a realistic boundary | PASS (4/4) | PASS | PASS | PASS | PASS | PASS |
+| M07 Replan after a change | PASS (4/4) | PASS | PASS | PASS | PASS | PASS |
+| M08 Recover after a mistake | PASS (4/4) | PASS | PASS | PASS | PASS | PASS |
+| M09 Make the handover usable | PASS (4/4); missing owner → `C-OWNERS` is the next change; escalation "I cannot assign … escalating to Priya because …" → all criteria met, no flaw invented | PASS | PASS | PASS | PASS | PASS (client-call follow-up board) |
+| M10 Choose what not to do | PASS (4/4); escalation counts for `C-DEFER` | PASS | PASS | PASS | PASS | PASS |
+
+Cross-cutting (same file): unsupported evaluator quote (`PRISM_AUDIT_AI_FAULT=mismatch`) →
+meaning criteria `UNCERTAIN / QUOTE_NOT_VERIFIED`, work preserved, no practice unit; provider
+failure (`throw`) → `EVALUATION_UNAVAILABLE`, `focus.reviewIncomplete`, attempt readable, allowance
+`used` unchanged, retry is a free reissue (`retryOrigin.reissued = true`), same key → same attempt,
+two simultaneous retries → one new attempt (2 rows total); replay carries only the presented
+stimulus of that opportunity (a never-presented later-stage stimulus and a rubric anchor string
+never appear), formal units/report/session/ledger byte-identical before and after.
+
+Screenshots inspected (`audit-results/ui/p6/*-{1440,390}.png`, 16 files; no horizontal overflow,
+axe serious/critical empty at both widths for every step): `01-catalogue-goal` shows the Execution
+family only after the goal filter, each card with target behaviour, situation, "About 15 minutes,
+untimed · Text, English", Draft label and Open mission; `02-first-view` shows focus / duration /
+mode / "No limit on attempts here", the scene, What to do, What you know and "What will be
+checked" folded; `04-feedback` leads with "One thing you did" (meaning check, the learner's own
+sentence) and "One thing to change next" (the unowned task) with all checks folded;
+`06-retry-comparison` shows "Shown now, not before: Every task has an owner…" and the no-growth
+note; `07-fresh-challenge` shows the uncoached notice, "A different setting for the same
+behaviours", the client follow-up board and no Hints/Show examples buttons; `08-history` groups
+Practice records with Open and fresh-challenge actions and no Formal group.
+
+Defects found and fixed during this run:
+
+1. **Summary praised nothing** — `evaluate.js` said "Mission completed — 0 of 2 target behaviours
+   demonstrated" for filler. Now "Attempt reviewed — none of the N target behaviours shown yet."
+   (found by the M01–M10 acceptance loop).
+2. **Board table overflowed at 390** (`expectNoHorizontalOverflow` 59 px) — `<fieldset>` has
+   `min-width: min-content`; fixed with `min-w-0` on the artifact fieldsets, `max-w-full` on the
+   scroll region and `min-w-0` on the work column. A second pass found the task column crushed to
+   one character per line; the table is now `w-max min-w-full` with a `min-w-[9rem]` row header so
+   it scrolls inside its region.
+3. **Fresh challenge on the same mission did not switch attempts** — the player read `?attempt=`
+   only on mount, so a challenge that chose the same mission's transfer setting kept showing the
+   finished attempt. The page now follows a changed `?attempt=` (and only a change, so a retry
+   started on the page is never undone).
+4. **Next-change panel repeated itself / quoted a cell** — the failed rule's description equalled
+   the criterion text, and "Your words" quoted a one-word board cell. `buildFocus` now falls back
+   to "Not met by the automatic check…" and quotes the learner only for meaning checks and only
+   for ≥ 4-word text.
+5. Fixed-clock test worlds tie every `createdAt`, so "the newest finished attempt" was ambiguous;
+   retry now follows the retry-chain tip and the memory repo breaks timestamp ties by insertion.
+
+Not run / not claimed: live-model (Layer C) meaning judgements; firefox/webkit/mobile projects for
+the p6 spec (chromium only; the 390 viewport is exercised by resize); human content, measurement
+and accessibility approval of M01–M10 (all DRAFT, `review_record.approval = NOT_APPROVED`).
+
 ## P5 remaining gaps closed - 2026-10-03
 
 Commands (from `studai-prism/`, Windows, isolated processes; deterministic audit provider only; no

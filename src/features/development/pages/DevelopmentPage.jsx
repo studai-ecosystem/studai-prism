@@ -15,6 +15,7 @@ import { DEVELOPMENT_COPY } from '../../../lib/copy/student.js'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button.jsx'
 import { InlineNotice } from '../../../components/ui/Notice.jsx'
+import { Select } from '../../../components/ui/FormControls.jsx'
 import { usePracticeStarters } from '../hooks.js'
 
 const ORIGIN_ID = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/
@@ -33,7 +34,7 @@ function groupByFamily(missions, fallback) {
 
 export default function DevelopmentPage() {
   const { active } = useWorkspace()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const query = useDevelopmentPlan()
   const growth = useGrowth()
@@ -53,7 +54,16 @@ export default function DevelopmentPage() {
   const allowance = plan.allowance || { kind: 'UNLIMITED' }
   const exhausted = allowance.kind === 'BOUNDED' && allowance.remaining <= 0
   const hasDraft = plan.catalogue.some((m) => m.status === 'DRAFT')
-  const groups = groupByFamily(plan.catalogue, copy.ungrouped)
+  const allGroups = groupByFamily(plan.catalogue, copy.ungrouped)
+  // P6.1 "Choose a different goal": a report recommendation is guidance, not
+  // homework. The learner picks any family; nothing is inferred from the choice.
+  const goal = params.get('goal') || ''
+  const groups = goal ? allGroups.filter((g) => g.id === goal) : allGroups
+  const chooseGoal = (value) => {
+    const next = new URLSearchParams(params)
+    if (value) next.set('goal', value); else next.delete('goal')
+    setParams(next, { replace: true })
+  }
   const openStarted = ({ attempt, missionId }) => navigate(`${devPath}/missions/${missionId}?attempt=${encodeURIComponent(attempt.id)}`)
   const replay = () => starters.replay.mutate({ sessionId: sourceId, opportunityId: momentId }, { onSuccess: openStarted })
   const challenge = (capabilityId) => starters.challenge.mutate({ capabilityId }, { onSuccess: openStarted })
@@ -117,6 +127,18 @@ export default function DevelopmentPage() {
             )}
             <h3 className="text-base font-semibold text-prism-ink">{DEVELOPMENT_COPY.missions.catalogueTitle}</h3>
             {hasDraft && <p className="text-sm text-prism-ink-muted" data-testid="draft-note">{copy.draftNote}</p>}
+            {allGroups.length > 1 && (
+              <Select
+                id="goal-filter"
+                data-testid="goal-filter"
+                label={copy.chooseGoal}
+                value={goal}
+                onChange={(e) => chooseGoal(e.target.value)}
+                placeholder={copy.allGoals}
+                options={allGroups.map((g) => ({ value: g.id, label: g.name }))}
+                className="max-w-sm"
+              />
+            )}
             {starters.challenge.error && <div role="alert"><InlineNotice tone="blocked">{starters.challenge.error.message}</InlineNotice></div>}
             {groups.map((g) => (
               <section key={g.id} aria-labelledby={`family-${g.id}`} className="space-y-3" data-testid="family-group">

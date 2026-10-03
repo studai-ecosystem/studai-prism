@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'p2', 'p3', 'p4', 'p5', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, p2, p3, p4, p5, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
+if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'browser', 'browser-smoke', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, p3, p4, p5, p6, browser, browser-smoke, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -99,6 +99,14 @@ try {
   if (mode === 'p5') {
     env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
     browserArgs.splice(2, browserArgs.length, 'p5-report-states.spec.js')
+  }
+  // P6: the real-browser practice journey (choose goal → M09 → feedback →
+  // scaffold → retry → comparison → fresh challenge → history), desktop
+  // Chromium with 1440/390 screenshots; draft + development content on the
+  // 4174 audit server only.
+  if (mode === 'p6') {
+    env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
+    browserArgs.splice(2, browserArgs.length, 'p6-practice-journey.spec.js', '--project=chromium')
   }
   exitCode = await run(mode === 'database'
     ? ['--test', 'server/test/experienceBaseline.db.test.js']

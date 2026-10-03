@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkspace, wsKey } from '../../app/providers/WorkspaceProvider.jsx'
 import {
-  fetchV2Mission, fetchMissionAttempt, startMissionAttempt, saveMissionWork, revealMissionHint, submitMissionAttempt, replayMoment, startChallenge,
+  fetchV2Mission, fetchMissionAttempt, startMissionAttempt, saveMissionWork, revealMissionHint, revealMissionExamples, submitMissionAttempt, replayMoment, startChallenge,
 } from '../../api/development.js'
 
 const noRetry = (count, err) => !['FORBIDDEN', 'NOT_FOUND', 'VALIDATION_FAILED', 'CONFLICT'].includes(err?.code) && err?.status !== 404 && count < 1
@@ -30,6 +30,7 @@ export function useMissionActions(missionId) {
     start: useMutation({ mutationFn: (opts) => startMissionAttempt(missionId, opts), onSuccess: (a) => { put(a); refresh() } }),
     save: useMutation({ mutationFn: ({ attemptId, version, work }) => saveMissionWork(attemptId, version, work), onSuccess: put }),
     hint: useMutation({ mutationFn: ({ attemptId, version }) => revealMissionHint(attemptId, version), onSuccess: put }),
+    examples: useMutation({ mutationFn: ({ attemptId }) => revealMissionExamples(attemptId), onSuccess: put }),
     submit: useMutation({ mutationFn: (attemptId) => submitMissionAttempt(attemptId), onSuccess: (a) => { put(a); refresh() } }),
   }
 }

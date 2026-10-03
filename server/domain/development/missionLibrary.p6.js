@@ -35,6 +35,26 @@ const det = (criterion_id, behavior_id, description, artifact_ids) => ({ criteri
 const meaning = (criterion_id, behavior_id, description, artifact_ids, intent, synonyms, evaluator_guidance) => ({
   criterion_id, behavior_id, description, check: 'MEANING', artifact_ids, evaluator_guidance, meaning: { intent, synonyms },
 })
+// P6.2 reviewer-package helpers. Examples are teaching support (shown after a
+// submission or on request) — a copied example is detected and never counted
+// as the learner's own behaviour. Nothing here is approved: every review
+// record says so.
+const example = (example_id, criterion_ids, text, note) => ({ example_id, kind: 'EXAMPLE', criterion_ids, text, note })
+const counter = (example_id, criterion_ids, text, note) => ({ example_id, kind: 'COUNTEREXAMPLE', criterion_ids, text, note })
+const clarify = (question, answer) => ({ question, answer })
+const REVIEW_RECORD = Object.freeze({
+  status: 'DRAFT', authored_by: 'Prism product-engineering team (synthetic content)', authored_on: '2026-10-03',
+  reviewed_by: null, reviewed_on: null, approval: 'NOT_APPROVED',
+  notes: 'Original synthetic situation; no real person, institution or product. Needs content and measurement review before publication.',
+})
+const A11Y_TEXT = 'One text box, keyboard-only, screen-reader labelled, untimed. The suggested minutes are guidance, not a limit. No colour-only state; feedback is text.'
+const A11Y_SHEET = 'Short labelled fields, keyboard-only, screen-reader labelled, untimed. Field order follows the reading order of the task. No colour-only state.'
+const A11Y_BOARD = 'The board is a labelled table with editable cells reachable by Tab; every cell has a row and column label for screen readers. Untimed; the message box wraps long text. No colour-only state.'
+const CONFOUNDS_TEXT = [
+  'Writing fluency in English can look like the behaviour; checks read for the specific fact or intent, not polish.',
+  'A learner may know the convention (ask a question) without applying it to the right fact; the meaning check asks for the fact.',
+  'Copying an exposed example is detected and not counted as the learner\'s own behaviour.',
+]
 
 export const P6_MISSIONS = Object.freeze([
   // ── Reasoning ─────────────────────────────────────────────────────────
@@ -88,6 +108,33 @@ export const P6_MISSIONS = Object.freeze([
     },
     reflection_prompt: 'Which fact, if it had turned out differently, would have changed your reply most?',
     retry_variation: 'A different decision-relevant fact is absent (the session date is not fixed).',
+    situation_facts: ['Dev has booked Room 2 and asks you to confirm.', 'Room 2 seats twelve.', 'Nobody has said how many people are coming.', 'Two other teams were invited last week.'],
+    learner_actions: ['Read what Dev asked and what is actually known.', 'Write a reply that asks for the missing fact.', 'Make the confirmation conditional instead of confirming now.'],
+    clarifications: [
+      clarify('Can I confirm Room 2 and change it later?', 'You can decide that; the task is to show what you still need to know before you confirm.'),
+      clarify('Do I know the date of the session?', 'Yes, Tuesday. Only the headcount is unknown.'),
+    ],
+    examples: [
+      example('EX-ASK', ['C-ASKS', 'C-NAMES-UNKNOWN'], 'Before I confirm Room 2, can you tell me how many people are coming? Two other teams were invited last week, so the number could be well over twelve.', 'Asks for the one fact that decides the room and says why it matters.'),
+      counter('CX-CONFIRM', ['C-HOLDS'], 'Confirmed, Room 2 is booked for Tuesday. Thanks for sorting it.', 'Confirms a fact nobody has; the headcount is never asked for.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-NAMES-UNKNOWN', 'C-ASKS', 'C-HOLDS', 'C-LIMIT'], next_change_priority: ['C-NAMES-UNKNOWN', 'C-HOLDS', 'C-ASKS', 'C-LIMIT'] },
+    transfer: {
+      setting: 'A colleague, Jo, messages you: "Can you confirm the courier slot for Friday? I have booked the standard van." You know the standard van takes parcels up to 20 kg in total. Nobody has weighed the kit boxes yet, and a second set of boxes was added yesterday.',
+      objective: 'Reply to Jo: say what you still need to know before confirming, ask for it, and say what you will do once you have it without treating the slot as settled.',
+      constraints_notes: ['The standard van carries up to 20 kg.', 'A second set of boxes was added yesterday.'],
+      situation_facts: ['Jo has booked the standard van and asks you to confirm.', 'The van carries up to 20 kg.', 'Nobody has weighed the boxes.', 'More boxes were added yesterday.'],
+      exposure_tags: [],
+      rule_overrides: [{ rule_id: 'R-LIMIT', params: { pattern: '\\b(twenty|20)\\s*kg\\b|\\b20\\b|weight limit', flags: 'i' }, description: 'The reply refers to the weight limit.' }],
+      meaning_overrides: [{
+        criterion_id: 'C-NAMES-UNKNOWN', intent: 'States that the total weight of the boxes is unknown and is needed before the van can be confirmed.',
+        synonyms: ['how much do they weigh', 'how heavy', 'total weight', 'weigh the boxes', 'weight of the kit', 'not sure how heavy', 'weighed'],
+        evaluator_guidance: 'Met only if the learner identifies the weight as the unknown. Not met if they only ask a generic question or confirm the van.',
+      }],
+    },
+    accessibility_note: A11Y_TEXT,
+    confounds: CONFOUNDS_TEXT,
+    review_record: REVIEW_RECORD,
     estimated_duration: { minutes: 10 },
   },
   {
@@ -146,6 +193,32 @@ export const P6_MISSIONS = Object.freeze([
     },
     reflection_prompt: 'What made the summary sound reliable, and what would have made you check it sooner?',
     retry_variation: 'The error changes from a contradiction to an unsupported assumption (no delivery time is stated at all).',
+    situation_facts: ['The summary says order 60 packs for Friday and that delivery takes two days.', '48 people have confirmed.', 'Friday is three working days away.', 'The supplier page says delivery takes four working days.'],
+    learner_actions: ['Compare the summary with the brief.', 'Fill in the check note: decision, claim checked, finding, uncertainty, alternative.', 'Propose what to do instead if the summary should not be followed as written.'],
+    clarifications: [
+      clarify('Is the supplier page up to date?', 'Treat it as the most recent information you have.'),
+      clarify('Can more people still confirm?', 'Possibly; nothing in the brief rules it out.'),
+    ],
+    examples: [
+      example('EX-CONFLICT', ['C-CLAIM', 'C-CONFLICT'], 'I checked the delivery claim against the supplier page, and it says four working days, so an order placed today will not arrive by Friday.', 'Names the claim and the specific fact it conflicts with.'),
+      counter('CX-VAGUE', ['C-UNCERTAIN'], 'I am not sure about this summary, it feels a bit optimistic to me.', 'Doubt without a fact; nothing is checked and no uncertainty is named.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-CONFLICT', 'C-CLAIM', 'C-ALT', 'C-UNCERTAIN'], next_change_priority: ['C-CONFLICT', 'C-ALT', 'C-UNCERTAIN', 'C-CLAIM'] },
+    transfer: {
+      setting: 'An automatically generated summary says: "Book the larger hall for the open evening; attendance will exceed eighty." The sign-up sheet you hold shows forty-one names with three days to go, last year\'s final count was fifty-five, and the summary gives no source for "eighty".',
+      objective: 'Write a short check note: say whether you would book the larger hall, which claim you checked and what you found, what you are still unsure about, and what you would do instead.',
+      constraints_notes: ['The summary was produced automatically and gives no source for its attendance figure.'],
+      situation_facts: ['The summary recommends the larger hall because attendance will exceed eighty.', 'The sign-up sheet shows forty-one names.', 'Last year\'s final count was fifty-five.', 'No source is given for eighty.'],
+      exposure_tags: [],
+      meaning_overrides: [{
+        criterion_id: 'C-CONFLICT', intent: 'Identifies that the attendance figure (eighty) has no source and is not supported by the sign-ups (forty-one) or last year (fifty-five).',
+        synonyms: ['no source', 'where does eighty', 'nothing supports', 'forty-one', 'only 41', 'last year was fifty-five', 'unsupported', 'not backed by'],
+        evaluator_guidance: 'Met only if the learner states that the figure is unsupported or names the sign-up or last-year figure against it. Not met for general doubt.',
+      }],
+    },
+    accessibility_note: A11Y_SHEET,
+    confounds: CONFOUNDS_TEXT,
+    review_record: REVIEW_RECORD,
     estimated_duration: { minutes: 12 },
   },
 
@@ -199,6 +272,32 @@ export const P6_MISSIONS = Object.freeze([
     },
     reflection_prompt: 'What did you leave out that you would have included for a colleague who was in the discussion?',
     retry_variation: 'The audience changes from a familiar colleague to an unfamiliar external contact who needs a yes/no.',
+    situation_facts: ['Two options were compared: one long session or two shorter sessions.', 'Two shorter sessions were chosen.', 'The room holds fifteen; twenty-two people are joining.', 'Ravi manages the calendar and did not follow the discussion.'],
+    learner_actions: ['Put the decision in the first sentence.', 'Give the one reason Ravi needs: the room does not hold everyone.', 'End with what to book and by when.'],
+    clarifications: [
+      clarify('Should I explain both options to Ravi?', 'He did not follow the discussion and cannot act on the comparison; he can act on what to book.'),
+      clarify('Which days are the sessions?', 'Not fixed yet; you may propose days or ask Ravi for free slots.'),
+    ],
+    examples: [
+      example('EX-LEAD', ['C-MAIN-FIRST', 'C-REASON', 'C-ASK', 'C-DEADLINE'], 'We will run two shorter onboarding sessions instead of one, because the room holds fifteen and twenty-two people are joining. Please book two slots of ninety minutes next week and confirm by Thursday.', 'Decision first, the capacity reason, a concrete booking action and a deadline.'),
+      counter('CX-COMPARISON', ['C-MAIN-FIRST', 'C-ASK'], 'Hi Ravi, we had a long discussion about the onboarding format and weighed up several pros and cons of a single session versus smaller groups before reaching a view.', 'Opens with the discussion, not the decision, and asks for nothing.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-MAIN-FIRST', 'C-REASON', 'C-ASK', 'C-DEADLINE'], next_change_priority: ['C-MAIN-FIRST', 'C-ASK', 'C-REASON', 'C-DEADLINE'] },
+    transfer: {
+      setting: 'You compared two time slots for a visiting group\'s lab tour: the morning, or the afternoon. You chose the afternoon because the lab is in use for teaching until noon. Mr Okafor, who coordinates the visit from the other side and has had none of this discussion, needs a clear yes or no on the 2 pm slot he proposed.',
+      objective: 'Write Mr Okafor a message that leads with the answer (yes to 2 pm), gives the one reason he needs, and says exactly what you need him to confirm and by when.',
+      constraints_notes: ['Mr Okafor was not part of the discussion and needs a yes or no.', 'The lab is in use until noon.'],
+      situation_facts: ['Two slots were compared: morning or afternoon.', 'The afternoon was chosen because the lab is in use until noon.', 'Mr Okafor proposed 2 pm and needs a yes or no.'],
+      exposure_tags: [],
+      rule_overrides: [{ rule_id: 'R-MAIN-FIRST', params: { pattern: '^[\\s\\S]{0,200}\\b(yes|afternoon|2\\s?pm|14:00)\\b', flags: 'i' }, description: 'The answer (yes / the afternoon slot) appears in the opening lines.' }],
+      meaning_overrides: [
+        { criterion_id: 'C-REASON', intent: 'Explains that the lab is used for teaching until noon, so a morning slot is not possible.', synonyms: ['in use until noon', 'teaching until', 'lab is busy', 'not free in the morning', 'until midday', 'morning is not possible', 'lab is used'], evaluator_guidance: 'Met only if the lab-use reason is given. Not met if a different or no reason is given.' },
+        { criterion_id: 'C-ASK', intent: 'Asks Mr Okafor to confirm something concrete (the 2 pm slot, group size or arrival point) rather than describing the discussion.', synonyms: ['please confirm', 'could you confirm', 'can you confirm', 'let me know', 'send me', 'confirm the group size', 'confirm 2 pm'], evaluator_guidance: 'Met only if a concrete confirmation is requested. Not met if the message only informs.' },
+      ],
+    },
+    accessibility_note: A11Y_TEXT,
+    confounds: CONFOUNDS_TEXT,
+    review_record: REVIEW_RECORD,
     estimated_duration: { minutes: 10 },
   },
 
@@ -254,6 +353,32 @@ export const P6_MISSIONS = Object.freeze([
     },
     reflection_prompt: 'Which part of Mina\'s concern was legitimate, and did your reply show that?',
     retry_variation: 'The counterparty values a different constraint (accessibility rather than time).',
+    situation_facts: ['Mina wants to drop the printed handout from Thursday\'s session.', 'Printing takes an afternoon the team does not have.', 'About half the group joins without laptops.'],
+    learner_actions: ['Restate Mina\'s concern in your own words.', 'Say where you disagree and tie it to the group without laptops.', 'Offer one next step or a way to decide.'],
+    clarifications: [
+      clarify('Can we print fewer copies or a shorter handout?', 'Nothing rules that out; it is one possible next step.'),
+      clarify('Who decides in the end?', 'The two of you; the task is to reach a workable next step, not to win.'),
+    ],
+    examples: [
+      example('EX-RESTATE', ['C-RESTATE', 'C-DISAGREE', 'C-NEXT'], 'You are right that printing takes an afternoon we do not have, and some handouts do go unread. I still think we need something on paper because half the group joins without laptops and would have nothing to follow. Could we try a single page for just that half?', 'Restates the concern, disagrees with a reason tied to the group, offers a smaller next step.'),
+      counter('CX-GIVE-WAY', ['C-DISAGREE', 'C-NEXT'], 'Fine, let us drop the handout then, you know this better than I do.', 'Gives way without stating the disagreement or a next step.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-RESTATE', 'C-DISAGREE', 'C-NEXT', 'C-SUBSTANTIVE'], next_change_priority: ['C-RESTATE', 'C-NEXT', 'C-DISAGREE', 'C-SUBSTANTIVE'] },
+    transfer: {
+      setting: 'Your colleague Omar wants to replace the slide deck for Thursday\'s session with a live whiteboard: "Slides feel rigid and nobody reads them afterwards." You think the shared slide file matters because two participants use screen readers and need the material in advance in a readable form.',
+      objective: 'Reply to Omar: show you understood his concern, say where you disagree and why, and offer a next step both of you could accept.',
+      constraints_notes: ['Two participants use screen readers.', 'Omar finds slides rigid and unread afterwards.'],
+      situation_facts: ['Omar wants to replace the slides with a live whiteboard.', 'He finds slides rigid and unread afterwards.', 'Two participants use screen readers and need material in advance.'],
+      exposure_tags: [],
+      meaning_overrides: [
+        { criterion_id: 'C-RESTATE', intent: 'Shows the concern was understood: slides can feel rigid and are rarely read afterwards.', synonyms: ['feel rigid', 'rigid', 'nobody reads them', 'rarely read', 'you are right that', 'i understand that slides', 'fair point about', 'i see why'], evaluator_guidance: 'Met only if the learner restates the rigidity or unread point. Not met for a generic "I hear you".' },
+        { criterion_id: 'C-DISAGREE', intent: 'Says they still want a shared readable file because two participants use screen readers and need it in advance.', synonyms: ['screen reader', 'in advance', 'readable file', 'two participants', 'i disagree', 'i still think', 'i see it differently', 'that said'], evaluator_guidance: 'Met only if a reason tied to the two participants is given. Not met if the learner simply gives way or simply insists.' },
+        { criterion_id: 'C-NEXT', intent: 'Offers a concrete compromise or way to decide (whiteboard live plus a short readable file sent before, ask the two participants, a trial).', synonyms: ['both', 'as well as', 'send a short', 'ask the two', 'could we', 'what if we', 'let us try', 'how about', 'one page'], evaluator_guidance: 'Met only if a specific next step is proposed. Not met for "let us discuss".' },
+      ],
+    },
+    accessibility_note: A11Y_TEXT,
+    confounds: [...CONFOUNDS_TEXT, 'Politeness words are not the behaviour; the check reads for the restated concern and the reason, not tone.'],
+    review_record: REVIEW_RECORD,
     estimated_duration: { minutes: 12 },
   },
   {
@@ -308,6 +433,30 @@ export const P6_MISSIONS = Object.freeze([
     },
     reflection_prompt: 'Did you state the limit before or after offering the alternative, and did it read as a refusal or a plan?',
     retry_variation: 'The deadline matters more than the scope (Priya needs an answer in five minutes).',
+    situation_facts: ['Priya asks you to also run the sign-in desk on Thursday morning.', 'You own the room setup from 8:00 and the welcome at 9:00.', 'Both need you in the room.', 'The sign-in desk is in the corridor from 8:30.'],
+    learner_actions: ['Say what you can take on.', 'Say what you cannot, and explain the clash.', 'Offer an alternative and name who decides if the limit is tested.'],
+    clarifications: [
+      clarify('Can someone else do the setup?', 'Nothing in the facts says so; you may propose it as the alternative.'),
+      clarify('Does the desk need to be covered the whole morning?', 'Priya has not said; you may ask or propose a time slice.'),
+    ],
+    examples: [
+      example('EX-CLASH', ['C-LIMIT', 'C-WHY', 'C-INSTEAD'], 'I cannot take the desk from 8:30 because the setup from 8:00 and the welcome at 9:00 both need me in the room at the same time. I can cover the desk until 8:50 and then hand it to whoever Priya names.', 'States the limit, explains the time clash, offers a bounded alternative.'),
+      counter('CX-BUSY', ['C-WHY'], 'Sorry, I am really busy that morning so I cannot do the desk as well.', 'A limit without the clash; the reader cannot tell what gives.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-WHY', 'C-LIMIT', 'C-INSTEAD', 'C-DECIDER'], next_change_priority: ['C-WHY', 'C-INSTEAD', 'C-DECIDER', 'C-LIMIT'] },
+    transfer: {
+      setting: 'Priya messages: "Can you take the visitor tour at 11:00? I need an answer in the next five minutes." You already run the feedback session from 10:30 to 11:30, which cannot move because the visitors leave at noon.',
+      objective: 'Reply to Priya within the five minutes: say clearly what you can and cannot take on, explain the clash, offer what you can do instead, and agree who decides if plans change.',
+      constraints_notes: ['Priya needs an answer in five minutes.', 'The feedback session runs 10:30 to 11:30 and cannot move.'],
+      situation_facts: ['Priya asks you to take the visitor tour at 11:00.', 'An answer is needed in five minutes.', 'You run the feedback session 10:30 to 11:30.', 'The visitors leave at noon.'],
+      exposure_tags: [],
+      meaning_overrides: [{
+        criterion_id: 'C-WHY', intent: 'Explains that the tour at 11:00 falls inside the feedback session (10:30 to 11:30), which cannot move.', synonyms: ['during the feedback session', 'inside the session', 'overlap', '11:00 is in the middle', 'cannot move', 'at the same time', 'two places', 'clash'], evaluator_guidance: 'Met only if the time clash is explained. Not met for "I am too busy".',
+      }],
+    },
+    accessibility_note: A11Y_SHEET,
+    confounds: CONFOUNDS_TEXT,
+    review_record: REVIEW_RECORD,
     estimated_duration: { minutes: 10 },
   },
 
@@ -368,6 +517,31 @@ export const P6_MISSIONS = Object.freeze([
     },
     reflection_prompt: 'What did you keep unchanged, and why was that still valid?',
     retry_variation: 'The change affects a dependency (the room is unavailable until 10:00) rather than a person.',
+    situation_facts: ['Thursday\'s session has three parts: setup (you), a short talk by Sam, group work (you).', 'Sam is needed elsewhere until noon.', 'The session runs 9:30 to 11:30.', 'Priya is free that morning.'],
+    learner_actions: ['Give every part an owner on the board and note what changes.', 'In the message, name the affected part and what your change costs.', 'Ask Priya for one specific thing.'],
+    clarifications: [
+      clarify('Can the session be moved to the afternoon?', 'No; it must finish by 11:30.'),
+      clarify('Can I drop the talk entirely?', 'Yes, if you say what that costs.'),
+    ],
+    examples: [
+      example('EX-REPLAN', ['C-AFFECTED', 'C-REPLAN', 'C-HELP'], 'Only the short talk depends on Sam, so I will swap it with the group work and shorten the talk to ten minutes at the end, which costs us the discussion time after it. Priya, could you give the talk at 11:00 using Sam\'s slides?', 'Names the affected part, states the change and its cost, asks Priya one specific thing.'),
+      counter('CX-MANAGE', ['C-REPLAN', 'C-HELP'], 'Sam cannot make it, but we will manage somehow on the day and any help from anyone is welcome.', 'No change, no cost, no specific request.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-REPLAN', 'C-AFFECTED', 'C-HELP', 'C-OWNERS'], next_change_priority: ['C-REPLAN', 'C-HELP', 'C-OWNERS', 'C-AFFECTED'] },
+    transfer: {
+      setting: 'Your plan for Thursday\'s session has three parts: setup (you), a short talk by Sam, and group work (you). The room has just been double-booked and is unavailable until 10:00. The session starts at 9:30 and must finish by 11:30. Priya is free that morning and knows the other rooms.',
+      objective: 'Update the board and write to Priya: say which part is affected, what you will change and what it costs, and ask Priya for one specific thing.',
+      constraints_notes: ['The session must finish by 11:30.', 'The room is unavailable until 10:00.'],
+      situation_facts: ['The session has setup, a short talk and group work.', 'The room is unavailable until 10:00.', 'The session must finish by 11:30.', 'Priya is free and knows the other rooms.'],
+      exposure_tags: [],
+      rule_overrides: [{ rule_id: 'R-AFFECTED', params: { pattern: '\\bsetup\\b|\\broom\\b|\\b9:15\\b', flags: 'i' }, description: 'The message names the affected part (the setup or the room).' }],
+      meaning_overrides: [{
+        criterion_id: 'C-HELP', intent: 'Asks Priya for one concrete thing (for example to find another room, to greet people at 9:30, or to confirm when the room frees up).', synonyms: ['could you', 'can you', 'would you be able', 'priya, please', 'i need you to', 'can i ask you to', 'find another room', 'check the room'], evaluator_guidance: 'Met only if the request names what Priya should do. Not met for "any help welcome".',
+      }],
+    },
+    accessibility_note: A11Y_BOARD,
+    confounds: CONFOUNDS_TEXT,
+    review_record: REVIEW_RECORD,
     estimated_duration: { minutes: 15 },
   },
   {
@@ -421,6 +595,31 @@ export const P6_MISSIONS = Object.freeze([
     },
     reflection_prompt: 'Did your correction make the reader\'s next step obvious, or did it mostly explain yourself?',
     retry_variation: 'The error arises from ambiguous source information (two bookings with different times).',
+    situation_facts: ['Your message said 10:00; the booking is 9:30.', 'Sam asked whether he misread.', 'Twenty people received the message an hour ago.', 'Some will have added 10:00 to their calendars.'],
+    learner_actions: ['Say plainly what was wrong and that it was yours.', 'Give the correct time.', 'Address what people may already have done with the wrong time.', 'Say what you will do so it does not happen again.'],
+    clarifications: [
+      clarify('Should I reply only to Sam?', 'Everyone who got the first message gets this one.'),
+      clarify('Do I need to explain how it happened?', 'Not in detail; owning it and preventing it matter more than the story.'),
+    ],
+    examples: [
+      example('EX-OWN', ['C-OWN', 'C-CORRECT', 'C-KNOCKON', 'C-PREVENT'], 'My mistake: I wrote 10:00 in this morning\'s message, but the session starts at 9:30. If you have already put 10:00 in your calendar, please change it to 9:30. Next time I will check the time against the booking before sending.', 'Owns the specific error, corrects it, handles the calendar knock-on, names a concrete prevention step.'),
+      counter('CX-PASSIVE', ['C-OWN', 'C-KNOCKON'], 'Please note the time was incorrect in the earlier message; the correct start is 9:30.', 'Passive voice hides whose error it was; nothing is said about calendars.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-OWN', 'C-CORRECT', 'C-KNOCKON', 'C-PREVENT'], next_change_priority: ['C-OWN', 'C-KNOCKON', 'C-PREVENT', 'C-CORRECT'] },
+    transfer: {
+      setting: 'Two bookings exist for Thursday\'s session: the room calendar shows 14:30, the confirmation email from the venue says 14:00. You told the group 14:30. The venue has just confirmed that 14:00 is right and the calendar entry was stale. Twenty people got your message yesterday.',
+      objective: 'Write the correction you will send to the group: own the specific error, give the right time, deal with what the mistake may already have affected, and say what you will do so it does not happen again.',
+      constraints_notes: ['The venue confirmation (14:00) is authoritative.', 'Your message went out yesterday.'],
+      situation_facts: ['Two sources disagreed: calendar 14:30, venue email 14:00.', 'You told the group 14:30.', 'The venue confirms 14:00.', 'Twenty people got the message yesterday.'],
+      exposure_tags: [],
+      rule_overrides: [{ rule_id: 'R-CORRECT', params: { pattern: '\\b14[:.]00\\b|\\b2\\s?pm\\b|two o\'clock', flags: 'i' }, description: 'The correction gives the right start time (14:00).' }],
+      meaning_overrides: [{
+        criterion_id: 'C-OWN', intent: 'Says the earlier time was wrong and that choosing it was their error, without blaming the calendar or the venue.', synonyms: ['my mistake', 'i sent the wrong', 'i got the time wrong', 'apologies', 'sorry', 'i wrote 14:30', 'the error was mine', 'i should have checked'], evaluator_guidance: 'Met only if ownership is explicit. Not met for a passive "the time was incorrect" or for blaming the calendar.',
+      }],
+    },
+    accessibility_note: A11Y_TEXT,
+    confounds: [...CONFOUNDS_TEXT, 'Apology words alone are not ownership; the check reads for the named error, not remorse or tone.'],
+    review_record: REVIEW_RECORD,
     estimated_duration: { minutes: 10 },
   },
 
@@ -463,9 +662,9 @@ export const P6_MISSIONS = Object.freeze([
         det('C-OWNERS', 'ASSIGN_RESPONSIBILITY', 'Every task has an owner, or a named person who will decide.', ['BOARD']),
         det('C-DONE', 'DEFINE_COMPLETION', 'Every task has a written completion check.', ['BOARD']),
         meaning('C-REALISTIC', 'ASSIGN_RESPONSIBILITY', 'Owners respect who is available when.', ['HANDOVER', 'BOARD'],
-          'Monday tasks are not given to Tom, and the projector test sits on Tuesday when the room is free; or an unresolvable task is escalated to a named decider.',
-          ['tom is away', 'lea on monday', 'tuesday when the room', 'room is free', 'not monday', 'tom cannot', 'available on', 'tom from tuesday', 'ask priya to decide'],
-          'Met only if availability is reflected in the assignment or escalation. Not met if Tom owns Monday work with no comment.'),
+          'Monday tasks are not given to Tom, and the projector test sits on Tuesday when the room is free; or an unresolvable task is escalated to a named decider with the reason.',
+          ['tom is away', 'lea on monday', 'tuesday when the room', 'room is free', 'not monday', 'tom cannot', 'available on', 'tom from tuesday', 'ask priya to decide', 'escalating to', 'escalate to', 'cannot assign'],
+          'Met only if availability is reflected in the assignment, or an unassignable task is explicitly escalated to a named person with a reason (a defensible escalation counts). Not met if Tom owns Monday work with no comment.'),
         meaning('C-VERIFIABLE', 'DEFINE_COMPLETION', 'Completion checks are observable by someone else.', ['BOARD', 'HANDOVER'],
           'Each "done when" names something another person could see or receive (a file sent, a confirmation received, a successful test), not "when finished".',
           ['sent to', 'uploaded', 'confirmed by', 'booking confirmation', 'test run', 'shown on screen', 'list has', 'checked by', 'in the shared folder', 'reply from'],
@@ -482,6 +681,41 @@ export const P6_MISSIONS = Object.freeze([
     },
     reflection_prompt: 'Which task was hardest to give an owner, and did you escalate it or force it?',
     retry_variation: 'A dependency has no available owner (nobody is free on Tuesday for the projector test).',
+    situation_facts: ['Lea and Tom agreed to prepare a short demonstration for next Wednesday.', 'Nobody wrote down who does what.', 'Four tasks have no owner and no completion check.', 'Lea is free Monday and Tuesday; Tom is away on Monday.', 'The projector can only be tested on Tuesday when the room is free.'],
+    learner_actions: ['Give every task an owner and a "done when" on the board.', 'Respect who is available when; escalate what cannot be owned.', 'Write the handover so Lea and Tom can start without asking you anything.'],
+    clarifications: [
+      clarify('Can I give a task to myself?', 'You are handing over; if a task has no realistic owner, name who decides rather than taking it silently.'),
+      clarify('What if nobody can do a task on its due day?', 'Say so and escalate it to a named person with the reason. A defensible escalation is a valid answer.'),
+      clarify('Does the completion check have to be a document?', 'No; anything another person could see or receive counts.'),
+    ],
+    examples: [
+      example('EX-HANDOVER', ['C-REALISTIC', 'C-VERIFIABLE'], 'Lea takes both Monday items, the slides and the room booking, since Tom cannot work that day; Tom runs the projector test on Tuesday afternoon once the room is free. A task is finished when another person can see it: the deck sitting in the shared folder, the booking confirmation forwarded, or the test slide showing on screen.', 'Owners follow availability and every check is something another person could see.'),
+      counter('CX-WE-WILL-SORT', ['C-OWNERS', 'C-VERIFIABLE'], 'You two sort out the slides and the room between you this week, and we will know it is done when it feels ready.', 'No owner, no observable check; the two people still have to ask.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-REALISTIC', 'C-OWNERS', 'C-VERIFIABLE', 'C-DONE'], next_change_priority: ['C-OWNERS', 'C-DONE', 'C-REALISTIC', 'C-VERIFIABLE'] },
+    transfer: {
+      setting: 'After a call with a client, Lea and Tom agreed to follow up but nobody wrote down who does what. The board lists four follow-up tasks with no owner and no completion check. Lea is out on Thursday; Tom has no access to the quoting tool. The follow-up call cannot be booked until the client replies, which nobody can make happen.',
+      objective: 'Give each follow-up task a realistic owner and a completion check someone else could verify, then write the handover both can run from. If a task cannot be owned yet, say who decides and why.',
+      constraints_notes: ['Lea is out on Thursday.', 'Tom has no access to the quoting tool.', 'The follow-up call depends on the client replying.'],
+      situation_facts: ['Lea and Tom agreed to follow up after a client call.', 'Four tasks have no owner and no completion check.', 'Lea is out on Thursday; Tom cannot use the quoting tool.', 'The follow-up call cannot be booked until the client replies.'],
+      exposure_tags: [],
+      artifact_initial_state: {
+        BOARD: { rows: [
+          { id: 'summary', task: 'Send the call summary to the client', due: 'Wednesday', owner: null, done_when: null },
+          { id: 'quote', task: 'Share the revised quote', due: 'Thursday', owner: null, done_when: null },
+          { id: 'followup', task: 'Book the follow-up call', due: 'When the client replies', owner: null, done_when: null },
+          { id: 'record', task: 'Update the contact record', due: 'Friday', owner: null, done_when: null },
+        ] },
+      },
+      meaning_overrides: [{
+        criterion_id: 'C-REALISTIC', intent: 'Thursday work is not given to Lea, the quote is not given to Tom, and the follow-up call (which depends on the client) is escalated to a named decider with the reason rather than forced onto someone.',
+        synonyms: ['lea is out', 'not lea on thursday', 'tom cannot access', 'no access to the quoting', 'depends on the client', 'until the client replies', 'escalating to', 'escalate to', 'cannot assign', 'ask priya to decide', 'who decides'],
+        evaluator_guidance: 'Met only if availability or access is reflected in the assignment, or the dependent task is explicitly escalated to a named person with a reason. Not met if Lea owns Thursday work or Tom owns the quote with no comment.',
+      }],
+    },
+    accessibility_note: A11Y_BOARD,
+    confounds: [...CONFOUNDS_TEXT, 'A learner may force an owner onto every task to "finish"; the escalation route is explained so forcing is not rewarded over an honest handover.'],
+    review_record: REVIEW_RECORD,
     estimated_duration: { minutes: 15 },
   },
   {
@@ -527,9 +761,9 @@ export const P6_MISSIONS = Object.freeze([
           ['room first', 'before the reminder', 'reminder needs the room', 'depends on the room', 'cannot send the reminder', 'once the room is confirmed', 'after the room', 'until the room'],
           'Met only if the room-to-reminder dependency is stated. Not met if the order is right but no dependency is named.'),
         meaning('C-DEFER', 'PRIORITIZE_WORK', 'Explicitly defers or hands off at least one task with a reason.', ['NOTE', 'BOARD'],
-          'Names a task that will not be done this week (or by them) and gives the reason.',
-          ['defer', 'leave until', 'after friday', 'hand to', 'ask someone', 'not this week', 'drop', 'skip', 'can wait', 'hand off'],
-          'Met only if a task is explicitly deferred or handed off with a reason. Not met if all five are kept.'),
+          'Names a task that will not be done this week (or by them) and gives the reason; escalating a task to a named person with the reason also counts.',
+          ['defer', 'leave until', 'after friday', 'hand to', 'ask someone', 'not this week', 'drop', 'skip', 'can wait', 'escalating to', 'escalate to', 'cannot assign'],
+          'Met only if a task is explicitly deferred, handed off or escalated with a reason. Not met if all five are kept.'),
       ],
     },
     scaffolding_policy: {
@@ -542,6 +776,27 @@ export const P6_MISSIONS = Object.freeze([
     },
     reflection_prompt: 'Which task did you drop that you would have been tempted to squeeze in, and what would it have cost?',
     retry_variation: 'A formerly low-priority task becomes urgent (the shared folder is needed by a visitor on Thursday).',
+    situation_facts: ['It is Wednesday afternoon; five tasks are open for Friday\'s session.', 'You have time for three.', 'Nothing can be finalised until the room is confirmed.', 'The reminder must include the room details.'],
+    learner_actions: ['Give every task an order from 1 to 5.', 'Write DO, DEFER or HAND OFF with a reason for each.', 'In the note, explain the dependency that fixes part of the order.'],
+    clarifications: [
+      clarify('Can I hand a task to someone else?', 'Yes, if you name who and say why; that counts as a decision.'),
+      clarify('Do I have to do exactly three?', 'Three is what you have time for; the point is to decide explicitly about the other two.'),
+    ],
+    examples: [
+      example('EX-ORDER', ['C-DEPENDENCY', 'C-DEFER'], 'The room comes first because the reminder cannot go out until the room is confirmed, so the reminder is second. I will defer tidying the shared folder until after Friday because nobody needs it before the session.', 'States the room-to-reminder dependency and defers a task with a reason.'),
+      counter('CX-ALL-FIVE', ['C-DEFER'], 'I will try to get through all five tasks by Friday and see how far I get.', 'Nothing is deferred; the choice has not been made.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-DEPENDENCY', 'C-DEFER', 'C-ORDER', 'C-DECISIONS'], next_change_priority: ['C-DEFER', 'C-DEPENDENCY', 'C-DECISIONS', 'C-ORDER'] },
+    transfer: {
+      setting: 'It is Wednesday afternoon. Five tasks are open for Friday\'s session and you have time for three. A visitor has just asked to see the shared folder on Thursday morning, so tidying it is no longer the small task it was. The room still has to be confirmed before the reminder with room details can go out.',
+      objective: 'Order the tasks again, give each a decision with a reason tied to the goal or a dependency, and say explicitly which tasks you now defer or hand to someone else.',
+      constraints_notes: ['You have time for three of the five tasks.', 'The visitor needs the shared folder on Thursday morning.', 'The reminder must include the room details.'],
+      situation_facts: ['Five tasks are open; time for three.', 'The shared folder is needed by a visitor on Thursday morning.', 'The reminder depends on the room being confirmed.'],
+      exposure_tags: [],
+    },
+    accessibility_note: A11Y_BOARD,
+    confounds: CONFOUNDS_TEXT,
+    review_record: REVIEW_RECORD,
     estimated_duration: { minutes: 12 },
   },
 ])
@@ -560,5 +815,33 @@ export function handoverRevision(v1) {
     why_it_matters: 'A handover is read by someone who was not there. If they cannot tell what is open, who owns it and what to do first, the work stops the moment you leave.',
     reflection_prompt: 'Could Sam tell what he owns from this handover without messaging you?',
     retry_variation: 'The ambiguity concerns scope (what "launch checklist" includes) rather than timing.',
+    situation_facts: ['You are away for two days and unreachable.', 'Two board tasks have no owner: the vendor quotes (Thursday) and the launch checklist (Friday).', 'Sam takes over and has not seen the plan.'],
+    learner_actions: ['Fill in an owner (or who decides) for both tasks.', 'Write the handover message naming both tasks.', 'Say what Sam does first and give a day and time for the check-in.'],
+    clarifications: [
+      clarify('Can Sam own both tasks?', 'Yes, if you say so on the board and in the message.'),
+      clarify('What if I do not know who should own a task?', 'Write who should decide; that is a settled answer for Sam.'),
+    ],
+    examples: [
+      example('EX-SAM', ['C-NAMES-TASKS', 'C-FIRST-STEP'], 'Sam, two tasks have no owner yet: the vendor quotes due Thursday and the launch checklist due Friday. Please call the venue first to confirm the quote, before anything else.', 'Names both open tasks and gives one concrete first step.'),
+      counter('CX-SPEED', ['C-FIRST-STEP', 'C-CHECKPOINT'], 'Sam, please get up to speed with the plan while I am away and we can catch up soon.', 'No task named, no first step, no check-in anyone can put in a calendar.'),
+    ],
+    first_attempt_feedback: { completed_priority: ['C-OWNERSHIP', 'C-NAMES-TASKS', 'C-CHECKPOINT', 'C-FIRST-STEP'], next_change_priority: ['C-NAMES-TASKS', 'C-OWNERSHIP', 'C-CHECKPOINT', 'C-FIRST-STEP'] },
+    transfer: {
+      setting: 'You are leaving for two days and a small event plan is not finished. Two tasks on the board have no owner yet: the venue contract and the "comms pack" — and nobody agrees what the comms pack actually includes. Your colleague Sam is taking over while you are away and has not seen the plan before.',
+      objective: 'Write the handover so Sam can pick the plan up without asking you: name the two unowned tasks, assign an owner or ask Sam to find one, say what Sam must do first (including how to settle what the comms pack includes), and give a time when you will check in.',
+      constraints_notes: ['Sam has not seen this plan before.', 'You will be unreachable for two days.', 'The scope of the comms pack is not agreed.'],
+      situation_facts: ['You are away for two days and unreachable.', 'Two tasks have no owner: the venue contract and the comms pack.', 'Nobody agrees what the comms pack includes.', 'Sam has not seen the plan.'],
+      exposure_tags: [],
+      artifact_initial_state: {
+        BOARD: { rows: [{ id: 'quotes', task: 'Venue contract', due: 'Thursday', owner: null }, { id: 'checklist', task: 'Comms pack', due: 'Friday', owner: null }] },
+      },
+      rule_overrides: [
+        { rule_id: 'R-MSG-QUOTES', params: { pattern: 'venue\\s+contract', flags: 'i' }, description: 'The message names the venue contract.' },
+        { rule_id: 'R-MSG-CHECKLIST', params: { pattern: 'comms\\s+pack', flags: 'i' }, description: 'The message names the comms pack.' },
+      ],
+    },
+    accessibility_note: A11Y_BOARD,
+    confounds: CONFOUNDS_TEXT,
+    review_record: REVIEW_RECORD,
   })
 }

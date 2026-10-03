@@ -73,7 +73,9 @@ export function createDevelopmentRepoMemory(db) {
       return clone(db.missionAttempts.get(id) || null)
     },
     async listAttempts({ userId, organizationId = null }) {
-      return [...db.missionAttempts.values()]
+      // Newest first; equal timestamps (fixed test clocks) fall back to
+      // reverse insertion order so the latest attempt is still first.
+      return [...db.missionAttempts.values()].reverse()
         .filter((a) => a.userId === userId && (a.organizationId || null) === (organizationId || null))
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
         .map(clone)
@@ -90,12 +92,20 @@ export function createDevelopmentRepoMemory(db) {
       Object.assign(row, { work: work === undefined ? row.work : clone(work), hintsUsed: hintsUsed === undefined ? row.hintsUsed : hintsUsed, version: row.version + 1, updatedAt: now() })
       return { attempt: clone(row) }
     },
-    async completeAttempt(id, { status, evaluation, submittedAt }) {
+    async completeAttempt(id, { status, evaluation, submittedAt, assistance }) {
       const row = db.missionAttempts.get(id)
       if (!row) return null
       if (row.status !== 'IN_PROGRESS') return { attempt: clone(row), replayed: true }
-      Object.assign(row, { status, evaluation: clone(evaluation), submittedAt, version: row.version + 1, updatedAt: now() })
+      Object.assign(row, { status, evaluation: clone(evaluation), submittedAt, version: row.version + 1, updatedAt: now(), ...(assistance === undefined ? {} : { assistance: clone(assistance) }) })
       return { attempt: clone(row), replayed: false }
+    },
+    // P6.4 assistance provenance (examples revealed, exposure) — recorded on
+    // an attempt in any status, since examples may be shown after feedback.
+    async recordAssistance(id, assistance) {
+      const row = db.missionAttempts.get(id)
+      if (!row) return null
+      Object.assign(row, { assistance: clone(assistance), version: row.version + 1, updatedAt: now() })
+      return clone(row)
     },
 
     async appendPracticeUnits(units) {

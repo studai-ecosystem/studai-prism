@@ -99,6 +99,34 @@ cannot close manual accessibility or real-pipeline gates.
 
 ## Appendix B: DRAFT reviewer intake
 
+### M01–M10 reviewer package complete in code (P6, 2026-10-03) - still DRAFT, not approved
+
+Each of the ten practice missions (`server/domain/development/missionLibrary.p6.js`, parsed by
+`missionSchema.js`) now carries the full reviewer package the plan asks for: situation facts,
+objective, learner actions, possible clarifications, initial artifact state, success criteria,
+examples **and** counterexamples (bound to criterion ids), the deterministic-versus-semantic check
+split, first-attempt feedback logic, optional scaffold (three hints), retry variation, an
+unfamiliar-transfer version (different setting, same behaviour and criterion ids, own starting
+artifact state and fact-bound rule / meaning overrides), accessibility note, known confounds and a
+review record. `missionPackageGaps()` reports zero gaps for all ten; the server test
+`missionsEndToEnd.test.js` asserts it and runs every mission end to end with synthetic work (valid,
+paraphrase, filler, copied example, M09 missing owner and justified escalation).
+
+Every `review_record` is `{ status: DRAFT, reviewed_by: null, reviewed_on: null, approval:
+NOT_APPROVED }` with the authoring note "Original synthetic situation; no real person,
+institution or product. Needs content and measurement review before publication." Nothing here is
+self-approved: the content is reachable only behind `PRISM_DRAFT_CONTENT`, is never recommended,
+and publication remains the separate human decision recorded through the review tooling above.
+Items for the first review pass, found while running the package: (1) the meaning harness's
+keyword-stuffing guard rejected M09's original example sentence, so the example was rewritten as
+a longer exemplar — reviewers should judge whether examples read as realistic work rather than as
+criterion lists; (2) M04's transfer version ("comms pack" scope ambiguity) reuses M04's criteria
+and rules with renamed task patterns — reviewers should confirm the scope ambiguity is testable with
+the current `C-FIRST-STEP` (BOTH) check; (3) escalation phrasings ("escalating to", "cannot
+assign") were added to M09 `C-REALISTIC` and M10 `C-DEFER` so a defensible escalation is never
+scored as failure — a measurement reviewer should confirm the guidance. These are review items, not
+approvals.
+
 ### Reviewer workflow now available (P4.8, 2026-10-03) - still no approval
 
 The review tooling exists in code; **nothing has been approved**. `CORE-TEAMREADY-A`

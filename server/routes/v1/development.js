@@ -7,6 +7,7 @@
 //   GET   /mission-attempts/:attemptId
 //   PATCH /mission-attempts/:attemptId            If-Match version
 //   POST  /mission-attempts/:attemptId/hints      If-Match version
+//   POST  /mission-attempts/:attemptId/examples   reveals the mission's examples (recorded as assistance exposure; refused when uncoached)
 //   POST  /mission-attempts/:attemptId/submit     runs the §16.3 pipeline once
 //   POST  /development/replay                     Idempotency-Key; { sessionId, opportunityId } → PRACTICE attempt from a moment (P6.6)
 //   POST  /development/challenge                  Idempotency-Key; { capabilityId } → uncoached attempt in an unexposed setting (P6.7)
@@ -90,6 +91,10 @@ export function createDevelopmentRouter({ requireUser, campus }) {
   }))
   router.post('/mission-attempts/:attemptId/hints', ...student, store, attempt, asyncHandler(async (req, res) => (
     sendAttempt(res, await svc().revealHint(req.user, req.workspace, req.params.attemptId, { expectedVersion: ifMatchOf(req) }))
+  )))
+  // P6.5 examples / counterexamples on explicit request (also after feedback).
+  router.post('/mission-attempts/:attemptId/examples', ...student, store, attempt, asyncHandler(async (req, res) => (
+    sendAttempt(res, await svc().revealExamples(req.user, req.workspace, req.params.attemptId))
   )))
   router.post('/mission-attempts/:attemptId/submit', ...student, store, attempt, asyncHandler(async (req, res) => {
     const out = await svc().submit(req.user, req.workspace, req.params.attemptId)

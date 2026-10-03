@@ -116,14 +116,21 @@ export function createDevelopmentRepoPg({ query, getPool }) {
       if (!current) return null
       return { conflict: current.status !== 'IN_PROGRESS' ? 'SUBMITTED' : 'VERSION', attempt: current }
     },
-    async completeAttempt(id, { status, evaluation, submittedAt }) {
+    async completeAttempt(id, { status, evaluation, submittedAt, assistance }) {
       const { rows } = await query(`
-        UPDATE mission_attempts SET status = $2, evaluation = $3::jsonb, submitted_at = $4, version = version + 1, updated_at = now()
+        UPDATE mission_attempts SET status = $2, evaluation = $3::jsonb, submitted_at = $4, assistance_json = COALESCE($5::jsonb, assistance_json), version = version + 1, updated_at = now()
         WHERE id = $1 AND status = 'IN_PROGRESS' RETURNING *`,
-      [id, status, JSON.stringify(evaluation), submittedAt])
+      [id, status, JSON.stringify(evaluation), submittedAt, assistance === undefined ? null : JSON.stringify(assistance)])
       if (rows[0]) return { attempt: attempt(rows[0]), replayed: false }
       const current = await this.getAttempt(id)
       return current ? { attempt: current, replayed: true } : null
+    },
+    async recordAssistance(id, assistance) {
+      const { rows } = await query(
+        'UPDATE mission_attempts SET assistance_json = $2::jsonb, version = version + 1, updated_at = now() WHERE id = $1 RETURNING *',
+        [id, JSON.stringify(assistance)],
+      )
+      return attempt(rows[0]) || null
     },
 
     async appendPracticeUnits(units) {

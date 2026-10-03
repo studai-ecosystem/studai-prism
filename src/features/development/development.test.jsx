@@ -343,6 +343,158 @@ describe('P6 mission player: uncoached mode and completion flow', () => {
   })
 })
 
+// ── P6.1 / P6.5 / P6.6: catalogue card facts and goal filter; focus feedback, examples on request, comparison, copied text ──
+describe('P6 practice catalogue and player', () => {
+  const rich = (c, over = {}) => ({ ...c, availability: c.status === 'PUBLISHED' ? 'REVIEWED' : 'DRAFT', behaviourIds: ['QUESTION_ASSUMPTION', 'STATE_UNCERTAINTY'], situation: 'Dev has booked Room 2 and asks you to confirm.', untimed: true, mode: { input: 'TEXT', language: 'en', label: 'Text, English' }, hasTransfer: true, estimatedMinutes: 10, ...over })
+  it('cards state target behaviour, situation, untimed minutes, mode and availability; "Choose a different goal" filters by family; a bounded allowance is exact', async () => {
+    renderStudent('/app/development', <DevelopmentPage />, {
+      '/api/v1/me/development-plan': planWith({ catalogue: [rich(published, { situation: 'A test budget is available.', behaviourIds: ['TESTABLE_HYPOTHESIS'], hasTransfer: false }), rich(M01), rich(M04, { targetCapabilityName: 'Getting your point across' }), rich(M02)], allowance: { kind: 'BOUNDED', total: 4, used: 1, remaining: 3, validUntil: null } }),
+      '/api/v1/me/growth': growthNone,
+    })
+    const m01 = (await screen.findAllByRole('article')).find((a) => within(a).queryByText('Find the missing fact'))
+    expect(within(m01).getByTestId('card-target')).toHaveTextContent('Making decisions · question assumption, state uncertainty')
+    expect(within(m01).getByTestId('card-situation')).toHaveTextContent('Dev has booked Room 2 and asks you to confirm.')
+    expect(within(m01).getByTestId('card-facts')).toHaveTextContent('About 10 minutes, untimed · Text, English · Has an unfamiliar-setting version')
+    expect(within(m01).getByTestId('draft-label')).toHaveTextContent('Draft content')
+    expect(within(m01).getByRole('link', { name: /^Open mission/ })).toHaveAttribute('href', `/app/development/missions/${M01.id}`)
+    const pub = screen.getAllByRole('article').find((a) => within(a).queryByText(published.title))
+    expect(within(pub).getByTestId('reviewed-label')).toHaveTextContent('Reviewed')
+    expect(screen.getByTestId('practice-allowance')).toHaveTextContent('3 of 4 practice attempts remaining')
+    // Choose a different goal: only that family's missions remain; nothing is inferred from the choice.
+    expect(screen.getAllByTestId('family-group')).toHaveLength(3)
+    await userEvent.selectOptions(screen.getByLabelText('Choose a different goal'), 'CAP-L1-COMMUNICATION')
+    await waitFor(() => expect(screen.getAllByTestId('family-group')).toHaveLength(1))
+    expect(screen.getByText('Hand over an unfinished plan to a colleague')).toBeInTheDocument()
+    expect(screen.queryByText('Find the missing fact')).not.toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Choose a different goal'), '')
+    await waitFor(() => expect(screen.getAllByTestId('family-group')).toHaveLength(3))
+    expect(document.body.textContent).not.toMatch(/deficit|weak|\d+\s*%|level\s*\d/i)
+  })
+
+  const m01View = { ...mission, mission: { ...mission.mission, id: M01.id, title: M01.title, displayCode: 'M01', status: 'DRAFT', availability: 'DRAFT', targetCapability: { id: 'CAP-L1-REASONING', name: 'Making decisions' }, scenario: { setting: 'Dev asks you to confirm Room 2.', objective: 'Reply to Dev.' }, situationFacts: ['Room 2 seats twelve.', 'Nobody has said how many are coming.'], whatIsChecked: [{ criterionId: 'C-ASKS', description: 'Asks Dev a question.' }, { criterionId: 'C-NAMES-UNKNOWN', description: 'Says the headcount is unknown.' }], hintCount: 3, examplesAvailable: 2, estimatedMinutes: 10, untimed: true, mode: { input: 'TEXT', language: 'en', label: 'Text, English' } }, allowance: { kind: 'BOUNDED', total: 4, used: 1, remaining: 3, validUntil: null } }
+  const focusResult = {
+    status: 'EVALUATED', verified: true, summary: 'Mission completed — 1 of 2 target behaviours demonstrated.', counts: { demonstrated: 1, uncertain: 0, total: 2, copied: 0 },
+    focus: { version: 'mission-feedback.v1', completed: { criterionId: 'C-ASKS', description: 'Asks Dev a question.', quote: 'could you tell me how many people are coming?', source: 'AUTOMATIC_CHECK' }, nextChange: { criterionId: 'C-NAMES-UNKNOWN', description: 'Says the headcount is unknown.', because: 'Not shown in this attempt.', yourWords: 'Confirmed, see you Tuesday.' }, allMet: false, reviewIncomplete: false, note: null },
+    comparison: null,
+    criteria: [
+      { criterionId: 'C-ASKS', description: 'Asks Dev a question.', result: 'OBSERVED', reason: 'RULES_PASSED', quote: null, checks: [{ description: 'The reply asks Dev a question.', passed: true }], note: 'Shown in this attempt.' },
+      { criterionId: 'C-NAMES-UNKNOWN', description: 'Says the headcount is unknown.', result: 'NOT_OBSERVED', reason: 'MEANING_NOT_EXPRESSED', quote: null, checks: [], note: 'Not shown yet in this attempt.' },
+    ],
+  }
+  const examples = [
+    { id: 'EX-ASK', kind: 'EXAMPLE', criterionIds: ['C-ASKS'], text: 'Before I confirm Room 2, can you tell me how many people are coming?', note: 'Asks for the one fact that decides the room.' },
+    { id: 'CX-CONFIRM', kind: 'COUNTEREXAMPLE', criterionIds: ['C-HOLDS'], text: 'Confirmed, Room 2 is booked for Tuesday.', note: 'Confirms a fact nobody has.' },
+  ]
+  it('first view shows target, scene, what to do, duration (untimed) and the exact allowance with checks folded away; feedback leads with one observation, its source and one next change; examples open only on request and are recorded', async () => {
+    const started = attempt({ missionId: M01.id, work: { HYPOTHESIS: { text: '' } }, hintsRemaining: 3, variant: 'BASE', scene: { setting: 'Dev asks you to confirm Room 2.', objective: 'Reply to Dev.', constraints: [], situationFacts: ['Room 2 seats twelve.'] }, examples: [], examplesAvailable: 2, assistance: { mode: 'GUIDED', hintsUsed: 0, scaffoldRequested: false }, provenance: { hintsExposed: [], examplesExposed: [], coachedRevision: false, retryOrigin: { kind: 'FIRST', previousAttemptId: null }, feedbackVersion: null, evaluatorVersion: null } })
+    let current = null
+    const { calls } = renderStudent('/app/development/missions/:missionId', <MissionPlayerPage />, {
+      [`/api/v1/missions/${M01.id}`]: () => jsonResponse(200, { data: m01View }),
+      [`POST /api/v1/missions/${M01.id}/attempts`]: () => { current = started; return jsonResponse(201, { data: current }) },
+      [`POST /api/v1/mission-attempts/${ATT}/submit`]: () => { current = { ...current, status: 'EVALUATED', version: 3, result: focusResult, submittedAt: '2026-10-10T09:00:00Z' }; return jsonResponse(201, { data: current }) },
+      [`POST /api/v1/mission-attempts/${ATT}/examples`]: () => { current = { ...current, version: current.version + 1, examples, provenance: { ...current.provenance, examplesExposed: examples.map((e) => e.id) } }; return jsonResponse(200, { data: current }) },
+      [`/api/v1/mission-attempts/${ATT}`]: () => jsonResponse(200, { data: current }),
+      '/api/v1/me/development-plan': planWith(),
+      '/api/v1/me/growth': growthNone,
+    }, { route: `/app/development/missions/${M01.id}` })
+    // First view, before any attempt.
+    const facts = await screen.findByTestId('first-view-facts')
+    expect(facts).toHaveTextContent('Focus: Making decisions')
+    expect(facts).toHaveTextContent('About 10 minutes, untimed')
+    expect(facts).toHaveTextContent('Text, English')
+    expect(screen.getByTestId('first-view-allowance')).toHaveTextContent('3 of 4 practice attempts remaining')
+    expect(screen.getByTestId('scene-setting')).toHaveTextContent('Dev asks you to confirm Room 2.')
+    expect(screen.getByText('What to do')).toBeInTheDocument()
+    expect(screen.getByText('Room 2 seats twelve.')).toBeInTheDocument()
+    const checks = screen.getByTestId('what-is-checked')
+    expect(checks.tagName).toBe('DETAILS')
+    expect(checks.open).toBe(false)
+    expect(screen.queryByTestId('examples-action')).not.toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/time limit|proctor|camera|seconds left/i)
+    // Attempt: examples are offered only on explicit request, and not shown until asked.
+    await userEvent.click(screen.getByRole('button', { name: 'Start mission' }))
+    expect(await screen.findByTestId('examples-action')).toBeInTheDocument()
+    expect(screen.queryByTestId('examples-drawer')).not.toBeInTheDocument()
+    expect(calls.some((c) => c.url.endsWith('/examples'))).toBe(false)
+    // Submit → feedback focus.
+    await userEvent.click(screen.getByRole('button', { name: 'Submit for feedback' }))
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Submit this attempt?' })).getByRole('button', { name: 'Submit' }))
+    const focus = await screen.findByTestId('feedback-focus')
+    const observed = within(focus).getByTestId('focus-observed')
+    expect(observed).toHaveTextContent('One thing you did')
+    expect(observed).toHaveTextContent('Asks Dev a question.')
+    expect(observed).toHaveTextContent('Your words: “could you tell me how many people are coming?”')
+    expect(observed).toHaveTextContent('Source: an automatic check of your work')
+    const next = within(focus).getByTestId('focus-next')
+    expect(next).toHaveTextContent('One thing to change next')
+    expect(next).toHaveTextContent('Says the headcount is unknown.')
+    expect(next).toHaveTextContent('Not shown in this attempt.')
+    expect(screen.getByTestId('all-checks').open).toBe(false)
+    expect(screen.getAllByTestId('mission-criterion')).toHaveLength(2)
+    expect(screen.queryByTestId('feedback-comparison')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    // Examples after feedback, on request: a drawer with examples and counterexamples, and the request is recorded server-side.
+    await userEvent.click(screen.getByTestId('examples-action'))
+    const drawer = await screen.findByTestId('examples-drawer')
+    await waitFor(() => expect(within(drawer).getAllByTestId('example-item')).toHaveLength(2))
+    expect(calls.filter((c) => c.url.endsWith('/examples') && c.method === 'POST')).toHaveLength(1)
+    expect(within(drawer).getByText('Example')).toBeInTheDocument()
+    expect(within(drawer).getByText('What not to do')).toBeInTheDocument()
+    expect(drawer).toHaveTextContent('not counted as your own')
+    expect(document.body.textContent).not.toMatch(/congrat|well done|\d+\s*%|level\s*\d|percentile/i)
+  })
+
+  it('a retry shows the criterion comparison (ids only, no percentage) and labels copied example text honestly without praising it', async () => {
+    const retryResult = {
+      ...focusResult,
+      summary: '0 of 2 target behaviours demonstrated so far; 0 could not be checked reliably this time. 1 check matches an example or hint you were shown and is not counted as your own.',
+      counts: { demonstrated: 0, uncertain: 0, total: 2, copied: 1 },
+      focus: { version: 'mission-feedback.v1', completed: null, nextChange: { criterionId: 'C-ASKS', description: 'Asks Dev a question.', because: 'This matches the example you were shown, so it is not counted as your own.', yourWords: null }, allMet: false, reviewIncomplete: false, note: null },
+      comparison: { previousAttemptId: ATT, newlyMet: ['C-NAMES-UNKNOWN'], noLongerMet: ['C-ASKS'], notCompared: [], note: 'Compared with your earlier attempt on the behaviours that could be checked in both. This is practice; it does not measure growth and it does not change any assessment.' },
+      criteria: [
+        { criterionId: 'C-ASKS', description: 'Asks Dev a question.', result: 'COPIED_ASSISTANCE', reason: 'COPIED_ASSISTANCE', quote: null, checks: [{ description: 'The reply asks Dev a question.', passed: true }], note: 'This matches the example you were shown, so it is not counted as your own.' },
+        { criterionId: 'C-NAMES-UNKNOWN', description: 'Says the headcount is unknown.', result: 'OBSERVED', reason: 'MEANING_EXPRESSED', quote: 'I do not yet have a headcount for Tuesday', checks: [], note: 'Shown in this attempt.' },
+      ],
+    }
+    renderStudent('/app/development/missions/:missionId', <MissionPlayerPage />, {
+      [`/api/v1/missions/${M01.id}`]: { data: { ...m01View, openAttemptId: ATT_R } },
+      [`/api/v1/mission-attempts/${ATT_R}`]: { data: attempt({ id: ATT_R, missionId: M01.id, status: 'EVALUATED', version: 3, result: retryResult, submittedAt: '2026-10-10T09:00:00Z', variant: 'BASE', examples: [], examplesAvailable: 2, assistance: { mode: 'GUIDED', hintsUsed: 0, scaffoldRequested: false }, provenance: { hintsExposed: [], examplesExposed: ['EX-ASK'], coachedRevision: true, retryOrigin: { kind: 'RETRY', previousAttemptId: ATT, reissued: false }, feedbackVersion: 'mission-feedback.v1', evaluatorVersion: 'mission_evaluator.v1' } }) },
+      '/api/v1/me/development-plan': planWith(),
+      '/api/v1/me/growth': growthNone,
+    }, { route: `/app/development/missions/${M01.id}` })
+    const cmp = await screen.findByTestId('feedback-comparison')
+    expect(cmp).toHaveTextContent('Compared with your earlier attempt')
+    expect(within(cmp).getByText('Shown now, not before').parentElement).toHaveTextContent('Says the headcount is unknown.')
+    expect(within(cmp).getByText('Shown before, not now').parentElement).toHaveTextContent('Asks Dev a question.')
+    expect(cmp).toHaveTextContent('does not measure growth')
+    expect(cmp.textContent).not.toMatch(/\d+\s*%|improv/i)
+    const focus = screen.getByTestId('feedback-focus')
+    expect(within(focus).queryByTestId('focus-observed')).not.toBeInTheDocument()
+    expect(within(focus).getByTestId('focus-next')).toHaveTextContent('This matches the example you were shown, so it is not counted as your own.')
+    const copied = screen.getAllByTestId('mission-criterion').find((c) => c.dataset.result === 'COPIED_ASSISTANCE')
+    expect(copied).toHaveTextContent('Matches an example')
+    expect(copied).toHaveTextContent('not counted as your own')
+    expect(copied).not.toHaveTextContent('Your words')
+    expect(screen.getByTestId('mission-summary')).toHaveTextContent('not counted as your own')
+  })
+
+  it('a fresh challenge attempt shows the transfer scene (not the base scene) with the uncoached note and no examples action', async () => {
+    const transfer = attempt({ id: ATT_C, missionId: M01.id, hints: [], hintsRemaining: 0, variant: 'TRANSFER', scene: { setting: 'Jo asks you to confirm the courier slot for Friday.', objective: 'Reply to Jo.', constraints: ['The van carries up to 20 kg.'], situationFacts: ['Nobody has weighed the boxes.'] }, examples: [], examplesAvailable: 0, assistance: { mode: 'UNCOACHED', hintsUsed: 0, scaffoldRequested: false } })
+    renderStudent('/app/development/missions/:missionId', <MissionPlayerPage />, {
+      [`/api/v1/missions/${M01.id}`]: { data: m01View },
+      [`/api/v1/mission-attempts/${ATT_C}`]: { data: transfer },
+    }, { route: `/app/development/missions/${M01.id}?attempt=${ATT_C}` })
+    expect(await screen.findByTestId('transfer-note')).toHaveTextContent('A different setting for the same behaviours.')
+    expect(screen.getByTestId('scene-setting')).toHaveTextContent('Jo asks you to confirm the courier slot for Friday.')
+    expect(screen.getByTestId('scene-setting')).not.toHaveTextContent('Room 2')
+    expect(screen.getByTestId('scene-objective')).toHaveTextContent('Reply to Jo.')
+    expect(screen.getByText('Nobody has weighed the boxes.')).toBeInTheDocument()
+    expect(screen.getByTestId('uncoached-note')).toHaveTextContent('setting you have not seen before')
+    expect(screen.queryByTestId('examples-action')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Hints/ })).not.toBeInTheDocument()
+  })
+})
+
 describe('Campus development (interventions)', () => {
   it('shows calendar days as the same day in every browser time zone', () => {
     const tz = process.env.TZ

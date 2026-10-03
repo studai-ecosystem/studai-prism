@@ -27,6 +27,10 @@ function textFor(task, request) {
     // KEYWORDS_ONLY, so tests can show paraphrase acceptance without a model.
     if (/MEANING CRITERIA \(JSON\)/.test(system)) {
       const spec = (() => { try { return JSON.parse(/MEANING CRITERIA \(JSON\)\s*([^\r\n]+)/.exec(system)?.[1] || '[]') } catch { return [] } })()
+      // 'mismatch': the evaluator claims every criterion with a quote the
+      // learner never wrote — the pipeline must withhold, never trust it.
+      if (auditFault() === 'mismatch') return JSON.stringify({ criteria: spec.map((c) => ({ criterion_id: c.criterion_id, met: true, quote: 'words the learner never actually wrote here', reason: 'EXPRESSED' })) })
+      if (auditFault() === 'malformed') return '{"criteria": [ not json'
       const work = (system.split('<candidate_transcript>').pop() || '').split('</candidate_transcript>')[0].trim()
       const sentences = work.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean)
       const allPhraseWords = new Set(spec.flatMap((c) => (c.phrasings || []).flatMap((p) => String(p).toLowerCase().split(/\s+/))))
@@ -124,10 +128,14 @@ function textFor(task, request) {
 }
 
 export async function auditConverse(request) {
-  if (request?.requestMetadata?.task === 'evidence_evaluator' && auditFault() === 'throw') {
+  const task = request?.requestMetadata?.task
+  // Layer B fault injection: provider failure for the evidence evaluator and
+  // the mission evaluator (P6 acceptance: a failed review keeps the work,
+  // charges no attempt and is retried with the same effect).
+  if ((task === 'evidence_evaluator' || task === 'mission_evaluator') && auditFault() === 'throw') {
     throw Object.assign(new Error('audit provider unavailable'), { name: 'ServiceUnavailableException', code: 'PROVIDER_DOWN' })
   }
-  const text = textFor(request?.requestMetadata?.task, request)
+  const text = textFor(task, request)
   return {
     output: { message: { content: [{ text }] } },
     stopReason: 'end_turn',

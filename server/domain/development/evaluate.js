@@ -11,8 +11,9 @@
 import { runDeterministicChecks, candidateTextFor, VALIDATORS_VERSION } from './validators.js'
 import { MISSION_SCHEMA_VERSION } from './missionSchema.js'
 import { meaningWorkTooShort } from './evaluator.js'
+import { copiedFrom, buildFocus, FEEDBACK_VERSION } from './feedback.js'
 
-export const PIPELINE_VERSION = 'mission-pipeline.v2'
+export const PIPELINE_VERSION = 'mission-pipeline.v3'
 export const CONFIDENCE_THRESHOLD = 0.7
 const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 
@@ -26,7 +27,11 @@ function quoteVerified(quote, texts) {
   return texts.some((t) => norm(t).includes(q))
 }
 
-export async function evaluateMissionWork({ mission, work, evaluator, candidateName = null }) {
+// `exposed`: sentences the learner was shown before submitting (scaffold
+// hints and examples, from this and earlier attempts of the mission). A
+// criterion whose text reproduces one of them is COPIED_ASSISTANCE: shown
+// honestly, never praised, never counted as the learner's own behaviour.
+export async function evaluateMissionWork({ mission, work, evaluator, candidateName = null, exposed = [] }) {
   const det = runDeterministicChecks(mission, work)
   const needEvaluator = mission.rubric.criteria.filter((c) => c.check === 'EVALUATOR' || (c.check === 'BOTH' && det.get(c.criterion_id).observed))
   const needMeaning = mission.rubric.criteria.filter((c) => c.check === 'MEANING')
@@ -54,26 +59,31 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
   const criteria = mission.rubric.criteria.map((c) => {
     const d = det.get(c.criterion_id)
     const base = { criterionId: c.criterion_id, behaviorId: c.behavior_id, description: c.description, check: c.check, rules: d.rules, quote: null }
-    if (c.check === 'DETERMINISTIC') return { ...base, result: d.observed ? 'OBSERVED' : 'NOT_OBSERVED', reason: d.observed ? 'RULES_PASSED' : 'RULES_NOT_MET' }
-    if (c.check === 'MEANING') {
-      if (!mv.available) return { ...base, result: 'UNCERTAIN', reason: 'EVALUATION_UNAVAILABLE' }
-      const m = meanings.get(c.criterion_id)
-      if (!m) return { ...base, result: 'UNCERTAIN', reason: 'NO_EVALUATOR_DECISION' }
-      if (!m.met) return { ...base, result: 'NOT_OBSERVED', reason: m.reason === 'EMPTY_WORK' ? 'EMPTY_WORK' : `MEANING_${m.reason}` }
-      if (!quoteVerified(m.quote, texts.get(c.criterion_id))) return { ...base, result: 'UNCERTAIN', reason: 'QUOTE_NOT_VERIFIED' }
-      return { ...base, result: 'OBSERVED', reason: 'MEANING_EXPRESSED', quote: m.quote.trim() }
-    }
-    if (c.check === 'BOTH' && !d.observed) return { ...base, result: 'NOT_OBSERVED', reason: 'RULES_NOT_MET' }
-    if (!ev.available) return { ...base, result: 'UNCERTAIN', reason: 'EVALUATION_UNAVAILABLE' }
-    const a = answers.get(c.criterion_id)
-    if (!a) return { ...base, result: 'UNCERTAIN', reason: 'NO_EVALUATOR_DECISION' }
-    if (a.confidence < CONFIDENCE_THRESHOLD) return { ...base, result: 'UNCERTAIN', reason: 'LOW_CONFIDENCE' }
-    if (!a.observed) {
-      // BOTH: rules passed but the evaluator disagrees → uncertain, never a verdict.
-      return c.check === 'BOTH' ? { ...base, result: 'UNCERTAIN', reason: 'CHECKS_DISAGREE' } : { ...base, result: 'NOT_OBSERVED', reason: 'EVALUATOR_NOT_OBSERVED' }
-    }
-    if (!quoteVerified(a.quote, texts.get(c.criterion_id))) return { ...base, result: 'UNCERTAIN', reason: 'QUOTE_NOT_VERIFIED' }
-    return { ...base, result: 'OBSERVED', reason: c.check === 'BOTH' ? 'RULES_AND_EVALUATOR_AGREE' : 'EVALUATOR_OBSERVED', quote: a.quote.trim() }
+    const decided = (() => {
+      if (c.check === 'DETERMINISTIC') return { ...base, result: d.observed ? 'OBSERVED' : 'NOT_OBSERVED', reason: d.observed ? 'RULES_PASSED' : 'RULES_NOT_MET' }
+      if (c.check === 'MEANING') {
+        if (!mv.available) return { ...base, result: 'UNCERTAIN', reason: 'EVALUATION_UNAVAILABLE' }
+        const m = meanings.get(c.criterion_id)
+        if (!m) return { ...base, result: 'UNCERTAIN', reason: 'NO_EVALUATOR_DECISION' }
+        if (!m.met) return { ...base, result: 'NOT_OBSERVED', reason: m.reason === 'EMPTY_WORK' ? 'EMPTY_WORK' : `MEANING_${m.reason}` }
+        if (!quoteVerified(m.quote, texts.get(c.criterion_id))) return { ...base, result: 'UNCERTAIN', reason: 'QUOTE_NOT_VERIFIED' }
+        return { ...base, result: 'OBSERVED', reason: 'MEANING_EXPRESSED', quote: m.quote.trim() }
+      }
+      if (c.check === 'BOTH' && !d.observed) return { ...base, result: 'NOT_OBSERVED', reason: 'RULES_NOT_MET' }
+      if (!ev.available) return { ...base, result: 'UNCERTAIN', reason: 'EVALUATION_UNAVAILABLE' }
+      const a = answers.get(c.criterion_id)
+      if (!a) return { ...base, result: 'UNCERTAIN', reason: 'NO_EVALUATOR_DECISION' }
+      if (a.confidence < CONFIDENCE_THRESHOLD) return { ...base, result: 'UNCERTAIN', reason: 'LOW_CONFIDENCE' }
+      if (!a.observed) {
+        // BOTH: rules passed but the evaluator disagrees → uncertain, never a verdict.
+        return c.check === 'BOTH' ? { ...base, result: 'UNCERTAIN', reason: 'CHECKS_DISAGREE' } : { ...base, result: 'NOT_OBSERVED', reason: 'EVALUATOR_NOT_OBSERVED' }
+      }
+      if (!quoteVerified(a.quote, texts.get(c.criterion_id))) return { ...base, result: 'UNCERTAIN', reason: 'QUOTE_NOT_VERIFIED' }
+      return { ...base, result: 'OBSERVED', reason: c.check === 'BOTH' ? 'RULES_AND_EVALUATOR_AGREE' : 'EVALUATOR_OBSERVED', quote: a.quote.trim() }
+    })()
+    if (decided.result === 'UNCERTAIN' || !exposed.length) return decided
+    const copied = copiedFrom(texts.get(c.criterion_id), exposed)
+    return copied ? { ...decided, result: 'COPIED_ASSISTANCE', reason: 'COPIED_ASSISTANCE', quote: null, copiedFrom: { source: copied.source, id: copied.id } } : decided
   })
 
   const behaviors = mission.target_behavior_ids.map((b) => {
@@ -83,27 +93,33 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
   })
   const demonstrated = behaviors.filter((b) => b.result === 'DEMONSTRATED').length
   const uncertain = behaviors.filter((b) => b.result === 'UNCERTAIN').length
+  const copied = criteria.filter((c) => c.result === 'COPIED_ASSISTANCE').length
   const status = ev.available && mv.available ? 'EVALUATED' : 'EVALUATION_UNAVAILABLE'
   const verified = status === 'EVALUATED' && uncertain === 0
   const total = behaviors.length
   const noun = (n) => (n === 1 ? 'behaviour' : 'behaviours')
-  const summary = verified
-    ? `Mission completed — ${demonstrated} of ${total} target ${noun(total)} demonstrated.`
-    : `${demonstrated} of ${total} target ${noun(total)} demonstrated so far; ${uncertain} could not be checked reliably this time.`
+  const copiedNote = copied ? ` ${copied} ${copied === 1 ? 'check matches' : 'checks match'} an example or hint you were shown and ${copied === 1 ? 'is' : 'are'} not counted as your own.` : ''
+  const summary = (verified
+    ? (demonstrated === 0
+      ? `Attempt reviewed — none of the ${total} target ${noun(total)} shown yet.`
+      : `Mission completed — ${demonstrated} of ${total} target ${noun(total)} demonstrated.`)
+    : `${demonstrated} of ${total} target ${noun(total)} demonstrated so far; ${uncertain} could not be checked reliably this time.`) + copiedNote
+  const focus = buildFocus({ mission, criteria, status, learnerTextFor: (c) => candidateTextFor(mission, work, mission.rubric.criteria.find((x) => x.criterion_id === c.criterionId)?.artifact_ids || []) })
 
   return {
     status,
     verified,
     summary,
+    focus,
     criteria,
     behaviors,
-    counts: { demonstrated, uncertain, total },
+    counts: { demonstrated, uncertain, total, copied },
     evaluator: {
       used: needEvaluator.length > 0 || needMeaning.length > 0, available: ev.available && mv.available,
       reason: ev.available ? (mv.available ? null : mv.reason) : ev.reason,
       promptVersion: evaluator?.promptVersion || null, meaningPromptVersion: needMeaning.length ? (evaluator?.meaningPromptVersion || null) : null, model: ev.model || mv.model || null,
     },
-    versions: { pipeline: PIPELINE_VERSION, validators: VALIDATORS_VERSION, schema: MISSION_SCHEMA_VERSION, confidenceThreshold: CONFIDENCE_THRESHOLD },
+    versions: { pipeline: PIPELINE_VERSION, validators: VALIDATORS_VERSION, schema: MISSION_SCHEMA_VERSION, feedback: FEEDBACK_VERSION, confidenceThreshold: CONFIDENCE_THRESHOLD },
   }
 }
 

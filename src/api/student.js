@@ -52,6 +52,8 @@ export const HistoryItemSchema = z.object({
   reportFormat: z.enum(['V3', 'LEGACY_V2']).nullable(),
   permittedAction: z.object({ kind: z.enum(['VIEW_REPORT', 'RESUME', 'RECOVER', 'VIEW', 'NONE']), to: z.string().nullable() }),
   recoveryState: z.enum(['NONE', 'RESUMABLE', 'AWAITING_REPORT', 'RECOVERABLE', 'SUPPORT_REQUIRED', 'HELD']),
+  // Practice only (P6.7): enough to offer a fresh challenge from history.
+  practice: z.object({ capabilityId: z.string().nullable(), assistanceMode: z.enum(['GUIDED', 'UNCOACHED']), variant: z.enum(['BASE', 'TRANSFER']) }).optional(),
 }).passthrough()
 
 const HistorySchema = z.object({ items: z.array(HistoryItemSchema), nextCursor: z.string().nullable() })

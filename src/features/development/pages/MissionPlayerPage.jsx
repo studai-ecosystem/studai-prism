@@ -53,6 +53,7 @@ export default function MissionPlayerPage() {
   const [saveState, setSaveState] = useState('idle') // idle | saving | saved | error | conflict | closed
   const [closedMessage, setClosedMessage] = useState(null)
   const [hintsOpen, setHintsOpen] = useState(false)
+  const [examplesOpen, setExamplesOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [notSubmitted, setNotSubmitted] = useState(false)
   const feedbackRef = useRef(null)
@@ -64,6 +65,21 @@ export default function MissionPlayerPage() {
   useEffect(() => {
     if (missionQuery.data?.openAttemptId && !attemptId) setAttemptId(missionQuery.data.openAttemptId)
   }, [missionQuery.data, attemptId])
+  // A fresh challenge or replay may land on the SAME mission route with a
+  // new ?attempt=; follow it instead of staying on the previous attempt.
+  // Only a CHANGE of the requested id counts, so a retry started on this
+  // page (which does not rewrite the URL) is never undone.
+  const lastRequested = useRef(requestedAttempt)
+  useEffect(() => {
+    if (requestedAttempt && requestedAttempt !== lastRequested.current) {
+      lastRequested.current = requestedAttempt
+      setAttemptId(requestedAttempt)
+      setDirty(false)
+      setSaveState('idle')
+      setWork(null)
+      workRef.current = null
+    }
+  }, [requestedAttempt])
   // Adopt the server copy when an attempt loads (never over unsaved edits).
   useEffect(() => {
     if (attempt && !dirty) { setWork(attempt.work); workRef.current = attempt.work }
@@ -157,9 +173,19 @@ export default function MissionPlayerPage() {
   const pastAttempts = missionQuery.data.pastAttempts.filter((p) => p.id !== attempt?.id)
   const inProgress = attempt?.status === 'IN_PROGRESS' && saveState !== 'closed'
   const uncoached = attempt?.assistance?.mode === 'UNCOACHED'
+  // The scene this attempt runs: a fresh challenge may use the mission's
+  // unfamiliar-setting version, so the attempt's scene wins over the base.
+  const scene = attempt?.scene || { setting: mission.scenario.setting, objective: mission.scenario.objective, constraints: mission.constraints, situationFacts: mission.situationFacts || [] }
+  const transfer = attempt?.variant === 'TRANSFER'
+  const examplesAvailable = attempt ? (attempt.examplesAvailable || 0) : (mission.examplesAvailable || 0)
+  const allowance = missionQuery.data.allowance || { kind: 'UNLIMITED' }
   const saveText = { idle: dirty ? 'Unsaved changes' : '', saving: 'Saving…', saved: 'All changes saved', error: 'Not saved — check your connection. Your work is kept on this page.', conflict: '', closed: '' }[saveState]
   const campusName = active.type === 'CAMPUS_STUDENT' ? (active.organizationName || 'Your institution') : null
   const originKind = origin?.kind || attempt?.origin?.kind || null
+  const showExamples = () => {
+    setExamplesOpen(true)
+    if (attempt && (attempt.examples || []).length === 0 && examplesAvailable > 0 && !actions.examples.isPending) actions.examples.mutate({ attemptId: attempt.id })
+  }
 
   return (
     <div className="space-y-6">
@@ -173,14 +199,18 @@ export default function MissionPlayerPage() {
       {uncoached && (
         <div data-testid="uncoached-note"><InlineNotice tone="neutral">{copy.uncoachedNote}</InlineNotice></div>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        {mission.targetCapability.name && <span className="text-sm text-prism-ink-muted">Focus: {mission.targetCapability.name}</span>}
-        {intervention && <span className="text-sm text-prism-ink-muted">· Part of {intervention.name}{intervention.endsOn ? `, until ${formatDate(intervention.endsOn)}` : ''}</span>}
-      </div>
+      <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-prism-ink-muted" data-testid="first-view-facts">
+        {mission.targetCapability.name && <div><dt className="sr-only">{copy.firstView.target}</dt><dd>Focus: {mission.targetCapability.name}</dd></div>}
+        <div><dt className="sr-only">Duration</dt><dd>{copy.firstView.duration(mission.estimatedMinutes)}</dd></div>
+        {mission.mode?.label && <div><dt className="sr-only">Mode</dt><dd>{mission.mode.label}</dd></div>}
+        <div><dt className="sr-only">Allowance</dt><dd data-testid="first-view-allowance">{allowance.kind === 'BOUNDED' ? DEVELOPMENT_COPY.missions.allowanceRemaining(allowance.remaining, allowance.total) : copy.firstView.allowanceUnlimited}</dd></div>
+        {intervention && <div><dt className="sr-only">Intervention</dt><dd>Part of {intervention.name}{intervention.endsOn ? `, until ${formatDate(intervention.endsOn)}` : ''}</dd></div>}
+      </dl>
       {campusName && <p className="text-sm text-prism-ink-muted">{DEVELOPMENT_COPY.missions.campusPrivacy(campusName)}</p>}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <Panel title="The situation">
-          <p className="text-sm text-prism-ink">{mission.scenario.setting}</p>
+        <Panel title={copy.firstView.scene}>
+          {transfer && <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-prism-ink-muted" data-testid="transfer-note">{copy.transferNote}</p>}
+          <p className="text-sm text-prism-ink" data-testid="scene-setting">{scene.setting}</p>
           {attempt?.stimulus?.source === 'ASSESSMENT_MOMENT' && (
             <div className="mt-4 rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-subtle p-3" data-testid="replay-stimulus">
               <h3 className="text-sm font-semibold text-prism-ink">{copy.stimulusTitle}</h3>
@@ -188,26 +218,28 @@ export default function MissionPlayerPage() {
               <p className="mt-2 text-xs text-prism-ink-subtle">{copy.stimulusNote}</p>
             </div>
           )}
-          <h3 className="mt-4 text-sm font-semibold text-prism-ink">Your task</h3>
-          <p className="mt-1 text-sm text-prism-ink">{mission.scenario.objective}</p>
+          <h3 className="mt-4 text-sm font-semibold text-prism-ink">{copy.firstView.task}</h3>
+          <p className="mt-1 text-sm text-prism-ink" data-testid="scene-objective">{scene.objective}</p>
+          <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-prism-ink-muted">{mission.instructions.map((i) => <li key={i}>{i}</li>)}</ol>
+          {(scene.situationFacts?.length || scene.constraints.length) > 0 && (
+            <>
+              <h3 className="mt-4 text-sm font-semibold text-prism-ink">{copy.firstView.facts}</h3>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-prism-ink-muted">{(scene.situationFacts?.length ? scene.situationFacts : scene.constraints).map((c) => <li key={c}>{c}</li>)}</ul>
+            </>
+          )}
           {mission.whyItMatters && (
             <>
               <h3 className="mt-4 text-sm font-semibold text-prism-ink">{copy.whyItMatters}</h3>
               <p className="mt-1 text-sm text-prism-ink-muted">{mission.whyItMatters}</p>
             </>
           )}
-          <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-prism-ink-muted">{mission.instructions.map((i) => <li key={i}>{i}</li>)}</ol>
-          {mission.constraints.length > 0 && (
-            <>
-              <h3 className="mt-4 text-sm font-semibold text-prism-ink">Constraints</h3>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-prism-ink-muted">{mission.constraints.map((c) => <li key={c}>{c}</li>)}</ul>
-            </>
-          )}
-          <h3 className="mt-4 text-sm font-semibold text-prism-ink">{copy.whatIsChecked}</h3>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-prism-ink-muted">{mission.whatIsChecked.map((c) => <li key={c.criterionId}>{c.description}</li>)}</ul>
+          <details className="mt-4" data-testid="what-is-checked">
+            <summary className="cursor-pointer text-sm font-semibold text-prism-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-prism-accent">{copy.whatIsChecked}</summary>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-prism-ink-muted">{mission.whatIsChecked.map((c) => <li key={c.criterionId}>{c.description}</li>)}</ul>
+          </details>
         </Panel>
 
-        <section aria-labelledby="mission-work-title" className="space-y-4">
+        <section aria-labelledby="mission-work-title" className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="mission-work-title" tabIndex={-1} className="text-lg font-semibold text-prism-ink focus:outline-none">Your work</h2>
             {inProgress && <span role="status" aria-live="polite" className="text-sm text-prism-ink-muted">{saveText}</span>}
@@ -237,6 +269,7 @@ export default function MissionPlayerPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <Button onClick={() => setConfirmOpen(true)} disabled={actions.submit.isPending}>Submit for feedback</Button>
                   {mission.hintCount > 0 && !uncoached && <Button variant="secondary" onClick={() => setHintsOpen(true)}>Hints ({attempt.hints.length} of {mission.hintCount} shown)</Button>}
+                  {examplesAvailable > 0 && !uncoached && <Button variant="secondary" onClick={showExamples} data-testid="examples-action">{copy.examplesAction}</Button>}
                 </div>
               )}
               <div role="alert">
@@ -259,6 +292,7 @@ export default function MissionPlayerPage() {
                   {actions.start.error && <div role="alert" className="mt-3"><InlineNotice tone="blocked">{actions.start.error.message}</InlineNotice></div>}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button onClick={() => start(true)} loading={actions.start.isPending}>{copy.retry}</Button>
+                    {examplesAvailable > 0 && !uncoached && <Button variant="secondary" onClick={showExamples} data-testid="examples-action">{copy.examplesAction}</Button>}
                     <LinkButton to={devPath}>Back to development</LinkButton>
                     <LinkButton to={historyPath} variant="secondary">{copy.backToHistory}</LinkButton>
                   </div>
@@ -286,6 +320,25 @@ export default function MissionPlayerPage() {
               <Button variant="secondary" loading={actions.hint.isPending} onClick={showHint}>Show a hint</Button>
             )}
             {actions.hint.error && <div role="alert"><InlineNotice tone="blocked">{actions.hint.error.message}</InlineNotice></div>}
+          </div>
+        )}
+      </Drawer>
+
+      <Drawer open={examplesOpen} onClose={() => setExamplesOpen(false)} title={copy.examplesTitle}>
+        {attempt && (
+          <div className="space-y-3" data-testid="examples-drawer">
+            <p className="text-sm text-prism-ink-muted">{copy.examplesNote}</p>
+            {actions.examples.isPending && <p className="text-sm text-prism-ink-muted" role="status">Loading examples…</p>}
+            {actions.examples.error && <div role="alert"><InlineNotice tone="blocked">{actions.examples.error.message}</InlineNotice></div>}
+            <ul className="space-y-3">
+              {(attempt.examples || []).map((e) => (
+                <li key={e.id} className="rounded-[var(--prism-radius-md)] border border-prism-border p-3" data-testid="example-item" data-kind={e.kind}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-prism-ink-muted">{copy.exampleKind[e.kind]}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-prism-ink">{e.text}</p>
+                  <p className="mt-1 text-xs text-prism-ink-subtle">{e.note}</p>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </Drawer>

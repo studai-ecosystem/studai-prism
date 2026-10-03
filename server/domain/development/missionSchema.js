@@ -53,10 +53,62 @@ const Criterion = z.object({
   artifact_ids: z.array(Id).min(1).max(4),
 }).strict()
 
+// P6.2 reviewer package. Examples are teaching support shown only after a
+// submission or on explicit request; copying one is detected and never
+// counted as the learner's own behaviour (P6.4).
+const Example = z.object({
+  example_id: Id,
+  kind: z.enum(['EXAMPLE', 'COUNTEREXAMPLE']),
+  criterion_ids: z.array(Id).min(1).max(4),
+  text: Text(600),
+  note: Text(300),
+}).strict()
+// First-attempt feedback logic: which completed criterion to acknowledge
+// first and which missing one is the highest-value next change.
+const FirstAttemptFeedback = z.object({
+  completed_priority: z.array(Id).min(1).max(8),
+  next_change_priority: z.array(Id).min(1).max(8),
+}).strict()
+// Unfamiliar-transfer version: a different setting for the SAME behaviour
+// ids. It may swap the starting artifact state, rule parameters and meaning
+// phrasings that are bound to the base facts; criteria, behaviours and
+// artifact structure stay identical so feedback stays comparable.
+const Transfer = z.object({
+  setting: Text(1200),
+  objective: Text(600),
+  constraints_notes: z.array(Text(300)).max(6),
+  situation_facts: z.array(Text(300)).min(1).max(10),
+  exposure_tags: z.array(Id).max(8),
+  artifact_initial_state: z.record(z.record(z.unknown())).optional(),
+  rule_overrides: z.array(z.object({ rule_id: Id, params: z.record(z.unknown()), description: Text(300).optional() }).strict()).max(20).optional(),
+  meaning_overrides: z.array(z.object({ criterion_id: Id, intent: Text(400), synonyms: z.array(Text(80)).min(1).max(12), evaluator_guidance: Text(600).optional() }).strict()).max(8).optional(),
+}).strict()
+// A DRAFT review record never records an approval: publication is a separate
+// human decision recorded elsewhere (content_review, 0050).
+const ReviewRecord = z.object({
+  status: z.literal('DRAFT'),
+  authored_by: Text(80),
+  authored_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reviewed_by: z.null(),
+  reviewed_on: z.null(),
+  approval: z.literal('NOT_APPROVED'),
+  notes: Text(600).optional(),
+}).strict()
+
 export const MissionContentSchema = z.object({
   mission_id: Id,
   version: z.number().int().min(1),
   status: z.enum(['DRAFT', 'PUBLISHED', 'RETIRED']),
+  // P6.2 reviewer-package fields (optional so earlier versions stay byte-identical).
+  situation_facts: z.array(Text(300)).min(1).max(10).optional(),
+  learner_actions: z.array(Text(300)).min(1).max(8).optional(),
+  clarifications: z.array(z.object({ question: Text(300), answer: Text(400) }).strict()).max(8).optional(),
+  examples: z.array(Example).max(8).optional(),
+  first_attempt_feedback: FirstAttemptFeedback.optional(),
+  transfer: Transfer.optional(),
+  accessibility_note: Text(600).optional(),
+  confounds: z.array(Text(300)).min(1).max(8).optional(),
+  review_record: ReviewRecord.optional(),
   // P6 authoring metadata (optional so earlier versions stay byte-identical).
   display_code: z.string().regex(/^M\d{2}$/).optional(),
   source: z.enum(['ORIGINAL', 'LEGACY']).optional(),
@@ -100,7 +152,89 @@ export const MissionContentSchema = z.object({
   }
   for (const b of behaviors) if (![...criteria.values()].some((c) => c.behavior_id === b)) ctx.addIssue({ code: 'custom', message: `behaviour ${b} has no criterion` })
   if (m.required_evidence.min_criteria_observed > m.rubric.criteria.length) ctx.addIssue({ code: 'custom', message: 'required evidence exceeds the rubric' })
+  // P6.2 package cross-checks.
+  for (const e of m.examples || []) for (const id of e.criterion_ids) if (!criteria.has(id)) ctx.addIssue({ code: 'custom', message: `example ${e.example_id} references unknown criterion ${id}` })
+  if (m.first_attempt_feedback) {
+    for (const id of [...m.first_attempt_feedback.completed_priority, ...m.first_attempt_feedback.next_change_priority]) {
+      if (!criteria.has(id)) ctx.addIssue({ code: 'custom', message: `first-attempt feedback references unknown criterion ${id}` })
+    }
+  }
+  if (m.transfer) {
+    const rules = new Set(m.deterministic_validation_rules.map((r) => r.rule_id))
+    for (const o of m.transfer.rule_overrides || []) if (!rules.has(o.rule_id)) ctx.addIssue({ code: 'custom', message: `transfer overrides unknown rule ${o.rule_id}` })
+    for (const o of m.transfer.meaning_overrides || []) {
+      const c = criteria.get(o.criterion_id)
+      if (!c) ctx.addIssue({ code: 'custom', message: `transfer overrides unknown criterion ${o.criterion_id}` })
+      else if (c.check !== 'MEANING') ctx.addIssue({ code: 'custom', message: `transfer meaning override ${o.criterion_id} is not a MEANING criterion` })
+    }
+    for (const id of Object.keys(m.transfer.artifact_initial_state || {})) if (!artifacts.has(id)) ctx.addIssue({ code: 'custom', message: `transfer starts unknown artifact ${id}` })
+  }
+  if (m.review_record && m.status !== 'DRAFT') ctx.addIssue({ code: 'custom', message: 'a review record describes DRAFT content only' })
 })
+
+export const MISSION_VARIANTS = Object.freeze(['BASE', 'TRANSFER'])
+
+// The mission as it runs for one attempt. TRANSFER swaps the scene, the
+// starting artifact state and any fact-bound rule parameters / meaning
+// phrasings; everything else (criteria, behaviours, artifact structure,
+// hints, feedback policy) is the base mission, so two attempts stay
+// comparable criterion by criterion.
+export function applyVariant(mission, variant = 'BASE') {
+  if (variant !== 'TRANSFER') return mission
+  const t = mission.transfer
+  if (!t) throw Object.assign(new Error(`Mission ${mission.mission_id} has no transfer version`), { code: 'NO_TRANSFER_VARIANT' })
+  const ruleOverride = new Map((t.rule_overrides || []).map((o) => [o.rule_id, o]))
+  const meaningOverride = new Map((t.meaning_overrides || []).map((o) => [o.criterion_id, o]))
+  return {
+    ...mission,
+    scenario_context: { setting: t.setting, objective: t.objective },
+    constraints: { ...mission.constraints, notes: t.constraints_notes },
+    situation_facts: t.situation_facts,
+    exposure_tags: t.exposure_tags,
+    artifacts: mission.artifacts.map((a) => (t.artifact_initial_state?.[a.artifact_id] ? { ...a, initial_state: t.artifact_initial_state[a.artifact_id] } : a)),
+    deterministic_validation_rules: mission.deterministic_validation_rules.map((r) => {
+      const o = ruleOverride.get(r.rule_id)
+      return o ? { ...r, params: o.params, description: o.description || r.description } : r
+    }),
+    rubric: {
+      criteria: mission.rubric.criteria.map((c) => {
+        const o = meaningOverride.get(c.criterion_id)
+        return o ? { ...c, meaning: { intent: o.intent, synonyms: o.synonyms }, evaluator_guidance: o.evaluator_guidance || c.evaluator_guidance } : c
+      }),
+    },
+  }
+}
+
+// P6.2 reviewer-package completeness: the fields every authored mission must
+// carry before a human can review it. Returns the names that are missing or
+// empty (an empty array means the package is complete).
+export const P6_PACKAGE_FIELDS = Object.freeze([
+  'situation_facts', 'objective', 'learner_actions', 'clarifications', 'initial_artifact_state', 'success_criteria',
+  'examples', 'counterexamples', 'deterministic_checks', 'semantic_checks', 'first_attempt_feedback', 'scaffold',
+  'retry_variation', 'transfer', 'accessibility_note', 'confounds', 'review_record',
+])
+export function missionPackageGaps(m) {
+  const gaps = []
+  const has = (name, ok) => { if (!ok) gaps.push(name) }
+  has('situation_facts', Array.isArray(m.situation_facts) && m.situation_facts.length > 0)
+  has('objective', Boolean(m.scenario_context?.objective))
+  has('learner_actions', Array.isArray(m.learner_actions) && m.learner_actions.length > 0)
+  has('clarifications', Array.isArray(m.clarifications) && m.clarifications.length > 0)
+  has('initial_artifact_state', Array.isArray(m.artifacts) && m.artifacts.every((a) => a.initial_state && typeof a.initial_state === 'object'))
+  has('success_criteria', (m.rubric?.criteria || []).length > 0)
+  has('examples', (m.examples || []).some((e) => e.kind === 'EXAMPLE'))
+  has('counterexamples', (m.examples || []).some((e) => e.kind === 'COUNTEREXAMPLE'))
+  has('deterministic_checks', (m.rubric?.criteria || []).some((c) => c.check === 'DETERMINISTIC' || c.check === 'BOTH'))
+  has('semantic_checks', (m.rubric?.criteria || []).some((c) => c.check === 'MEANING' || c.check === 'EVALUATOR' || c.check === 'BOTH'))
+  has('first_attempt_feedback', Boolean(m.first_attempt_feedback))
+  has('scaffold', (m.scaffolding_policy?.hints || []).length > 0)
+  has('retry_variation', Boolean(m.retry_variation))
+  has('transfer', Boolean(m.transfer) && m.transfer.setting !== m.scenario_context?.setting)
+  has('accessibility_note', Boolean(m.accessibility_note))
+  has('confounds', Array.isArray(m.confounds) && m.confounds.length > 0)
+  has('review_record', Boolean(m.review_record) && m.review_record.approval === 'NOT_APPROVED')
+  return gaps
+}
 
 export function parseMission(content) {
   const r = MissionContentSchema.safeParse(content)
