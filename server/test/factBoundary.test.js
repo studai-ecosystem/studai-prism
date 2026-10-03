@@ -90,3 +90,20 @@ test('validateGeneratedAction (T34): deadline, identity, scope, payment, thresho
   assert.equal(validateGeneratedAction(null, graph).ok, false)
   for (const t of ['browser', 'email', 'shell', 'database']) assert.equal(toolAllowed(t), false)
 })
+
+test('answerFactQuestion matches only the question sentence, so a plan that mentions the venue is not answered with a fact pointer', () => {
+  const world = worldStateFor(form, { revealedFactIds: [] })
+  const plan = 'Sam is out Day 1 afternoon, so room setup moves to Day 1 morning and I take the materials myself. Priya, can you cover the list if I run short?'
+  const out = answerFactQuestion({ form, worldState: world, text: plan })
+  assert.notEqual(out.factId, 'F-VENUE', 'a decision that mentions the room is not a venue question')
+  assert.equal(answerFactQuestion({ form, worldState: world, text: 'What equipment does the venue have?' }).factId, 'F-VENUE')
+  assert.equal(answerFactQuestion({ form, worldState: world, text: 'I will book the room. How many participants are expected?' }).factId, 'F-PARTICIPANTS')
+})
+
+test('answerFactQuestion leaves a request to a colleague to the Director instead of answering "not known"', () => {
+  const world = worldStateFor(form, { revealedFactIds: [] })
+  const out = answerFactQuestion({ form, worldState: world, text: 'Priya, can you cover the list if I run short?' })
+  assert.equal(out.kind, 'NONE')
+  assert.equal(out.text, null)
+  assert.equal(answerFactQuestion({ form, worldState: world, text: 'Who approved the budget?' }).kind, 'UNKNOWN')
+})

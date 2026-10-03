@@ -56,15 +56,23 @@ function matchesTriggers(text, fact) {
 
 export function answerFactQuestion({ form, worldState, text }) {
   if (typeof text !== 'string' || !text.trim()) return { kind: 'UNKNOWN', factId: null, text: null }
+  // Only the question sentences are matched: a plan that merely mentions the
+  // venue while stating a decision is not a request for information.
+  const questions = String(text).split(/(?<=[.!?])\s+/).filter((s) => /\?\s*$/.test(s))
+  const asked = questions.length ? questions.join(' ') : text
+  // A request to a colleague ("can you cover…?", "would you take…?") is a
+  // proposal, not a fact lookup: the Director handles it, not the fact table.
+  const infoQuestion = /\b(what|which|how (?:many|much|long)|when|where|who|is there|are there|do we|does the|did)\b/i.test(asked)
   // Already given (public or already revealed) → neutral pointer, no penalty.
   for (const fact of Object.values(worldState?.facts || {})) {
-    if (matchesTriggers(text, fact)) return { kind: 'ALREADY_GIVEN', factId: fact.id, text: `That is already in the brief: ${fact.text}`, neutral: true }
+    if (matchesTriggers(asked, fact)) return { kind: 'ALREADY_GIVEN', factId: fact.id, text: `That is already in the brief: ${fact.text}`, neutral: true }
   }
   // Relevant conditional fact → authored answer, revealed from now on.
   for (const cf of form.conditionalFacts || []) {
     if (worldState?.facts?.[cf.id]) continue
-    if (matchesTriggers(text, cf)) return { kind: 'AUTHORED', factId: cf.id, text: cf.text }
+    if (matchesTriggers(asked, cf)) return { kind: 'AUTHORED', factId: cf.id, text: cf.text }
   }
+  if (!infoQuestion) return { kind: 'NONE', factId: null, text: null }
   return { kind: 'UNKNOWN', factId: null, text: 'That is not known at this point; nobody on the team has that information.' }
 }
 

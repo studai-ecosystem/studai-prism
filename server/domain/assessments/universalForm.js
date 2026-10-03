@@ -71,7 +71,7 @@ const PUBLIC_FACTS = [
   { id: 'F-PARTICIPANTS', text: '24 participants are expected.', triggers: ['participant', 'how many people', 'attendees', 'headcount'] },
   { id: 'F-FACILITATORS', text: 'Two facilitators (Priya and Sam) will run the workshop.', triggers: ['facilitator', 'who runs', 'who is running'] },
   { id: 'F-PREP-DAYS', text: 'There are two working days to prepare.', triggers: ['how long', 'how much time', 'days to prepare', 'deadline', 'when is'] },
-  { id: 'F-VENUE', text: 'The venue has basic equipment: tables, chairs, one screen and a whiteboard.', triggers: ['venue', 'room', 'equipment', 'projector', 'screen'] },
+  { id: 'F-VENUE', text: 'The venue has basic equipment: tables, chairs, one screen and a whiteboard.', triggers: ['what equipment', 'which equipment', 'is there a projector', 'does the venue have', 'what does the venue', 'what is in the room'] },
   { id: 'F-OPEN-TASKS', text: 'Three preparation tasks are still open: confirm the venue setup, prepare participant materials, and confirm the participant list and needs.', triggers: ['open task', 'outstanding', 'what is left', 'remaining'] },
   { id: 'F-PRIORITIES', text: 'Two legitimate priorities compete: reaching as many participants as possible, and supporting each participant well.', triggers: ['priorit', 'reach', 'support', 'goal'] },
 ]
@@ -127,7 +127,7 @@ const WORLD_CHANGES = [
     description: 'Sam is unavailable for the afternoon of Day 1.',
     setFacts: [
       { id: 'F-FACILITATORS', text: 'Two facilitators (Priya and Sam) will run the workshop, but Sam is now unavailable for the afternoon of Day 1.' },
-      { id: 'F-FACILITATOR-CHANGE', text: 'New: Sam cannot work on preparation during the afternoon of Day 1. The board the learner has built is unchanged.', triggers: ['sam unavailable', 'what changed', 'afternoon'] },
+      { id: 'F-FACILITATOR-CHANGE', text: 'New: Sam cannot work on preparation during the afternoon of Day 1. Your board is unchanged; revise it if you need to.', triggers: ['sam unavailable', 'what changed', 'afternoon'] },
     ],
     preservesBoard: true,
   },
