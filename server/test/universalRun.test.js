@@ -266,12 +266,33 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     assert.equal(bad.body.error.code, 'VALIDATION_FAILED')
     assert.equal((await w.repos.sessionIo.getAction(sid, 'art-bad-0001')).state, 'FAILED')
 
-    // Finish with the last opportunity unanswered.
+    // Finish with the last opportunity unanswered. The recorded-context store
+    // fails exactly at publication time (after the evidence is applied): the
+    // evidence stands, the report is "not ready" — never a weakness, and a
+    // plain GET never retries publication. The next explicit finish does.
+    const listActions = w.repos.sessionIo.listActions
+    w.repos.sessionIo.listActions = async (...args) => {
+      if ((await w.repos.sessionIo.getJob(evaluateJobKey(sid)))?.state === 'DONE') throw new Error('context store unavailable')
+      return listActions.apply(w.repos.sessionIo, args)
+    }
     const fin = await w.call('POST', `/assessment-sessions/${sid}/finish`, { early: true })
     assert.equal(fin.status, 200, JSON.stringify(fin.body))
     assert.equal(fin.body.data.state, 'COMPLETE')
     assert.equal(w.engine.calls.evaluate, 0)
     assert.equal((await w.repos.sessionIo.getJob(evaluateJobKey(sid))).state, 'DONE')
+    assert.ok(w.audits.some((a) => a.type === 'report.v3.publish_failed' && a.sid === sid && a.payload.code === 'REPORT_PROCESSING_FAILED'))
+    const incomplete = await w.call('GET', `/assessment-sessions/${sid}/report`)
+    assert.equal(incomplete.status, 409)
+    assert.equal(incomplete.body.error.code, 'REPORT_NOT_READY')
+    w.repos.sessionIo.listActions = listActions
+    assert.equal((await w.call('GET', `/assessment-sessions/${sid}/report`)).status, 409, 'a read never publishes')
+    assert.equal(w.repos.db.reportVersions?.length || 0, 0)
+    const again = await w.call('POST', `/assessment-sessions/${sid}/finish`, { early: true })
+    assert.equal(again.status, 200, JSON.stringify(again.body))
+    const published = await w.call('GET', `/assessment-sessions/${sid}/report`)
+    assert.equal(published.status, 200, JSON.stringify(published.body))
+    assert.equal(published.body.data.version.reason, 'INITIAL')
+    assert.equal(w.repos.db.reportVersions.length, 1)
 
     ledger = await w.repos.sessionIo.listOpportunities(sid)
     const stateOf = (id) => ledger.find((r) => r.opportunityId === id).state
@@ -333,14 +354,6 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     assert.equal(decisions.length, 11, 'one recorded decision per presentation')
     assert.ok(decisions.every((a) => a.payload.renderHash && a.payload.formVersion === CORE_TEAMREADY_A.version && !('content' in a.payload)))
     assert.ok(!JSON.stringify(w.audits).includes(ANSWERS['OPP-REASON-OPTIONS']), 'no transcript text in audit output')
-
-    const listActions = w.repos.sessionIo.listActions
-    w.repos.sessionIo.listActions = async () => { throw new Error('context store unavailable') }
-    const incomplete = await w.call('GET', `/assessment-sessions/${sid}/report`)
-    assert.equal(incomplete.status, 409)
-    assert.equal(incomplete.body.error.code, 'REPORT_PROCESSING_FAILED')
-    assert.match(incomplete.body.error.message, /review is incomplete/i)
-    w.repos.sessionIo.listActions = listActions
   } finally { w.close() }
 })
 

@@ -11,6 +11,9 @@ export function createReportVersionsRepoMemory(db) {
       const rows = db.reportVersions.filter((v) => v.sessionId === sessionId)
       return clone(rows.sort((a, b) => b.version - a.version)[0]) || null
     },
+    async get(sessionId, version) {
+      return clone(db.reportVersions.find((v) => v.sessionId === sessionId && v.version === version)) || null
+    },
     // Version history without report bodies (P5.1): what exists, when and why.
     async listVersions(sessionId) {
       return db.reportVersions.filter((v) => v.sessionId === sessionId).sort((a, b) => a.version - b.version)
@@ -41,6 +44,10 @@ export function createReportVersionsRepoPg({ query }) {
   return {
     async latest(sessionId) {
       const { rows } = await query('SELECT * FROM student_report_versions WHERE session_id = $1 ORDER BY version DESC LIMIT 1', [sessionId])
+      return row(rows[0]) || null
+    },
+    async get(sessionId, version) {
+      const { rows } = await query('SELECT * FROM student_report_versions WHERE session_id = $1 AND version = $2', [sessionId, version])
       return row(rows[0]) || null
     },
     async listVersions(sessionId) {

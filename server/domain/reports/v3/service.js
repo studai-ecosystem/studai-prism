@@ -14,7 +14,7 @@ import { definitionForScenario } from '../../assessments/catalog.js'
 import { evaluateJobKey, draftSegmentFor, isUniversalSnapshot } from '../../assessments/draftSegments.js'
 import { coverageReport } from '../../assessments/director.js'
 import { hashToken } from '../../memberships/inviteService.js'
-import { buildStudentReportV3, reportContentHash, REPORT_V3_BUILDER_VERSION } from './build.js'
+import { buildStudentReportV3, reportContentHash, projectDisclosure, REPORT_V3_BUILDER_VERSION } from './build.js'
 import { assertReportSafe } from './schema.js'
 import { REVIEW_DECISIONS } from './repository.js'
 import { behaviourGaps } from '../../development/recommendations.js'
@@ -22,6 +22,10 @@ import { behaviourGaps } from '../../development/recommendations.js'
 export const MAX_SHARE_DAYS = 180
 export const REVIEW_REASON_MIN = 10
 export const REVIEW_REASON_MAX = 2000
+// Why a version exists. INITIAL is written once per session by the evaluation
+// worker (or finish()); every later version is an explicit, reasoned act that
+// links to the version it supersedes. Reads never add to this list.
+export const PUBLICATION_REASONS = Object.freeze(['INITIAL', 'REVIEW_CORRECTION', 'RE_ANALYSIS'])
 const DAY = 86400000
 
 // Hash of the evidence set a published version was built from (P2.7): ids,
@@ -77,10 +81,11 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
     }
   }
 
-  // Builds (and versions) the full report; audiences get views of it. The
-  // sponsor shown is always the session's sponsoring organization — never the
-  // reader's organization.
-  async function build(sessionId, loaded, { disclosure = 'FULL', candidateName = null, reason = null, withheldOverride = null } = {}) {
+  // Renders the full report from the session's stored evidence and recorded
+  // context. Pure with respect to storage: nothing here writes. Only
+  // publish() turns a rendering into a version. The sponsor shown is always
+  // the session's sponsoring organization — never the reader's organization.
+  async function render(sessionId, loaded, { withheldOverride = null } = {}) {
     const { session, report, scope, admin } = loaded
     const done = completion(loaded)
     if (!done) throw new ApiError('REPORT_NOT_READY', 'This report is not ready yet.')
@@ -108,7 +113,7 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
     const sponsored = scope?.sponsorType === 'INSTITUTION'
     const sponsorName = sponsored ? (await repos.organizations.getOrganization(scope.sponsorOrganizationId))?.name || null : null
     const header = {
-      candidateName: candidateName || report?.candidateName || session?.candidateName || null,
+      candidateName: null,
       assessmentTitle: definition?.title || null,
       scenarioTitle: bank?.title || general?.title || null,
       completedAt: done.completedAt,
@@ -120,54 +125,83 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
     // form's required opportunities against the ledger); null for legacy runs.
     const pinnedSnapshot = draftSegmentFor(scenarioId)
     const coverage = isUniversalSnapshot(pinnedSnapshot) && (opportunities || []).length ? coverageReport(pinnedSnapshot.form, opportunities) : null
-    const render = (level) => assertReportSafe(buildStudentReportV3({
-      sessionId, definition, formId: form?.id || null, units: allUnits, turns, header, disclosure: level, opportunities: opportunities || [], coverage, withheldEvidenceIds: withheldIds,
+    const full = assertReportSafe(buildStudentReportV3({
+      sessionId, definition, formId: form?.id || null, units: allUnits, turns, header, disclosure: 'FULL', opportunities: opportunities || [], coverage, withheldEvidenceIds: withheldIds,
     }))
-    let full
-    let version
-    const latest = await repos.reportVersions.latest(sessionId)
-    const publication = (setHash) => ({
-      evidenceSetHash: setHash, issuedAt: clock().toISOString(),
-      reason: reason || (latest ? 'RE_EVALUATION' : 'INITIAL'), priorVersion: latest?.version || null,
-    })
-    if (done.kind === 'EVALUATION_RUN') {
-      // Immutable publication: the stored version is served while the
-      // evidence set it was issued from is unchanged (P2.7).
-      const setHash = evidenceSetHash(units)
-      if (latest && latest.evidenceSetHash === setHash && !reason) {
-        full = { ...latest.report, header: { ...latest.report.header, candidateName: header.candidateName } }
-        version = { version: latest.version, createdAt: latest.createdAt, reason: latest.reason ?? null, priorVersion: latest.priorVersion ?? null }
-      } else {
-        full = render('FULL')
-        version = await persist(sessionId, full, publication(setHash))
-      }
-    } else {
-      full = render('FULL')
-      version = await persist(sessionId, full, reason ? publication(null) : {})
-    }
-    const view = disclosure === 'FULL' ? full : render(disclosure)
-    return { report: view, version, units: allUnits, withheldIds }
+    return { full, units: allUnits, withheldIds, evidenceSetHash: evidenceSetHash(units), done }
   }
 
-  // The stored version holds report content only: the display name is account
-  // data (it can change) and is added per view, so views never fork versions.
-  async function persist(sessionId, built, publication = {}) {
-    const report = { ...built, header: { ...built.header, candidateName: null } }
-    const contentHash = reportContentHash(report)
-    const existing = await repos.reportVersions.findByHash(sessionId, contentHash)
-    if (existing) return { version: existing.version, createdAt: existing.createdAt, reason: existing.reason ?? null, priorVersion: existing.priorVersion ?? null }
+  // Explicit publication (worker completion, finish(), a reviewer's
+  // correction or an authorized re-analysis). Reads never call this.
+  //   INITIAL           first version; idempotent — an existing version is
+  //                     returned untouched, however the evidence or the
+  //                     catalogue have changed since.
+  //   REVIEW_CORRECTION / RE_ANALYSIS
+  //                     a new version linked to the previous one, with the
+  //                     reason, method (builder version) and issue date
+  //                     recorded. Identical content is refused as CONFLICT.
+  async function publish(sessionId, { reason = 'INITIAL', note = null, withheldOverride = null, requestId = null } = {}) {
+    requireStore()
+    if (!PUBLICATION_REASONS.includes(reason)) throw new ApiError('VALIDATION_FAILED', 'Unknown publication reason.')
+    const loaded = await load(sessionId)
     const latest = await repos.reportVersions.latest(sessionId)
+    if (reason === 'INITIAL' && latest) return { version: versionRecord(latest), created: false }
+    if (reason !== 'INITIAL') {
+      if (!latest) throw new ApiError('REPORT_NOT_READY', 'There is no published report to supersede yet.')
+      const text = typeof note === 'string' ? note.trim() : ''
+      if (text.length < REVIEW_REASON_MIN || text.length > REVIEW_REASON_MAX) throw new ApiError('VALIDATION_FAILED', 'A new report version needs a specific reason.')
+    }
+    const { full, evidenceSetHash: setHash } = await render(sessionId, loaded, { withheldOverride })
+    const contentHash = reportContentHash(full)
+    if (latest && latest.contentHash === contentHash) {
+      if (reason === 'INITIAL') return { version: versionRecord(latest), created: false }
+      throw new ApiError('CONFLICT', 'This would not change the published report.')
+    }
+    const publication = { evidenceSetHash: setHash, issuedAt: clock().toISOString(), reason, priorVersion: latest?.version || null }
     try {
-      const row = await repos.reportVersions.append({ sessionId, version: (latest?.version || 0) + 1, contentHash, builderVersion: REPORT_V3_BUILDER_VERSION, report, ...publication })
-      audit('report.v3.version_created', sessionId, { sessionId, version: row.version, builderVersion: REPORT_V3_BUILDER_VERSION, ...(publication.reason ? { reason: publication.reason, priorVersion: publication.priorVersion } : {}) })
-      return { version: row.version, createdAt: row.createdAt, reason: row.reason ?? null, priorVersion: row.priorVersion ?? null }
+      const row = await repos.reportVersions.append({ sessionId, version: (latest?.version || 0) + 1, contentHash, builderVersion: REPORT_V3_BUILDER_VERSION, report: full, ...publication })
+      audit('report.v3.version_created', sessionId, { sessionId, version: row.version, builderVersion: REPORT_V3_BUILDER_VERSION, reason, priorVersion: publication.priorVersion, ...(note ? { note: String(note).trim().slice(0, REVIEW_REASON_MAX) } : {}), requestId })
+      return { version: versionRecord(row), created: true }
     } catch (err) {
       if (err?.code !== 'CONFLICT') throw err
-      const raced = await repos.reportVersions.findByHash(sessionId, contentHash)
+      // Two publishers raced: the stored row wins, whoever wrote it.
+      const raced = await repos.reportVersions.findByHash(sessionId, contentHash) || await repos.reportVersions.latest(sessionId)
       if (!raced) throw err
-      return { version: raced.version, createdAt: raced.createdAt, reason: raced.reason ?? null, priorVersion: raced.priorVersion ?? null }
+      return { version: versionRecord(raced), created: false }
     }
   }
+
+  // The snapshot every audience reads: the latest stored version (or, by
+  // number, an earlier one). Never renders, never writes. A completed run
+  // without a stored version is "not ready" — publication is pending, which
+  // is a technical state, never a finding.
+  async function select(sessionId, loaded, { disclosure = 'FULL', candidateName = null, version = null } = {}) {
+    const done = completion(loaded)
+    if (!done) throw new ApiError('REPORT_NOT_READY', 'This report is not ready yet.')
+    // Held or invalidated sessions are never formal evidence (K59).
+    if (loaded.admin?.invalid || loaded.admin?.reviewState === 'held') throw new ApiError('REPORT_UNDER_REVIEW', 'This report is being reviewed.')
+    const stored = Number.isInteger(version) && typeof repos.reportVersions.get === 'function'
+      ? await repos.reportVersions.get(sessionId, version)
+      : (await repos.reportVersions.latest(sessionId)) || await materialiseLegacy(sessionId, loaded, done)
+    if (!stored) throw new ApiError('REPORT_NOT_READY', 'Your report is being prepared.')
+    const view = projectDisclosure(stored.report, disclosure)
+    // The display name is account data, added per view; it is never stored.
+    const name = candidateName || loaded.report?.candidateName || loaded.session?.candidateName || null
+    const report = { ...view, header: { ...view.header, candidateName: name } }
+    return { report, version: versionRecord(stored), stored }
+  }
+
+  // Legacy sessions (engine-scored, report already issued, no evaluation
+  // worker) get their V3 version materialised once, on first read, from the
+  // evidence already on record. It is an INITIAL publication like any other:
+  // audited, immutable and never re-rendered afterwards.
+  async function materialiseLegacy(sessionId, loaded, done) {
+    if (done.kind !== 'LEGACY') return null
+    await publish(sessionId, { reason: 'INITIAL' })
+    return repos.reportVersions.latest(sessionId)
+  }
+
+  const versionRecord = (v) => ({ version: v.version, createdAt: v.createdAt, reason: v.reason ?? null, priorVersion: v.priorVersion ?? null, issuedAt: v.issuedAt ?? null, builderVersion: v.builderVersion ?? null })
 
   function ownsInWorkspace(loaded, user, workspace) {
     const owner = loaded.session?.userId || loaded.report?.userId || null
@@ -198,16 +232,33 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
     return (await repos.reportReviews.listForSession(sessionId)).filter((r) => r.state === 'OPEN').length
   }
 
-  const versionView = (v) => ({ number: v.version, createdAt: v.createdAt, reason: v.reason ?? null, priorVersion: v.priorVersion ?? null })
+  // The evidence a stored version was issued from: units recorded no later
+  // than the version, minus any a correction withheld. Evidence recorded
+  // afterwards never leaks into projections beside that version.
+  async function unitsCitedBy(sessionId, stored) {
+    const all = await evidence.units(sessionId).catch(() => [])
+    const withheld = new Set(stored?.report?.review?.withheldEvidenceIds || [])
+    const cutoff = stored?.issuedAt || stored?.createdAt ? new Date(stored.issuedAt || stored.createdAt).getTime() : null
+    return all.filter((u) => !withheld.has(u.evidence_id) && (cutoff == null || !u.created_at || new Date(u.created_at).getTime() <= cutoff))
+  }
+
+  const versionView = (v) => ({ number: v.version, createdAt: v.createdAt, reason: v.reason ?? null, priorVersion: v.priorVersion ?? null, issuedAt: v.issuedAt ?? null })
 
   return {
+    // Explicit publication; see publish(). Exposed for the evaluation worker
+    // (INITIAL) and for authorized re-analysis (RE_ANALYSIS with a reason).
+    publish: (sessionId, options) => publish(sessionId, options),
+
     async forOwner({ user, workspace, sessionId, requestId }) {
       requireStore()
       const loaded = await load(sessionId)
       if (!ownsInWorkspace(loaded, user, workspace)) throw new ApiError('NOT_FOUND', 'Not found')
-      const { report, version, units } = await build(sessionId, loaded, { candidateName: user.name || null })
+      const { report, version, stored } = await select(sessionId, loaded, { candidateName: user.name || null })
       audit('report.v3.viewed', sessionId, { sessionId, audience: 'OWNER', version: version.version, requestId })
-      const [recommendations, openRequests] = await Promise.all([recommendationsFor(user, workspace, report, units), openReviewCount(sessionId)])
+      // Recommendations are a live projection beside the snapshot, computed
+      // from the evidence the stored version itself cites (never from
+      // evidence recorded since): the findings do not move, the suggestions may.
+      const [recommendations, openRequests] = await Promise.all([recommendationsFor(user, workspace, report, await unitsCitedBy(sessionId, stored)), openReviewCount(sessionId)])
       return {
         report,
         version: versionView(version),
@@ -285,12 +336,10 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
         const ids = Array.isArray(correction?.withholdEvidenceIds) ? [...new Set(correction.withholdEvidenceIds.filter((x) => typeof x === 'string' && x))].sort() : []
         if (!ids.length) throw new ApiError('VALIDATION_FAILED', 'A correction names at least one evidence unit to withhold.')
         const note = typeof correction?.note === 'string' ? correction.note.trim().slice(0, REVIEW_REASON_MAX) : null
-        const loaded = await load(review.sessionId)
         const own = new Set((await evidence.units(review.sessionId)).filter((u) => u.session_id === review.sessionId).map((u) => u.evidence_id))
         if (ids.some((id) => !own.has(id))) throw new ApiError('VALIDATION_FAILED', 'Every withheld id must be an evidence unit of this session.')
         const before = await repos.reportVersions.latest(review.sessionId)
-        const { version } = await build(review.sessionId, loaded, { reason: 'REVIEW_CORRECTION', withheldOverride: ids })
-        if (before && version.version === before.version) throw new ApiError('CONFLICT', 'This correction would not change the published report.')
+        const { version } = await publish(review.sessionId, { reason: 'REVIEW_CORRECTION', note: text, withheldOverride: ids, requestId })
         published = { version: version.version, priorVersion: before?.version ?? null, reason: 'REVIEW_CORRECTION' }
         stored = { withholdEvidenceIds: ids, note, publishedVersion: version.version }
       }
@@ -310,7 +359,7 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
       })
       // A student share carries the disclosure level the student chose.
       const disclosure = access.via === 'SHARE_GRANT' ? access.disclosure || 'SUMMARY' : 'FULL'
-      const { report, version } = await build(sessionId, loaded, { disclosure })
+      const { report, version } = await select(sessionId, loaded, { disclosure })
       audit('report.v3.viewed', sessionId, { sessionId, audience: 'SPONSOR', via: access.via, disclosure, organizationId, version: version.version, requestId: req.requestId })
       return {
         report,
@@ -333,7 +382,7 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
       const owner = loaded.session?.userId || loaded.report?.userId || null
       if (owner !== grant.ownerUserId) throw new ApiError('NOT_FOUND', 'This link is not valid or has expired.')
       // A link holder never learns why a report is unavailable (e.g. an integrity hold).
-      const built = await build(resource.resourceId, loaded, { disclosure: resource.disclosureLevel }).catch((err) => {
+      const built = await select(resource.resourceId, loaded, { disclosure: resource.disclosureLevel }).catch((err) => {
         if (err?.code === 'REPORT_UNDER_REVIEW' || err?.code === 'REPORT_NOT_READY' || err?.code === 'REPORT_PROCESSING_FAILED') throw new ApiError('NOT_FOUND', 'This link is not valid or has expired.')
         throw err
       })

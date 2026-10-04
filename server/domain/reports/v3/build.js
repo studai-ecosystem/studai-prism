@@ -341,6 +341,26 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
   }
 }
 
+// A restricted disclosure of a STORED full version. Pure and derived only from
+// the snapshot itself, so a SUMMARY share shows exactly the issued findings
+// with the same withholding rules the builder applies: no quotes, no
+// evidence list, no moments, no development priorities, no credential id.
+export function projectDisclosure(full, disclosure) {
+  if (!DISCLOSURE_LEVELS.includes(disclosure)) throw new Error(`Unknown disclosure level: ${disclosure}`)
+  if (disclosure === 'FULL' || full.disclosure === disclosure) return full
+  const shown = new Set((full.summary?.capabilities || []).map((c) => c.summary?.claimId).filter(Boolean))
+  return {
+    ...full,
+    disclosure,
+    header: { ...full.header, verification: { ...full.header.verification, credentialId: null } },
+    evidence: [],
+    boundedObservations: [],
+    moments: [],
+    development: null,
+    claims: (full.claims || []).filter((c) => shown.has(c.claim_id) || c.status === 'INSUFFICIENT').map((c) => ({ ...c, quote: null })),
+  }
+}
+
 // Stable hash of the content a version stores (key order independent).
 export function reportContentHash(report) {
   const canon = (v) => (Array.isArray(v) ? v.map(canon)

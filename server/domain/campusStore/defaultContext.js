@@ -88,7 +88,7 @@ export function createDefaultCampusContext() {
     roles: { evaluate: ({ capabilityProfile, candidateInterests }) => roleAffinityEngine.computeRoleAffinity(capabilityProfile, candidateInterests) },
     engine: createEngineAdapter({ invoke: invokeEngine }),
     missionEvaluator: createMissionEvaluator({ complete: completeViaGateway }),
-    sliceEvaluator: createSliceEvaluator({ complete: completeViaGateway, recordUnit: (unit) => evidenceGraph.recordEvidenceUnit(unit) }),
+    sliceEvaluator: createSliceEvaluator({ complete: completeViaGateway, recordUnit: (unit, tx) => evidenceGraph.recordEvidenceUnit(unit, tx) }),
     preparationComplete: completeViaGateway,
   })
 }

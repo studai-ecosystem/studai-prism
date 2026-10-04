@@ -13,6 +13,7 @@
 //                                  rated and one not → HUMAN_REVIEW_REQUIRED
 //                                  (JUDGE_DISAGREEMENT), never an average (T33)
 //   malformed / missing output   → throws (the job records TECHNICAL_FAILURE)
+import { createHash } from 'node:crypto'
 import { renderPrompt } from '../../engine/prompts.js'
 import { sanitizeCandidateText } from '../../lib/promptSecurity.js'
 import { capabilityInfo } from '../assessments/catalog.js'
@@ -133,6 +134,15 @@ export function classifyUnit(raw, { opportunity, actions }) {
   return { ...base, outcome: 'RATED', reason: null, action, excerpt, level }
 }
 
+// Stable logical key of one observation: the same (run, pinned snapshot,
+// opportunity, behaviour) always maps to the same evidence id, so applying a
+// retried or duplicated evaluation of the same job can never add a second
+// row for it. The attempt number is deliberately not part of the key.
+export function logicalEvidenceId({ sessionId, snapshotHash, opportunityId, behaviourId }) {
+  const digest = createHash('sha256').update([sessionId, snapshotHash || '', opportunityId, behaviourId || ''].join('\u0000')).digest('hex')
+  return `ev-${digest.slice(0, 48)}`
+}
+
 function toEvidenceInput(decision, { sessionId, formId, pin, attempt, provenanceBase }) {
   const action = decision.action
   const sourceType = action ? (action.kind === 'ARTIFACT' ? 'WORK_ARTIFACT' : 'DIALOGUE_TURN') : null
@@ -164,6 +174,7 @@ function toEvidenceInput(decision, { sessionId, formId, pin, attempt, provenance
     ...(decision.excerpt ? { dialogue_excerpt: decision.excerpt } : {}),
   } : null
   return {
+    evidence_id: logicalEvidenceId({ sessionId, snapshotHash: pin.snapshotHash, opportunityId: decision.opportunityId, behaviourId: decision.behaviourId }),
     session_id: sessionId,
     assessment_form_id: formId,
     capability_id: decision.capabilityId,
@@ -198,6 +209,16 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
   if (typeof complete !== 'function') throw new Error('sliceEvaluator: complete() is required')
   if (typeof recordUnit !== 'function') throw new Error('sliceEvaluator: recordUnit() is required')
 
+  // Compute-then-apply: `apply: false` returns the validated, proposed units
+  // without writing anything; the caller applies them inside its own guarded
+  // transaction (sessionIoRepository.applyEvaluation) via persistUnit().
+  async function finish(inputs, attempt, apply) {
+    if (!apply) return { units: inputs, attempt, applied: false }
+    const stored = []
+    for (const input of inputs) stored.push(await recordUnit(input))
+    return { units: stored, attempt, applied: true }
+  }
+
   async function ask(messages, sessionId) {
     const call = complete({ messages, temperature: 0, max_completion_tokens: 900, response_format: { type: 'json_object' } }, { task: 'evidence_evaluator', retries: 1, sessionId })
     const timeout = new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'TIMEOUT' })), timeoutMs).unref?.())
@@ -224,12 +245,16 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
   return {
     promptVersion: EVALUATOR_PROMPT,
     evaluatorVersion: SLICE_EVALUATOR_VERSION,
+    /** Write one proposed unit through the evidence boundary (used by the apply step). */
+    persistUnit: (unit, tx = null) => recordUnit(unit, tx),
     /**
      * Evaluate one run. Throws on provider / output failure so the caller's job
      * records a technical failure; never writes a partial "deficit".
-     * @returns { units: stored units, attempt }
+     * With `apply: false` nothing is written: the proposed units are returned
+     * for the caller's fenced apply step.
+     * @returns { units, attempt, applied }
      */
-    async evaluateRun({ sessionId, actions, snapshot, pin, formId = null, attempt = 1, opportunities = null }) {
+    async evaluateRun({ sessionId, actions, snapshot, pin, formId = null, attempt = 1, opportunities = null, apply = true }) {
       const eligible = eligibleActions(actions)
       const inputs = []
       const provenanceBase = { evaluatorPrompt: EVALUATOR_PROMPT, snapshotId: snapshot.id, snapshotVersion: snapshot.version }
@@ -263,9 +288,7 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
             inputs.push(toEvidenceInput({ ...decision, opportunityGroup: target.group, behaviourIds: def.behaviourIds || [behaviourId] }, { sessionId, formId, pin, attempt, provenanceBase }))
           }
         }
-        const stored = []
-        for (const input of inputs) stored.push(await recordUnit(input))
-        return { units: stored, attempt }
+        return finish(inputs, attempt, apply)
       }
       for (const opportunity of snapshot.opportunities || []) {
         let decision
@@ -276,10 +299,8 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
         }
         inputs.push(toEvidenceInput({ ...decision, opportunityGroup: opportunity.group || null }, { sessionId, formId, pin, attempt, provenanceBase }))
       }
-      // All evaluator calls succeeded: write the whole set.
-      const stored = []
-      for (const input of inputs) stored.push(await recordUnit(input))
-      return { units: stored, attempt }
+      // All evaluator calls succeeded: the whole set is applied or none of it.
+      return finish(inputs, attempt, apply)
     },
   }
 }

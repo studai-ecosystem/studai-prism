@@ -2,7 +2,7 @@
 // artifact writes — memory and Postgres adapters with the same semantics.
 import { createHash, randomUUID } from 'node:crypto'
 import { ApiError } from '../http/errors.js'
-import { iso } from '../campusStore/pgUtil.js'
+import { iso, withTransaction } from '../campusStore/pgUtil.js'
 import { clone } from '../campusStore/memoryDb.js'
 
 const ACTION_KINDS = new Set(['MESSAGE', 'ARTIFACT', 'FINISH'])
@@ -202,6 +202,28 @@ export function createSessionIoRepoMemory(db) {
       job.state = 'DONE'; job.resultState = resultState; job.leaseExpiresAt = null; job.updatedAt = now()
       return clone(job)
     },
+    // Fenced apply step (compute-then-apply). Re-checks, at write time, that
+    // this worker still holds the lease and that no erasure marker exists,
+    // then writes the accepted evidence batch (idempotent on evidence_id),
+    // marks the evaluated opportunities and completes the job. A stale or
+    // erased result is refused before a single unit is written.
+    async applyEvaluation({ jobId, fencingToken, sessionId, units = [], writeUnit, evaluatedOpportunityIds = [], resultState = 'DONE' }) {
+      if (typeof writeUnit !== 'function') throw new ApiError('VALIDATION_FAILED', 'Invalid evaluation apply.')
+      const job = [...db.assessmentJobs.values()].find((j) => j.jobId === jobId)
+      if (!job || job.sessionId !== sessionId || job.state !== 'LEASED' || job.fencingToken !== fencingToken) throw STALE()
+      if (db.erasureMarkers.has(sessionId)) throw ERASED()
+      const stored = []
+      for (const unit of units) stored.push(await writeUnit(unit, null))
+      for (const opportunityId of evaluatedOpportunityIds) {
+        const row = db.opportunities.get(key(sessionId, opportunityId))
+        if (row) { row.state = 'EVALUATED'; row.updatedAt = now() }
+      }
+      // The lease is re-checked after the writes: a reclaim during a slow
+      // write leaves the job to the new holder (whose replay is idempotent).
+      if (job.state !== 'LEASED' || job.fencingToken !== fencingToken) throw STALE()
+      job.state = 'DONE'; job.resultState = resultState; job.leaseExpiresAt = null; job.updatedAt = now()
+      return { job: clone(job), units: stored }
+    },
     async failJob(jobId, fencingToken, { retryAfterMs = null, resultState = 'FAILED' } = {}) {
       const job = [...db.assessmentJobs.values()].find((j) => j.jobId === jobId)
       if (!job || job.state !== 'LEASED' || job.fencingToken !== fencingToken) throw STALE()
@@ -273,7 +295,7 @@ const opportunity = (r) => r && ({
   createdAt: iso(r.created_at), updatedAt: iso(r.updated_at),
 })
 
-export function createSessionIoRepoPg({ query }) {
+export function createSessionIoRepoPg({ query, getPool = null }) {
   const erased = async (sessionId) => (await query('SELECT 1 FROM assessment_erasure_markers WHERE session_id = $1', [sessionId])).rows.length > 0
   return {
     // --- P4.5 opportunity ledger ------------------------------------------------
@@ -438,6 +460,38 @@ export function createSessionIoRepoPg({ query }) {
       )
       if (!rows[0]) throw STALE()
       return job(rows[0])
+    },
+    // Fenced apply step in ONE transaction: lock the job row, verify lease
+    // ownership and the absence of an erasure marker, write the evidence
+    // batch (idempotent on evidence_id), mark opportunities, complete the
+    // job. Any failure rolls the whole batch back; nothing is half-published.
+    async applyEvaluation({ jobId, fencingToken, sessionId, units = [], writeUnit, evaluatedOpportunityIds = [], resultState = 'DONE' }) {
+      if (typeof writeUnit !== 'function') throw new ApiError('VALIDATION_FAILED', 'Invalid evaluation apply.')
+      if (typeof getPool !== 'function') throw new ApiError('UPSTREAM_UNAVAILABLE', 'The review could not be completed.')
+      return withTransaction(getPool, async (client) => {
+        const { rows: held } = await client.query(
+          `SELECT * FROM assessment_jobs WHERE job_id = $1 AND session_id = $2 AND state = 'LEASED' AND fencing_token = $3 FOR UPDATE`,
+          [jobId, sessionId, fencingToken],
+        )
+        if (!held[0]) throw STALE()
+        const { rows: marker } = await client.query('SELECT 1 FROM assessment_erasure_markers WHERE session_id = $1 FOR SHARE', [sessionId])
+        if (marker.length) throw ERASED()
+        const stored = []
+        for (const unit of units) stored.push(await writeUnit(unit, { client }))
+        if (evaluatedOpportunityIds.length) {
+          await client.query(
+            `UPDATE assessment_opportunities SET state = 'EVALUATED', updated_at = now() WHERE session_id = $1 AND opportunity_id = ANY($2::text[])`,
+            [sessionId, evaluatedOpportunityIds],
+          )
+        }
+        const { rows } = await client.query(
+          `UPDATE assessment_jobs SET state = 'DONE', result_state = $3, lease_expires_at = NULL, updated_at = now()
+           WHERE job_id = $1 AND state = 'LEASED' AND fencing_token = $2 RETURNING *`,
+          [jobId, fencingToken, resultState],
+        )
+        if (!rows[0]) throw STALE()
+        return { job: job(rows[0]), units: stored }
+      })
     },
     async failJob(jobId, fencingToken, { retryAfterMs = null, resultState = 'FAILED' } = {}) {
       const retry = retryAfterMs != null

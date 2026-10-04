@@ -43,6 +43,10 @@ export function createAssessmentSessionService({
   // units for JUDGE_DISAGREEMENT, so the existing human rating queue can be
   // fed when PRISM_V3_RATING_QUEUE is on. Never changes the units.
   onHumanReviewRequired = async () => {},
+  // Explicit report publication once an evaluation run is DONE and its
+  // evidence applied ({ sessionId, requestId } → stored version). Reads never
+  // publish; null → no Report V3 publication from this service.
+  publishReport = null,
 }) {
   const localLocks = createMemorySessionLocks()
   const withLock = (resource, work) => {
@@ -251,8 +255,11 @@ export function createAssessmentSessionService({
   }
 
   // One worker pass: claim one EVALUATE_RUN job and run it to DONE or FAILED.
-  // The lease is held only around the claim/complete; the evaluator runs
-  // outside any transaction and a stale fencing token can never complete.
+  // Compute-then-apply: the evaluator only proposes units; the repository's
+  // fenced apply step re-checks lease ownership and the erasure marker at
+  // write time and writes the batch (idempotent on logical evidence ids) in
+  // the same transaction that completes the job. A stale fencing token can
+  // never publish anything.
   async function runEvaluationWorkerOnce({ requestId } = {}) {
     const io = jobs()
     const job = await io.claimJob(DRAFT_EVALUATE_JOB_KIND, EVALUATE_LEASE_MS)
@@ -266,17 +273,20 @@ export function createAssessmentSessionService({
       const actions = await io.listActions(job.sessionId)
       const universal = isUniversalRun(run)
       const opportunities = universal ? await io.listOpportunities(job.sessionId) : null
-      const { units } = await sliceEvaluator.evaluateRun({
+      const { units: proposed } = await sliceEvaluator.evaluateRun({
         sessionId: job.sessionId, actions, snapshot: run.snapshot, pin: run.pin, formId: run.pin.formId || null, attempt: job.attempts,
         ...(universal ? { opportunities } : {}),
+        apply: false,
       })
-      if (universal) {
-        for (const row of opportunities) if (['ACTION_RECEIVED', 'EVALUATION_PENDING'].includes(row.state)) await io.setOpportunityState(job.sessionId, row.opportunityId, 'EVALUATED')
-      }
       // P10.5: a model result that arrives after an erasure marker is never
-      // written back (tombstone check on both sides of the external call).
+      // written back (tombstone check on both sides of the external call,
+      // and again inside the apply transaction).
       if (await io.hasErasureMarker(job.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
-      const done = await io.completeJob(job.jobId, job.fencingToken, 'DONE')
+      const { job: done, units } = await io.applyEvaluation({
+        jobId: job.jobId, fencingToken: job.fencingToken, sessionId: job.sessionId, units: proposed,
+        writeUnit: (unit, tx) => sliceEvaluator.persistUnit(unit, tx),
+        evaluatedOpportunityIds: universal ? opportunities.filter((row) => ['ACTION_RECEIVED', 'EVALUATION_PENDING'].includes(row.state)).map((row) => row.opportunityId) : [],
+      })
       audit('assessment.evaluation_completed', job.sessionId, { sessionId: job.sessionId, jobId: job.jobId, attempt: job.attempts, units: units.length, requestId })
       const disputed = units.filter((u) => (u?.provenance_json || u?.provenance || {}).reason === 'JUDGE_DISAGREEMENT')
       if (disputed.length) {
@@ -285,13 +295,32 @@ export function createAssessmentSessionService({
           audit('assessment.human_review_enqueue_failed', job.sessionId, { sessionId: job.sessionId, code: err?.code || 'ENQUEUE_FAILED', requestId })
         }
       }
+      // Evidence is applied; the report is published explicitly from it.
+      // A publication failure leaves the job DONE and the report "not ready";
+      // the learner's next finish() re-attempts publication (never a read).
+      await publishFor(job.sessionId, requestId)
       return done
     } catch (err) {
       // Any failure (provider, malformed output, evidence write) is a
       // technical state the learner can retry — never an evidence deficit.
+      // A stale lease (CONFLICT) means another holder owns the job now: its
+      // own outcome stands and this worker records nothing.
       const failedJob = await io.failJob(job.jobId, job.fencingToken, { resultState: 'TECHNICAL_FAILURE' }).catch(() => null)
       audit('assessment.evaluation_failed', job.sessionId, { sessionId: job.sessionId, jobId: job.jobId, attempt: job.attempts, code: err?.code || 'EVALUATION_FAILED', requestId })
       return failedJob
+    }
+  }
+
+  // Explicit report publication after a DONE evaluation (idempotent: an
+  // already-published report is returned, never rebuilt). Failure is audited
+  // and surfaced to finish(); a GET never triggers this.
+  async function publishFor(sessionId, requestId) {
+    if (typeof publishReport !== 'function') return null
+    try {
+      return await publishReport({ sessionId, requestId })
+    } catch (err) {
+      audit('report.v3.publish_failed', sessionId, { sessionId, code: err?.code || 'PUBLISH_FAILED', requestId })
+      return null
     }
   }
 
@@ -852,6 +881,9 @@ export function createAssessmentSessionService({
       if (run) {
         const existing = await evaluationJob(sessionId)
         if (existing?.state === 'DONE') {
+          // Evidence already applied: make sure the report is published
+          // (idempotent) before the learner is told it is ready.
+          if (typeof publishReport === 'function') await publishFor(sessionId, requestId)
           await settle(sessionId, user)
           return { state: 'COMPLETE' }
         }
@@ -884,7 +916,11 @@ export function createAssessmentSessionService({
           job = await evaluationJob(sessionId)
         }
         const processing = processingOf(job)
-        if (processing?.state === 'DONE') { await settle(sessionId, user); return { state: 'COMPLETE' } }
+        if (processing?.state === 'DONE') {
+          await publishFor(sessionId, requestId)
+          await settle(sessionId, user)
+          return { state: 'COMPLETE' }
+        }
         if (processing?.state === 'FAILED') {
           // Technical, retryable: the learner's work stays saved; finish again re-runs the review.
           throw new ApiError('UPSTREAM_UNAVAILABLE', 'The review did not finish. Your work is saved; please try again.', { details: { processing } })

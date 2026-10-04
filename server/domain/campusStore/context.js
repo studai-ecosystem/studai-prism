@@ -178,6 +178,11 @@ export function createCampusContext({
     if (!ratingQueueOn()) return { enqueued: 0, skipped: 'RATING_QUEUE_OFF' }
     return validation.enqueueSession(sessionId, { enqueuedBy: `system:${String(reason).toLowerCase()}` })
   }
+  const reports = createReportService({
+    repos: storeView, legacy, catalog, evidence, sessionScopes, dataAccess, scenarioSource, audit: auditWriter, clock, ...(shareTokenFactory ? { tokenFactory: shareTokenFactory } : {}),
+    // P5.6 read-time recommendations: honest PRACTICE_OFF while Development V2 is dark.
+    development: { recommendFor },
+  })
   return {
     repos,
     campusAvailable,
@@ -209,14 +214,12 @@ export function createCampusContext({
       ? createAssessmentSessionService({
         repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter, sliceEvaluator, releaseGate, onHumanReviewRequired,
         onSponsoredCompleted: ({ organizationId, assignmentId }) => admin.checkCompletionThresholds(organizationId, assignmentId),
+        // Explicit Report V3 publication once a run's evidence is applied.
+        publishReport: ({ sessionId, requestId }) => reports.publish(sessionId, { reason: 'INITIAL', requestId }),
       })
       : null,
     ledger,
-    reports: createReportService({
-      repos: storeView, legacy, catalog, evidence, sessionScopes, dataAccess, scenarioSource, audit: auditWriter, clock, ...(shareTokenFactory ? { tokenFactory: shareTokenFactory } : {}),
-      // P5.6 read-time recommendations: honest PRACTICE_OFF while Development V2 is dark.
-      development: { recommendFor },
-    }),
+    reports,
     invites,
     admin,
     development,

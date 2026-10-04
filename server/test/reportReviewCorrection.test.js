@@ -261,7 +261,7 @@ test('P5.7/T36: a reviewer decides once; CORRECT publishes a NEW version without
     assert.equal(v2.body.data.report.moments.some((m) => m.id === 'p5-a1'), false)
     assert.equal(w.repos.db.reportVersions.length, 2, 'an ordinary read publishes nothing new')
     const versions = await w.call('student', 'GET', `/api/v1/assessment-sessions/${SID}/report/versions`)
-    assert.deepEqual(versions.body.data.versions.map((v) => [v.version, v.reason, v.priorVersion]), [[1, null, null], [2, 'REVIEW_CORRECTION', 1]])
+    assert.deepEqual(versions.body.data.versions.map((v) => [v.version, v.reason, v.priorVersion]), [[1, 'INITIAL', null], [2, 'REVIEW_CORRECTION', 1]])
     assert.equal(versions.body.data.reviews[0].state, 'RESOLVED')
 
     // Downstream read models recompute without the withheld unit (CAP_A keeps
@@ -354,7 +354,13 @@ test('T35: a new-run completion (DONE evaluation job, no legacy report) is a for
     assert.equal((await w.call('newrun', 'GET', `/api/v1/me/capabilities/${CAP_A}`)).body.data.state, 'NOT_MEASURED')
     const job = await w.repos.sessionIo.claimJob('EVALUATE_RUN', 60000)
     await w.repos.sessionIo.completeJob(job.jobId, job.fencingToken, 'DONE')
-    // The report service publishes version 1 from the evaluation run.
+    // Until the worker publishes, a read says "not ready" and creates nothing.
+    const unpublished = await w.call('newrun', 'GET', `/api/v1/assessment-sessions/${SID_NEWRUN}/report`)
+    assert.equal(unpublished.status, 409)
+    assert.equal(unpublished.body.error.code, 'REPORT_NOT_READY')
+    assert.equal(w.repos.db.reportVersions.filter((v) => v.sessionId === SID_NEWRUN).length, 0)
+    // The worker's explicit publication issues version 1 from the evaluation run.
+    await w.campus.reports.publish(SID_NEWRUN, { reason: 'INITIAL' })
     const report = await w.call('newrun', 'GET', `/api/v1/assessment-sessions/${SID_NEWRUN}/report`)
     assert.equal(report.status, 200, JSON.stringify(report.body))
     assert.equal(report.body.data.version.reason, 'INITIAL')

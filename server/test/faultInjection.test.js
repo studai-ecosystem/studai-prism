@@ -92,9 +92,11 @@ async function world() {
   }
   const engine = fakeEngine(state, clock)
   const audits = []
-  const fault = { mode: null, calls: 0 }
+  const fault = { mode: null, calls: 0, writes: 0, onModelCall: null }
   const complete = async (params, options) => {
     fault.calls += 1
+    // A hook that runs while the model call is in flight (lease loss etc.).
+    if (typeof fault.onModelCall === 'function') await fault.onModelCall(fault.calls)
     if (fault.mode === 'throw') throw Object.assign(new Error('provider unavailable'), { code: 'PROVIDER_DOWN' })
     if (fault.mode === 'timeout') {
       await new Promise((r) => setTimeout(r, 5))
@@ -109,7 +111,16 @@ async function world() {
     }
     return out
   }
-  const sliceEvaluator = createSliceEvaluator({ complete, recordUnit: async (unit) => evidenceGraph.recordEvidenceUnit(unit) })
+  // The evidence write is where a mid-batch failure is injected: the Nth
+  // write of a batch throws once (`fault.writeFailAt`).
+  const sliceEvaluator = createSliceEvaluator({
+    complete,
+    recordUnit: async (unit, tx) => {
+      fault.writes += 1
+      if (fault.writeFailAt && fault.writes === fault.writeFailAt) { fault.writeFailAt = null; throw Object.assign(new Error('SYNTHETIC_EVIDENCE_WRITE_FAILURE'), { code: 'WRITE_FAILED' }) }
+      return evidenceGraph.recordEvidenceUnit(unit, tx)
+    },
+  })
   const campus = createCampusContext({
     repos, clock, legacy, engine, sliceEvaluator,
     scenarioSource: async () => ({ generalScenarios: [], bankScenarios: draftBankScenarios() }),
@@ -330,12 +341,15 @@ test('T32 failed quote verification: units go to human review with no quotation;
   } finally { w.close() }
 })
 
-test('T51 publication race: concurrent first reads publish exactly one version', async () => {
+test('T51 stable read: concurrent reads of a published report serve one stored snapshot; concurrent publications issue exactly one version', async () => {
   const w = await world()
   try {
     const sid = await w.start()
     await w.act(sid)
     assert.equal((await w.finish(sid)).status, 200)
+    // The worker published once; racing INITIAL publications are no-ops.
+    const published = await Promise.all([1, 2, 3].map(() => w.campus.reports.publish(sid, { reason: 'INITIAL' })))
+    assert.ok(published.every((p) => p.created === false && p.version.version === 1))
     const reads = await Promise.all([1, 2, 3, 4].map(() => w.call('GET', `/assessment-sessions/${sid}/report`)))
     assert.ok(reads.every((r) => r.status === 200))
     assert.ok(reads.every((r) => r.body.data.version.number === 1))
@@ -345,6 +359,133 @@ test('T51 publication race: concurrent first reads publish exactly one version',
     const versions = await w.call('GET', `/assessment-sessions/${sid}/report/versions`)
     assert.equal(versions.status, 200)
     assert.equal(versions.body.data.versions?.length ?? versions.body.data.length, 1)
+  } finally { w.close() }
+})
+
+test('publication is separate from viewing: later evidence, a catalogue change or a share link never alter an issued report; a re-analysis is an explicit, reasoned, linked version', async () => {
+  const w = await world()
+  try {
+    const sid = await w.start()
+    await w.act(sid)
+    assert.equal((await w.finish(sid)).status, 200)
+    const v1 = await w.call('GET', `/assessment-sessions/${sid}/report`)
+    assert.equal(v1.status, 200)
+    const issued = JSON.stringify(v1.body.data.report)
+    // Later evidence arrives for the session (e.g. a reviewed addition).
+    const late = await evidenceGraph.recordEvidenceUnit({ session_id: sid, capability_id: 'CAP-L1-COMMUNICATION', source_turn: 99, rubric_level: 5 })
+    assert.ok(late.evidence_id)
+    const again = await w.call('GET', `/assessment-sessions/${sid}/report`)
+    assert.equal(again.body.data.version.number, 1)
+    assert.equal(JSON.stringify(again.body.data.report), issued, 'a read never rebuilds an issued report')
+    // A share link reads the same snapshot, restricted to its disclosure.
+    const share = await w.call('POST', '/me/share-grants', { recipientType: 'LINK', sessionId: sid, disclosureLevel: 'SUMMARY', expiresInDays: 1 })
+    assert.equal(share.status, 201, JSON.stringify(share.body))
+    const shared = await w.call('GET', `/shared/${share.body.data.token}`, null, {}, null)
+    assert.equal(shared.status, 200, JSON.stringify(shared.body))
+    assert.equal(shared.body.data.version.number, 1)
+    assert.equal(shared.body.data.report.disclosure, 'SUMMARY')
+    assert.deepEqual(shared.body.data.report.summary, v1.body.data.report.summary, 'the summary is the issued one')
+    assert.deepEqual(shared.body.data.report.moments, [])
+    assert.deepEqual(shared.body.data.report.evidence, [])
+    assert.equal(shared.body.data.report.development, null)
+    assert.ok(shared.body.data.report.claims.every((c) => c.quote === null))
+    assert.equal((await w.repos.reportVersions.latest(sid)).version, 1, 'viewing created no version')
+    assert.equal(w.audits.filter((a) => a.type === 'report.v3.version_created' && a.sid === sid).length, 1)
+    // An explicit re-analysis needs a reason and links to the previous version.
+    await assert.rejects(w.campus.reports.publish(sid, { reason: 'RE_ANALYSIS' }), (e) => e.code === 'VALIDATION_FAILED')
+    await assert.rejects(w.campus.reports.publish(sid, { reason: 'NOT_A_REASON', note: 'A reason that is long enough.' }), (e) => e.code === 'VALIDATION_FAILED')
+    const withheld = [(await unitsOf(sid))[0].evidence_id]
+    const note = 'Authorised re-analysis: one observation is withheld after a method review.'
+    const re = await w.campus.reports.publish(sid, { reason: 'RE_ANALYSIS', note, withheldOverride: withheld })
+    assert.equal(re.created, true)
+    assert.equal(re.version.version, 2)
+    assert.equal(re.version.priorVersion, 1)
+    assert.equal(re.version.reason, 'RE_ANALYSIS')
+    assert.ok(re.version.issuedAt && re.version.builderVersion)
+    const v2 = await w.call('GET', `/assessment-sessions/${sid}/report`)
+    assert.equal(v2.body.data.version.number, 2)
+    assert.notEqual(JSON.stringify(v2.body.data.report), issued)
+    // Version 1 is still exactly what was issued.
+    assert.equal(JSON.stringify({ ...(await w.repos.reportVersions.get(sid, 1)).report, header: { ...(await w.repos.reportVersions.get(sid, 1)).report.header, candidateName: USER.name } }), issued)
+    await assert.rejects(w.campus.reports.publish(sid, { reason: 'RE_ANALYSIS', note, withheldOverride: withheld }), (e) => e.code === 'CONFLICT')
+    assert.ok(w.audits.some((a) => a.type === 'report.v3.version_created' && a.sid === sid && a.payload.version === 2 && a.payload.reason === 'RE_ANALYSIS' && a.payload.priorVersion === 1 && a.payload.note === note))
+  } finally { w.close() }
+})
+
+test('lease lost while the model runs: the stale worker\'s result is refused at apply time, nothing is written, the reclaiming worker\'s single result stands', async () => {
+  const w = await world()
+  try {
+    const sid = await w.start()
+    await w.act(sid)
+    const io = w.repos.sessionIo
+    let stolen = null
+    w.fault.onModelCall = async (n) => {
+      if (n !== 1) return
+      // The lease expires during the first model call and another worker claims the job.
+      w.tick(130_000)
+      stolen = await io.claimJob(DRAFT_EVALUATE_JOB_KIND, 1000)
+      assert.ok(stolen, 'the job was reclaimed while the first worker was still computing')
+    }
+    const first = await w.finish(sid)
+    assert.equal(first.status, 202, JSON.stringify(first.body))
+    assert.equal(first.body.data.state, 'SCORING', 'the live reclaimed lease is respected')
+    assert.equal((await unitsOf(sid)).length, 0, 'the stale worker wrote nothing')
+    assert.ok(w.audits.some((a) => a.type === 'assessment.evaluation_failed' && a.sid === sid && a.payload.attempt === 1 && a.payload.code === 'CONFLICT'))
+    assert.equal((await io.getJob(evaluateJobKey(sid))).fencingToken, stolen.fencingToken, 'the stale worker could not fail the job either')
+    assert.equal((await w.repos.reportVersions.latest(sid)), null)
+    w.fault.onModelCall = null
+    w.tick(1500)
+    const recovered = await w.finish(sid)
+    assert.equal(recovered.status, 200, JSON.stringify(recovered.body))
+    const units = await unitsOf(sid)
+    assert.equal(units.length, 3)
+    assert.ok(units.every((u) => u.provenance_json.evaluatorAttempt === 3))
+    assert.equal((await w.repos.reportVersions.latest(sid)).version, 1)
+  } finally { w.close() }
+})
+
+test('evidence write fails mid-batch: no partial publication, the job is a technical failure, the retry applies exactly one set (idempotent logical ids)', async () => {
+  const w = await world()
+  try {
+    const sid = await w.start()
+    await w.act(sid)
+    w.fault.writeFailAt = 2
+    const failed = await w.finish(sid)
+    assert.equal(failed.status, 503, JSON.stringify(failed.body))
+    assert.equal(failed.body.error.details.processing.resultState, 'TECHNICAL_FAILURE')
+    assert.equal((await w.call('GET', `/assessment-sessions/${sid}/report`)).status, 409, 'nothing is published')
+    assert.equal(await w.repos.reportVersions.latest(sid), null)
+    const retried = await w.finish(sid)
+    assert.equal(retried.status, 200, JSON.stringify(retried.body))
+    const units = await unitsOf(sid)
+    assert.equal(units.length, 3, 'one accepted set, no duplicate observations')
+    assert.equal(new Set(units.map((u) => u.evidence_id)).size, 3)
+    assert.equal(new Set(units.map((u) => `${u.provenance_json.opportunityId}|${u.provenance_json.behaviourId}`)).size, 3)
+    assert.equal((await w.call('GET', `/assessment-sessions/${sid}/report`)).status, 200)
+  } finally { w.close() }
+})
+
+test('two workers hold the same logical job in turn: only the current lease can apply; the superseded worker\'s batch is refused before any write', async () => {
+  const w = await world()
+  try {
+    const sid = await w.start()
+    await w.act(sid)
+    const io = w.repos.sessionIo
+    await io.enqueueJob({ taskKey: evaluateJobKey(sid), sessionId: sid, kind: DRAFT_EVALUATE_JOB_KIND })
+    const workerA = await io.claimJob(DRAFT_EVALUATE_JOB_KIND, 1000)
+    w.tick(1500)
+    assert.equal((await w.finish(sid)).status, 200)
+    const before = await unitsOf(sid)
+    assert.equal(before.length, 3)
+    let writes = 0
+    await assert.rejects(io.applyEvaluation({
+      jobId: workerA.jobId, fencingToken: workerA.fencingToken, sessionId: sid,
+      units: before.map((u) => ({ ...u })), writeUnit: async () => { writes += 1 },
+    }), (e) => e.code === 'CONFLICT')
+    assert.equal(writes, 0, 'refused before the first write')
+    assert.equal((await unitsOf(sid)).length, 3)
+    assert.equal((await io.getJob(evaluateJobKey(sid))).state, 'DONE')
+    assert.equal((await w.repos.reportVersions.latest(sid)).version, 1)
   } finally { w.close() }
 })
 

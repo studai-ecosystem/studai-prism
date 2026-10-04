@@ -27,7 +27,7 @@ export const REPORT_COPY = {
   versionsTitle: 'Version history',
   versionsIntro: 'Every published version of this report is kept. A correction creates a new version with its reason; nothing is rewritten.',
   versionsNone: 'No version has been published yet.',
-  versionReasons: { INITIAL: 'First publication', RE_EVALUATION: 'Re-evaluation of the evidence', CORRECTION: 'Correction after review', REVIEW_CORRECTION: 'Corrected after a review' },
+  versionReasons: { INITIAL: 'First publication', RE_EVALUATION: 'Re-evaluation of the evidence', RE_ANALYSIS: 'Re-analysis of the recorded evidence', CORRECTION: 'Correction after review', REVIEW_CORRECTION: 'Corrected after a review' },
   reviewPending: 'An interpretation review is pending',
   reviewPendingBody: 'A person is looking at what you pointed out. This report stays as published until they decide; any change appears as a new version.',
   correctedTitle: (version, prior) => `Corrected version ${version}${prior ? `, replacing version ${prior}` : ''}`,
