@@ -76,6 +76,7 @@ const MissionViewSchema = z.object({
     status: z.string().optional(), displayCode: nullableStr.optional(),
     availability: z.enum(['REVIEWED', 'DRAFT']).optional(),
     targetCapability: z.object({ id: z.string(), name: nullableStr }),
+    targetBehaviours: z.array(z.object({ id: z.string(), label: nullableStr })).optional(),
     scenario: z.object({ setting: z.string(), objective: z.string() }),
     situationFacts: z.array(z.string()).optional(),
     whyItMatters: nullableStr.optional(), reflectionPrompt: nullableStr.optional(),

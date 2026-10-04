@@ -678,17 +678,25 @@ export function createAssessmentSessionService({
               clarification: true,
             })
           }
+          // A work-material opportunity is served by a message only when the
+          // board already carries the requested plan (ready for review) or a
+          // stakeholder reacted to a concrete allocation in the message. A
+          // learner whose board is complete is never asked to "make it
+          // concrete" again; one whose board is not is told what is missing.
           const needsConcreteWorkProposal = Boolean(definition?.reviewReadiness)
-          if (needsConcreteWorkProposal && interpretation.kind !== LEARNER_INTENT.UNCLEAR && !reaction) {
+          const boardReady = needsConcreteWorkProposal ? boardReviewReadiness(run.snapshot.form, definition, boardState).ready : true
+          if (needsConcreteWorkProposal && interpretation.kind !== LEARNER_INTENT.UNCLEAR && !reaction && !boardReady) {
             messages.push({
               speaker: definition?.stimulus?.speaker || 'Colleague',
               role: definition?.stimulus?.role || null,
               actorKind: definition?.stimulus?.actorKind || 'AI_PARTICIPANT',
-              content: 'Please make the ownership and order concrete: who will take each open task, and which should happen first?',
+              content: definition?.clarification?.template || (definition?.reviewReadiness?.edited?.length
+                ? 'Please finish it on the board too: every task needs an owner, a due point and a status we can run from.'
+                : 'Please make the ownership and order concrete on the board: who will take each open task, and which should happen first?'),
               clarification: true,
             })
           }
-          const serves = interpretation.servesOpportunity && !reaction?.continue && (!needsConcreteWorkProposal || Boolean(reaction))
+          const serves = interpretation.servesOpportunity && !reaction?.continue && (!needsConcreteWorkProposal || Boolean(reaction) || boardReady)
           const attached = await attachAction(sessionId, run, action, { serves })
           const completed = attached?.state === 'ACTION_RECEIVED'
           const attachedOpportunities = await repos.sessionIo.listOpportunities(sessionId)
@@ -696,7 +704,7 @@ export function createAssessmentSessionService({
             sessionId, run, action, opportunity: attached, actions, opportunities: attachedOpportunities,
           })
           const revealedFactIdsForAction = [...new Set([
-            ...(answer.kind === 'AUTHORED' && answer.factId ? [answer.factId] : []),
+            ...(answer.revealedFactIds || (answer.kind === 'AUTHORED' && answer.factId ? [answer.factId] : [])),
             ...(reaction?.revealedFactIds || []),
           ])]
           const actionResponse = { messages, exchanges: messageActions(actions).length + 1 }

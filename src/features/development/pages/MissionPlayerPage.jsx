@@ -200,7 +200,10 @@ export default function MissionPlayerPage() {
         <div data-testid="uncoached-note"><InlineNotice tone="neutral">{copy.uncoachedNote}</InlineNotice></div>
       )}
       <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-prism-ink-muted" data-testid="first-view-facts">
-        {mission.targetCapability.name && <div><dt className="sr-only">{copy.firstView.target}</dt><dd>Focus: {mission.targetCapability.name}</dd></div>}
+        {mission.targetCapability.name && <div><dt className="sr-only">Focus</dt><dd>Focus: {mission.targetCapability.name}</dd></div>}
+        {mission.targetBehaviours?.some((b) => b.label) && (
+          <div><dt className="sr-only">{copy.firstView.target}</dt><dd data-testid="first-view-behaviours">{copy.firstView.target}: {mission.targetBehaviours.filter((b) => b.label).map((b) => b.label).join('; ')}</dd></div>
+        )}
         <div><dt className="sr-only">Duration</dt><dd>{copy.firstView.duration(mission.estimatedMinutes)}</dd></div>
         {mission.mode?.label && <div><dt className="sr-only">Mode</dt><dd>{mission.mode.label}</dd></div>}
         <div><dt className="sr-only">Allowance</dt><dd data-testid="first-view-allowance">{allowance.kind === 'BOUNDED' ? DEVELOPMENT_COPY.missions.allowanceRemaining(allowance.remaining, allowance.total) : copy.firstView.allowanceUnlimited}</dd></div>

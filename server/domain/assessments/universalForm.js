@@ -68,12 +68,12 @@ const behaviour = (id) => {
 
 // --- facts --------------------------------------------------------------------
 const PUBLIC_FACTS = [
-  { id: 'F-PARTICIPANTS', text: '24 participants are expected.', triggers: ['participant', 'how many people', 'attendees', 'headcount'] },
+  { id: 'F-PARTICIPANTS', text: '24 participants are expected.', triggers: ['participant', 'how many people', 'attendees', 'headcount', 'confirmed number', 'the number', 'is 24', '24 confirmed', 'estimate', 'how many are'] },
   { id: 'F-FACILITATORS', text: 'Two facilitators (Priya and Sam) will run the workshop.', triggers: ['facilitator', 'who runs', 'who is running'] },
   { id: 'F-PREP-DAYS', text: 'There are two working days to prepare.', triggers: ['how long', 'how much time', 'days to prepare', 'deadline', 'when is'] },
   { id: 'F-VENUE', text: 'The venue has basic equipment: tables, chairs, one screen and a whiteboard.', triggers: ['what equipment', 'which equipment', 'is there a projector', 'does the venue have', 'what does the venue', 'what is in the room'] },
   { id: 'F-OPEN-TASKS', text: 'Three preparation tasks are still open: confirm the venue setup, prepare participant materials, and confirm the participant list and needs.', triggers: ['open task', 'outstanding', 'what is left', 'remaining'] },
-  { id: 'F-PRIORITIES', text: 'Two legitimate priorities compete: reaching as many participants as possible, and supporting each participant well.', triggers: ['priorit', 'reach', 'support', 'goal'] },
+  { id: 'F-PRIORITIES', text: 'Two legitimate priorities compete: reaching as many participants as possible, and supporting each participant well.', triggers: ['priorit', 'what matters most', 'the goal', 'which goal', 'compete', 'trade-off', 'tradeoff'] },
 ]
 const CONDITIONAL_FACTS = [
   { id: 'CF-FACILITATOR-HOURS', text: 'Each facilitator can give about half a day to preparation on each of the two days.', triggers: ['available', 'availability', 'capacity', 'how much can', 'hours'] },

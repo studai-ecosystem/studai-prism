@@ -103,6 +103,35 @@ test('answerFactQuestion matches only the question sentence, so a plan that ment
   assert.equal(answerFactQuestion({ form, worldState: world, text: 'I will book the room. How many participants are expected?' }).factId, 'F-PARTICIPANTS')
 })
 
+// Acceptance pass finding: "is 24 confirmed … accessibility support or
+// printed materials?" was answered with the priorities fact because
+// "support" was one of its triggers. Facts are matched by the most specific
+// trigger; a compound question gets up to two distinct facts; a shared
+// trigger word never pulls in a second, hidden fact.
+test('answerFactQuestion answers the question actually asked: specific triggers win, compound questions get two facts, a shared word does not reveal a hidden fact', () => {
+  const world = worldStateFor(form, { revealedFactIds: [] })
+  const out = answerFactQuestion({ form, worldState: world, text: 'Before we plan: is 24 the confirmed number or an estimate, and do we know yet whether anyone needs accessibility support or printed materials?' })
+  assert.notEqual(out.factId, 'F-PRIORITIES', '"support" alone is not a question about the priorities')
+  assert.equal(out.factIds[0], 'F-PARTICIPANTS')
+  assert.deepEqual(out.factIds, ['F-PARTICIPANTS', 'CF-PRINTING'], 'the printing question is the second, distinct part')
+  assert.deepEqual(out.revealedFactIds, ['CF-PRINTING'])
+  assert.equal(out.kind, 'AUTHORED')
+  assert.match(out.text, /24 participants are expected/)
+  assert.match(out.text, /printed on the morning/)
+  // One question, one fact: nothing extra is appended.
+  const one = answerFactQuestion({ form, worldState: world, text: 'How many participants are we expecting?' })
+  assert.deepEqual(one.factIds, ['F-PARTICIPANTS'])
+  assert.equal(one.kind, 'ALREADY_GIVEN')
+  // After Sam's change, "availability" is answered by the known change only;
+  // the hidden hours fact sharing that word is not revealed.
+  const changed = worldStateFor(form, { revealedFactIds: [], appliedWorldChangeIds: ['WC-FACILITATOR-UNAVAILABLE'] })
+  const avail = answerFactQuestion({ form, worldState: changed, text: 'What is Sam availability now?' })
+  assert.equal(avail.kind, 'ALREADY_GIVEN')
+  assert.deepEqual(avail.revealedFactIds, [])
+  // A question with no matching fact and no information phrasing is left to the Director.
+  assert.equal(answerFactQuestion({ form, worldState: world, text: 'Shall we reach everyone we can?' }).kind, 'NONE')
+})
+
 test('answerFactQuestion leaves a request to a colleague to the Director instead of answering "not known"', () => {
   const world = worldStateFor(form, { revealedFactIds: [] })
   const out = answerFactQuestion({ form, worldState: world, text: 'Priya, can you cover the list if I run short?' })
@@ -155,6 +184,33 @@ test('stakeholder reactions are grounded in the actual proposal and board state'
   })
   assert.equal(feasible.continue, false)
   assert.doesNotMatch(feasible.content, /error|wrong/i)
+  // Acceptance pass finding: a re-plan that keeps Sam in the morning and
+  // mentions the afternoon for someone else must not be met with "I cannot
+  // take preparation work that afternoon". The conflict is grounded in the
+  // board (Sam on a Day 1 afternoon task) or an actual assignment sentence.
+  const replan = opportunityById(form, 'OPP-ADAPT-REPLAN')
+  const decision = { kind: LEARNER_INTENT.DECISION, servesOpportunity: true }
+  const keepsSamMorning = stakeholderReaction({
+    form, opportunity: replan, interpretation: decision,
+    action: { kind: 'MESSAGE', payload: { text: 'Then the venue setup stays with Sam in the Day 1 morning, which is unchanged. I will move my participant-list check to Day 1 afternoon so Sam has the morning free of questions from me.' } },
+    boardState: { 'R1.owner': 'Sam', 'R1.due': 'Day 1 morning', 'R3.owner': 'You', 'R3.due': 'Day 1 afternoon' },
+    worldState: world,
+  })
+  assert.ok(!keepsSamMorning || !/cannot take preparation work that afternoon/i.test(keepsSamMorning.content), 'no afternoon conflict when Sam is kept in the morning')
+  const assignsSamAfternoon = stakeholderReaction({
+    form, opportunity: replan, interpretation: decision,
+    action: { kind: 'MESSAGE', payload: { text: 'Sam takes the materials on the Day 1 afternoon and I do the list.' } },
+    boardState: {},
+    worldState: world,
+  })
+  assert.match(assignsSamAfternoon.content, /cannot take preparation work that afternoon/i)
+  const boardConflict = stakeholderReaction({
+    form, opportunity: replan, interpretation: decision,
+    action: { kind: 'MESSAGE', payload: { text: 'Board updated as discussed.' } },
+    boardState: { 'R2.owner': 'Sam', 'R2.due': 'Day 1 afternoon' },
+    worldState: world,
+  })
+  assert.match(boardConflict.content, /cannot take preparation work that afternoon/i)
 })
 
 test('feedback stimulus does not allege an error when the current board is consistent', () => {

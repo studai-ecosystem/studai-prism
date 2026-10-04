@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 import { ApiError } from '../http/errors.js'
 import { can } from '../permissions/can.js'
 import { capabilityInfo } from '../assessments/catalog.js'
-import { CORE_TEAMREADY_A, opportunityById } from '../assessments/universalForm.js'
+import { CORE_TEAMREADY_A, opportunityById, behaviourById, BEHAVIOUR_IDS } from '../assessments/universalForm.js'
 import { parseMission, applyVariant, MISSION_SCHEMA_VERSION } from './missionSchema.js'
 import { MISSION_LIBRARY, draftContentEnabled } from './missionLibrary.js'
 import { normaliseWork, initialWork, runDeterministicChecks, candidateTextFor } from './validators.js'
@@ -181,6 +181,10 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       displayCode: m.display_code || null,
       title: m.title,
       targetCapability: { id: m.target_capability_id, name: capabilityInfo(m.target_capability_id)?.name || null },
+      // The behaviours this mission practises, by their catalogue labels
+      // (ids from the universal form; a legacy id without a label is shown
+      // as its id, never invented).
+      targetBehaviours: m.target_behavior_ids.map((id) => ({ id, label: BEHAVIOUR_IDS.includes(id) ? behaviourById(id).label : null })),
       scenario: m.scenario_context,
       situationFacts: m.situation_facts || [],
       whyItMatters: m.why_it_matters || null,

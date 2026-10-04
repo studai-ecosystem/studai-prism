@@ -16,6 +16,7 @@ import { NextActionCard } from '../components/NextActionCard.jsx'
 import { IntentChooser } from '../components/IntentChooser.jsx'
 import { NewLearnerStart } from '../components/IntentStep.jsx'
 import { RecentActivityList } from '../components/RecentActivityList.jsx'
+import { useFlag } from '../../../app/providers/FeatureFlagProvider.jsx'
 
 function greeting(name) {
   const hour = new Date().getHours()
@@ -30,6 +31,7 @@ export default function HomePage() {
   const history = useStudentHistory()
   const plan = useDevelopmentPlan()
   const growth = useGrowth()
+  const preparationOn = useFlag('PRISM_PREPARATION_V1').enabled
   const campus = active.type === 'CAMPUS_STUDENT'
   const state = queryStateView(home, { label: 'Loading your home' })
   if (state) {
@@ -120,6 +122,28 @@ export default function HomePage() {
           ))}
         </ul>
       </section>
+
+      {!campus && (<section aria-labelledby="where-next-title" className="space-y-3" data-testid="home-entry-points">
+        <h2 id="where-next-title" className="text-lg font-semibold text-prism-ink">Where to go next</h2>
+        <ul className="grid gap-3 sm:grid-cols-3">
+          <li className="rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-surface p-4 text-sm text-prism-ink-muted">
+            <Link to="/app/capabilities" className="font-semibold text-prism-accent-strong underline">Understand</Link>
+            <p className="mt-1">My Prism: what each completed assessment observed, the moment behind it, and the evidence.</p>
+          </li>
+          <li className="rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-surface p-4 text-sm text-prism-ink-muted">
+            <Link to="/app/development" className="font-semibold text-prism-accent-strong underline">Practise</Link>
+            <p className="mt-1">Short practice missions with specific feedback. Practice never changes a formal result.</p>
+          </li>
+          <li className="rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-surface p-4 text-sm text-prism-ink-muted">
+            {preparationOn
+              ? <Link to="/app/prepare" className="font-semibold text-prism-accent-strong underline">Prepare</Link>
+              : <span className="font-semibold text-prism-ink">Prepare</span>}
+            <p className="mt-1">{preparationOn
+              ? 'Rehearse a real conversation privately and leave with a short card. Private to you.'
+              : 'Private rehearsal of a real conversation. Not yet available in this workspace.'}</p>
+          </li>
+        </ul>
+      </section>)}
 
       {!campus && (<section aria-labelledby="more-title" className="space-y-3">
         <h2 id="more-title" className="text-lg font-semibold text-prism-ink">Your evidence and growth</h2>

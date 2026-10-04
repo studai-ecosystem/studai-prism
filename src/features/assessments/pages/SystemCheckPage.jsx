@@ -87,6 +87,9 @@ export default function SystemCheckPage() {
   const [mic, setMic] = useState(null)
   const hasArtifacts = briefing.data?.definition.hasArtifacts
   const proctored = briefing.data?.assignment.integrityMode === 'PROCTORED'
+  // The V3 workspace is answered by typing and on the work material; spoken
+  // input is a separately reviewed variant and is not offered here.
+  const spokenInput = briefing.data?.start?.mode !== 'V3'
 
   const run = useCallback(async () => {
     setResults(null)
@@ -95,9 +98,9 @@ export default function SystemCheckPage() {
       checkBrowser(),
       checkConnection(navigator.onLine !== false, reachable),
       checkScreen(window.innerWidth, { needsLargeScreen: Boolean(hasArtifacts) }),
-      ...checkMediaSupport(navigator.mediaDevices, { needsCamera: proctored }),
+      ...checkMediaSupport(navigator.mediaDevices, { needsCamera: proctored, spokenInput }),
     ])
-  }, [hasArtifacts, proctored])
+  }, [hasArtifacts, proctored, spokenInput])
 
   useEffect(() => {
     if (briefing.data) run()
@@ -147,7 +150,7 @@ export default function SystemCheckPage() {
         )}
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={run}>Run the check again</Button>
-          <Button variant="ghost" onClick={async () => setMic(await testMicrophone(navigator.mediaDevices))}>Test microphone</Button>
+          {spokenInput && <Button variant="ghost" onClick={async () => setMic(await testMicrophone(navigator.mediaDevices))}>Test microphone</Button>}
         </div>
       </Card>
 

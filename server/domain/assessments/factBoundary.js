@@ -49,31 +49,63 @@ export function verifyRender(intendedHash, shownHash) {
 }
 
 const norm = (s) => String(s || '').toLowerCase()
-function matchesTriggers(text, fact) {
+// Triggers of `fact` that appear in `text`, most specific first ("confirmed
+// number" beats a bare "support"). Empty = no match.
+function matchedTriggers(text, fact) {
   const t = norm(text)
-  return (fact.triggers || []).some((k) => t.includes(norm(k)))
+  return (fact.triggers || []).map(norm).filter((k) => k && t.includes(k)).sort((a, b) => b.length - a.length)
 }
+function triggerScore(text, fact) { return matchedTriggers(text, fact)[0]?.length || 0 }
+function matchesTriggers(text, fact) { return triggerScore(text, fact) > 0 }
 
+// A learner question is answered from the fact table only: the best-matching
+// known fact (public or already revealed) is pointed to neutrally, the
+// best-matching unrevealed conditional fact is revealed. A compound question
+// ("is 24 confirmed, and can we print on the day?") gets up to two distinct
+// facts, most specific first; nothing is invented and nothing hidden leaks
+// without a matching ask.
+const MAX_FACTS_PER_ANSWER = 2
+const MIN_SECOND_TRIGGER = 5
 export function answerFactQuestion({ form, worldState, text }) {
-  if (typeof text !== 'string' || !text.trim()) return { kind: 'UNKNOWN', factId: null, text: null }
+  if (typeof text !== 'string' || !text.trim()) return { kind: 'UNKNOWN', factId: null, factIds: [], revealedFactIds: [], text: null }
   // Only the question sentences are matched: a plan that merely mentions the
   // venue while stating a decision is not a request for information.
   const questions = String(text).split(/(?<=[.!?])\s+/).filter((s) => /\?\s*$/.test(s))
   const asked = questions.length ? questions.join(' ') : text
   // A request to a colleague ("can you cover…?", "would you take…?") is a
   // proposal, not a fact lookup: the Director handles it, not the fact table.
-  const infoQuestion = /\b(what|which|how (?:many|much|long)|when|where|who|is there|are there|do we|does the|did)\b/i.test(asked)
-  // Already given (public or already revealed) → neutral pointer, no penalty.
-  for (const fact of Object.values(worldState?.facts || {})) {
-    if (matchesTriggers(asked, fact)) return { kind: 'ALREADY_GIVEN', factId: fact.id, text: `That is already in the brief: ${fact.text}`, neutral: true }
+  const infoQuestion = /\b(what|which|how (?:many|much|long)|when|where|who|is there|are there|do we|does the|did|is \d+|is the|are the)\b/i.test(asked)
+  const known = Object.values(worldState?.facts || {})
+    .map((fact) => ({ fact, triggers: matchedTriggers(asked, fact), kind: 'ALREADY_GIVEN' })).filter((m) => m.triggers.length)
+  const conditional = (form.conditionalFacts || []).filter((cf) => !worldState?.facts?.[cf.id])
+    .map((fact) => ({ fact, triggers: matchedTriggers(asked, fact), kind: 'AUTHORED' })).filter((m) => m.triggers.length)
+  // Known facts win ties: a question the brief already answers never
+  // reveals a hidden fact that happens to share a trigger word.
+  const ranked = [...known, ...conditional].sort((a, b) => b.triggers[0].length - a.triggers[0].length)
+  const chosen = []
+  for (const m of ranked) {
+    if (chosen.length >= MAX_FACTS_PER_ANSWER) break
+    if (!chosen.length) { chosen.push(m); continue }
+    // A second fact joins only when it answers a different part of the
+    // question: its triggers must not be the ones the first fact matched.
+    const covered = new Set(chosen.flatMap((c) => c.triggers))
+    const own = m.triggers.filter((k) => !covered.has(k) && !chosen.some((c) => c.triggers.some((ck) => ck.includes(k) || k.includes(ck))))
+    if (own.length && own[0].length >= MIN_SECOND_TRIGGER) chosen.push({ ...m, triggers: own })
   }
-  // Relevant conditional fact → authored answer, revealed from now on.
-  for (const cf of form.conditionalFacts || []) {
-    if (worldState?.facts?.[cf.id]) continue
-    if (matchesTriggers(asked, cf)) return { kind: 'AUTHORED', factId: cf.id, text: cf.text }
+  if (chosen.length) {
+    const revealed = chosen.filter((m) => m.kind === 'AUTHORED').map((m) => m.fact.id)
+    const parts = chosen.map((m) => (m.kind === 'ALREADY_GIVEN' ? `That is already in the brief: ${m.fact.text}` : m.fact.text))
+    return {
+      kind: revealed.length ? 'AUTHORED' : 'ALREADY_GIVEN',
+      factId: chosen[0].fact.id,
+      factIds: chosen.map((m) => m.fact.id),
+      revealedFactIds: revealed,
+      text: parts.join(' '),
+      ...(revealed.length ? {} : { neutral: true }),
+    }
   }
-  if (!infoQuestion) return { kind: 'NONE', factId: null, text: null }
-  return { kind: 'UNKNOWN', factId: null, text: 'That is not known at this point; nobody on the team has that information.' }
+  if (!infoQuestion) return { kind: 'NONE', factId: null, factIds: [], revealedFactIds: [], text: null }
+  return { kind: 'UNKNOWN', factId: null, factIds: [], revealedFactIds: [], text: 'That is not known at this point; nobody on the team has that information.' }
 }
 
 export const LEARNER_INTENT = Object.freeze({
@@ -193,9 +225,20 @@ export function stakeholderReaction({ form, opportunity, interpretation, action,
     if (proposesAllocation && authored.FEASIBLE_ALLOCATION) return { ...authored.FEASIBLE_ALLOCATION, continue: false }
   }
   if (opportunity?.id === 'OPP-ADAPT-REPLAN') {
-    const assignsSamAfternoon = /\bsam\b.{0,60}\bafternoon\b|\bafternoon\b.{0,60}\bsam\b/i.test(text)
-      && !/\b(not|cannot|can't|unavailable|out)\b/i.test(text)
-    if (assignsSamAfternoon && authored.SAM_AFTERNOON_CONFLICT) return { ...authored.SAM_AFTERNOON_CONFLICT, continue: true }
+    // Grounded in the board first: Sam owns a task due on the Day 1
+    // afternoon he can no longer work. The message counts only when a
+    // sentence actually assigns Sam afternoon work ("Sam takes … afternoon",
+    // "move … to Sam … afternoon"); mentioning Sam and the afternoon in one
+    // breath ("…afternoon so Sam has the morning free") is not an assignment.
+    const boardAssignsSamAfternoon = materializeBoard(form, boardState)
+      .some((row) => row.owner === 'Sam' && /\bday\s*1\b/i.test(String(row.due || '')) && /\bafternoon\b/i.test(String(row.due || '')))
+    const sentences = text.split(/(?<=[.!?])\s+/)
+    const textAssignsSamAfternoon = sentences.some((s) => /\bafternoon\b/i.test(s)
+      && (/\bsam\b\s*(?:,\s*)?(?:will|takes?|does|handles?|owns?|covers?|runs?|can|should|is on|gets)\b[^.!?]{0,40}\bafternoon\b/i.test(s)
+        || /\b(?:give|move|assign|hand|shift|put)\b[^.!?]{0,40}\bto\s+sam\b[^.!?]{0,40}\bafternoon\b/i.test(s)
+        || /\bafternoon\b[^.!?]{0,20}\b(?:for|to|with)\s+sam\b/i.test(s))
+      && !/\b(not|cannot|can't|unavailable|out|free|instead of sam|away from sam|off sam)\b/i.test(s))
+    if ((boardAssignsSamAfternoon || textAssignsSamAfternoon) && authored.SAM_AFTERNOON_CONFLICT) return { ...authored.SAM_AFTERNOON_CONFLICT, continue: true }
   }
   const reaction = authored[interpretation?.kind]
   if (!reaction) return null

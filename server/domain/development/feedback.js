@@ -59,8 +59,12 @@ export function buildFocus({ mission, criteria, status, learnerTextFor }) {
   const next = nextOrder.map((id) => byId.get(id)).find((c) => c.result === 'NOT_OBSERVED' || c.result === 'COPIED_ASSISTANCE') || null
   const reviewIncomplete = status !== 'EVALUATED'
   const allMet = !reviewIncomplete && criteria.length > 0 && criteria.every((c) => c.result === 'OBSERVED')
-  const ownWords = (c, { minWords = 1 } = {}) => {
+  const ownWords = (c, { minWords = 1, wholeOnly = false } = {}) => {
     const texts = (learnerTextFor ? learnerTextFor(c) : []).map((t) => String(t).trim()).filter(Boolean)
+    // wholeOnly: quote back only when the learner's whole text is one
+    // sentence (so "your words" is all of what they wrote), never an
+    // arbitrary first sentence of a longer reply.
+    if (wholeOnly && (texts.length !== 1 || splitSentences(texts[0]).length !== 1)) return null
     const first = texts.find((t) => words(t).length >= minWords)
     return first ? snippet(first) : null
   }
@@ -82,9 +86,11 @@ export function buildFocus({ mission, criteria, status, learnerTextFor }) {
       criterionId: next.criterionId,
       description: next.description,
       because: because(next),
-      // Only a real sentence of the learner's is worth quoting back here, and
-      // only for a meaning check (an automatic check already names what is missing).
-      yourWords: next.check === 'DETERMINISTIC' ? null : ownWords(next, { minWords: 4 }),
+      // Only the learner's whole (single-sentence) reply is worth quoting
+      // back under a missing criterion; a sentence picked from a longer reply
+      // would be shown against a behaviour it has nothing to do with. An
+      // automatic check already names what is missing.
+      yourWords: next.check === 'DETERMINISTIC' ? null : ownWords(next, { minWords: 4, wholeOnly: true }),
     } : null,
     allMet,
     reviewIncomplete,

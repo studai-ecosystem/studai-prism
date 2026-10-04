@@ -71,6 +71,13 @@ describe('Student Home (§9, P3.3)', () => {
     const next = screen.getByTestId('next-action')
     expect(next).toHaveAttribute('data-kind', 'REPORT_READY')
     expect(within(next).getByRole('link', { name: 'Open my report' })).toHaveAttribute('href', '/app/reports/latest')
+    // Understand / Practise / Prepare are named entry points; Prepare is
+    // honest about availability (flag off in this fixture → no dead link).
+    const entry = screen.getByTestId('home-entry-points')
+    expect(within(entry).getByRole('link', { name: 'Understand' })).toHaveAttribute('href', '/app/capabilities')
+    expect(within(entry).getByRole('link', { name: 'Practise' })).toHaveAttribute('href', '/app/development')
+    expect(within(entry).queryByRole('link', { name: 'Prepare' })).not.toBeInTheDocument()
+    expect(entry).toHaveTextContent('Not yet available in this workspace')
     noPercent()
   })
 
@@ -417,6 +424,11 @@ describe('System check (§11 item 9)', () => {
     expect(checkConnection(false, true).status).toBe('FAIL')
     expect(checkConnection(true, false).status).toBe('FAIL')
     expect(checkMediaSupport(undefined, { needsCamera: true }).map((r) => r.status)).toEqual(['WARN', 'FAIL'])
+    // Text-and-board workspace: the microphone row never implies speaking is a way to answer.
+    const typed = checkMediaSupport({ getUserMedia: () => {} }, { spokenInput: false })[0]
+    expect(typed.status).toBe('PASS')
+    expect(typed.message).toMatch(/spoken answers are not part of this version/)
+    expect(typed.message).not.toMatch(/speak your answers/)
     expect(summarise([{ status: 'PASS' }, { status: 'WARN' }])).toBe('WARN')
     const stop = vi.fn()
     const ok = await testMicrophone({ getUserMedia: async () => ({ getTracks: () => [{ stop }] }) })

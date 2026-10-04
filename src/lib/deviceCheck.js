@@ -24,13 +24,21 @@ export function checkConnection(online, apiReachable) {
   return { id: 'connection', label: 'Connection', status: 'PASS', message: 'Prism can be reached.' }
 }
 
-export function checkMediaSupport(mediaDevices, { needsCamera = false } = {}) {
+// `spokenInput: false` (the V3 text-and-board workspace): the microphone is
+// not part of the assessment, and the row says so instead of implying that
+// speaking is an available way to answer.
+export function checkMediaSupport(mediaDevices, { needsCamera = false, spokenInput = true } = {}) {
   const supported = Boolean(mediaDevices && typeof mediaDevices.getUserMedia === 'function')
-  const out = [{
+  const out = [spokenInput ? {
     id: 'microphone',
     label: 'Microphone (optional)',
     status: supported ? 'PASS' : 'WARN',
     message: supported ? 'You can speak your answers or type them.' : 'Speaking is not available in this browser. You can type your answers.',
+  } : {
+    id: 'microphone',
+    label: 'Microphone',
+    status: 'PASS',
+    message: 'Not needed. You answer this assessment by typing and on its work material; spoken answers are not part of this version.',
   }]
   if (needsCamera) {
     out.push({
