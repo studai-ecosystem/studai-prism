@@ -67,6 +67,16 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
     return null
   }
 
+  async function requiredReviewContext(done, name, read) {
+    if (done.kind !== 'EVALUATION_RUN') return typeof read === 'function' ? read() : []
+    if (typeof read !== 'function') throw new ApiError('REPORT_PROCESSING_FAILED', `The review is incomplete because its recorded ${name} context is unavailable.`)
+    try {
+      return await read()
+    } catch {
+      throw new ApiError('REPORT_PROCESSING_FAILED', `The review is incomplete because its recorded ${name} context could not be loaded.`)
+    }
+  }
+
   // Builds (and versions) the full report; audiences get views of it. The
   // sponsor shown is always the session's sponsoring organization — never the
   // reader's organization.
@@ -79,9 +89,9 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
     const [cat, scenarios, allUnits, actions, opportunities] = await Promise.all([
       catalog.getCatalog(), scenarioSource(), evidence.units(sessionId),
       // Accepted candidate actions outlive any history purge (P2.3 / T32).
-      repos.sessionIo && typeof repos.sessionIo.listActions === 'function' ? repos.sessionIo.listActions(sessionId).catch(() => []) : [],
+      requiredReviewContext(done, 'learner action', repos.sessionIo && typeof repos.sessionIo.listActions === 'function' ? () => repos.sessionIo.listActions(sessionId) : null),
       // Opportunity ledger (P4.5): the stimulus each moment answered.
-      repos.sessionIo && typeof repos.sessionIo.listOpportunities === 'function' ? repos.sessionIo.listOpportunities(sessionId).catch(() => []) : [],
+      requiredReviewContext(done, 'stimulus', repos.sessionIo && typeof repos.sessionIo.listOpportunities === 'function' ? () => repos.sessionIo.listOpportunities(sessionId) : null),
     ])
     // P5.7: units withheld by a reviewed correction never reach the builder
     // or the evidence-set hash, so a corrected publication is its own version.

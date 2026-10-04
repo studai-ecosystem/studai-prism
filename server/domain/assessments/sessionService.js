@@ -11,7 +11,7 @@ import { createMemorySessionLocks } from './sessionLocks.js'
 import { draftSegmentFor, buildRunPin, evaluateJobKey, DRAFT_EVALUATE_JOB_KIND, DRAFT_SEGMENT_ID, SLICE_METHOD_VERSION, isUniversalSnapshot, draftContentEnabled, answerSegmentQuestion } from './draftSegments.js'
 import { timingPolicyFor, legacyPolicy, isLegacyPolicy, deadlinesFor } from './timingPolicy.js'
 import { selectNext, stageStrip, coverageReport, parentOpportunityId } from './director.js'
-import { validateBoardPatch, worldStateFor } from './universalForm.js'
+import { BOARD_ARTIFACT_ID, validateBoardPatch, worldStateFor } from './universalForm.js'
 import { answerFactQuestion } from './factBoundary.js'
 
 const START_EVENT = 'start'
@@ -115,7 +115,47 @@ export function createAssessmentSessionService({
   const ledgerStore = () => (repos.sessionIo && typeof repos.sessionIo.listOpportunities === 'function' ? repos.sessionIo : null)
   const isUniversalRun = (run) => Boolean(run?.snapshot && isUniversalSnapshot(run.snapshot) && ledgerStore())
   const messageActions = (actions) => actions.filter((a) => a.kind === 'MESSAGE' && a.state === 'APPLIED')
-  const revealedFactIds = (actions) => actions.map((a) => a.result?.revealedFactId).filter(Boolean)
+  const revealedFactIds = (actions) => [...new Set(actions.map((a) => a.result?.revealedFactId).filter(Boolean))]
+  const appliedWorldChangeIds = (opportunities) => [...new Set(opportunities.map((o) => o.stimulus?.worldChangeId).filter(Boolean))]
+  const initialBoardState = (form) => ({ rows: form.board.rows.map((row) => ({ ...row })) })
+  async function evaluationContextFor({ sessionId, run, action, opportunity, actions, opportunities, workStateBefore = null, workStateAfter = null }) {
+    if (!opportunity?.stimulus?.messages?.length) throw new ApiError('UPSTREAM_UNAVAILABLE', 'The review context could not be recorded. Your work is saved; please try again.')
+    const form = run.snapshot.form
+    const revealed = revealedFactIds(actions)
+    const appliedChanges = appliedWorldChangeIds(opportunities)
+    const world = worldStateFor(form, { revealedFactIds: revealed, appliedWorldChangeIds: appliedChanges })
+    let before = workStateBefore
+    if (before == null) {
+      const latest = await repos.sessionIo.latestArtifactVersion(sessionId, BOARD_ARTIFACT_ID)
+      before = latest?.content?.data ?? initialBoardState(form)
+    }
+    const definition = run.snapshot.opportunities.find((o) => o.id === parentOpportunityId(opportunity.opportunityId))
+    return {
+      schemaVersion: 'assessment-action-context.v1',
+      situation: {
+        scenarioId: run.snapshot.id,
+        scenarioVersion: run.snapshot.version,
+        applicableFacts: Object.values(world.facts),
+        appliedWorldChangeIds: appliedChanges,
+      },
+      stimulus: {
+        opportunityId: opportunity.opportunityId,
+        presentedAt: opportunity.presentedAt,
+        renderHash: opportunity.renderHash,
+        messages: opportunity.stimulus.messages,
+      },
+      informationAccess: { revealedFactIds: revealed },
+      learnerAction: { actionId: action.actionId, kind: action.kind, sequence: action.sequence },
+      workState: { before, after: workStateAfter ?? before },
+      method: {
+        behaviourIds: definition?.behaviourIds || [],
+        rubricRef: run.pin.rubricRef,
+        promptVersion: sliceEvaluator?.promptVersion || null,
+        evaluatorVersion: sliceEvaluator?.evaluatorVersion || null,
+        methodVersion: run.pin.methodVersion,
+      },
+    }
+  }
   async function planOpportunities(sessionId, run) {
     const io = ledgerStore()
     for (const o of run.snapshot.opportunities) {
@@ -570,9 +610,18 @@ export function createAssessmentSessionService({
           throw err
         }
         if (isUniversalRun(run)) {
-          await attachAction(sessionId, run, action)
-          const actions = await repos.sessionIo.listActions(sessionId)
-          const world = worldStateFor(run.snapshot.form, { revealedFactIds: revealedFactIds(actions) })
+          const attached = await attachAction(sessionId, run, action)
+          const [actions, opportunities] = await Promise.all([
+            repos.sessionIo.listActions(sessionId),
+            repos.sessionIo.listOpportunities(sessionId),
+          ])
+          const world = worldStateFor(run.snapshot.form, {
+            revealedFactIds: revealedFactIds(actions),
+            appliedWorldChangeIds: appliedWorldChangeIds(opportunities),
+          })
+          const evaluationContext = await evaluationContextFor({
+            sessionId, run, action, opportunity: attached, actions, opportunities,
+          })
           const messages = []
           let revealedFactId = null
           if (/\?/.test(String(text))) {
@@ -582,7 +631,7 @@ export function createAssessmentSessionService({
           }
           const response = { messages, exchanges: messageActions(actions).length + 1 }
           const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
-          await applied(action, { ...stored.response, revealedFactId })
+          await applied(action, { ...stored.response, revealedFactId, evaluationContext })
           const shown = await presentNext(sessionId, run, { requestId })
           // The task-only stage strip after the Director moved on (names and
           // position only, as in the contract), so the player can update it
@@ -690,12 +739,27 @@ export function createAssessmentSessionService({
         const written = await repos.sessionIo.appendArtifactVersion({ sessionId, artifactId, version: currentVersion + 1, content: { data: artifact.data ?? null, notes: savedNotes }, savedBy: CANDIDATE })
         const response = { artifactId, version: written.version, data: artifact.data ?? null, notes: savedNotes }
         if (clientEventId) await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'ARTIFACT', response })
-        await applied(action, response)
         if (universal && action) {
           const attached = await attachAction(sessionId, run, action)
+          const [actions, opportunities] = await Promise.all([
+            repos.sessionIo.listActions(sessionId),
+            repos.sessionIo.listOpportunities(sessionId),
+          ])
+          const evaluationContext = await evaluationContextFor({
+            sessionId,
+            run,
+            action,
+            opportunity: attached,
+            actions,
+            opportunities,
+            workStateBefore: current?.content?.data ?? initialBoardState(run.snapshot.form),
+            workStateAfter: artifact.data ?? null,
+          })
+          await applied(action, { ...response, evaluationContext })
           const shown = attached?.state === 'ACTION_RECEIVED' ? await presentNext(sessionId, run, { requestId }) : []
           return { ...response, messages: shown, replayed: false }
         }
+        await applied(action, response)
         return { ...response, replayed: false }
       })
     },

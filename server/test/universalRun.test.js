@@ -41,7 +41,7 @@ const ANSWERS = {
   'OPP-REASON-OPTIONS': 'One session for all 24 reaches everyone at once; two smaller sessions support people better but double the setup. With two days I would run one session and keep materials minimal.',
   'OPP-COMM-PLAN-EXPLAIN': 'Plan: Sam sets up the room Day 1 morning, I confirm the list today, Priya prepares the materials Day 2. Sam, I need the seat count from you first.',
   'OPP-COLLAB-PUSHBACK': 'I hear that the room matters most and I agree it comes first. I still think a one-page agenda is worth it; can we do that instead of a full pack?',
-  'OPP-ADAPT-REPLAN': 'Sam is out Day 1 afternoon, so room setup moves to Day 1 morning and I take the materials myself. Priya, can you cover the list if I run short?',
+  'OPP-ADAPT-REPLAN': 'What is Sam availability now? Sam is out Day 1 afternoon, so room setup moves to Day 1 morning and I take the materials myself. Priya, can you cover the list if I run short?',
   'OPP-REASON-CHECK-RECOMMENDATION': 'No. The brief says 24 participants, not 40, and the venue only has one screen, so I would not rely on a projector. I am unsure the screen works with a laptop; Sam can check.',
   'OPP-COLLAB-HANDOVER-DISAGREEMENT': 'Both readings make sense. Priya, your worksheet idea is good but we do not have the time; let us agree Sam does the one-page agenda and we revisit the pack next time.',
   'OPP-ADAPT-FEEDBACK': 'You are right, I had the materials due after setup starts. Moving it to Day 2 morning; printing then happens on the day, which the venue allows.',
@@ -210,6 +210,13 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     assert.equal(first.exchanges, 1)
     const act1 = await w.repos.sessionIo.getAction(sid, 'evt-run-0001')
     assert.equal(act1.result.revealedFactId, 'CF-PRINTING')
+    assert.equal(act1.result.evaluationContext.schemaVersion, 'assessment-action-context.v1')
+    assert.equal(act1.result.evaluationContext.stimulus.opportunityId, 'OPP-REASON-FACTS-ASSUMPTIONS')
+    assert.equal(act1.result.evaluationContext.stimulus.messages[0].content, row.stimulus.messages[0].content)
+    assert.deepEqual(act1.result.evaluationContext.informationAccess.revealedFactIds, [], 'the answer revealed after this action is not backdated')
+    assert.equal(act1.result.evaluationContext.situation.applicableFacts.some((f) => f.id === 'CF-PRINTING'), false)
+    assert.equal(act1.result.evaluationContext.method.promptVersion, 'evidence_evaluator.v2')
+    assert.equal(act1.result.evaluationContext.method.evaluatorVersion, 'slice-evaluator.v2')
     ledger = await w.repos.sessionIo.listOpportunities(sid)
     assert.equal(ledger.find((r) => r.opportunityId === 'OPP-REASON-FACTS-ASSUMPTIONS').state, 'ACTION_RECEIVED')
     assert.deepEqual(ledger.find((r) => r.opportunityId === 'OPP-REASON-FACTS-ASSUMPTIONS').actionIds, [act1.actionId])
@@ -217,6 +224,7 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     // Drive the remaining stages, stopping with the LAST required opportunity presented but unanswered.
     const presentedOrder = ['OPP-REASON-FACTS-ASSUMPTIONS']
     let sawWorldChange = null
+    let availabilityAnswer = null
     for (let i = 0; i < 30; i += 1) {
       row = await w.presentedRow(sid)
       if (!row) break
@@ -225,6 +233,7 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
       if (row.opportunityId === 'OPP-COMM-HANDOVER-AUDIENCE') break
       const out = await w.answer(sid, row)
       assert.equal(out.replayed, false)
+      if (row.opportunityId === 'OPP-ADAPT-REPLAN') availabilityAnswer = out.messages.find((m) => m.factAnswer)
     }
     assert.equal(presentedOrder.at(-1), 'OPP-COMM-HANDOVER-AUDIENCE')
     assert.equal(new Set(presentedOrder).size, presentedOrder.length, 'no opportunity presented twice')
@@ -235,6 +244,8 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     assert.equal(sawWorldChange.messages[0].actorKind, 'SYSTEM')
     assert.match(sawWorldChange.messages[0].content, /What changed: Sam is unavailable/)
     assert.match(sawWorldChange.messages[0].content, /board is unchanged/)
+    assert.equal(availabilityAnswer.factAnswer, 'ALREADY_GIVEN')
+    assert.match(availabilityAnswer.content, /cannot work on preparation during the afternoon of Day 1/)
     const boardAfterChange = await w.repos.sessionIo.latestArtifactVersion(sid, BOARD_ARTIFACT_ID)
     assert.equal(boardAfterChange.content.data['R2.owner'], BOARD_PATCHES['OPP-EXEC-BOARD-OWNERS']['R2.owner'], 'the learner\'s earlier board work survives the scene change')
     assert.equal(w.engine.calls.message, 0, 'no engine dialogue for a universal run')
@@ -288,6 +299,8 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
         assert.equal(a.actorKind, 'CANDIDATE', 'T24: only candidate actions are evidence sources')
         assert.equal(a.state, 'APPLIED')
         assert.ok(ledger.find((r) => r.opportunityId === p.opportunityId).actionIds.includes(a.actionId), 'the unit links an action attached to its opportunity')
+        assert.equal(p.evaluationContext.stimulus.opportunityId, p.opportunityId)
+        assert.equal(p.evaluationContext.method.rubricRef, 'draft-teamready-rubric.v0.1')
       }
       assert.notEqual(u.evidence_status, 'SUFFICIENT')
     }
@@ -304,6 +317,13 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     assert.equal(independent, 9)
     assert.ok(units.length > independent)
     assert.equal(w.evaluatorCalls.length, units.filter((u) => u.provenance_json.reason !== 'NOT_ADDRESSED').length)
+    const firstPrompt = w.evaluatorCalls.find((call) => call.messages[1].content.includes('OPP-REASON-FACTS-ASSUMPTIONS')).messages[0].content
+    assert.match(firstPrompt, /Before we plan, what do you want to check or ask\?/)
+    assert.doesNotMatch(firstPrompt, /Materials can be printed on the morning/, 'a fact revealed after the action is not leaked backward')
+    const changedPrompt = w.evaluatorCalls.find((call) => call.messages[1].content.includes('OPP-ADAPT-REPLAN')).messages[0].content
+    assert.match(changedPrompt, /Change of plan on my side/)
+    assert.match(changedPrompt, /Sam cannot work on preparation during the afternoon of Day 1/)
+    assert.doesNotMatch(changedPrompt, /Each facilitator can give about half a day/, 'an unrevealed conditional fact stays hidden')
 
     c = await w.call('GET', `/assessment-sessions/${sid}`)
     assert.equal(c.body.data.status, 'COMPLETED')
@@ -313,6 +333,14 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     assert.equal(decisions.length, 11, 'one recorded decision per presentation')
     assert.ok(decisions.every((a) => a.payload.renderHash && a.payload.formVersion === CORE_TEAMREADY_A.version && !('content' in a.payload)))
     assert.ok(!JSON.stringify(w.audits).includes(ANSWERS['OPP-REASON-OPTIONS']), 'no transcript text in audit output')
+
+    const listActions = w.repos.sessionIo.listActions
+    w.repos.sessionIo.listActions = async () => { throw new Error('context store unavailable') }
+    const incomplete = await w.call('GET', `/assessment-sessions/${sid}/report`)
+    assert.equal(incomplete.status, 409)
+    assert.equal(incomplete.body.error.code, 'REPORT_PROCESSING_FAILED')
+    assert.match(incomplete.body.error.message, /review is incomplete/i)
+    w.repos.sessionIo.listActions = listActions
   } finally { w.close() }
 })
 

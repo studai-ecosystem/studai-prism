@@ -7,6 +7,7 @@ import { CORE_TEAMREADY_A, BEHAVIOUR_IDS, FAMILY, familiesCovered, worldStateFor
 import { PRIMARY_CAPABILITY_IDS } from '../domain/assessments/catalog.js'
 import { DRAFT_UNIVERSAL } from '../domain/assessments/timingPolicy.js'
 import { DRAFT_CORE_TEAMREADY_A_HANDOVER, UNIVERSAL_SNAPSHOT, buildRunPin, snapshotHash, draftBankScenarios } from '../domain/assessments/draftSegments.js'
+import { answerFactQuestion } from '../domain/assessments/factBoundary.js'
 
 const EXPECTED_BEHAVIOURS = [
   'QUESTION_ASSUMPTION', 'COMPARE_ALTERNATIVES', 'CHECK_EVIDENCE', 'STATE_UNCERTAINTY',
@@ -86,6 +87,9 @@ test('P4.7: every fact id a stimulus or world change references resolves; condit
   assert.ok(changed.facts['F-FACILITATOR-CHANGE'])
   assert.equal(changed.facts['F-PARTICIPANTS'].text, base.facts['F-PARTICIPANTS'].text)
   assert.equal(CORE_TEAMREADY_A.worldChanges[0].preservesBoard, true)
+  const availability = answerFactQuestion({ form: CORE_TEAMREADY_A, worldState: changed, text: 'What is Sam availability now?' })
+  assert.equal(availability.kind, 'ALREADY_GIVEN')
+  assert.match(availability.text, /cannot work on preparation during the afternoon of Day 1/)
 })
 
 test('P4.1: content is deep-frozen; a run pin hashes the whole form and the segment references the form', () => {

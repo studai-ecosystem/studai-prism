@@ -17,7 +17,8 @@ import { renderPrompt } from '../../engine/prompts.js'
 import { sanitizeCandidateText } from '../../lib/promptSecurity.js'
 import { capabilityInfo } from '../assessments/catalog.js'
 
-export const EVALUATOR_PROMPT = 'evidence_evaluator.v1'
+export const EVALUATOR_PROMPT = 'evidence_evaluator.v2'
+export const SLICE_EVALUATOR_VERSION = 'slice-evaluator.v2'
 const ELIGIBLE_KINDS = new Set(['MESSAGE', 'ARTIFACT'])
 const ABSTAIN_REASONS = new Set(['NOT_ADDRESSED', 'TOO_SPARSE', 'NOT_JUDGEABLE'])
 const MAX_EXCERPT = 600
@@ -77,15 +78,17 @@ export function eligibleActions(actions = []) {
 }
 
 export function buildEvaluatorMessages({ snapshot, opportunity, actions }) {
-  const cap = capabilityInfo(opportunity.capabilityId)
+  const anchors = snapshot.form?.rubric?.anchorsByBehaviour?.[opportunity.behaviourId]
+    || capabilityInfo(opportunity.capabilityId)?.anchors
+  if (!anchors) throw new EvaluatorOutputError(`Pinned anchors are unavailable for ${opportunity.behaviourId}`)
   const prompt = renderPrompt(EVALUATOR_PROMPT, {
-    PUBLIC_FACTS_JSON: JSON.stringify(snapshot.publicFacts || []),
     OPPORTUNITY_JSON: JSON.stringify({ id: opportunity.id, capabilityId: opportunity.capabilityId, behaviourId: opportunity.behaviourId, description: opportunity.description || '' }),
-    ANCHORS_JSON: JSON.stringify(cap?.anchors || {}),
+    ANCHORS_JSON: JSON.stringify(anchors),
     ACTIONS_JSON: JSON.stringify(actions.map((a) => ({
       actionId: a.actionId, kind: a.kind, sequence: a.sequence,
       ...(a.kind === 'ARTIFACT' ? { artifactId: a.payload?.artifactId || null } : {}),
       text: candidateTexts(a).map((t) => sanitizeCandidateText(t, 4000)).join('\n'),
+      context: a.result?.evaluationContext || null,
     }))),
   })
   return [
@@ -150,6 +153,7 @@ function toEvidenceInput(decision, { sessionId, formId, pin, attempt, provenance
     contraryEvidence: decision.contraryEvidence || null,
     ambiguity: decision.ambiguity || null,
     ...(decision.judgeSamples ? { judgeSamples: decision.judgeSamples, judgeSampleCount: decision.judgeSamples.length } : {}),
+    ...(action?.result?.evaluationContext ? { evaluationContext: action.result.evaluationContext } : {}),
   }
   const candidateAction = action ? {
     actionId: action.actionId,
@@ -219,6 +223,7 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
 
   return {
     promptVersion: EVALUATOR_PROMPT,
+    evaluatorVersion: SLICE_EVALUATOR_VERSION,
     /**
      * Evaluate one run. Throws on provider / output failure so the caller's job
      * records a technical failure; never writes a partial "deficit".
@@ -239,6 +244,14 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
           const def = defs.get(row.opportunityId.replace(/:CLARIFY$/, ''))
           if (!def) continue
           const mine = eligible.filter((a) => (row.actionIds || []).includes(a.actionId))
+          for (const action of mine) {
+            const context = action.result?.evaluationContext
+            if (!context || context.stimulus?.opportunityId !== row.opportunityId || !Array.isArray(context.situation?.applicableFacts)) {
+              const err = new EvaluatorOutputError(`Required action context is unavailable for ${row.opportunityId}`)
+              err.code = 'EVALUATION_CONTEXT_INCOMPLETE'
+              throw err
+            }
+          }
           for (const behaviourId of def.behaviourIds || [def.behaviourId]) {
             const target = { id: row.opportunityId, group: def.groupId || def.group || null, capabilityId: def.capabilityId, behaviourId, description: def.description || '' }
             let decision

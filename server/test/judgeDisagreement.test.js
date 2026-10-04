@@ -67,9 +67,22 @@ test('evaluator: a flagged unit costs exactly two provider calls; the stored uni
     recordUnit: async (unit) => { recorded.push(unit); return evidenceGraph.recordEvidenceUnit(unit) },
   })
   const sessionId = `disagree-${Math.random().toString(36).slice(2, 8)}`
-  const actions = [{ actionId: 'act-1', kind: 'MESSAGE', actorKind: 'CANDIDATE', state: 'APPLIED', sequence: 1, payloadHash: 'h', payload: { text: ANSWER } }]
-  const opportunities = [{ opportunityId: 'OPP-REASON-FACTS-ASSUMPTIONS', state: 'EVALUATION_PENDING', actionIds: ['act-1'] }]
   const pin = buildRunPin({ formId: CORE_TEAMREADY_A_FORM_ID, scenarioId: CORE_TEAMREADY_A.id })
+  const actions = [{
+    actionId: 'act-1', kind: 'MESSAGE', actorKind: 'CANDIDATE', state: 'APPLIED', sequence: 1, payloadHash: 'h', payload: { text: ANSWER },
+    result: {
+      evaluationContext: {
+        schemaVersion: 'assessment-action-context.v1',
+        situation: { scenarioId: CORE_TEAMREADY_A.id, scenarioVersion: CORE_TEAMREADY_A.version, applicableFacts: CORE_TEAMREADY_A.publicFacts, appliedWorldChangeIds: [] },
+        stimulus: { opportunityId: 'OPP-REASON-FACTS-ASSUMPTIONS', presentedAt: NOW.toISOString(), renderHash: 'synthetic', messages: [{ speaker: 'Priya', content: 'What do you want to check?' }] },
+        informationAccess: { revealedFactIds: [] },
+        learnerAction: { actionId: 'act-1', kind: 'MESSAGE', sequence: 1 },
+        workState: { before: { rows: CORE_TEAMREADY_A.board.rows }, after: { rows: CORE_TEAMREADY_A.board.rows } },
+        method: { behaviourIds: ['QUESTION_ASSUMPTION'], rubricRef: CORE_TEAMREADY_A.rubric.ref, promptVersion: 'evidence_evaluator.v2', evaluatorVersion: 'slice-evaluator.v2', methodVersion: pin?.methodVersion || null },
+      },
+    },
+  }]
+  const opportunities = [{ opportunityId: 'OPP-REASON-FACTS-ASSUMPTIONS', state: 'EVALUATION_PENDING', actionIds: ['act-1'] }]
   const { units } = await ev.evaluateRun({ sessionId, actions, snapshot: UNIVERSAL_SNAPSHOT, pin, formId: CORE_TEAMREADY_A_FORM_ID, opportunities })
   assert.equal(calls.length, 2, 'one behaviour targeted, one marker → exactly one extra sample')
   assert.equal(units.length, 1)

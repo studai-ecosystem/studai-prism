@@ -127,7 +127,7 @@ const WORLD_CHANGES = [
     description: 'Sam is unavailable for the afternoon of Day 1.',
     setFacts: [
       { id: 'F-FACILITATORS', text: 'Two facilitators (Priya and Sam) will run the workshop, but Sam is now unavailable for the afternoon of Day 1.' },
-      { id: 'F-FACILITATOR-CHANGE', text: 'New: Sam cannot work on preparation during the afternoon of Day 1. Your board is unchanged; revise it if you need to.', triggers: ['sam unavailable', 'what changed', 'afternoon'] },
+      { id: 'F-FACILITATOR-CHANGE', text: 'New: Sam cannot work on preparation during the afternoon of Day 1. Your board is unchanged; revise it if you need to.', triggers: ['sam unavailable', 'sam available', 'sam availability', 'availability', 'what changed', 'afternoon'] },
     ],
     preservesBoard: true,
   },
