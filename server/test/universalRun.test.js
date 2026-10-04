@@ -360,7 +360,7 @@ test('P4 T29/T31: finishing with no answers writes no unit and no deficit; a rep
   } finally { w.close() }
 })
 
-test('P4: a very short answer earns one authored clarification in the same group; its answer never inflates the independent count', async () => {
+test('P4: an unclear turn keeps the task open; an actionable concise turn completes it without inflating independence', async () => {
   const w = await world()
   try {
     const sid = await w.start()
@@ -368,9 +368,10 @@ test('P4: a very short answer earns one authored clarification in the same group
     const r1 = await w.call('POST', `/assessment-sessions/${sid}/messages`, { clientEventId: 'evt-short-001', text: 'ok sure' })
     assert.equal(r1.status, 201)
     const row = await w.presentedRow(sid)
-    assert.equal(row.opportunityId, 'OPP-REASON-FACTS-ASSUMPTIONS:CLARIFY')
+    assert.equal(row.opportunityId, 'OPP-REASON-FACTS-ASSUMPTIONS')
     assert.equal(row.groupId, 'G-UNDERSTAND-FACTS')
-    assert.match(r1.body.data.messages.at(-1).content, /same thing/)
+    assert.match(r1.body.data.messages.at(-1).content, /same thing/i)
+    assert.equal(row.actionIds.length, 1, 'the inquiry is recorded without closing the opportunity')
     const r2 = await w.call('POST', `/assessment-sessions/${sid}/messages`, { clientEventId: 'evt-long-0001', text: 'I want to confirm whether 24 is the confirmed number, because the room plan depends on it.' })
     assert.equal(r2.status, 201)
     // The same client event id replays the stored response, never a second acceptance.
@@ -382,8 +383,83 @@ test('P4: a very short answer earns one authored clarification in the same group
     const fin = await w.call('POST', `/assessment-sessions/${sid}/finish`, { early: true })
     assert.equal(fin.body.data.state, 'COMPLETE')
     const units = await evidenceGraph.getEvidenceUnits(sid)
-    assert.equal(units.length, 2, 'the opportunity and its clarification each yield a unit for the one targeted behaviour')
+    assert.equal(units.length, 1, 'the linked turns yield one unit for the one targeted behaviour')
     assert.equal(independentOpportunityCount(units), 1, 'T23: a clarification of the same opportunity is not a second independent observation')
     assert.ok(units.every((u) => u.provenance_json.behaviourId === 'QUESTION_ASSUMPTION'))
+  } finally { w.close() }
+})
+
+test('an information request during a decision is answered without completing the decision opportunity', async () => {
+  const w = await world()
+  try {
+    const sid = await w.start()
+    await w.call('POST', `/assessment-sessions/${sid}/begin`, {}, { 'Idempotency-Key': `begin-${sid}` })
+    for (let guard = 0; guard < 20; guard += 1) {
+      const row = await w.presentedRow(sid)
+      assert.ok(row)
+      if (row.opportunityId === 'OPP-ADAPT-REPLAN') break
+      await w.answer(sid, row)
+    }
+    let row = await w.presentedRow(sid)
+    assert.equal(row.opportunityId, 'OPP-ADAPT-REPLAN')
+    const question = await w.call('POST', `/assessment-sessions/${sid}/messages`, {
+      clientEventId: 'evt-info-only-0001',
+      text: 'Is Sam available in the afternoon?',
+    })
+    assert.equal(question.status, 201, JSON.stringify(question.body))
+    assert.ok(question.body.data.messages.some((message) => /afternoon of Day 1/i.test(message.content)))
+    row = await w.presentedRow(sid)
+    assert.equal(row.opportunityId, 'OPP-ADAPT-REPLAN', 'information access does not substitute for the pending decision')
+    const infoAction = await w.repos.sessionIo.getAction(sid, 'evt-info-only-0001')
+    assert.equal(infoAction.result.interpretation.kind, 'INFORMATION_REQUEST')
+    assert.equal(infoAction.result.interpretation.servesOpportunity, false)
+
+    const decision = await w.call('POST', `/assessment-sessions/${sid}/messages`, {
+      clientEventId: 'evt-decision-0001',
+      text: 'Ask Priya first. I will move room setup to the morning and take the materials myself.',
+    })
+    assert.equal(decision.status, 201, JSON.stringify(decision.body))
+    assert.notEqual((await w.presentedRow(sid)).opportunityId, 'OPP-ADAPT-REPLAN')
+  } finally { w.close() }
+})
+
+test('board autosaves stay drafts until complete, and stakeholder reactions distinguish overloaded from feasible plans', async () => {
+  const w = await world()
+  try {
+    const sid = await w.start()
+    await w.call('POST', `/assessment-sessions/${sid}/begin`, {}, { 'Idempotency-Key': `begin-${sid}` })
+    for (let guard = 0; guard < 10; guard += 1) {
+      const row = await w.presentedRow(sid)
+      assert.ok(row)
+      if (row.opportunityId === 'OPP-EXEC-BOARD-OWNERS') break
+      await w.answer(sid, row)
+    }
+    assert.equal((await w.presentedRow(sid)).opportunityId, 'OPP-EXEC-BOARD-OWNERS')
+
+    const partial = await w.call('PATCH', `/assessment-sessions/${sid}/artifacts/${BOARD_ARTIFACT_ID}`, {
+      updates: { 'R2.owner': 'Sam' },
+      clientEventId: 'art-partial-0001',
+    }, { 'If-Match': '0' })
+    assert.equal(partial.status, 200, JSON.stringify(partial.body))
+    assert.equal(partial.body.data.reviewReadiness.state, 'DRAFT_SAVED')
+    assert.equal((await w.presentedRow(sid)).opportunityId, 'OPP-EXEC-BOARD-OWNERS')
+
+    const overloaded = await w.call('PATCH', `/assessment-sessions/${sid}/artifacts/${BOARD_ARTIFACT_ID}`, {
+      updates: { 'R3.owner': 'Sam', 'R2.due': 'Day 2 morning' },
+      clientEventId: 'art-overloaded-0001',
+    }, { 'If-Match': '1' })
+    assert.equal(overloaded.status, 200, JSON.stringify(overloaded.body))
+    assert.equal(overloaded.body.data.reviewReadiness.ready, false)
+    assert.ok(overloaded.body.data.messages.some((message) => /morning available/i.test(message.content)))
+    assert.equal((await w.presentedRow(sid)).opportunityId, 'OPP-EXEC-BOARD-OWNERS')
+
+    const feasible = await w.call('PATCH', `/assessment-sessions/${sid}/artifacts/${BOARD_ARTIFACT_ID}`, {
+      updates: { 'R2.owner': 'Priya', 'R3.owner': 'You' },
+      clientEventId: 'art-feasible-0001',
+    }, { 'If-Match': '2' })
+    assert.equal(feasible.status, 200, JSON.stringify(feasible.body))
+    assert.equal(feasible.body.data.reviewReadiness.state, 'READY_FOR_REVIEW')
+    assert.ok(feasible.body.data.messages.some((message) => /allocation works/i.test(message.content)))
+    assert.equal((await w.presentedRow(sid)).opportunityId, 'OPP-COMM-PLAN-EXPLAIN')
   } finally { w.close() }
 })

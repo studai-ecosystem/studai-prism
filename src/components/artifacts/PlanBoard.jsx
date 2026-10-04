@@ -51,6 +51,15 @@ export default function PlanBoard({ artifactId, title, data, schema, controller 
           ? '“Provided” marks what the board already said; “Your edit” marks what you changed. Changes save automatically.'
           : 'This board is shown for reference; it cannot be edited here.'}
       </p>
+      {controller.reviewReadiness && (
+        <p className="mt-2 text-sm text-prism-ink-muted" role="status" data-testid="board-review-readiness">
+          {controller.reviewReadiness.ready
+            ? 'This plan has the requested fields and is ready for review.'
+            : controller.reviewReadiness.reason !== null
+              ? controller.reviewReadiness.reason
+              : 'Draft saved. Keep working on the requested plan fields.'}
+        </p>
+      )}
       <ol className="space-y-3" aria-label={`${title} tasks`}>
         {rows.map((row, i) => (
           <li key={ids[i]}>

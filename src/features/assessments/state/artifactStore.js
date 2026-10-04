@@ -9,7 +9,7 @@ import { newIdempotencyKey } from '../../../api/client.js'
 const clone = (v) => (v == null ? v : JSON.parse(JSON.stringify(v)))
 const UNSAVED = new Set(['DIRTY', 'ERROR', 'SAVING', 'CONFLICT'])
 
-export function createArtifactStore({ save }) {
+export function createArtifactStore({ save, onSaved = null }) {
   let items = new Map()
   const listeners = new Set()
   let snapshot = { items: [] }
@@ -49,7 +49,7 @@ export function createArtifactStore({ save }) {
             artifactId: a.artifactId, type: a.type, title: a.title, schema: a.schema || null,
             server: { data: clone(a.data), version: a.version, notes: serverNotes },
             local: clone(a.data), pending: null, notes: serverNotes, notesDirty: false,
-            status: 'SAVED', error: null, conflict: null, recovered: null, clientEventId: null,
+            status: 'SAVED', error: null, conflict: null, recovered: null, clientEventId: null, reviewReadiness: null,
           })
         }
       }
@@ -112,7 +112,9 @@ export function createArtifactStore({ save }) {
           error: null,
           clientEventId: null,
           lastSent: null,
+          reviewReadiness: out.reviewReadiness || now.reviewReadiness || null,
         })
+        if (typeof onSaved === 'function') onSaved(out)
         return stillDirty ? 'DIRTY' : 'SAVED'
       } catch (error) {
         const now = items.get(artifactId)

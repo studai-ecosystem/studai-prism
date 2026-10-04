@@ -53,6 +53,7 @@ export function ArtifactPane({ items, activeId, onSelect, store, onRetryLoad, re
   const controller = useMemo(() => active && ({
     autosave: true,
     saveState: active.status,
+    reviewReadiness: active.reviewReadiness,
     notes: active.notes,
     onChange: (updates) => store.edit(active.artifactId, updates),
     onNotes: (text) => store.setNotes(active.artifactId, text),

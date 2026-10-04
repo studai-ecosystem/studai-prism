@@ -12,7 +12,7 @@ import { draftSegmentFor, buildRunPin, evaluateJobKey, DRAFT_EVALUATE_JOB_KIND, 
 import { timingPolicyFor, legacyPolicy, isLegacyPolicy, deadlinesFor } from './timingPolicy.js'
 import { selectNext, stageStrip, coverageReport, parentOpportunityId } from './director.js'
 import { BOARD_ARTIFACT_ID, validateBoardPatch, worldStateFor } from './universalForm.js'
-import { answerFactQuestion } from './factBoundary.js'
+import { answerFactQuestion, boardReviewReadiness, interpretLearnerMessage, LEARNER_INTENT, stakeholderReaction } from './factBoundary.js'
 
 const START_EVENT = 'start'
 const BEGIN_EVENT = 'begin'
@@ -115,7 +115,10 @@ export function createAssessmentSessionService({
   const ledgerStore = () => (repos.sessionIo && typeof repos.sessionIo.listOpportunities === 'function' ? repos.sessionIo : null)
   const isUniversalRun = (run) => Boolean(run?.snapshot && isUniversalSnapshot(run.snapshot) && ledgerStore())
   const messageActions = (actions) => actions.filter((a) => a.kind === 'MESSAGE' && a.state === 'APPLIED')
-  const revealedFactIds = (actions) => [...new Set(actions.map((a) => a.result?.revealedFactId).filter(Boolean))]
+  const revealedFactIds = (actions) => [...new Set(actions.flatMap((a) => [
+    ...(Array.isArray(a.result?.revealedFactIds) ? a.result.revealedFactIds : []),
+    a.result?.revealedFactId,
+  ]).filter(Boolean))]
   const appliedWorldChangeIds = (opportunities) => [...new Set(opportunities.map((o) => o.stimulus?.worldChangeId).filter(Boolean))]
   const initialBoardState = (form) => ({ rows: form.board.rows.map((row) => ({ ...row })) })
   async function evaluationContextFor({ sessionId, run, action, opportunity, actions, opportunities, workStateBefore = null, workStateAfter = null }) {
@@ -170,8 +173,13 @@ export function createAssessmentSessionService({
     const remainingMs = timing?.answerDeadlineAt ? new Date(timing.answerDeadlineAt).getTime() - clock().getTime() : null
     const shown = []
     for (let guard = 0; guard < form.opportunities.length + 2; guard += 1) {
-      const [ledger, actions] = await Promise.all([io.listOpportunities(sessionId), io.listActions(sessionId)])
-      const next = selectNext({ form, presented: ledger, actions, budget: { remainingMs }, seed: sessionId })
+      const [ledger, actions, boardVersion] = await Promise.all([
+        io.listOpportunities(sessionId),
+        io.listActions(sessionId),
+        io.latestArtifactVersion(sessionId, BOARD_ARTIFACT_ID),
+      ])
+      const workState = boardVersion?.content?.data ?? initialBoardState(form)
+      const next = selectNext({ form, workState, presented: ledger, actions, budget: { remainingMs }, seed: sessionId })
       audit('assessment.director_decision', sessionId, { sessionId, kind: next.kind, ...next.decision, ...(next.kind === 'STOP' ? { reason: next.reason, partial: next.partial, review: next.review } : {}), requestId })
       if (next.kind === 'WAIT' || next.kind === 'STOP') break
       const id = next.kind === 'CLARIFY' ? next.opportunityId : next.opportunity.id
@@ -200,13 +208,14 @@ export function createAssessmentSessionService({
   // Attach an accepted candidate action to the opportunity currently shown.
   // An action of an accepted kind serves the opportunity; any other kind is
   // kept as linked work while the opportunity stays presented.
-  async function attachAction(sessionId, run, action) {
+  async function attachAction(sessionId, run, action, { serves = null } = {}) {
     const io = ledgerStore()
     const current = (await io.listOpportunities(sessionId)).find((r) => r.state === 'PRESENTED')
     if (!current) return null
     const def = run.snapshot.opportunities.find((o) => o.id === parentOpportunityId(current.opportunityId))
-    const serves = (def?.accepts || ['MESSAGE']).includes(action.kind) || current.opportunityId.endsWith(':CLARIFY')
-    return io.setOpportunityState(sessionId, current.opportunityId, serves ? 'ACTION_RECEIVED' : 'PRESENTED', { actionId: action.actionId })
+    const acceptedKind = (def?.accepts || ['MESSAGE']).includes(action.kind) || current.opportunityId.endsWith(':CLARIFY')
+    const completed = serves == null ? acceptedKind : acceptedKind && serves
+    return io.setOpportunityState(sessionId, current.opportunityId, completed ? 'ACTION_RECEIVED' : 'PRESENTED', { actionId: action.actionId })
   }
   // Learner-visible transcript of a universal run: recorded stimuli and the
   // learner's own accepted messages, in presentation order. Nothing from the
@@ -221,7 +230,7 @@ export function createAssessmentSessionService({
         const a = byId.get(id)
         if (a?.kind === 'MESSAGE' && a.state === 'APPLIED') {
           out.push({ speaker: 'You', role: null, content: a.payload.text, isUser: true })
-          for (const m of a.result?.messages || []) if (m.factAnswer) out.push({ speaker: m.speaker, role: m.role || null, content: m.content, isUser: false, actorKind: m.actorKind })
+          for (const m of a.result?.messages || []) if (m.factAnswer || m.stakeholderReaction || m.clarification) out.push({ speaker: m.speaker, role: m.role || null, content: m.content, isUser: false, actorKind: m.actorKind })
         }
       }
     }
@@ -610,34 +619,74 @@ export function createAssessmentSessionService({
           throw err
         }
         if (isUniversalRun(run)) {
-          const attached = await attachAction(sessionId, run, action)
-          const [actions, opportunities] = await Promise.all([
+          const [actions, opportunities, boardVersion] = await Promise.all([
             repos.sessionIo.listActions(sessionId),
             repos.sessionIo.listOpportunities(sessionId),
+            repos.sessionIo.latestArtifactVersion(sessionId, BOARD_ARTIFACT_ID),
           ])
+          const current = opportunities.find((row) => row.state === 'PRESENTED')
+          const definition = run.snapshot.form.opportunities.find((o) => o.id === parentOpportunityId(current?.opportunityId))
           const world = worldStateFor(run.snapshot.form, {
             revealedFactIds: revealedFactIds(actions),
             appliedWorldChangeIds: appliedWorldChangeIds(opportunities),
           })
-          const evaluationContext = await evaluationContextFor({
-            sessionId, run, action, opportunity: attached, actions, opportunities,
-          })
           const messages = []
-          let revealedFactId = null
+          let answer = { kind: 'NONE', factId: null, text: null }
           if (/\?/.test(String(text))) {
-            const answer = answerFactQuestion({ form: run.snapshot.form, worldState: world, text })
+            answer = answerFactQuestion({ form: run.snapshot.form, worldState: world, text })
             if (answer.text) messages.push({ speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', content: answer.text, factAnswer: answer.kind })
-            if (answer.kind === 'AUTHORED') revealedFactId = answer.factId
           }
-          const response = { messages, exchanges: messageActions(actions).length + 1 }
-          const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
-          await applied(action, { ...stored.response, revealedFactId, evaluationContext })
-          const shown = await presentNext(sessionId, run, { requestId })
+          const interpretation = interpretLearnerMessage({ text, opportunity: definition, factAnswer: answer })
+          const boardState = boardVersion?.content?.data ?? initialBoardState(run.snapshot.form)
+          const reaction = stakeholderReaction({ form: run.snapshot.form, opportunity: definition, interpretation, action, boardState, worldState: world })
+          if (reaction?.content) messages.push({ ...reaction, stakeholderReaction: true })
+          if (interpretation.kind === LEARNER_INTENT.UNCLEAR) {
+            messages.push({
+              speaker: definition?.stimulus?.speaker || 'Colleague',
+              role: definition?.stimulus?.role || null,
+              actorKind: definition?.stimulus?.actorKind || 'AI_PARTICIPANT',
+              content: definition?.clarification?.template || 'I am not sure what action you want to take yet. What would you do next?',
+              clarification: true,
+            })
+          }
+          const needsConcreteWorkProposal = Boolean(definition?.reviewReadiness)
+          if (needsConcreteWorkProposal && interpretation.kind !== LEARNER_INTENT.UNCLEAR && !reaction) {
+            messages.push({
+              speaker: definition?.stimulus?.speaker || 'Colleague',
+              role: definition?.stimulus?.role || null,
+              actorKind: definition?.stimulus?.actorKind || 'AI_PARTICIPANT',
+              content: 'Please make the ownership and order concrete: who will take each open task, and which should happen first?',
+              clarification: true,
+            })
+          }
+          const serves = interpretation.servesOpportunity && !reaction?.continue && (!needsConcreteWorkProposal || Boolean(reaction))
+          const attached = await attachAction(sessionId, run, action, { serves })
+          const completed = attached?.state === 'ACTION_RECEIVED'
+          const attachedOpportunities = await repos.sessionIo.listOpportunities(sessionId)
+          const evaluationContext = await evaluationContextFor({
+            sessionId, run, action, opportunity: attached, actions, opportunities: attachedOpportunities,
+          })
+          const revealedFactIdsForAction = [...new Set([
+            ...(answer.kind === 'AUTHORED' && answer.factId ? [answer.factId] : []),
+            ...(reaction?.revealedFactIds || []),
+          ])]
+          const actionResponse = { messages, exchanges: messageActions(actions).length + 1 }
+          const actionResult = {
+            ...actionResponse,
+            interpretation,
+            revealedFactId: revealedFactIdsForAction[0] || null,
+            revealedFactIds: revealedFactIdsForAction,
+            evaluationContext,
+          }
+          await applied(action, actionResult)
+          const shown = completed ? await presentNext(sessionId, run, { requestId }) : []
           // The task-only stage strip after the Director moved on (names and
           // position only, as in the contract), so the player can update it
           // without a second round trip.
           const stages = stageStrip(run.snapshot.form, await repos.sessionIo.listOpportunities(sessionId))
-          return { ...stored.response, messages: [...stored.response.messages, ...shown], stages, replayed: false }
+          const response = { ...actionResponse, messages: [...messages, ...shown], stages }
+          const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
+          return { ...stored.response, replayed: false }
         }
         if (run?.snapshot) {
           // The handover segment: authored replies from pinned facts only.
@@ -738,9 +787,25 @@ export function createAssessmentSessionService({
         const savedNotes = typeof notes === 'string' ? notes : currentNotes
         const written = await repos.sessionIo.appendArtifactVersion({ sessionId, artifactId, version: currentVersion + 1, content: { data: artifact.data ?? null, notes: savedNotes }, savedBy: CANDIDATE })
         const response = { artifactId, version: written.version, data: artifact.data ?? null, notes: savedNotes }
-        if (clientEventId) await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'ARTIFACT', response })
         if (universal && action) {
-          const attached = await attachAction(sessionId, run, action)
+          const opportunitiesBefore = await repos.sessionIo.listOpportunities(sessionId)
+          const currentOpportunity = opportunitiesBefore.find((row) => row.state === 'PRESENTED')
+          const definition = run.snapshot.form.opportunities.find((o) => o.id === parentOpportunityId(currentOpportunity?.opportunityId))
+          const reviewReadiness = boardReviewReadiness(run.snapshot.form, definition, artifact.data ?? {})
+          const interpretation = { kind: LEARNER_INTENT.WORK_ACTION, servesOpportunity: reviewReadiness.ready, reason: reviewReadiness.state }
+          const world = worldStateFor(run.snapshot.form, {
+            revealedFactIds: revealedFactIds(await repos.sessionIo.listActions(sessionId)),
+            appliedWorldChangeIds: appliedWorldChangeIds(opportunitiesBefore),
+          })
+          const reaction = reviewReadiness.ready
+            ? stakeholderReaction({ form: run.snapshot.form, opportunity: definition, interpretation, action, boardState: artifact.data ?? {}, worldState: world })
+            : null
+          const effectiveReadiness = reaction?.continue
+            ? { ready: false, state: 'DRAFT_SAVED', reason: 'The plan needs a response to the stakeholder constraint.' }
+            : reviewReadiness
+          const serves = effectiveReadiness.ready
+          const attached = await attachAction(sessionId, run, action, { serves })
+          const completed = attached?.state === 'ACTION_RECEIVED'
           const [actions, opportunities] = await Promise.all([
             repos.sessionIo.listActions(sessionId),
             repos.sessionIo.listOpportunities(sessionId),
@@ -755,10 +820,16 @@ export function createAssessmentSessionService({
             workStateBefore: current?.content?.data ?? initialBoardState(run.snapshot.form),
             workStateAfter: artifact.data ?? null,
           })
-          await applied(action, { ...response, evaluationContext })
-          const shown = attached?.state === 'ACTION_RECEIVED' ? await presentNext(sessionId, run, { requestId }) : []
-          return { ...response, messages: shown, replayed: false }
+          const reactionMessages = reaction?.content ? [{ ...reaction, stakeholderReaction: true }] : []
+          const actionResult = { ...response, messages: reactionMessages, interpretation, reviewReadiness: effectiveReadiness, revealedFactIds: reaction?.revealedFactIds || [], evaluationContext }
+          await applied(action, actionResult)
+          const shown = completed ? await presentNext(sessionId, run, { requestId }) : []
+          const stages = stageStrip(run.snapshot.form, await repos.sessionIo.listOpportunities(sessionId))
+          const finalResponse = { ...response, messages: [...reactionMessages, ...shown], stages, reviewReadiness: effectiveReadiness }
+          if (clientEventId) await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'ARTIFACT', response: finalResponse })
+          return { ...finalResponse, replayed: false }
         }
+        if (clientEventId) await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'ARTIFACT', response })
         await applied(action, response)
         return { ...response, replayed: false }
       })

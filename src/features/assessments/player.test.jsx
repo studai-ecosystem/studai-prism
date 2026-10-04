@@ -16,6 +16,7 @@ import { createArtifactStore } from './state/artifactStore.js'
 import AssessmentPlayerPage from './pages/AssessmentPlayerPage.jsx'
 import AnalyticsDashboard from '../../components/artifacts/AnalyticsDashboard.jsx'
 import CustomerTicketLog from '../../components/artifacts/CustomerTicketLog.jsx'
+import PlanBoard from '../../components/artifacts/PlanBoard.jsx'
 import { FunnelSteps } from './components/FunnelSteps.jsx'
 import { humanizeKey } from '../../components/artifacts/format.js'
 import { ASSESSMENT_CONSENT_ITEMS, CONSENT_VERSION } from '../../lib/copy/assessmentConsent.js'
@@ -54,6 +55,27 @@ function renderPlayer(routes, { route = '/app/assessment/sess-v3-0001', workspac
 const bodyOf = (spy, suffix) => spy.mock.calls.filter(([u]) => String(u).endsWith(suffix)).map(([, init]) => JSON.parse(init.body))
 
 describe('artifact store (§39.3)', () => {
+  it('retains server review readiness and notifies the player after a confirmed save', async () => {
+    const onSaved = vi.fn()
+    const store = createArtifactStore({
+      save: async (_id, args) => ({
+        version: args.ifMatch + 1,
+        data: { 'R2.owner': args.updates['R2.owner'] },
+        reviewReadiness: { ready: false, state: 'DRAFT_SAVED', reason: 'Keep working until the requested plan fields are complete.' },
+      }),
+      onSaved,
+    })
+    store.load([{ artifactId: 'A', type: 'PLAN_BOARD', title: 'Plan', data: {}, version: 0 }])
+    store.edit('A', { 'R2.owner': 'Priya' })
+    await store.flush('A')
+    expect(store.getSnapshot().items[0].reviewReadiness).toEqual({
+      ready: false,
+      state: 'DRAFT_SAVED',
+      reason: 'Keep working until the requested plan fields are complete.',
+    })
+    expect(onSaved).toHaveBeenCalledOnce()
+  })
+
   it('saves with If-Match, keeps edits made during a save, and recovers the draft on a conflict', async () => {
     const calls = []
     let behaviour = 'ok'
@@ -163,6 +185,31 @@ describe('artifact store (§39.3)', () => {
     expect(open.status).toBe('CONFLICT')
     expect(open.recovered.pending).toEqual({ total: 9 })
     expect(open.recovered.notes).toBe('Typed during the conflict')
+  })
+})
+
+describe('plan board review readiness', () => {
+  const data = { rows: [{ rowId: 'R1', task: 'Synthetic task', owner: null }] }
+  const schema = { editable: ['owner'], owners: ['Priya'], statuses: [] }
+  const controller = { autosave: true, saveState: 'SAVED', onChange: vi.fn() }
+
+  it('distinguishes a saved draft from work ready for review', () => {
+    const { rerender } = rtlRender(<PlanBoard
+      artifactId="A"
+      title="Synthetic plan"
+      data={data}
+      schema={schema}
+      controller={{ ...controller, reviewReadiness: { ready: false, state: 'DRAFT_SAVED', reason: 'Keep working until the requested plan fields are complete.' } }}
+    />)
+    expect(screen.getByTestId('board-review-readiness')).toHaveTextContent('Keep working until the requested plan fields are complete.')
+    rerender(<PlanBoard
+      artifactId="A"
+      title="Synthetic plan"
+      data={data}
+      schema={schema}
+      controller={{ ...controller, reviewReadiness: { ready: true, state: 'READY_FOR_REVIEW', reason: null } }}
+    />)
+    expect(screen.getByTestId('board-review-readiness')).toHaveTextContent('ready for review')
   })
 })
 

@@ -90,7 +90,14 @@ export default function AssessmentPlayerPage() {
   const remainingMs = useAssessmentClock(contract?.timing, contract?.clockReceivedAt)
   const accessError = session.error && (session.error.status === 404 || ['FORBIDDEN', 'ENTITLEMENT_REQUIRED', 'ENTITLEMENT_EXPIRED'].includes(session.error.code))
 
-  const store = useMemo(() => createArtifactStore({ save: (artifactId, args) => saveSessionArtifact(sessionId, artifactId, args) }), [sessionId])
+  const sessionRef = useRef(session)
+  sessionRef.current = session
+  const store = useMemo(() => createArtifactStore({
+    save: (artifactId, args) => saveSessionArtifact(sessionId, artifactId, args),
+    onSaved: (result) => {
+      if (result.reviewReadiness?.ready || result.messages?.length) sessionRef.current.refresh()
+    },
+  }), [sessionId])
   useEffect(() => { if (contract) store.load(contract.artifacts) }, [contract, store])
   const artifactState = useAssessmentAutosave(store)
   const [activeArtifact, setActiveArtifact] = useState(null)

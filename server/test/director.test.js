@@ -77,7 +77,7 @@ test('P4.6: the same seed yields the same sequence, hashes and content; a differ
   assert.ok(!ids.includes('OPP-COMM-CLARIFY-BRIEF'))
 })
 
-test('P4.6 policy 2: a very short answer earns one bounded authored clarification, never two, and never a scoring hint', () => {
+test('P4.6 policy 2: the Director waits on stored interpretation, not response length', () => {
   const ledger = planned()
   const first = selectNext({ form, presented: ledger, actions: [], seed: 's' })
   assert.equal(first.kind, 'PRESENT')
@@ -85,14 +85,16 @@ test('P4.6 policy 2: a very short answer earns one bounded authored clarificatio
   assert.equal(first.decision.policy, '1_REQUIRED')
   const r = ledger.find((x) => x.opportunityId === first.opportunity.id)
   const a = message('a1', 'ok sure')
-  Object.assign(r, { state: 'ACTION_RECEIVED', actionIds: ['a1'], updatedAt: '2026-10-02T10:01:00Z' })
+  a.result = { interpretation: { kind: 'UNCLEAR', servesOpportunity: false } }
+  Object.assign(r, { state: 'PRESENTED', actionIds: ['a1'], updatedAt: '2026-10-02T10:01:00Z' })
   const second = selectNext({ form, presented: ledger, actions: [a], seed: 's' })
-  assert.equal(second.kind, 'CLARIFY')
-  assert.equal(second.decision.policy, '2_CLARIFY')
-  assert.equal(second.opportunityId, 'OPP-REASON-FACTS-ASSUMPTIONS:CLARIFY')
-  assert.doesNotMatch(second.stimulus.text, /ownership|show more|score|level/i)
-  ledger.push(row(second.opportunityId, 'ACTION_RECEIVED', { actionIds: ['a2'], updatedAt: '2026-10-02T10:02:00Z' }))
-  const third = selectNext({ form, presented: ledger, actions: [a, message('a2', 'no', 2)], seed: 's' })
+  assert.equal(second.kind, 'WAIT')
+  assert.equal(second.decision.policy, 'WAIT_FOR_CLARIFICATION')
+  r.state = 'ACTION_RECEIVED'
+  const actionable = message('a2', 'Ask Priya first', 2)
+  actionable.result = { interpretation: { kind: 'HELP_REQUEST', servesOpportunity: true } }
+  r.actionIds.push(actionable.actionId)
+  const third = selectNext({ form, presented: ledger, actions: [a, actionable], seed: 's' })
   assert.equal(third.kind, 'PRESENT', 'a second short answer does not earn a second clarification')
   assert.equal(third.decision.policy, '1_REQUIRED')
 })

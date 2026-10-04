@@ -59,7 +59,21 @@ export const SessionContractSchema = z.object({
 
 const StartSchema = z.object({ sessionId: z.string(), resumed: z.boolean(), to: z.string() })
 const MessageResultSchema = z.object({ messages: z.array(Message), exchanges: z.number().int().min(0), replayed: z.boolean(), stages: StageStrip.optional() })
-const ArtifactResultSchema = z.object({ artifactId: z.string(), version: z.number().int().min(1), data: z.unknown(), notes: z.string().optional(), replayed: z.boolean() })
+const ReviewReadiness = z.object({
+  ready: z.boolean(),
+  state: z.enum(['DRAFT_SAVED', 'READY_FOR_REVIEW']),
+  reason: z.string().nullable(),
+})
+const ArtifactResultSchema = z.object({
+  artifactId: z.string(),
+  version: z.number().int().min(1),
+  data: z.unknown(),
+  notes: z.string().optional(),
+  replayed: z.boolean(),
+  messages: z.array(Message).optional(),
+  stages: StageStrip.optional(),
+  reviewReadiness: ReviewReadiness.optional(),
+})
 const FinishSchema = z.object({ state: z.enum(['COMPLETE', 'SCORING']) })
 const BeginSchema = z.object({ startedAt: z.string().datetime(), deadlineAt: z.string().datetime(), graceDeadlineAt: z.string().datetime().nullable().optional(), policyVersion: z.string().nullable().optional(), replayed: z.boolean() })
 

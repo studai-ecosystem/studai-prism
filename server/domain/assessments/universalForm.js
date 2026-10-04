@@ -150,6 +150,11 @@ const OPPORTUNITIES = [
     stimulus: { speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', factIds: ['F-PREP-DAYS', 'F-PRIORITIES'], template: '{{F-PREP-DAYS}} {{F-PRIORITIES}} We could run one full session for everyone, or two shorter sessions with smaller groups, or trim the content. Which way would you go, and why?' } }),
   opp({ id: 'OPP-EXEC-BOARD-OWNERS', stageId: 'CHOOSE_COORDINATE', groupId: 'G-INITIAL-BOARD', capabilityId: FAMILY.EXECUTION, behaviourIds: ['ASSIGN_RESPONSIBILITY', 'PRIORITIZE_WORK'], accepts: ['ARTIFACT', 'MESSAGE'],
     description: 'Gives the open tasks realistic owners and an order on the shared board.',
+    reviewReadiness: { all: ['R2.owner', 'R3.owner'], any: ['R2.due', 'R3.due', 'R2.dependency', 'R3.dependency'] },
+    reactions: {
+      OVERLOADED_SAM: { speaker: 'Sam', role: 'Operations colleague', actorKind: 'AI_PARTICIPANT', content: 'I only have the morning available, and the room setup is already assigned to me. Which of the remaining tasks should take priority?', factAnswer: 'AUTHORED' },
+      FEASIBLE_ALLOCATION: { speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', content: 'That allocation works with the responsibilities already on the board. Let us use it as the plan.' },
+    },
     stimulus: { speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', factIds: ['F-OPEN-TASKS'], template: '{{F-OPEN-TASKS}} Two of those have no owner on the board. Can you update the board with who does what, and in what order?' } }),
   opp({ id: 'OPP-COMM-PLAN-EXPLAIN', stageId: 'CHOOSE_COORDINATE', groupId: 'G-INITIAL-BOARD', capabilityId: FAMILY.COMMUNICATION, behaviourIds: ['STATE_MAIN_POINT'], dependsOn: ['OPP-EXEC-BOARD-OWNERS'],
     description: 'Explains the board decisions so a colleague knows what to do next. Dependent on the board change in the same group.',
@@ -160,12 +165,19 @@ const OPPORTUNITIES = [
   // Stage 3
   opp({ id: 'OPP-ADAPT-REPLAN', stageId: 'RESPOND_TO_CHANGE', groupId: 'G-CHANGE-REPLAN', capabilityId: FAMILY.ADAPTABILITY, behaviourIds: ['REPLAN_CONSTRAINT', 'SEEK_HELP'],
     description: 'Re-plans under the lost facilitator time; postponement, reduced scope or asking for help may all be defensible.',
+    reactions: {
+      HELP_REQUEST: { speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', content: 'I can take the part you asked for. Keep the board aligned with that revised responsibility.' },
+      DECISION: { speaker: 'Sam', role: 'Operations colleague', actorKind: 'AI_PARTICIPANT', content: 'That is a workable response to the time we still have. Update the board if any responsibility or due point moved.' },
+      REFUSAL: { speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', content: 'Understood. If the current scope is not workable, make the boundary explicit and say what should be postponed or reduced.', continue: true },
+      SAM_AFTERNOON_CONFLICT: { speaker: 'Sam', role: 'Operations colleague', actorKind: 'AI_PARTICIPANT', content: 'I cannot take preparation work that afternoon. Choose a morning task for me, move it to someone else, or reduce the scope.', factAnswer: 'ALREADY_GIVEN' },
+    },
     stimulus: { speaker: 'Sam', role: 'Operations colleague', actorKind: 'AI_PARTICIPANT', factIds: ['F-FACILITATOR-CHANGE'], template: 'Change of plan on my side: {{F-FACILITATOR-CHANGE}} What do you want to do about it?' } }),
   opp({ id: 'OPP-COLLAB-PRIORITY-ALIGN', stageId: 'RESPOND_TO_CHANGE', groupId: 'G-CHANGE-PRIORITY', capabilityId: FAMILY.COLLABORATION, behaviourIds: ['NEGOTIATE_BOUNDARY'], required: false,
     description: 'Agrees a limit on what can be taken on now that time is shorter.',
     stimulus: { speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', factIds: ['F-PRIORITIES'], template: 'With less time, {{F-PRIORITIES}} Which one gives, and how much of it are you willing to take on yourself?' } }),
   opp({ id: 'OPP-EXEC-DEPENDENCY-UPDATE', stageId: 'RESPOND_TO_CHANGE', groupId: 'G-CHANGE-DEPENDENCY', capabilityId: FAMILY.EXECUTION, behaviourIds: ['CHECK_DEPENDENCY'], required: false, accepts: ['ARTIFACT', 'MESSAGE'],
     description: 'Updates due points and dependencies on the board after the change without erasing earlier work.',
+    reviewReadiness: { any: ['R1.due', 'R2.due', 'R3.due', 'R1.dependency', 'R2.dependency', 'R3.dependency'] },
     stimulus: { speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', factIds: [], template: 'Does anything on the board need to move now? Update the due points or dependencies if so.' } }),
   // Stage 4
   opp({ id: 'OPP-REASON-CHECK-RECOMMENDATION', stageId: 'CHECK_RECOMMENDATION', groupId: 'G-CHECK-AI', capabilityId: FAMILY.REASONING, behaviourIds: ['CHECK_EVIDENCE', 'STATE_UNCERTAINTY'], aiGenerated: true,
@@ -184,9 +196,13 @@ const OPPORTUNITIES = [
   // Stage 6
   opp({ id: 'OPP-ADAPT-FEEDBACK', stageId: 'FINISH_WORK', groupId: 'G-FINISH-FEEDBACK', capabilityId: FAMILY.ADAPTABILITY, behaviourIds: ['REPAIR_MISTAKE', 'UPDATE_WITH_EVIDENCE'],
     description: 'Responds to relevant feedback that the board has an inconsistency, and repairs it.',
+    statefulStimuli: {
+      boardConsistent: { speaker: 'Sam', role: 'Operations colleague', actorKind: 'AI_PARTICIPANT', factIds: ['F-PREP-DAYS'], template: 'I checked the board against the available time: {{F-PREP-DAYS}} I cannot see a timing or dependency conflict. Is it workable as written, or would you still change anything?' },
+    },
     stimulus: { speaker: 'Sam', role: 'Operations colleague', actorKind: 'AI_PARTICIPANT', factIds: ['F-PREP-DAYS'], template: 'One thing: {{F-PREP-DAYS}} Something on the board is due after the workshop starts, or depends on a task that finishes later. Can you fix it, or tell me if I have misread the board?' } }),
   opp({ id: 'OPP-EXEC-BOARD-FINAL', stageId: 'FINISH_WORK', groupId: 'G-FINAL', capabilityId: FAMILY.EXECUTION, behaviourIds: ['DEFINE_COMPLETION', 'CHECK_DEPENDENCY'], accepts: ['ARTIFACT', 'MESSAGE'],
     description: 'Finalises the board: owners, due points, dependencies, status and what done looks like.',
+    reviewReadiness: { all: ['R1.owner', 'R2.owner', 'R3.owner', 'R1.due', 'R2.due', 'R3.due'], edited: ['R1.status', 'R2.status', 'R3.status'] },
     stimulus: { speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', factIds: [], template: 'Last pass on the board: make it something we can run from without asking you questions. Status and how we know each task is done, please.' } }),
   opp({ id: 'OPP-COMM-HANDOVER-AUDIENCE', stageId: 'FINISH_WORK', groupId: 'G-FINAL', capabilityId: FAMILY.COMMUNICATION, behaviourIds: ['ADAPT_TO_AUDIENCE', 'STATE_MAIN_POINT'], dependsOn: ['OPP-EXEC-BOARD-FINAL'],
     description: 'Explains the final plan to the programme contact, who needs a decision, not internal detail. Dependent on the final board change in the same group.',

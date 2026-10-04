@@ -4,7 +4,10 @@
 // render hash is stable and sensitive to content.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { renderStimulus, verifyRender, answerFactQuestion, validateGeneratedAction, toolAllowed } from '../domain/assessments/factBoundary.js'
+import {
+  renderStimulus, verifyRender, answerFactQuestion, validateGeneratedAction, toolAllowed,
+  boardReviewReadiness, interpretLearnerMessage, LEARNER_INTENT, stakeholderReaction, stimulusForWorkState,
+} from '../domain/assessments/factBoundary.js'
 import { CORE_TEAMREADY_A as form, worldStateFor, opportunityById } from '../domain/assessments/universalForm.js'
 
 const world = worldStateFor(form)
@@ -106,4 +109,61 @@ test('answerFactQuestion leaves a request to a colleague to the Director instead
   assert.equal(out.kind, 'NONE')
   assert.equal(out.text, null)
   assert.equal(answerFactQuestion({ form, worldState: world, text: 'Who approved the budget?' }).kind, 'UNKNOWN')
+})
+
+test('learner interpretation is task-aware and does not use word count as ambiguity', () => {
+  const decisionOpportunity = opportunityById(form, 'OPP-ADAPT-REPLAN')
+  const inquiryOpportunity = opportunityById(form, 'OPP-REASON-FACTS-ASSUMPTIONS')
+  const factAnswer = { kind: 'AUTHORED', factId: 'CF-FACILITATOR-HOURS' }
+  assert.deepEqual(interpretLearnerMessage({ text: 'How much time does Sam have?', opportunity: decisionOpportunity, factAnswer }).kind, LEARNER_INTENT.INFORMATION_REQUEST)
+  assert.equal(interpretLearnerMessage({ text: 'How much time does Sam have?', opportunity: decisionOpportunity, factAnswer }).servesOpportunity, false)
+  assert.equal(interpretLearnerMessage({ text: 'How much time does Sam have?', opportunity: inquiryOpportunity, factAnswer }).servesOpportunity, true)
+  assert.equal(interpretLearnerMessage({ text: 'Ask Priya first', opportunity: decisionOpportunity }).kind, LEARNER_INTENT.HELP_REQUEST)
+  assert.equal(interpretLearnerMessage({ text: 'Postpone the materials', opportunity: decisionOpportunity }).kind, LEARNER_INTENT.DECISION)
+  assert.equal(interpretLearnerMessage({ text: 'I cannot take both tasks', opportunity: decisionOpportunity }).kind, LEARNER_INTENT.REFUSAL)
+  assert.equal(interpretLearnerMessage({ text: 'Use a smaller handout', opportunity: decisionOpportunity }).kind, LEARNER_INTENT.DECISION)
+  assert.equal(interpretLearnerMessage({ text: 'ok sure', opportunity: decisionOpportunity }).kind, LEARNER_INTENT.UNCLEAR)
+  assert.equal(interpretLearnerMessage({ text: 'Materials tomorrow morning', opportunity: decisionOpportunity }).kind, LEARNER_INTENT.PROPOSAL)
+})
+
+test('board readiness distinguishes cumulative drafts from work ready for review', () => {
+  const owners = opportunityById(form, 'OPP-EXEC-BOARD-OWNERS')
+  const partial = boardReviewReadiness(form, owners, { 'R2.owner': 'Priya' })
+  assert.equal(partial.ready, false)
+  assert.equal(partial.state, 'DRAFT_SAVED')
+  const ready = boardReviewReadiness(form, owners, { 'R2.owner': 'Priya', 'R3.owner': 'You', 'R3.due': 'Day 1 morning' })
+  assert.equal(ready.ready, true)
+  assert.equal(ready.state, 'READY_FOR_REVIEW')
+})
+
+test('stakeholder reactions are grounded in the actual proposal and board state', () => {
+  const owners = opportunityById(form, 'OPP-EXEC-BOARD-OWNERS')
+  const interpretation = { kind: LEARNER_INTENT.PROPOSAL, servesOpportunity: true }
+  const overloaded = stakeholderReaction({
+    form, opportunity: owners, interpretation,
+    action: { kind: 'ARTIFACT', payload: { text: '' } },
+    boardState: { 'R2.owner': 'Sam', 'R3.owner': 'Sam' },
+    worldState: world,
+  })
+  assert.equal(overloaded.continue, true)
+  assert.match(overloaded.content, /morning available/i)
+  const feasible = stakeholderReaction({
+    form, opportunity: owners, interpretation,
+    action: { kind: 'ARTIFACT', payload: { text: '' } },
+    boardState: { 'R2.owner': 'Priya', 'R3.owner': 'You' },
+    worldState: world,
+  })
+  assert.equal(feasible.continue, false)
+  assert.doesNotMatch(feasible.content, /error|wrong/i)
+})
+
+test('feedback stimulus does not allege an error when the current board is consistent', () => {
+  const feedback = opportunityById(form, 'OPP-ADAPT-FEEDBACK')
+  const stimulus = stimulusForWorkState({
+    form,
+    opportunity: feedback,
+    workState: { 'R1.due': 'Day 1 morning', 'R2.due': 'Day 2 morning', 'R3.due': 'Day 1 morning' },
+  })
+  assert.notEqual(stimulus, feedback.stimulus)
+  assert.doesNotMatch(stimulus.template, /error|doesn't line up|does not line up/i)
 })

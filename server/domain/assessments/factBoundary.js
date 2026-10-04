@@ -76,6 +76,132 @@ export function answerFactQuestion({ form, worldState, text }) {
   return { kind: 'UNKNOWN', factId: null, text: 'That is not known at this point; nobody on the team has that information.' }
 }
 
+export const LEARNER_INTENT = Object.freeze({
+  INFORMATION_REQUEST: 'INFORMATION_REQUEST',
+  PROPOSAL: 'PROPOSAL',
+  DECISION: 'DECISION',
+  REFUSAL: 'REFUSAL',
+  HELP_REQUEST: 'HELP_REQUEST',
+  UNCLEAR: 'UNCLEAR',
+  WORK_ACTION: 'WORK_ACTION',
+})
+
+const INQUIRY_BEHAVIOURS = new Set(['QUESTION_ASSUMPTION', 'CLARIFY_REQUEST', 'CHECK_UNDERSTANDING'])
+const meaningful = (text, pattern) => pattern.test(String(text || '').toLowerCase())
+
+// Deterministic, task-aware interpretation. This decides whether the learner
+// has only requested information or has also made an actionable response; it
+// never infers personality, quality or a rubric level.
+export function interpretLearnerMessage({ text, opportunity, factAnswer = null }) {
+  const raw = String(text || '').trim()
+  const inquiryOpportunity = (opportunity?.behaviourIds || []).some((id) => INQUIRY_BEHAVIOURS.has(id))
+  const hasFactRequest = Boolean(factAnswer && !['NONE'].includes(factAnswer.kind))
+  const scopeDecision = meaningful(raw, /\b(postpone|delay|defer|reduce|reduced|trim|smaller|drop|skip|go ahead|proceed|keep)\b/)
+  const helpRequest = meaningful(raw, /\b(ask|need|request|could|can|would)\b.{0,50}\b(priya|sam|help|cover|support|take)\b|\b(priya|sam)\b.{0,30}\b(help|cover|take)\b/)
+  const refusal = meaningful(raw, /\b(i|we)\s+(?:cannot|can't|won't|will not|would not|decline|refuse)\b|\bnot workable\b/)
+  const decision = scopeDecision || meaningful(raw, /\b(i|we)\s+(?:will|would|choose|recommend|prefer|plan|can take|can handle)\b|\b(first|then|priority|prioriti[sz]e|assign|owner|move|schedule|by day|due)\b/)
+  const proposal = meaningful(raw, /\b(should|could|let'?s|how about|proposal|option)\b/)
+  const acceptance = meaningful(raw, /\b(i agree|that works|accept|go with)\b/)
+  const fillerOnly = /^(?:(?:ok(?:ay)?|sure|maybe|fine|yes|no)(?:[ ,]+(?:ok(?:ay)?|sure|maybe|fine|yes|no))*|i don'?t know|not sure)[.! ]*$/i.test(raw)
+
+  let kind
+  if (refusal) kind = LEARNER_INTENT.REFUSAL
+  else if (helpRequest) kind = LEARNER_INTENT.HELP_REQUEST
+  else if (scopeDecision || decision || acceptance) kind = LEARNER_INTENT.DECISION
+  else if (proposal) kind = LEARNER_INTENT.PROPOSAL
+  else if (hasFactRequest) kind = LEARNER_INTENT.INFORMATION_REQUEST
+  else kind = fillerOnly || !raw ? LEARNER_INTENT.UNCLEAR : LEARNER_INTENT.PROPOSAL
+
+  return {
+    kind,
+    servesOpportunity: kind === LEARNER_INTENT.INFORMATION_REQUEST ? inquiryOpportunity : kind !== LEARNER_INTENT.UNCLEAR,
+    factQuestion: hasFactRequest,
+    reason: kind === LEARNER_INTENT.INFORMATION_REQUEST && !inquiryOpportunity
+      ? 'INFORMATION_ONLY'
+      : kind === LEARNER_INTENT.UNCLEAR ? 'NEEDS_CLARIFICATION' : 'ACTIONABLE',
+  }
+}
+
+export function materializeBoard(form, data = {}) {
+  return form.board.rows.map((row) => {
+    const out = { ...row }
+    for (const field of form.board.editable) {
+      const key = `${row.rowId}.${field}`
+      if (Object.prototype.hasOwnProperty.call(data || {}, key)) out[field] = data[key]
+    }
+    return out
+  })
+}
+
+export function boardReviewReadiness(form, opportunity, data = {}) {
+  const rule = opportunity?.reviewReadiness
+  if (!rule) return { ready: true, state: 'READY_FOR_REVIEW', reason: null }
+  const rows = new Map(materializeBoard(form, data).map((row) => [row.rowId, row]))
+  const value = (key) => {
+    const [rowId, field] = String(key).split('.')
+    return rows.get(rowId)?.[field]
+  }
+  const present = (key) => value(key) !== null && value(key) !== undefined && String(value(key)).trim() !== ''
+  const edited = (key) => Object.prototype.hasOwnProperty.call(data || {}, key) && present(key)
+  const missing = (rule.all || []).filter((key) => !present(key))
+  const unedited = (rule.edited || []).filter((key) => !edited(key))
+  const anySatisfied = !(rule.any || []).length || rule.any.some((key) => edited(key))
+  const ready = missing.length === 0 && unedited.length === 0 && anySatisfied
+  return {
+    ready,
+    state: ready ? 'READY_FOR_REVIEW' : 'DRAFT_SAVED',
+    reason: ready ? null : 'Keep working until the requested plan fields are complete.',
+  }
+}
+
+export function boardHasTimingIssue(form, data = {}) {
+  const rows = materializeBoard(form, data)
+  const byId = new Map(rows.map((row) => [row.rowId, row]))
+  const day = (value) => {
+    const m = /\bday\s*(\d+)\b/i.exec(String(value || ''))
+    return m ? Number(m[1]) : null
+  }
+  for (const row of rows) {
+    if (/\b(after|day\s*[3-9])\b/i.test(String(row.due || ''))) return true
+    const dependency = row.dependency ? byId.get(row.dependency) : null
+    if (dependency?.dependency === row.rowId) return true
+    const ownDay = day(row.due)
+    const dependencyDay = day(dependency?.due)
+    if (ownDay != null && dependencyDay != null && ownDay < dependencyDay) return true
+  }
+  return false
+}
+
+export function stimulusForWorkState({ form, opportunity, workState }) {
+  if (opportunity?.statefulStimuli?.boardConsistent && !boardHasTimingIssue(form, workState)) {
+    return opportunity.statefulStimuli.boardConsistent
+  }
+  return opportunity?.stimulus
+}
+
+export function stakeholderReaction({ form, opportunity, interpretation, action, boardState = {}, worldState = null }) {
+  const authored = opportunity?.reactions || {}
+  const text = String(action?.payload?.text || '')
+  if (opportunity?.id === 'OPP-EXEC-BOARD-OWNERS') {
+    const rows = materializeBoard(form, boardState)
+    const overloadsSam = rows.filter((row) => row.owner === 'Sam').length >= 3
+      || /\bsam\b.{0,60}\b(both|all|two)\b|\b(both|all|two)\b.{0,60}\bsam\b/i.test(text)
+    if (overloadsSam && authored.OVERLOADED_SAM) return { ...authored.OVERLOADED_SAM, revealedFactIds: ['CF-FACILITATOR-HOURS'], continue: true }
+    const namesWork = /\b(priya|sam|i|me|you)\b.{0,45}\b(handle|take|own|assign|cover|responsible)\b|\b(handle|take|own|assign|cover)\b.{0,45}\b(priya|sam|me|you)\b/i.test(text)
+    const taskReferences = text.match(/\b(room|setup|materials?|handouts?|participant list|list|needs)\b/gi) || []
+    const proposesAllocation = action?.kind === 'ARTIFACT' || (namesWork && new Set(taskReferences.map((value) => value.toLowerCase())).size >= 2)
+    if (proposesAllocation && authored.FEASIBLE_ALLOCATION) return { ...authored.FEASIBLE_ALLOCATION, continue: false }
+  }
+  if (opportunity?.id === 'OPP-ADAPT-REPLAN') {
+    const assignsSamAfternoon = /\bsam\b.{0,60}\bafternoon\b|\bafternoon\b.{0,60}\bsam\b/i.test(text)
+      && !/\b(not|cannot|can't|unavailable|out)\b/i.test(text)
+    if (assignsSamAfternoon && authored.SAM_AFTERNOON_CONFLICT) return { ...authored.SAM_AFTERNOON_CONFLICT, continue: true }
+  }
+  const reaction = authored[interpretation?.kind]
+  if (!reaction) return null
+  return { ...reaction, continue: Boolean(reaction.continue), worldStateVersion: worldState?.appliedWorldChangeIds || [] }
+}
+
 // --- structured action validation --------------------------------------------------
 const PROTECTED_FIELDS = new Set(['deadline', 'deadlineAt', 'answerDeadlineAt', 'graceDeadlineAt', 'durationMs', 'timing', 'userId', 'sessionId', 'identity', 'candidateName', 'scope', 'formId', 'version', 'snapshotHash', 'payment', 'price', 'amount', 'entitlement', 'threshold', 'rubricLevel', 'level', 'score', 'access', 'permissions', 'role', 'mode'])
 const ALLOWED_TYPES = new Set(['SAY', 'BOARD_PATCH', 'REVEAL_FACT', 'APPLY_WORLD_CHANGE'])

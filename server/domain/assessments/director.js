@@ -6,13 +6,14 @@
 //
 // Policy (in order):
 //   1. a required, eligible, unserved opportunity;
-//   2. one bounded authored clarification when the last answer is ambiguous;
+//   2. wait on the same opportunity while a fact request, draft save or
+//      bounded clarification has not yet produced an actionable response;
 //   3. a complementary allowed opportunity for a family under the coverage
 //      floor — never a paraphrase of an already-served opportunity;
 //   4. required state transitions ride on the first opportunity of a stage;
 //   5. stop at the approved budget and report precise partial/review reasons.
 import { createHash } from 'node:crypto'
-import { renderStimulus } from './factBoundary.js'
+import { renderStimulus, stimulusForWorkState } from './factBoundary.js'
 import { stageIndex, worldStateFor } from './universalForm.js'
 
 export const OPPORTUNITY_STATES = Object.freeze([
@@ -66,22 +67,14 @@ function eligible(form, o, states, stageIdx) {
   return (o.dependsOn || []).every((d) => ANSWERED_STATES.has(states.get(d) || 'PLANNED'))
 }
 
-// Ambiguity is a bounded, declared rule: a very short free-text answer to an
-// opportunity that authored a clarification. Never style, tone or persona.
-function ambiguous(action) {
-  if (!action || action.kind !== 'MESSAGE') return false
-  const words = String(action.payload?.text || '').trim().split(/\s+/).filter(Boolean)
-  return words.length > 0 && words.length < 4
-}
-
 /**
- * selectNext({ form, worldState?, presented (ledger rows), actions, coverage?, budget, seed })
+ * selectNext({ form, worldState?, workState?, presented (ledger rows), actions, coverage?, budget, seed })
  *  → { kind: 'PRESENT', opportunity, stimulus, worldChangeId, decision }
  *  | { kind: 'CLARIFY', opportunityId, parentId, stimulus, decision }
  *  | { kind: 'WAIT', opportunityId, decision }
  *  | { kind: 'STOP', reason, partial: [...], review: [...], decision }
  */
-export function selectNext({ form, worldState = null, presented = [], actions = [], coverage = null, budget = {}, seed = 'seed' }) {
+export function selectNext({ form, worldState = null, workState = null, presented = [], actions = [], coverage = null, budget = {}, seed = 'seed' }) {
   const states = new Map(presented.map((r) => [r.opportunityId, r.state]))
   const maxPresented = Number.isInteger(budget.maxOpportunities) ? budget.maxOpportunities : form.director.maxPresentedOpportunities
   const presentedCount = presented.filter((r) => r.state !== 'PLANNED' && r.state !== 'SKIPPED_BY_POLICY' && r.state !== 'NOT_ACCESSIBLE').length
@@ -89,7 +82,14 @@ export function selectNext({ form, worldState = null, presented = [], actions = 
   const decision = (policy, extra = {}) => ({ policy, ...inputs, ...extra })
 
   const awaiting = presented.find((r) => r.state === 'PRESENTED')
-  if (awaiting) return { kind: 'WAIT', opportunityId: awaiting.opportunityId, decision: decision('WAIT_FOR_ACTION') }
+  if (awaiting) {
+    const latest = actions.filter((a) => (awaiting.actionIds || []).includes(a.actionId)).sort((a, b) => b.sequence - a.sequence)[0]
+    const wait = latest?.result?.interpretation?.kind === 'INFORMATION_REQUEST' ? 'WAIT_FOR_DECISION'
+      : latest?.result?.interpretation?.kind === 'UNCLEAR' ? 'WAIT_FOR_CLARIFICATION'
+        : latest?.result?.reviewReadiness?.ready === false ? 'WAIT_FOR_REVIEW_READY'
+          : 'WAIT_FOR_ACTION'
+    return { kind: 'WAIT', opportunityId: awaiting.opportunityId, decision: decision(wait) }
+  }
 
   const review = presented.filter((r) => r.state === 'REVIEW_REQUIRED').map((r) => r.opportunityId)
   const partial = form.opportunities.filter((o) => o.required && !ANSWERED_STATES.has(states.get(o.id) || 'PLANNED')).map((o) => o.id)
@@ -111,24 +111,12 @@ export function selectNext({ form, worldState = null, presented = [], actions = 
     const stage = form.stages.find((s) => s.id === o.stageId)
     const worldChangeId = stageEntering && stage?.worldChangeId ? stage.worldChangeId : null
     const stateForRender = worldChangeId ? worldStateFor(form, { appliedWorldChangeIds: [...applied, worldChangeId], revealedFactIds: world.revealedFactIds }) : world
-    const stimulus = renderStimulus({ form, opportunity: o, worldState: stateForRender })
+    const stimulus = renderStimulus({ form, opportunity: o, worldState: stateForRender, variant: stimulusForWorkState({ form, opportunity: o, workState }) })
     return { kind: 'PRESENT', opportunity: o, stimulus, worldChangeId, decision: decision(policy, { opportunityId: o.id, stageId: o.stageId, renderHash: stimulus.renderHash, renderStatus: stimulus.status }) }
   }
 
   // 1. required, eligible, unserved
   const required = authored(form.opportunities.filter((o) => o.required && eligible(form, o, states, stageIdx)))
-  // 2. bounded clarification of the last answered opportunity (checked before
-  //    moving on so the learner's interpretation is settled first).
-  const lastAnswered = [...presented].filter((r) => ANSWERED_STATES.has(r.state) && !isClarificationId(r.opportunityId)).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0]
-  if (lastAnswered) {
-    const o = form.opportunities.find((x) => x.id === lastAnswered.opportunityId)
-    const clarifyId = `${lastAnswered.opportunityId}${CLARIFY_SUFFIX}`
-    const lastAction = actions.filter((a) => (lastAnswered.actionIds || []).includes(a.actionId)).sort((a, b) => b.sequence - a.sequence)[0]
-    if (o?.clarification && !states.has(clarifyId) && ambiguous(lastAction) && (form.director.maxClarificationsPerOpportunity || 0) > 0) {
-      const stimulus = renderStimulus({ form, opportunity: o, worldState: world, variant: { ...o.stimulus, template: o.clarification.template, factIds: [] } })
-      return { kind: 'CLARIFY', opportunityId: clarifyId, parentId: o.id, opportunity: o, stimulus, decision: decision('2_CLARIFY', { opportunityId: clarifyId, renderHash: stimulus.renderHash }) }
-    }
-  }
   if (required.length) return present(required[0], '1_REQUIRED')
 
   // 3. complementary for incomplete coverage (no paraphrases)
