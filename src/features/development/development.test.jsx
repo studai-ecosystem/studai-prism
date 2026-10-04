@@ -376,6 +376,7 @@ describe('P6 practice catalogue and player', () => {
     status: 'EVALUATED', verified: true, summary: 'Mission completed — 1 of 2 target behaviours demonstrated.', counts: { demonstrated: 1, uncertain: 0, total: 2, copied: 0 },
     focus: { version: 'mission-feedback.v1', completed: { criterionId: 'C-ASKS', description: 'Asks Dev a question.', quote: 'could you tell me how many people are coming?', source: 'AUTOMATIC_CHECK' }, nextChange: { criterionId: 'C-NAMES-UNKNOWN', description: 'Says the headcount is unknown.', because: 'Not shown in this attempt.', yourWords: 'Confirmed, see you Tuesday.' }, allMet: false, reviewIncomplete: false, note: null },
     comparison: null,
+    counterpart: { name: 'Dev', role: 'Colleague', lines: [{ criterionId: 'C-ASKS', when: 'OBSERVED', text: 'Fair question — I will find out how many are coming.' }, { criterionId: 'C-NAMES-UNKNOWN', when: 'NOT_OBSERVED', text: 'Which number do you actually need from me?' }], closing: null, note: 'This reply is written from what your message did and did not do in this attempt. It is practice, not a judgement of you.' },
     criteria: [
       { criterionId: 'C-ASKS', description: 'Asks Dev a question.', result: 'OBSERVED', reason: 'RULES_PASSED', quote: null, checks: [{ description: 'The reply asks Dev a question.', passed: true }], note: 'Shown in this attempt.' },
       { criterionId: 'C-NAMES-UNKNOWN', description: 'Says the headcount is unknown.', result: 'NOT_OBSERVED', reason: 'MEANING_NOT_EXPRESSED', quote: null, checks: [], note: 'Not shown yet in this attempt.' },
@@ -429,6 +430,14 @@ describe('P6 practice catalogue and player', () => {
     expect(next).toHaveTextContent('One thing to change next')
     expect(next).toHaveTextContent('Says the headcount is unknown.')
     expect(next).toHaveTextContent('Not shown in this attempt.')
+    // P6.8: the counterpart replies from the actual results, in criterion order.
+    const counterpart = screen.getByTestId('feedback-counterpart')
+    expect(counterpart).toHaveTextContent('Dev replies (Colleague)')
+    const lines = within(counterpart).getAllByTestId('counterpart-line')
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toHaveAttribute('data-when', 'OBSERVED')
+    expect(lines[1]).toHaveTextContent('Which number do you actually need from me?')
+    expect(counterpart).toHaveTextContent('It is practice, not a judgement of you.')
     expect(screen.getByTestId('all-checks').open).toBe(false)
     expect(screen.getAllByTestId('mission-criterion')).toHaveLength(2)
     expect(screen.queryByTestId('feedback-comparison')).not.toBeInTheDocument()

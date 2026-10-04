@@ -40,6 +40,26 @@ function Focus({ focus }) {
   )
 }
 
+// P6.8: the person the learner wrote to replies in character. Every line is
+// bound by the server to a criterion the review actually decided, so what
+// appears here follows the learner's own message; nothing is scripted praise.
+function Counterpart({ counterpart }) {
+  const copy = DEVELOPMENT_COPY.player
+  if (!counterpart || (!counterpart.lines.length && !counterpart.closing)) return null
+  return (
+    <section aria-labelledby="mission-counterpart-title" className="space-y-2 rounded-[var(--prism-radius-md)] border border-prism-border p-3" data-testid="feedback-counterpart">
+      <h3 id="mission-counterpart-title" className="text-sm font-semibold text-prism-ink">{copy.counterpartTitle(counterpart.name, counterpart.role)}</h3>
+      <ul className="space-y-1.5">
+        {counterpart.lines.map((l) => (
+          <li key={`${l.criterionId}:${l.when}`} className="text-sm text-prism-ink" data-testid="counterpart-line" data-when={l.when}>&ldquo;{l.text}&rdquo;</li>
+        ))}
+        {counterpart.closing && <li className="text-sm text-prism-ink" data-testid="counterpart-closing">&ldquo;{counterpart.closing}&rdquo;</li>}
+      </ul>
+      <p className="text-xs text-prism-ink-subtle">{counterpart.note}</p>
+    </section>
+  )
+}
+
 function Comparison({ comparison, criteria }) {
   const copy = DEVELOPMENT_COPY.player
   if (!comparison) return null
@@ -74,6 +94,7 @@ export const MissionFeedback = forwardRef(function MissionFeedback({ result }, h
       <p className="text-base font-medium text-prism-ink" data-testid="mission-summary">{result.summary}</p>
       {result.status === 'EVALUATION_UNAVAILABLE' && <InlineNotice tone="insufficient">{copy.unavailable}</InlineNotice>}
       <Focus focus={result.focus} />
+      <Counterpart counterpart={result.counterpart} />
       <Comparison comparison={result.comparison} criteria={result.criteria} />
       <details open={detailed} className="rounded-[var(--prism-radius-md)] border border-prism-border p-3" data-testid="all-checks">
         <summary className="cursor-pointer text-sm font-semibold text-prism-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-prism-accent">{copy.allChecks}</summary>

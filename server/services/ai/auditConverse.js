@@ -23,8 +23,9 @@ function textFor(task, request) {
     const system = (request?.system || []).map((s) => s.text || '').join('\n')
     // P6.4 meaning harness: a criterion is met only when one of its listed
     // phrasings appears inside a real sentence of the learner's work (at
-    // least six words, not mostly phrasing words). A bare keyword list is
-    // KEYWORDS_ONLY, so tests can show paraphrase acceptance without a model.
+    // least four words, not mostly that criterion's phrasing words). A bare
+    // keyword list is KEYWORDS_ONLY, so tests can show paraphrase acceptance
+    // without a model. Punctuation and length beyond that are irrelevant.
     if (/MEANING CRITERIA \(JSON\)/.test(system)) {
       const spec = (() => { try { return JSON.parse(/MEANING CRITERIA \(JSON\)\s*([^\r\n]+)/.exec(system)?.[1] || '[]') } catch { return [] } })()
       // 'mismatch': the evaluator claims every criterion with a quote the
@@ -33,7 +34,9 @@ function textFor(task, request) {
       if (auditFault() === 'malformed') return '{"criteria": [ not json'
       const work = (system.split('<candidate_transcript>').pop() || '').split('</candidate_transcript>')[0].trim()
       const sentences = work.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean)
-      const allPhraseWords = new Set(spec.flatMap((c) => (c.phrasings || []).flatMap((p) => String(p).toLowerCase().split(/\s+/))))
+      const STOP = new Set(['the', 'a', 'an', 'i', 'you', 'me', 'we', 'he', 'she', 'they', 'it', 'to', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'from', 'is', 'are', 'was', 'be', 'been', 'that', 'this', 'and', 'or', 'but', 'so', 'as', 'if', 'not', 'no', 'do', 'can', 'could', 'will', 'would', 'my', 'our', 'your', 'his', 'her', 'their', 'what', 'who', 'how', 'when', 'once', 'until', 'know', 'let', 'please', 'than', 'then', 'there', 'here', 'about', 'into'])
+      const content = (ws) => ws.map((w) => w.replace(/[^a-z0-9'-]/g, '')).filter((w) => w && !STOP.has(w))
+      const pooled = new Set(spec.flatMap((c) => content((c.phrasings || []).flatMap((p) => String(p).toLowerCase().split(/\s+/)))))
       const criteria = spec.map((c) => {
         const phrasings = (c.phrasings || []).map((p) => String(p).toLowerCase())
         for (const s of sentences) {
@@ -41,8 +44,9 @@ function textFor(task, request) {
           const hit = phrasings.find((p) => lower.includes(p))
           if (!hit) continue
           const words = lower.split(/\s+/).filter(Boolean)
-          const stuffed = words.filter((w) => allPhraseWords.has(w.replace(/[^a-z0-9']/g, ''))).length / words.length >= 0.5
-          if (words.length >= 6 && !stuffed) return { criterion_id: c.criterion_id, met: true, quote: s, reason: 'EXPRESSED' }
+          const meaningful = content(words)
+          const stuffed = meaningful.length > 0 && meaningful.filter((w) => pooled.has(w)).length / meaningful.length > 0.7
+          if (words.length >= 4 && !stuffed) return { criterion_id: c.criterion_id, met: true, quote: s, reason: 'EXPRESSED' }
           return { criterion_id: c.criterion_id, met: false, quote: '', reason: 'KEYWORDS_ONLY' }
         }
         return { criterion_id: c.criterion_id, met: false, quote: '', reason: 'NOT_EXPRESSED' }

@@ -5,7 +5,7 @@
 // kept, and the objective's hypothesis and budget-allocation steps become
 // checkable criteria. No job-family fallback exists: a mission is found by id
 // or not at all. New missions need governance review (HA-C009).
-import { P6_MISSIONS, handoverRevision } from './missionLibrary.p6.js'
+import { P6_MISSIONS, handoverRevision, handoverRevisionV3 } from './missionLibrary.p6.js'
 
 const MKT_EXPERIMENT_V1 = {
     mission_id: 'MIS-MKT-EXP-01',
@@ -185,16 +185,21 @@ const HANDOVER_V1 = {
 }
 
 // Library order: published legacy mission, handover v1 (frozen), handover v2
-// (M04 metadata revision), then the P6 originals M01–M03 and M05–M10.
+// (M04 metadata revision), handover v3 (M04 honest-checks revision, P6.8),
+// then the P6 originals M01–M03 and M05–M10.
+const HANDOVER_V2 = handoverRevision(HANDOVER_V1)
 export const MISSION_LIBRARY = Object.freeze([
   MKT_EXPERIMENT_V1,
   HANDOVER_V1,
-  handoverRevision(HANDOVER_V1),
+  HANDOVER_V2,
+  handoverRevisionV3(HANDOVER_V2),
   ...P6_MISSIONS,
 ])
 
 // The ten P6 starter missions (latest version per id, with display codes).
-export const P6_LIBRARY = Object.freeze(MISSION_LIBRARY.filter((m) => m.display_code).sort((a, b) => a.display_code.localeCompare(b.display_code)))
+export const P6_LIBRARY = Object.freeze([...MISSION_LIBRARY.filter((m) => m.display_code)
+  .reduce((latest, m) => (!latest.has(m.mission_id) || latest.get(m.mission_id).version < m.version ? latest.set(m.mission_id, m) : latest), new Map()).values()]
+  .sort((a, b) => a.display_code.localeCompare(b.display_code)))
 
 export const DRAFT_CONTENT_FLAG = 'PRISM_DRAFT_CONTENT'
 export const draftContentEnabled = () => process.env[DRAFT_CONTENT_FLAG] === 'true'

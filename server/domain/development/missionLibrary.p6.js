@@ -17,8 +17,6 @@ const COMMON = Object.freeze({
   feedback_policy: { mode: 'CRITERION', show_unobserved: true },
   accessibility_mode: { keyboard_only: true, screen_reader: true, untimed: true },
 })
-const DAY = '\\b(mon|tues?|wed(nes)?|thu(rs)?|fri|sat(ur)?|sun)(day)?\\b|\\btomorrow\\b|\\btoday\\b|\\bby\\s+\\d{1,2}(:\\d{2})?\\b'
-
 const message = (artifact_id, title, prompt, max_length = 1500) => ({ artifact_id, type: 'TEXT_RESPONSE', title, prompt, initial_state: { text: '' }, max_length })
 const sheet = (artifact_id, title, prompt, fields) => ({
   artifact_id, type: 'FIELD_SHEET', title, prompt,
@@ -31,10 +29,18 @@ const col = (key, label, editable = false, kind = 'text') => ({ key, label, kind
 const required = (rule_id, criterion_id, artifact_id, path, min_length, description) => ({ rule_id, criterion_id, type: 'REQUIRED_FIELD', artifact_id, path, params: { min_length }, description })
 const pattern = (rule_id, criterion_id, artifact_id, path, re, description) => ({ rule_id, criterion_id, type: 'TEXT_PATTERN', artifact_id, path, params: { pattern: re, flags: 'i' }, description })
 const range = (rule_id, criterion_id, artifact_id, path, min, max, description) => ({ rule_id, criterion_id, type: 'NUMBER_RANGE', artifact_id, path, params: { min, max }, description })
+// P6.8 valid-reference rule: the value names one of the people (or decision
+// words) that exist in the situation. Confirms a reference, never its wisdom.
+const oneOf = (rule_id, criterion_id, artifact_id, path, options, description) => ({ rule_id, criterion_id, type: 'ONE_OF', artifact_id, path, params: { options }, description })
 const det = (criterion_id, behavior_id, description, artifact_ids) => ({ criterion_id, behavior_id, description, check: 'DETERMINISTIC', artifact_ids })
 const meaning = (criterion_id, behavior_id, description, artifact_ids, intent, synonyms, evaluator_guidance) => ({
   criterion_id, behavior_id, description, check: 'MEANING', artifact_ids, evaluator_guidance, meaning: { intent, synonyms },
 })
+// P6.8 counterpart reply lines, bound to one criterion's actual result.
+const reacts = (criterion_id, observed, notObserved) => [
+  { criterion_id, when: 'OBSERVED', text: observed },
+  { criterion_id, when: 'NOT_OBSERVED', text: notObserved },
+]
 // P6.2 reviewer-package helpers. Examples are teaching support (shown after a
 // submission or on request) — a copied example is detected and never counted
 // as the learner's own behaviour. Nothing here is approved: every review
@@ -54,6 +60,7 @@ const CONFOUNDS_TEXT = [
   'Writing fluency in English can look like the behaviour; checks read for the specific fact or intent, not polish.',
   'A learner may know the convention (ask a question) without applying it to the right fact; the meaning check asks for the fact.',
   'Copying an exposed example is detected and not counted as the learner\'s own behaviour.',
+  'Length, headings and punctuation are not evidence: a concise sentence that does the thing counts; long text that does not is not met.',
 ]
 
 export const P6_MISSIONS = Object.freeze([
@@ -80,18 +87,21 @@ export const P6_MISSIONS = Object.freeze([
     ],
     artifacts: [message('REPLY', 'Reply to Dev', 'What do you need to know before you can confirm?', 1200)],
     constraints: { notes: ['Room 2 seats twelve.', 'Two other teams were invited last week.'] },
-    deterministic_validation_rules: [
-      pattern('R-ASKS', 'C-ASKS', 'REPLY', 'text', '\\?', 'The reply asks Dev a question.'),
-      pattern('R-LIMIT', 'C-LIMIT', 'REPLY', 'text', '\\b(twelve|12)\\b', 'The reply refers to the room limit.'),
-    ],
+    deterministic_validation_rules: [],
     rubric: {
       criteria: [
-        det('C-ASKS', 'QUESTION_ASSUMPTION', 'Asks Dev a question instead of only confirming.', ['REPLY']),
+        meaning('C-ASKS', 'QUESTION_ASSUMPTION', 'Asks Dev for the missing information instead of only confirming.', ['REPLY'],
+          'Asks Dev for information needed before confirming (a request, with or without a question mark).',
+          ['could you', 'can you', 'please confirm', 'please check', 'do you know', 'check with', 'confirm how many', 'who is coming', 'how many are', 'would you'],
+          'Met if the reply asks Dev for information needed to decide; "Please confirm the expected attendance" counts and a question mark is not required. Not met if the reply only informs or confirms, or for a courtesy "let me know if you need anything".'),
         meaning('C-NAMES-UNKNOWN', 'QUESTION_ASSUMPTION', 'Says that the number of people attending is not yet known and matters for the room.', ['REPLY'],
           'States that how many people are coming is unknown and is needed before the room can be confirmed.',
           ['how many people', 'how many are coming', 'number of people', 'headcount', 'who is coming', 'not sure how many'],
           'Met only if the learner identifies attendance as the unknown. Not met if they only ask a generic question or confirm the room.'),
-        det('C-LIMIT', 'STATE_UNCERTAINTY', 'Refers to the room limit when explaining the risk.', ['REPLY']),
+        meaning('C-LIMIT', 'STATE_UNCERTAINTY', 'Connects the room limit to the risk of confirming now.', ['REPLY'],
+          'Refers to the room\'s limit (twelve seats) as the reason confirming without the headcount is risky.',
+          ['seats twelve', 'only seats', 'room only', 'holds twelve', 'twelve', 'a dozen', 'over twelve', 'more than twelve', 'fits twelve', 'too small'],
+          'Met only if the limit is tied to the risk (the room may not fit everyone). Not met if "12" appears without that connection, or the limit is not mentioned.'),
         meaning('C-HOLDS', 'STATE_UNCERTAINTY', 'Makes the confirmation conditional on the missing fact.', ['REPLY'],
           'Says what will happen once the missing fact is known, instead of confirming now.',
           ['once I know', 'until I know', 'when I know', 'depends on', 'if more than', 'for now', 'hold the booking', 'pencil'],
@@ -125,11 +135,14 @@ export const P6_MISSIONS = Object.freeze([
       constraints_notes: ['The standard van carries up to 20 kg.', 'A second set of boxes was added yesterday.'],
       situation_facts: ['Jo has booked the standard van and asks you to confirm.', 'The van carries up to 20 kg.', 'Nobody has weighed the boxes.', 'More boxes were added yesterday.'],
       exposure_tags: [],
-      rule_overrides: [{ rule_id: 'R-LIMIT', params: { pattern: '\\b(twenty|20)\\s*kg\\b|\\b20\\b|weight limit', flags: 'i' }, description: 'The reply refers to the weight limit.' }],
       meaning_overrides: [{
         criterion_id: 'C-NAMES-UNKNOWN', intent: 'States that the total weight of the boxes is unknown and is needed before the van can be confirmed.',
         synonyms: ['how much do they weigh', 'how heavy', 'total weight', 'weigh the boxes', 'weight of the kit', 'not sure how heavy', 'weighed'],
         evaluator_guidance: 'Met only if the learner identifies the weight as the unknown. Not met if they only ask a generic question or confirm the van.',
+      }, {
+        criterion_id: 'C-LIMIT', intent: 'Refers to the van\'s limit (20 kg) as the reason confirming without the weight is risky.',
+        synonyms: ['20 kg', 'twenty kilos', 'up to 20', 'weight limit', 'too heavy', 'over 20', 'carries up to', 'the van only takes'],
+        evaluator_guidance: 'Met only if the limit is tied to the risk (the boxes may exceed it). Not met if "20" appears without that connection, or the limit is not mentioned.',
       }],
     },
     accessibility_note: A11Y_TEXT,
@@ -165,13 +178,13 @@ export const P6_MISSIONS = Object.freeze([
       ['alternative', 'What would you do instead?', 400],
     ])],
     constraints: { notes: ['The summary was produced automatically and not checked by a person.'] },
-    deterministic_validation_rules: [
-      required('R-CLAIM', 'C-CLAIM', 'CHECK', 'fields.claim_checked', 8, 'The note names the claim that was checked.'),
-      required('R-ALT', 'C-ALT', 'CHECK', 'fields.alternative', 12, 'The note proposes what to do instead.'),
-    ],
+    deterministic_validation_rules: [],
     rubric: {
       criteria: [
-        det('C-CLAIM', 'CHECK_EVIDENCE', 'Names the claim that was checked.', ['CHECK']),
+        meaning('C-CLAIM', 'CHECK_EVIDENCE', 'Names the specific claim that was checked.', ['CHECK'],
+          'Names the specific claim from the summary that was checked (the two-day delivery, or the order of 60 against 48 confirmed).',
+          ['delivery claim', 'two-day delivery', 'claim that', 'the claim', '60 packs', 'order of 60', 'sixty packs', 'delivery time', 'two-day claim', 'checked the'],
+          'Met only if a specific claim from the summary is named. Not met for "I checked the summary" with no claim, or for a filled-in field that names nothing.'),
         meaning('C-CONFLICT', 'CHECK_EVIDENCE', 'Points to the specific conflict between the summary and a known fact.', ['CHECK'],
           'Identifies that the delivery time (four working days versus three) or the quantity (48 confirmed versus 60) contradicts the summary.',
           ['four working days', 'four days', 'will not arrive', 'does not arrive', 'too late', 'only 48', '48 people', 'more than confirmed', 'three working days'],
@@ -180,7 +193,10 @@ export const P6_MISSIONS = Object.freeze([
           'States something not yet known (for example late confirmations or a faster delivery option) and its effect on the choice.',
           ['not sure', 'unsure', 'do not know', 'unclear', 'might change', 'could change', 'depends on', 'if more people'],
           'Met only if a specific uncertainty is named. Not met for "not sure" with no object.'),
-        det('C-ALT', 'CHECK_EVIDENCE', 'Proposes a defensible alternative.', ['CHECK']),
+        meaning('C-ALT', 'CHECK_EVIDENCE', 'Proposes an alternative that fits the facts.', ['CHECK'],
+          'Proposes a specific alternative that works with the facts (an order that can arrive in time, a quantity close to the 48 confirmed, a different supplier or format), not a vague "do something else".',
+          ['instead', 'order 50', 'order 48', 'in-house', 'next day', 'different supplier', 'smaller order', 'print tomorrow', 'print shop'],
+          'Met only if the alternative is specific and consistent with the delivery and quantity facts. Not met for "find another way", for an alternative that still cannot arrive by Friday, or for a filled-in field with no actual proposal.'),
       ],
     },
     scaffolding_policy: {
@@ -214,6 +230,14 @@ export const P6_MISSIONS = Object.freeze([
         criterion_id: 'C-CONFLICT', intent: 'Identifies that the attendance figure (eighty) has no source and is not supported by the sign-ups (forty-one) or last year (fifty-five).',
         synonyms: ['no source', 'where does eighty', 'nothing supports', 'forty-one', 'only 41', 'last year was fifty-five', 'unsupported', 'not backed by'],
         evaluator_guidance: 'Met only if the learner states that the figure is unsupported or names the sign-up or last-year figure against it. Not met for general doubt.',
+      }, {
+        criterion_id: 'C-CLAIM', intent: 'Names the specific claim from the summary that was checked (attendance will exceed eighty, so the larger hall is needed).',
+        synonyms: ['attendance claim', 'exceed eighty', 'over eighty', 'eighty people', 'the claim', 'claim that', 'larger hall is needed', 'attendance figure'],
+        evaluator_guidance: 'Met only if the attendance claim is named. Not met for "I checked the summary" with no claim.',
+      }, {
+        criterion_id: 'C-ALT', intent: 'Proposes a specific alternative consistent with the facts (hold the usual room and keep the larger hall provisional, re-check sign-ups before a deadline, ask for the source).',
+        synonyms: ['instead', 'usual room', 'smaller room', 'provisional', 'hold the hall', 'keep the option', 'check the sign-ups', 'wait until', 'ask where eighty', 'recount'],
+        evaluator_guidance: 'Met only if the alternative is specific and fits the sign-up facts. Not met for "find another way" or for booking the larger hall anyway with no condition.',
       }],
     },
     accessibility_note: A11Y_SHEET,
@@ -244,22 +268,25 @@ export const P6_MISSIONS = Object.freeze([
     ],
     artifacts: [message('NOTE', 'Message to Ravi', 'Ravi has one minute to read this.', 1200)],
     constraints: { notes: ['Ravi was not part of the discussion.', 'The room holds fifteen people.'] },
-    deterministic_validation_rules: [
-      pattern('R-MAIN-FIRST', 'C-MAIN-FIRST', 'NOTE', 'text', '^[\\s\\S]{0,200}\\btwo\\b[\\s\\S]{0,60}\\bsessions?\\b', 'The decision (two sessions) appears in the opening lines.'),
-      pattern('R-DEADLINE', 'C-DEADLINE', 'NOTE', 'text', DAY, 'The message gives a day or time for the booking.'),
-    ],
+    deterministic_validation_rules: [],
     rubric: {
       criteria: [
-        det('C-MAIN-FIRST', 'STATE_MAIN_POINT', 'States the decision in the opening lines.', ['NOTE']),
+        meaning('C-MAIN-FIRST', 'STATE_MAIN_POINT', 'States the decision up front, before the background.', ['NOTE'],
+          'Opens with the decision itself (two sessions rather than one) before any reasoning or background.',
+          ['two shorter', 'two sessions', 'decision: two', 'we will run two', 'split into two', 'pair of', 'two slots', 'run it twice'],
+          'Met only if the decision is stated in the first sentence or two, in any wording. Not met if it appears only after the reasoning, or not at all.'),
         meaning('C-REASON', 'STATE_MAIN_POINT', 'Gives the reason for two sessions: the room cannot hold everyone at once.', ['NOTE'],
           'Explains that the room\'s capacity (fifteen) is below the number joining (twenty-two), so one session does not fit.',
-          ['room holds', 'holds fifteen', 'only fifteen', 'twenty-two', 'does not fit', 'too many for the room', 'room is too small', 'more people than seats'],
+          ['room holds', 'holds fifteen', 'only fifteen', 'twenty-two', 'does not fit', 'too many for the room', 'room is too small', 'more people than seats', 'space takes fifteen'],
           'Met only if the capacity reason is given. Not met if a different or no reason is given.'),
         meaning('C-ASK', 'ADAPT_TO_AUDIENCE', 'Tells Ravi the specific booking action.', ['NOTE'],
           'Names the concrete action Ravi should take (book two sessions / slots) rather than describing the discussion.',
           ['please book', 'can you book', 'could you book', 'book two', 'two slots', 'put two sessions', 'reserve'],
           'Met only if a booking action is requested. Not met if the message only informs.'),
-        det('C-DEADLINE', 'ADAPT_TO_AUDIENCE', 'Gives a deadline for the booking.', ['NOTE']),
+        meaning('C-DEADLINE', 'ADAPT_TO_AUDIENCE', 'Gives Ravi a deadline for the booking.', ['NOTE'],
+          'Tells Ravi by when the booking should be made (a day, a date or "by the end of the week").',
+          ['by thursday', 'by friday', 'by monday', 'by tuesday', 'by wednesday', 'by the end of', 'by tomorrow', 'let me know by', 'confirm them by', 'before friday', 'by end of'],
+          'Met only if a time by which Ravi should act is given, in any form. Not met if days are mentioned only as session dates, or no deadline is given.'),
       ],
     },
     scaffolding_policy: {
@@ -289,8 +316,8 @@ export const P6_MISSIONS = Object.freeze([
       constraints_notes: ['Mr Okafor was not part of the discussion and needs a yes or no.', 'The lab is in use until noon.'],
       situation_facts: ['Two slots were compared: morning or afternoon.', 'The afternoon was chosen because the lab is in use until noon.', 'Mr Okafor proposed 2 pm and needs a yes or no.'],
       exposure_tags: [],
-      rule_overrides: [{ rule_id: 'R-MAIN-FIRST', params: { pattern: '^[\\s\\S]{0,200}\\b(yes|afternoon|2\\s?pm|14:00)\\b', flags: 'i' }, description: 'The answer (yes / the afternoon slot) appears in the opening lines.' }],
       meaning_overrides: [
+        { criterion_id: 'C-MAIN-FIRST', intent: 'Opens with the answer itself (yes to the 2 pm slot) before any reasoning.', synonyms: ['yes to 2 pm', 'yes, the afternoon', 'the afternoon slot works', '2 pm works', 'confirm the 2 pm', 'the answer is yes', 'afternoon is fine', 'yes, 2 pm'], evaluator_guidance: 'Met only if the yes/no answer comes first, in any wording. Not met if it follows the reasoning or is missing.' },
         { criterion_id: 'C-REASON', intent: 'Explains that the lab is used for teaching until noon, so a morning slot is not possible.', synonyms: ['in use until noon', 'teaching until', 'lab is busy', 'not free in the morning', 'until midday', 'morning is not possible', 'lab is used'], evaluator_guidance: 'Met only if the lab-use reason is given. Not met if a different or no reason is given.' },
         { criterion_id: 'C-ASK', intent: 'Asks Mr Okafor to confirm something concrete (the 2 pm slot, group size or arrival point) rather than describing the discussion.', synonyms: ['please confirm', 'could you confirm', 'can you confirm', 'let me know', 'send me', 'confirm the group size', 'confirm 2 pm'], evaluator_guidance: 'Met only if a concrete confirmation is requested. Not met if the message only informs.' },
       ],
@@ -323,15 +350,13 @@ export const P6_MISSIONS = Object.freeze([
     ],
     artifacts: [message('REPLY', 'Reply to Mina', 'Write as you would in a team chat.', 1200)],
     constraints: { notes: ['Printing takes an afternoon.', 'About half the group joins without laptops.'] },
-    deterministic_validation_rules: [
-      required('R-SUBSTANTIVE', 'C-SUBSTANTIVE', 'REPLY', 'text', 120, 'The reply engages rather than answering in one line.'),
-    ],
+    deterministic_validation_rules: [],
     rubric: {
       criteria: [
         meaning('C-RESTATE', 'UNDERSTAND_CONCERN', 'Restates Mina\'s concern accurately.', ['REPLY'],
           'Shows the concern was understood: printing costs time the team does not have, and the handouts may go unread.',
-          ['takes an afternoon', 'time to print', 'nobody reads', 'may not read', 'you are right that', 'i understand that printing', 'fair point about'],
-          'Met only if the learner restates the time cost or the unread risk. Not met for a generic "I hear you".'),
+          ['takes an afternoon', 'time to print', 'nobody reads', 'may not read', 'you are right that', 'i understand that printing', 'fair point about', 'go unread', 'end up unread'],
+          'Met only if the learner restates the time cost or the unread risk, in their own words and however briefly. Not met for a generic "I hear you" or for length without the concern.'),
         meaning('C-DISAGREE', 'DISAGREE_CONSTRUCTIVELY', 'States the disagreement with a reason tied to the facts.', ['REPLY'],
           'Says they still want a handout because people without laptops would have nothing to follow.',
           ['without laptops', 'no laptop', 'nothing to follow', 'half the group', 'i disagree', 'i still think', 'i see it differently', 'that said'],
@@ -340,8 +365,24 @@ export const P6_MISSIONS = Object.freeze([
           'Offers a concrete compromise or decision method (shorter handout, print fewer, ask the group, a quick trial).',
           ['one page', 'single page', 'shorter handout', 'print only', 'ask the group', 'could we', 'what if we', 'let us try', 'how about'],
           'Met only if a specific next step is proposed. Not met for "let us discuss".'),
-        det('C-SUBSTANTIVE', 'UNDERSTAND_CONCERN', 'Replies substantively rather than in one line.', ['REPLY']),
       ],
+    },
+    // P6.8: Mina answers in character from what the reply actually did.
+    counterpart: {
+      name: 'Mina', role: 'Colleague',
+      reactions: [
+        ...reacts('C-RESTATE',
+          'Thanks — yes, that is my worry exactly: the afternoon it takes and how many copies end up unread.',
+          'I am not sure you heard my point. It is the afternoon of printing we do not have, not the handout as such.'),
+        ...reacts('C-DISAGREE',
+          'The people without laptops — fair, I had not weighed that. That changes the picture for the exercises.',
+          'So where do you actually stand? I cannot tell whether you agree with dropping it or not.'),
+        ...reacts('C-NEXT',
+          'That I could live with. Let us do it that way and see how Thursday goes.',
+          'OK, but what do we do on Thursday? I need something we can both act on, not just the disagreement.'),
+      ],
+      all_met: 'Good — you heard me, you said where you differ and why, and you gave us something we can try. I am in.',
+      none_met: 'I cannot work with this yet: I do not see my concern reflected, I cannot tell where you stand, and there is nothing for Thursday.',
     },
     scaffolding_policy: {
       hints: [
@@ -363,7 +404,7 @@ export const P6_MISSIONS = Object.freeze([
       example('EX-RESTATE', ['C-RESTATE', 'C-DISAGREE', 'C-NEXT'], 'You are right that printing takes an afternoon we do not have, and some handouts do go unread. I still think we need something on paper because half the group joins without laptops and would have nothing to follow. Could we try a single page for just that half?', 'Restates the concern, disagrees with a reason tied to the group, offers a smaller next step.'),
       counter('CX-GIVE-WAY', ['C-DISAGREE', 'C-NEXT'], 'Fine, let us drop the handout then, you know this better than I do.', 'Gives way without stating the disagreement or a next step.'),
     ],
-    first_attempt_feedback: { completed_priority: ['C-RESTATE', 'C-DISAGREE', 'C-NEXT', 'C-SUBSTANTIVE'], next_change_priority: ['C-RESTATE', 'C-NEXT', 'C-DISAGREE', 'C-SUBSTANTIVE'] },
+    first_attempt_feedback: { completed_priority: ['C-RESTATE', 'C-DISAGREE', 'C-NEXT'], next_change_priority: ['C-RESTATE', 'C-NEXT', 'C-DISAGREE'] },
     transfer: {
       setting: 'Your colleague Omar wants to replace the slide deck for Thursday\'s session with a live whiteboard: "Slides feel rigid and nobody reads them afterwards." You think the shared slide file matters because two participants use screen readers and need the material in advance in a readable form.',
       objective: 'Reply to Omar: show you understood his concern, say where you disagree and why, and offer a next step both of you could accept.',
@@ -375,6 +416,22 @@ export const P6_MISSIONS = Object.freeze([
         { criterion_id: 'C-DISAGREE', intent: 'Says they still want a shared readable file because two participants use screen readers and need it in advance.', synonyms: ['screen reader', 'in advance', 'readable file', 'two participants', 'i disagree', 'i still think', 'i see it differently', 'that said'], evaluator_guidance: 'Met only if a reason tied to the two participants is given. Not met if the learner simply gives way or simply insists.' },
         { criterion_id: 'C-NEXT', intent: 'Offers a concrete compromise or way to decide (whiteboard live plus a short readable file sent before, ask the two participants, a trial).', synonyms: ['both', 'as well as', 'send a short', 'ask the two', 'could we', 'what if we', 'let us try', 'how about', 'one page'], evaluator_guidance: 'Met only if a specific next step is proposed. Not met for "let us discuss".' },
       ],
+      counterpart: {
+        name: 'Omar', role: 'Colleague',
+        reactions: [
+          ...reacts('C-RESTATE',
+            'Yes — that is it: the deck feels rigid in the room and nobody opens it afterwards.',
+            'I do not think you have picked up what bothers me about the slides; it is how rigid they make the session.'),
+          ...reacts('C-DISAGREE',
+            'The two people on screen readers — I had not thought about them needing it in advance. Fair.',
+            'I still cannot tell whether you want to keep the slides or not, or why.'),
+          ...reacts('C-NEXT',
+            'I can go with that. Let us try it on Thursday.',
+            'Then what do we actually do on Thursday? I need a plan, not just the objection.'),
+        ],
+        all_met: 'You heard my point, you told me where you differ and why, and you gave us a way forward. Agreed.',
+        none_met: 'I am not sure we have moved: my concern is not reflected, I cannot see your position, and nothing is decided for Thursday.',
+      },
     },
     accessibility_note: A11Y_TEXT,
     confounds: [...CONFOUNDS_TEXT, 'Politeness words are not the behaviour; the check reads for the restated concern and the reason, not tone.'],
@@ -408,20 +465,44 @@ export const P6_MISSIONS = Object.freeze([
     ])],
     constraints: { notes: ['Room setup from 8:00 and the welcome at 9:00 both need you in the room.', 'The desk is in the corridor from 8:30.'] },
     deterministic_validation_rules: [
-      required('R-LIMIT', 'C-LIMIT', 'REPLY', 'fields.cannot_do', 8, 'A limit is stated.'),
-      required('R-INSTEAD', 'C-INSTEAD', 'REPLY', 'fields.instead', 10, 'An alternative is offered.'),
-      required('R-DECIDER', 'C-DECIDER', 'REPLY', 'fields.who_decides', 3, 'A decider is named.'),
+      oneOf('R-DECIDER', 'C-DECIDER', 'REPLY', 'fields.who_decides', ['priya'], 'The decider named is someone in the situation (Priya asked for the desk).'),
     ],
     rubric: {
       criteria: [
-        det('C-LIMIT', 'NEGOTIATE_BOUNDARY', 'States a limit clearly.', ['REPLY']),
+        meaning('C-LIMIT', 'NEGOTIATE_BOUNDARY', 'States the limit: what they cannot take on.', ['REPLY'],
+          'Says plainly what they will not take on (the sign-in desk from 8:30, or the part of it that clashes).',
+          ['cannot', "can't", 'not able to', 'not realistic', 'will not be able', 'is not possible', 'unable to', 'cannot run', 'not going to be able'],
+          'Met only if a specific limit is stated, however briefly. Not met for "it is difficult" with nothing refused, or for a filled-in field that refuses nothing.'),
         meaning('C-WHY', 'NEGOTIATE_BOUNDARY', 'Explains the capacity clash.', ['REPLY'],
           'Explains that the desk from 8:30 overlaps with setup and the welcome, which both need them in the room.',
           ['at the same time', 'overlap', '8:30', 'both need me', 'in the room', 'two places', 'clash', 'while i am setting up'],
           'Met only if the time clash is explained. Not met for "I am too busy".'),
-        det('C-INSTEAD', 'NEGOTIATE_BOUNDARY', 'Offers what can be done instead.', ['REPLY']),
+        meaning('C-INSTEAD', 'NEGOTIATE_BOUNDARY', 'Offers a concrete alternative.', ['REPLY'],
+          'Offers something specific they can do instead (cover until a time, brief a stand-in, leave the list ready).',
+          ['i can hand', 'i can offer', 'what i can offer', 'i can brief', 'i can cover', 'instead i', 'i could', 'leave them', 'hand the desk', 'until 8:50'],
+          'Met only if the alternative is concrete (a time slice, a stand-in, a prepared handover). Not met for "I will help where I can".'),
         det('C-DECIDER', 'NEGOTIATE_BOUNDARY', 'Names who decides if the limit is tested.', ['REPLY']),
       ],
+    },
+    // P6.8: Priya answers in character from what the reply actually did.
+    counterpart: {
+      name: 'Priya', role: 'Coordinator',
+      reactions: [
+        ...reacts('C-LIMIT',
+          'Understood — the desk from 8:30 is a no from you. Good to have that clear.',
+          'I still do not know what you are actually saying no to. Can you take the desk or not?'),
+        ...reacts('C-WHY',
+          'Right, setup and the welcome both have you in the room; I had not lined the times up.',
+          'Why not, though? Without the clash spelled out I cannot tell what would give.'),
+        ...reacts('C-INSTEAD',
+          'That alternative works for me; I can plan the desk around it.',
+          'So what can you do? A plain no leaves me with an uncovered desk at 8:30.'),
+        ...reacts('C-DECIDER',
+          'Agreed — if the desk has to be covered after all, that call sits with me.',
+          'And if I need the desk covered anyway, who decides what moves?'),
+      ],
+      all_met: 'That is a clear answer: what you can do, what you cannot and why, an alternative, and who decides. I can work with it.',
+      none_met: 'I am not clearer than before: I cannot tell what you will take on, why the desk is a problem, or what happens instead.',
     },
     scaffolding_policy: {
       hints: [
@@ -453,6 +534,25 @@ export const P6_MISSIONS = Object.freeze([
       meaning_overrides: [{
         criterion_id: 'C-WHY', intent: 'Explains that the tour at 11:00 falls inside the feedback session (10:30 to 11:30), which cannot move.', synonyms: ['during the feedback session', 'inside the session', 'overlap', '11:00 is in the middle', 'cannot move', 'at the same time', 'two places', 'clash'], evaluator_guidance: 'Met only if the time clash is explained. Not met for "I am too busy".',
       }],
+      counterpart: {
+        name: 'Priya', role: 'Coordinator',
+        reactions: [
+          ...reacts('C-LIMIT',
+            'OK — the 11:00 tour is a no from you. That is the answer I needed in the time I had.',
+            'Five minutes and I still do not have a yes or no on the tour from you.'),
+          ...reacts('C-WHY',
+            'Of course, 11:00 sits inside your feedback session and that cannot move.',
+            'Why not? If I do not know what it clashes with, I cannot move anything else around.'),
+          ...reacts('C-INSTEAD',
+            'That I can use; let me see if it covers the visitors.',
+            'So what can you offer the visitors instead? A bare no leaves them with nobody at 11:00.'),
+          ...reacts('C-DECIDER',
+            'Agreed — if the tour has to happen anyway, I make that call.',
+            'And if the tour has to go ahead, who decides what gives?'),
+        ],
+        all_met: 'Clear and in time: what you can and cannot do, why, an alternative, and who decides. Thank you.',
+        none_met: 'The five minutes are up and I am no clearer on what you can do, what clashes, or what happens instead.',
+      },
     },
     accessibility_note: A11Y_SHEET,
     confounds: CONFOUNDS_TEXT,
@@ -490,12 +590,14 @@ export const P6_MISSIONS = Object.freeze([
     ],
     constraints: { notes: ['The session must finish by 11:30.', 'Sam is unavailable until noon.'] },
     deterministic_validation_rules: [
-      pattern('R-AFFECTED', 'C-AFFECTED', 'NOTE', 'text', '\\btalk\\b|\\bsam\\b', 'The message names the affected part.'),
-      required('R-OWNERS', 'C-OWNERS', 'PLAN', 'rows.owner', 2, 'Every part has an owner on the board.'),
+      oneOf('R-OWNERS', 'C-OWNERS', 'PLAN', 'rows.owner', ['me', 'i', 'myself', 'you', 'priya', 'sam'], 'Every part names an owner who is in the plan (you, Priya or Sam).'),
     ],
     rubric: {
       criteria: [
-        det('C-AFFECTED', 'REPLAN_CONSTRAINT', 'Names the part of the plan the change affects.', ['NOTE']),
+        meaning('C-AFFECTED', 'REPLAN_CONSTRAINT', 'Names the part of the plan the change affects.', ['NOTE'],
+          'Identifies which part of the session the change breaks (Sam\'s short talk), in any wording.',
+          ["sam's talk", "sam's slot", "sam's short talk", 'the talk', 'his talk', 'part that breaks', 'affected', 'depends on sam'],
+          'Met only if the affected part is identified. Not met if the message says "the plan changed" without saying which part, or names the wrong part.'),
         meaning('C-REPLAN', 'REPLAN_CONSTRAINT', 'Re-plans inside the time limit and states the cost.', ['NOTE', 'PLAN'],
           'Changes the affected part (moved, shortened, swapped or dropped) and says what that costs in scope, time or quality.',
           ['move the talk', 'swap', 'shorten', 'drop the talk', 'skip', 'postpone', 'instead of', 'cut', 'reorder', 'start with group work', 'we lose'],
@@ -504,7 +606,7 @@ export const P6_MISSIONS = Object.freeze([
           'Asks Priya for one concrete thing (for example to give the talk, cover setup, or confirm the room).',
           ['could you', 'can you', 'would you be able', 'priya, please', 'i need you to', 'can i ask you to', 'would you give the talk'],
           'Met only if the request names what Priya should do. Not met for "any help welcome".'),
-        det('C-OWNERS', 'REPLAN_CONSTRAINT', 'Every part has an owner on the board.', ['PLAN']),
+        det('C-OWNERS', 'REPLAN_CONSTRAINT', 'Every part has an owner who is in the plan.', ['PLAN']),
       ],
     },
     scaffolding_policy: {
@@ -534,9 +636,12 @@ export const P6_MISSIONS = Object.freeze([
       constraints_notes: ['The session must finish by 11:30.', 'The room is unavailable until 10:00.'],
       situation_facts: ['The session has setup, a short talk and group work.', 'The room is unavailable until 10:00.', 'The session must finish by 11:30.', 'Priya is free and knows the other rooms.'],
       exposure_tags: [],
-      rule_overrides: [{ rule_id: 'R-AFFECTED', params: { pattern: '\\bsetup\\b|\\broom\\b|\\b9:15\\b', flags: 'i' }, description: 'The message names the affected part (the setup or the room).' }],
       meaning_overrides: [{
         criterion_id: 'C-HELP', intent: 'Asks Priya for one concrete thing (for example to find another room, to greet people at 9:30, or to confirm when the room frees up).', synonyms: ['could you', 'can you', 'would you be able', 'priya, please', 'i need you to', 'can i ask you to', 'find another room', 'check the room'], evaluator_guidance: 'Met only if the request names what Priya should do. Not met for "any help welcome".',
+      }, {
+        criterion_id: 'C-AFFECTED', intent: 'Identifies which part of the session the room clash breaks (the setup at 9:15 and the start), in any wording.',
+        synonyms: ['the setup', 'setup is affected', 'the room', 'room is unavailable', '9:15', 'the start', 'first part', 'affected part', 'cannot set up', 'no room until'],
+        evaluator_guidance: 'Met only if the affected part is identified. Not met for "the plan changed" without saying which part.',
       }],
     },
     accessibility_note: A11Y_BOARD,
@@ -566,15 +671,15 @@ export const P6_MISSIONS = Object.freeze([
     artifacts: [message('CORRECTION', 'Correction to the group', 'Everyone who got the first message gets this one.', 1200)],
     constraints: { notes: ['The booking is 9:30.', 'The first message went out an hour ago.'] },
     deterministic_validation_rules: [
-      pattern('R-CORRECT', 'C-CORRECT', 'CORRECTION', 'text', '\\b9[:.]30\\b|half past nine', 'The correction gives the right start time.'),
+      pattern('R-CORRECT', 'C-CORRECT', 'CORRECTION', 'text', '\\b0?9[:.]30\\b|\\b9\\s?30\\s?(am)?\\b|half past nine|nine[- ]thirty', 'The correction gives the right start time (9:30).'),
     ],
     rubric: {
       criteria: [
         meaning('C-OWN', 'REPAIR_MISTAKE', 'Acknowledges the specific error as their own.', ['CORRECTION'],
           'Says the earlier time was wrong and that the error was theirs, without blaming others or hiding it.',
-          ['my mistake', 'i sent the wrong', 'i got the time wrong', 'apologies', 'sorry', 'i wrote 10:00', 'the error was mine', 'i made an error'],
+          ['my mistake', 'i sent the wrong', 'i got the time wrong', 'apologies', 'sorry', 'i wrote 10:00', 'the error was mine', 'i made an error', 'my error'],
           'Met only if ownership is explicit. Not met for a passive "the time was incorrect".'),
-        det('C-CORRECT', 'REPAIR_MISTAKE', 'Gives the correct start time.', ['CORRECTION']),
+        det('C-CORRECT', 'REPAIR_MISTAKE', 'Gives the correct start time (9:30).', ['CORRECTION']),
         meaning('C-KNOCKON', 'UPDATE_WITH_EVIDENCE', 'Addresses what the wrong time may already have affected.', ['CORRECTION'],
           'Checks for knock-on effects (calendar entries, travel, arrival, room) and tells people what to do about them.',
           ['calendar', 'invite', 'travel', 'arrive', 'if you have already', 'please update', 'knock-on', 'forwarded', 'let anyone know'],
@@ -654,13 +759,13 @@ export const P6_MISSIONS = Object.freeze([
     ],
     constraints: { notes: ['Lea is free Monday and Tuesday.', 'Tom is away on Monday.', 'The projector can only be tested on Tuesday.'] },
     deterministic_validation_rules: [
-      required('R-OWNERS', 'C-OWNERS', 'BOARD', 'rows.owner', 2, 'Every task has an owner, or a named person who will decide.'),
-      required('R-DONE', 'C-DONE', 'BOARD', 'rows.done_when', 6, 'Every task has a written completion check.'),
+      oneOf('R-OWNERS', 'C-OWNERS', 'BOARD', 'rows.owner', ['lea', 'tom', 'escalate', 'escalated', 'decide', 'decides'], 'Every task names Lea or Tom, or escalates it to a named decider.'),
+      required('R-DONE', 'C-DONE', 'BOARD', 'rows.done_when', 6, 'Every task has something written in "done when".'),
     ],
     rubric: {
       criteria: [
-        det('C-OWNERS', 'ASSIGN_RESPONSIBILITY', 'Every task has an owner, or a named person who will decide.', ['BOARD']),
-        det('C-DONE', 'DEFINE_COMPLETION', 'Every task has a written completion check.', ['BOARD']),
+        det('C-OWNERS', 'ASSIGN_RESPONSIBILITY', 'Every task names Lea or Tom as owner, or a named person who will decide.', ['BOARD']),
+        det('C-DONE', 'DEFINE_COMPLETION', 'Every task has a completion check written down.', ['BOARD']),
         meaning('C-REALISTIC', 'ASSIGN_RESPONSIBILITY', 'Owners respect who is available when.', ['HANDOVER', 'BOARD'],
           'Monday tasks are not given to Tom, and the projector test sits on Tuesday when the room is free; or an unresolvable task is escalated to a named decider with the reason.',
           ['tom is away', 'lea on monday', 'tuesday when the room', 'room is free', 'not monday', 'tom cannot', 'available on', 'tom from tuesday', 'ask priya to decide', 'escalating to', 'escalate to', 'cannot assign'],
@@ -750,12 +855,12 @@ export const P6_MISSIONS = Object.freeze([
     constraints: { notes: ['You have time for three of the five tasks.', 'The reminder must include the room details.'] },
     deterministic_validation_rules: [
       range('R-ORDER', 'C-ORDER', 'BOARD', 'rows.order', 1, 5, 'Every task has an order from 1 to 5.'),
-      required('R-DECISIONS', 'C-DECISIONS', 'BOARD', 'rows.decision', 6, 'Every task has a decision with a reason.'),
+      oneOf('R-DECISIONS', 'C-DECISIONS', 'BOARD', 'rows.decision', ['do', 'defer', 'hand off', 'hand-off', 'handoff', 'hand to', 'escalate', 'drop', 'skip'], 'Every task has a decision word (DO, DEFER, HAND OFF or an escalation).'),
     ],
     rubric: {
       criteria: [
         det('C-ORDER', 'PRIORITIZE_WORK', 'Every task has an order.', ['BOARD']),
-        det('C-DECISIONS', 'PRIORITIZE_WORK', 'Each task has a decision with a reason.', ['BOARD']),
+        det('C-DECISIONS', 'PRIORITIZE_WORK', 'Each task has a decision entered (DO, DEFER, HAND OFF or an escalation).', ['BOARD']),
         meaning('C-DEPENDENCY', 'CHECK_DEPENDENCY', 'Puts the room confirmation before the reminder because the reminder depends on it.', ['NOTE', 'BOARD'],
           'Explains that the reminder cannot go out until the room is confirmed, so the room comes first.',
           ['room first', 'before the reminder', 'reminder needs the room', 'depends on the room', 'cannot send the reminder', 'once the room is confirmed', 'after the room', 'until the room'],
@@ -843,5 +948,54 @@ export function handoverRevision(v1) {
     accessibility_note: A11Y_BOARD,
     confounds: CONFOUNDS_TEXT,
     review_record: REVIEW_RECORD,
+  })
+}
+
+// M04 v3 (P6.8) — the handover's checks are made honest. v1 and v2 stay
+// byte-identical; v3 changes only how claims are checked:
+//   C-NAMES-TASKS  "names both tasks" was two exact phrases ("vendor quotes",
+//                  "launch checklist") → MEANING, so "the quotes from the
+//                  vendor" counts and a reworded task name is not a failure.
+//   C-OWNERSHIP    "an owner or who decides" was any 2+ characters → ONE_OF a
+//                  person in the situation (Sam, Priya, you) or a decide word.
+//   C-FIRST-STEP   BOTH (8+ characters + evaluator) → MEANING: one concrete
+//                  first action, not a filled-in field.
+//   C-CHECKPOINT   unchanged: a day AND a clock time is a structural check.
+export function handoverRevisionV3(v2) {
+  const transfer = { ...v2.transfer }
+  delete transfer.rule_overrides
+  const criteria = v2.rubric.criteria.map((c) => {
+    if (c.criterion_id === 'C-NAMES-TASKS') {
+      return meaning('C-NAMES-TASKS', c.behavior_id, 'Names both unowned tasks in the handover message.', ['MESSAGE'],
+        'Names both tasks that have no owner (the vendor quotes and the launch checklist) so Sam knows what is open.',
+        ['vendor quotes', 'launch checklist', 'the quotes', 'the checklist', 'two tasks', 'both tasks', 'quotes and the', 'checklist due', 'quotes due', 'still unowned'],
+        'Met only if both open tasks are identifiable from the message, in any wording. Not met if only one is named or the tasks are referred to only as "the open items".')
+    }
+    if (c.criterion_id === 'C-FIRST-STEP') {
+      return meaning('C-FIRST-STEP', c.behavior_id, 'Tells Sam the one concrete thing to do first.', ['PLAN', 'MESSAGE'],
+        'Names one concrete action Sam should take before anything else (for example call the venue to confirm the quote).',
+        ['first', 'before anything else', 'start with', 'call the venue', 'ring the venue', 'to begin with', 'the first thing', 'start by'],
+        'Met only if one concrete first action is named. Not met for a list with no order, or for "get up to speed".')
+    }
+    if (c.criterion_id === 'C-OWNERSHIP') return { ...c, description: 'Assigns each unowned task to a person in the situation, or names who will decide.' }
+    return c
+  })
+  return Object.freeze({
+    ...v2,
+    version: 3,
+    deterministic_validation_rules: [
+      oneOf('R-BOARD-OWNERS', 'C-OWNERSHIP', 'BOARD', 'rows.owner', ['sam', 'priya', 'me', 'i', 'myself', 'decide', 'decides'], 'Both unowned tasks name Sam, Priya or you as owner, or say who decides.'),
+      ...v2.deterministic_validation_rules.filter((r) => r.criterion_id === 'C-CHECKPOINT'),
+    ],
+    rubric: { criteria },
+    confounds: [...v2.confounds, 'Naming a task is checked by meaning, not by the exact words on the board, so a reworded task name is not a failure.'],
+    transfer: {
+      ...transfer,
+      meaning_overrides: [{
+        criterion_id: 'C-NAMES-TASKS', intent: 'Names both tasks that have no owner (the venue contract and the comms pack) so Sam knows what is open.',
+        synonyms: ['venue contract', 'comms pack', 'the contract', 'two tasks', 'both tasks', 'contract and the', 'still unowned', 'communications pack'],
+        evaluator_guidance: 'Met only if both open tasks are identifiable from the message, in any wording. Not met if only one is named.',
+      }],
+    },
   })
 }

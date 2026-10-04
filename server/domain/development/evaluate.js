@@ -13,7 +13,7 @@ import { MISSION_SCHEMA_VERSION } from './missionSchema.js'
 import { meaningWorkTooShort } from './evaluator.js'
 import { copiedFrom, buildFocus, FEEDBACK_VERSION } from './feedback.js'
 
-export const PIPELINE_VERSION = 'mission-pipeline.v3'
+export const PIPELINE_VERSION = 'mission-pipeline.v4'
 export const CONFIDENCE_THRESHOLD = 0.7
 const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 
@@ -107,12 +107,14 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
         : `Attempt reviewed — ${demonstrated} of ${total} target ${noun(total)} demonstrated.`)
     : `${demonstrated} of ${total} target ${noun(total)} demonstrated so far; ${uncertain} could not be checked reliably this time.`) + copiedNote
   const focus = buildFocus({ mission, criteria, status, learnerTextFor: (c) => candidateTextFor(mission, work, mission.rubric.criteria.find((x) => x.criterion_id === c.criterionId)?.artifact_ids || []) })
+  const counterpart = counterpartReply({ mission, criteria, status })
 
   return {
     status,
     verified,
     summary,
     focus,
+    counterpart,
     criteria,
     behaviors,
     counts: { demonstrated, uncertain, total, copied },
@@ -123,6 +125,30 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
     },
     versions: { pipeline: PIPELINE_VERSION, validators: VALIDATORS_VERSION, schema: MISSION_SCHEMA_VERSION, feedback: FEEDBACK_VERSION, confidenceThreshold: CONFIDENCE_THRESHOLD },
   }
+}
+
+// P6.8 counterpart reply. The person the learner wrote to (Mina, Priya…)
+// answers in character, one line per criterion the evaluation could decide,
+// chosen by what the learner's message actually did (OBSERVED) or did not do
+// (NOT_OBSERVED). Copied text and uncertain checks get no line, so the reply
+// never praises borrowed words and never guesses; an incomplete review gets
+// no reply at all. Lines follow the mission's own criterion order.
+export const COUNTERPART_NOTE = 'This reply is written from what your message did and did not do in this attempt. It is practice, not a judgement of you.'
+export function counterpartReply({ mission, criteria, status }) {
+  const cp = mission.counterpart
+  if (!cp || status !== 'EVALUATED') return null
+  const byId = new Map(criteria.map((c) => [c.criterionId, c]))
+  const lines = []
+  for (const def of mission.rubric.criteria) {
+    const c = byId.get(def.criterion_id)
+    if (!c || (c.result !== 'OBSERVED' && c.result !== 'NOT_OBSERVED')) continue
+    const r = cp.reactions.find((x) => x.criterion_id === c.criterionId && x.when === c.result)
+    if (r) lines.push({ criterionId: c.criterionId, when: c.result, text: r.text })
+  }
+  const decided = criteria.filter((c) => c.result === 'OBSERVED' || c.result === 'NOT_OBSERVED')
+  const closing = decided.length && decided.every((c) => c.result === 'OBSERVED') && decided.length === criteria.length ? cp.all_met
+    : decided.length && decided.every((c) => c.result === 'NOT_OBSERVED') && decided.length === criteria.length ? cp.none_met : null
+  return { name: cp.name, role: cp.role, lines, closing, note: COUNTERPART_NOTE }
 }
 
 // Practice evidence rows: one per OBSERVED criterion, nothing else.

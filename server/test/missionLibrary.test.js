@@ -40,9 +40,11 @@ test('P6.2: ten DRAFT original missions, two per family, every one parses and st
     assert.equal(m.scaffolding_policy.hints.length, 3, `${m.display_code} has three scaffold hints`)
     assert.ok(m.estimated_duration.minutes >= 5)
     assert.ok(m.accessibility_mode.untimed)
-    // Mixed check kinds: deterministic where possible, MEANING for intent.
+    // P6.8: every claim is checked by a method that can establish it. Every
+    // mission has a MEANING check; a deterministic rule exists only where the
+    // claim is structural (see missionMeaning.test.js for the reviewed list).
     const kinds = new Set(m.rubric.criteria.map((c) => c.check))
-    assert.ok(kinds.has('DETERMINISTIC'), `${m.display_code} has at least one deterministic check`)
+    assert.ok(kinds.has('MEANING'), `${m.display_code} has at least one meaning check`)
     for (const c of m.rubric.criteria) if (c.check === 'MEANING') assert.ok(c.meaning.synonyms.length >= 3 && c.evaluator_guidance)
     // Starting state demonstrates nothing and nothing is quotable.
     const start = initialWork(m)
@@ -100,7 +102,7 @@ test('P6.2: a stored version is immutable (same version, different body is refus
     const lit = await svc.listMissions(user, ws)
     assert.equal(lit.items.length, 11)
     assert.equal(lit.items.filter((m) => m.status === 'DRAFT').length, 10)
-    assert.deepEqual(lit.items.find((m) => m.id === 'MIS-CORE-HANDOVER-01').version, 2, 'the latest draft version is served')
+    assert.deepEqual(lit.items.find((m) => m.id === 'MIS-CORE-HANDOVER-01').version, 3, 'the latest draft version is served')
     const plan = await svc.planFor(user, ws, PRIMARY_CAPABILITY_IDS.map((capabilityId) => ({ capabilityId })))
     assert.deepEqual(plan.recommended.map((m) => m.id), [], 'DRAFT missions are never recommended, even for matching priorities')
     assert.equal(plan.catalogue.length, 11)

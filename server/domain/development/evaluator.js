@@ -9,7 +9,7 @@ import { sanitizeCandidateText } from '../../lib/promptSecurity.js'
 import { tokenizeForModel } from '../../lib/identityIsolation.js'
 
 export const EVALUATOR_PROMPT = 'mission_evaluator.v1'
-export const MEANING_PROMPT = 'mission_meaning.v1'
+export const MEANING_PROMPT = 'mission_meaning.v2'
 // Work shorter than this (all artifacts together) is never sent to the model
 // for a meaning check: it is "not met — EMPTY_WORK", not guessed feedback.
 export const MIN_MEANING_CHARS = 20

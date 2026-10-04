@@ -130,7 +130,7 @@ test('P6.2: every mission package (M01–M10) carries the reviewer fields, a tra
     assert.ok(m.examples.some((e) => e.kind === 'EXAMPLE') && m.examples.some((e) => e.kind === 'COUNTEREXAMPLE'))
     for (const e of m.examples) assert.ok(e.text.split(/\s+/).length >= 6, `${m.display_code} ${e.example_id} is a real sentence`)
     const checks = new Set(m.rubric.criteria.map((c) => c.check))
-    assert.ok(checks.has('DETERMINISTIC') && (checks.has('MEANING') || checks.has('BOTH')), `${m.display_code} splits deterministic from semantic checks`)
+    assert.ok(checks.has('MEANING'), `${m.display_code} checks meaning, not only form`)
     // Transfer: different setting, same behaviour/criterion ids, empty start.
     const t = applyVariant(m, 'TRANSFER')
     assert.notEqual(t.scenario_context.setting, m.scenario_context.setting)
@@ -264,7 +264,7 @@ for (const mission of MISSIONS) {
       assert.ok(stored.assistance.copyCheck.sources.includes(`EXAMPLE:${ex.example_id}`))
       assert.deepEqual(stored.assistance.copyCheck.flagged, flagged.map((c) => c.criterionId))
       assert.equal(stored.assistance.feedbackVersion, 'mission-feedback.v1')
-      assert.ok(stored.assistance.promptVersion.meaning === 'mission_meaning.v1' || stored.assistance.promptVersion.evaluator === 'mission_evaluator.v1')
+      assert.ok(stored.assistance.promptVersion.meaning === 'mission_meaning.v2' || stored.assistance.promptVersion.evaluator === 'mission_evaluator.v1')
       // Earlier attempts are untouched by later ones.
       assert.deepEqual((await w.call(who, 'GET', `/mission-attempts/${valid.id}`)).body.data.result.criteria, r1.criteria)
     } finally { w.close() }
@@ -310,18 +310,23 @@ test('P6.4: an unsupported evaluator quote withholds the criterion for review an
     const a = await w.run('e', id, MISSION_FIXTURES[id].valid)
     delete process.env.PRISM_AUDIT_AI_FAULT
     const r = a.result
-    for (const c of r.criteria.filter((x) => ['C-NAMES-UNKNOWN', 'C-HOLDS'].includes(x.criterionId))) {
+    for (const c of r.criteria.filter((x) => ['C-ASKS', 'C-NAMES-UNKNOWN', 'C-LIMIT', 'C-HOLDS'].includes(x.criterionId))) {
       assert.equal(c.result, 'UNCERTAIN', `${c.criterionId}: a quote the learner never wrote is never trusted`)
       assert.equal(c.reason, 'QUOTE_NOT_VERIFIED')
       assert.equal(c.quote, null)
       assert.match(c.note, /not counted either way/)
     }
-    assert.equal(byId(r)['C-ASKS'].result, 'OBSERVED', 'deterministic checks still stand')
     assert.equal(r.verified, false)
     assert.deepEqual(a.work, MISSION_FIXTURES[id].valid, 'the work is preserved')
     const units = await w.repos.development.listPracticeUnits({ userId: USERS.e.id })
-    assert.ok(units.every((u) => !['C-NAMES-UNKNOWN', 'C-HOLDS'].includes(u.criterionId)), 'withheld criteria write no practice evidence')
+    assert.equal(units.length, 0, 'withheld criteria write no practice evidence')
     assert.ok(!/learner failed|you failed/i.test(JSON.stringify(r)))
+    // Deterministic (structural) checks still stand under the same fault: M08's correct time.
+    process.env.PRISM_AUDIT_AI_FAULT = 'mismatch'
+    const b = await w.run('e', 'MIS-CORE-REPAIR-01', MISSION_FIXTURES['MIS-CORE-REPAIR-01'].valid)
+    delete process.env.PRISM_AUDIT_AI_FAULT
+    assert.equal(byId(b.result)['C-CORRECT'].result, 'OBSERVED', 'deterministic checks still stand')
+    assert.equal(byId(b.result)['C-OWN'].result, 'UNCERTAIN')
   } finally { delete process.env.PRISM_AUDIT_AI_FAULT; w.close() }
 })
 

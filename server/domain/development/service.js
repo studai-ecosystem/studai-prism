@@ -263,6 +263,8 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       summary: ev.summary,
       counts: ev.counts,
       focus: ev.focus || null,
+      // P6.8: the counterpart's in-character reply, bound to the results above.
+      counterpart: ev.counterpart || null,
       comparison: ev.comparison || null,
       criteria: ev.criteria.map((c) => ({
         criterionId: c.criterionId,

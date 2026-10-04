@@ -2,9 +2,18 @@
 // the attempt's work is validated against the mission's artifact structure,
 // then every governed rule runs and reports what it actually saw. A criterion
 // passes deterministically only when ALL of its rules pass.
+//
+// What a deterministic rule may honestly claim (P6.8):
+//   REQUIRED_FIELD  the field contains text / a number   → "an answer was entered"
+//   ONE_OF          the value names one of the allowed    → "a valid reference"
+//                   options (a participant, a decision word)
+//   NUMBER_RANGE / SUM_EQUALS   arithmetic / constraint compliance
+//   TEXT_PATTERN    a specific required value (a time, a figure) is present
+// None of them establishes that a sentence is clear, defensible, specific or
+// addresses a concern; those are MEANING checks (evaluate.js).
 import { ApiError } from '../http/errors.js'
 
-export const VALIDATORS_VERSION = 'mission-validators.v1'
+export const VALIDATORS_VERSION = 'mission-validators.v2'
 
 const str = (v) => (typeof v === 'string' ? v : '')
 
@@ -89,6 +98,15 @@ function runRule(rule, work) {
       const re = new RegExp(String(rule.params.pattern), String(rule.params.flags || '').replace(/[^imsu]/g, ''))
       const passed = values.length > 0 && values.every((v) => re.test(str(v)))
       return { passed, detail: passed ? 'Matches the expected structure' : 'Does not match the expected structure' }
+    }
+    case 'ONE_OF': {
+      // Every value names at least one allowed option as a whole word
+      // (case-insensitive). Confirms a valid reference, nothing more.
+      const options = (Array.isArray(rule.params.options) ? rule.params.options : []).map((o) => String(o).trim().toLowerCase()).filter(Boolean)
+      const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const res = options.map((o) => new RegExp(`(^|[^a-z0-9])${escape(o)}(?![a-z0-9])`, 'i'))
+      const passed = options.length > 0 && values.length > 0 && values.every((v) => res.some((re) => re.test(str(v))))
+      return { passed, detail: passed ? 'Names an allowed option' : 'Does not name an allowed option' }
     }
     case 'NUMBER_RANGE': {
       const { min = -Infinity, max = Infinity } = rule.params

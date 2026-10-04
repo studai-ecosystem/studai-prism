@@ -75,7 +75,12 @@ test('T40: malformed or failing evaluator output keeps the attempt reviewable (U
   assert.equal(g.status, 'EVALUATION_UNAVAILABLE')
   assert.equal(by(g, 'C-NAMES-UNKNOWN').result, 'UNCERTAIN')
   assert.equal(by(g, 'C-NAMES-UNKNOWN').reason, 'EVALUATION_UNAVAILABLE')
-  assert.equal(by(g, 'C-ASKS').result, 'NOT_OBSERVED', 'deterministic checks still run')
+  assert.equal(by(g, 'C-ASKS').result, 'UNCERTAIN', 'a meaning check is withheld, never guessed')
+  // Deterministic (structural) checks still run without the evaluator.
+  const M08 = parseMission(MISSION_LIBRARY.find((m) => m.mission_id === 'MIS-CORE-REPAIR-01'))
+  const g8 = await evaluateMissionWork({ mission: M08, work: { CORRECTION: { text: 'Apologies all, we start at 9:30 not 10:00; please fix your calendars.' } }, evaluator: garbage })
+  assert.equal(by(g8, 'C-CORRECT').result, 'OBSERVED', 'deterministic checks still run')
+  assert.equal(by(g8, 'C-OWN').result, 'UNCERTAIN')
   const failing = createMissionEvaluator({ complete: async () => { throw new Error('boom') } })
   const f = await evaluateMissionWork({ mission: M01, work: work(text), evaluator: failing })
   assert.equal(f.evaluator.reason, 'PROVIDER_ERROR')

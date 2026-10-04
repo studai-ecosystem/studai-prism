@@ -345,6 +345,7 @@ export const DEVELOPMENT_COPY = {
     focusNext: 'One thing to change next',
     focusAllMet: 'Every checked behaviour was shown in this attempt.',
     focusIncomplete: 'The review could not be completed. Your work is kept and nothing was guessed.',
+    counterpartTitle: (name, role) => `${name} replies${role ? ` (${role})` : ''}`,
     yourWords: 'Your words',
     allChecks: 'All checks in this attempt',
     examplesAction: 'Show examples',

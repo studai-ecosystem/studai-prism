@@ -4,7 +4,7 @@
 // it has a way to observe.
 import { z } from 'zod'
 
-export const MISSION_SCHEMA_VERSION = 'mission-schema.v1'
+export const MISSION_SCHEMA_VERSION = 'mission-schema.v2'
 
 const Id = z.string().regex(/^[A-Z0-9][A-Z0-9_-]{1,63}$/)
 const Text = (max) => z.string().trim().min(1).max(max)
@@ -24,7 +24,7 @@ const Artifact = z.object({
 const Rule = z.object({
   rule_id: Id,
   criterion_id: Id,
-  type: z.enum(['REQUIRED_FIELD', 'TEXT_PATTERN', 'NUMBER_RANGE', 'SUM_EQUALS']),
+  type: z.enum(['REQUIRED_FIELD', 'TEXT_PATTERN', 'NUMBER_RANGE', 'SUM_EQUALS', 'ONE_OF']),
   artifact_id: Id,
   path: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$/).optional(),
   params: z.record(z.unknown()),
@@ -82,6 +82,8 @@ const Transfer = z.object({
   artifact_initial_state: z.record(z.record(z.unknown())).optional(),
   rule_overrides: z.array(z.object({ rule_id: Id, params: z.record(z.unknown()), description: Text(300).optional() }).strict()).max(20).optional(),
   meaning_overrides: z.array(z.object({ criterion_id: Id, intent: Text(400), synonyms: z.array(Text(80)).min(1).max(12), evaluator_guidance: Text(600).optional() }).strict()).max(8).optional(),
+  // P6.8: the transfer scene's own counterpart (a different person reacts).
+  counterpart: z.lazy(() => Counterpart).optional(),
 }).strict()
 // A DRAFT review record never records an approval: publication is a separate
 // human decision recorded elsewhere (content_review, 0050).
@@ -93,6 +95,19 @@ const ReviewRecord = z.object({
   reviewed_on: z.null(),
   approval: z.literal('NOT_APPROVED'),
   notes: Text(600).optional(),
+}).strict()
+// P6.8 counterpart reaction (negotiation / disagreement practice): the person
+// the learner wrote to replies in character. Every line is bound to what the
+// evaluation actually observed for one criterion (OBSERVED or NOT_OBSERVED),
+// so the reply follows the learner's actual message, never a script. Copied
+// or uncertain criteria get no line: the counterpart never praises borrowed
+// words and never guesses.
+const Counterpart = z.object({
+  name: Text(60),
+  role: Text(80),
+  reactions: z.array(z.object({ criterion_id: Id, when: z.enum(['OBSERVED', 'NOT_OBSERVED']), text: Text(400) }).strict()).min(2).max(16),
+  all_met: Text(400),
+  none_met: Text(400),
 }).strict()
 
 export const MissionContentSchema = z.object({
@@ -109,6 +124,7 @@ export const MissionContentSchema = z.object({
   accessibility_note: Text(600).optional(),
   confounds: z.array(Text(300)).min(1).max(8).optional(),
   review_record: ReviewRecord.optional(),
+  counterpart: Counterpart.optional(),
   // P6 authoring metadata (optional so earlier versions stay byte-identical).
   display_code: z.string().regex(/^M\d{2}$/).optional(),
   source: z.enum(['ORIGINAL', 'LEGACY']).optional(),
@@ -170,6 +186,15 @@ export const MissionContentSchema = z.object({
     for (const id of Object.keys(m.transfer.artifact_initial_state || {})) if (!artifacts.has(id)) ctx.addIssue({ code: 'custom', message: `transfer starts unknown artifact ${id}` })
   }
   if (m.review_record && m.status !== 'DRAFT') ctx.addIssue({ code: 'custom', message: 'a review record describes DRAFT content only' })
+  if (m.counterpart) {
+    for (const r of m.counterpart.reactions) if (!criteria.has(r.criterion_id)) ctx.addIssue({ code: 'custom', message: `counterpart reaction references unknown criterion ${r.criterion_id}` })
+  }
+  for (const r of m.transfer?.counterpart?.reactions || []) if (!criteria.has(r.criterion_id)) ctx.addIssue({ code: 'custom', message: `transfer counterpart reaction references unknown criterion ${r.criterion_id}` })
+  for (const r of m.deterministic_validation_rules) {
+    if (r.type === 'ONE_OF' && !(Array.isArray(r.params.options) && r.params.options.length > 0)) ctx.addIssue({ code: 'custom', message: `rule ${r.rule_id} needs options` })
+    // P6.8: a bare punctuation pattern (e.g. "?") is formatting, not behaviour.
+    if (r.type === 'TEXT_PATTERN' && /^\\?[?!.,;:]$|^\\\?$/.test(String(r.params.pattern || ''))) ctx.addIssue({ code: 'custom', message: `rule ${r.rule_id} matches punctuation only` })
+  }
 })
 
 export const MISSION_VARIANTS = Object.freeze(['BASE', 'TRANSFER'])
@@ -202,6 +227,7 @@ export function applyVariant(mission, variant = 'BASE') {
         return o ? { ...c, meaning: { intent: o.intent, synonyms: o.synonyms }, evaluator_guidance: o.evaluator_guidance || c.evaluator_guidance } : c
       }),
     },
+    ...(t.counterpart ? { counterpart: t.counterpart } : {}),
   }
 }
 
@@ -224,7 +250,12 @@ export function missionPackageGaps(m) {
   has('success_criteria', (m.rubric?.criteria || []).length > 0)
   has('examples', (m.examples || []).some((e) => e.kind === 'EXAMPLE'))
   has('counterexamples', (m.examples || []).some((e) => e.kind === 'COUNTEREXAMPLE'))
-  has('deterministic_checks', (m.rubric?.criteria || []).some((c) => c.check === 'DETERMINISTIC' || c.check === 'BOTH'))
+  // P6.8: every claim is checked by a method that can establish it — a
+  // deterministic rule where the claim is structural (a value is present, a
+  // valid reference, a constraint), a MEANING / evaluator check otherwise.
+  // Missions whose claims are all interpretive legitimately have no
+  // deterministic rule; what must exist is a declared method per criterion.
+  has('deterministic_checks', (m.rubric?.criteria || []).every((c) => c.check !== 'DETERMINISTIC' && c.check !== 'BOTH' || (m.deterministic_validation_rules || []).some((r) => r.criterion_id === c.criterion_id)))
   has('semantic_checks', (m.rubric?.criteria || []).some((c) => c.check === 'MEANING' || c.check === 'EVALUATOR' || c.check === 'BOTH'))
   has('first_attempt_feedback', Boolean(m.first_attempt_feedback))
   has('scaffold', (m.scaffolding_policy?.hints || []).length > 0)

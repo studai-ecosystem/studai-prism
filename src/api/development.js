@@ -101,6 +101,12 @@ const FocusSchema = z.object({
 const ComparisonSchema = z.object({
   previousAttemptId: nullableStr, newlyMet: z.array(z.string()), noLongerMet: z.array(z.string()), notCompared: z.array(z.string()).optional(), note: z.string(),
 })
+// P6.8 counterpart reply: in-character lines bound to criterion results.
+const CounterpartSchema = z.object({
+  name: z.string(), role: nullableStr.optional(),
+  lines: z.array(z.object({ criterionId: z.string(), when: z.enum(['OBSERVED', 'NOT_OBSERVED']), text: z.string() })),
+  closing: nullableStr.optional(), note: z.string(),
+})
 export const CRITERION_RESULTS = ['OBSERVED', 'NOT_OBSERVED', 'UNCERTAIN', 'COPIED_ASSISTANCE']
 const ResultSchema = z.object({
   status: z.enum(['EVALUATED', 'EVALUATION_UNAVAILABLE']),
@@ -108,6 +114,7 @@ const ResultSchema = z.object({
   summary: z.string(),
   counts: z.object({ demonstrated: z.number(), uncertain: z.number(), total: z.number(), copied: z.number().optional() }),
   focus: FocusSchema.nullable().optional(),
+  counterpart: CounterpartSchema.nullable().optional(),
   comparison: ComparisonSchema.nullable().optional(),
   criteria: z.array(z.object({
     criterionId: z.string(), description: z.string(), result: z.enum(CRITERION_RESULTS), reason: nullableStr.optional(),

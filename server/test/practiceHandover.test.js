@@ -17,7 +17,12 @@ import { MISSION_LIBRARY } from '../domain/development/missionLibrary.js'
 import { parseMission } from '../domain/development/missionSchema.js'
 import { createDevelopmentService, normaliseOrigin } from '../domain/development/service.js'
 import { initialWork, runDeterministicChecks } from '../domain/development/validators.js'
+import { createMissionEvaluator } from '../domain/development/evaluator.js'
+import { createCompletionService } from '../services/ai/completionService.js'
+import { auditConverse } from '../services/ai/auditConverse.js'
 
+process.env.NODE_ENV = 'test'
+process.env.PRISM_AUDIT_AI = 'true'
 process.env.PRISM_CAMPUS_ENABLED = 'true'
 process.env.PRISM_APP_SHELL_V3 = 'true'
 process.env.PRISM_DEVELOPMENT_V2 = 'true'
@@ -40,7 +45,7 @@ const GOOD_WORK = {
 }
 const PARTIAL_WORK = {
   BOARD: { rows: [{ id: 'quotes', owner: 'Sam' }, { id: 'checklist', owner: null }] },
-  MESSAGE: { text: 'Sam, please look after the vendor quotes while I am away.' },
+  MESSAGE: { text: 'Sam, please look after the supplier pricing while I am away.' },
   PLAN: { fields: { first_step: 'Read the plan.', checkpoint: 'soon' } },
 }
 
@@ -70,6 +75,9 @@ async function world() {
     audit: (type, sid, payload) => audits.push({ type, sid, payload }),
     evidence: { units: async (sessionId) => (sessionId === SESSION ? structuredClone(formalUnits) : []) },
     scenarioSource: async () => ({ generalScenarios: [{ id: 'syn-general-a' }], bankScenarios: {} }),
+    // P6.8: the latest handover version checks "names both tasks" and "first
+    // step" by meaning, so the deterministic harness evaluator is wired in.
+    missionEvaluator: createMissionEvaluator({ complete: createCompletionService({ converseFn: auditConverse }) }),
   })
   const requireUser = (req, _res, next) => {
     const user = USERS[req.get('x-test-user')]
@@ -175,10 +183,11 @@ test('P2.8: start with an origin, submit, criterion feedback, scaffold, retry as
     assert.ok(['EVALUATED', 'EVALUATION_UNAVAILABLE'].includes(r.status))
     const byCriterion = Object.fromEntries(r.criteria.map((c) => [c.criterionId, c]))
     assert.equal(byCriterion['C-NAMES-TASKS'].result, 'NOT_OBSERVED')
-    assert.deepEqual(byCriterion['C-NAMES-TASKS'].checks.map((c) => c.passed), [true, false], 'one task named, one not')
+    assert.equal(byCriterion['C-NAMES-TASKS'].reason, 'MEANING_NOT_EXPRESSED', 'naming the tasks is a meaning check, not a required phrase (P6.8)')
+    assert.deepEqual(byCriterion['C-NAMES-TASKS'].checks, [])
     assert.equal(byCriterion['C-OWNERSHIP'].result, 'NOT_OBSERVED')
     assert.equal(byCriterion['C-CHECKPOINT'].result, 'NOT_OBSERVED')
-    assert.notEqual(byCriterion['C-FIRST-STEP'].result, 'OBSERVED', 'BOTH criterion needs the evaluator too; without it nothing is claimed')
+    assert.notEqual(byCriterion['C-FIRST-STEP'].result, 'OBSERVED', '"Read the plan" is not a concrete first step')
     assert.ok(r.criteria.every((c) => c.quote === null || c.result === 'OBSERVED'))
     assert.ok(!/level\s*\d|score|%/i.test(JSON.stringify(r)))
     const unitsAfterPartial = await w.repos.development.listPracticeUnits({ userId: USERS.s1.id })

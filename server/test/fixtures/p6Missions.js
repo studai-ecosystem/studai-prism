@@ -24,7 +24,7 @@ export const MISSION_FIXTURES = {
     } } },
     paraphrase: { CHECK: { fields: {
       decision: 'No, not as written.',
-      claim_checked: 'The two-day delivery claim.',
+      claim_checked: 'I went back to the two-day delivery claim in the summary.',
       what_found: 'When I compared it with the supplier page, the lead time quoted there is four days, not two, which means nothing would land before Friday.',
       uncertain: 'What I do not know is whether late confirmations will push the number above 48, and that would affect the order size.',
       alternative: 'Print 50 in-house tomorrow and skip the supplier entirely for this run.',
@@ -34,7 +34,7 @@ export const MISSION_FIXTURES = {
   },
   'MIS-CORE-EXPLAIN-DECISION-01': {
     valid: { NOTE: { text: 'We will run two shorter onboarding sessions instead of one long one. Here is why: our usual room holds fifteen at most, but twenty-two colleagues have signed up, which simply will not work in a single sitting. Could you please book two ninety-minute slots for us next week, ideally Tuesday and Wednesday afternoon, and confirm them by Thursday?' } },
-    paraphrase: { NOTE: { text: 'Decision: two sessions, not one. Twenty-two have signed up and the space takes fifteen, so a single session would leave seven people standing. Please reserve a pair of afternoon slots next week and let me know by Friday.' } },
+    paraphrase: { NOTE: { text: 'Decision: we are going ahead with two sessions rather than one long one. Twenty-two have signed up and the space takes fifteen, so a single session would leave seven people standing. Please reserve a pair of afternoon slots next week and let me know by Friday.' } },
     filler: { NOTE: { text: FILLER } },
     copyTarget: { artifact: 'NOTE' },
   },
@@ -81,7 +81,7 @@ export const MISSION_FIXTURES = {
     },
     paraphrase: {
       PLAN: { rows: [{ id: 'setup', owner: 'Me', change: 'Same' }, { id: 'talk', owner: 'Priya', change: 'Becomes a short wrap-up' }, { id: 'group', owner: 'Me', change: 'Runs first' }] },
-      NOTE: { text: 'Sam\'s slot is the only one affected, Priya. Rather than the planned sequence, I will reorder things so the exercises happen first and Sam\'s talk shrinks to a brief wrap-up, which sacrifices some depth but protects the finish time. Would you be able to deliver that wrap-up at 11:10 from his slides?' },
+      NOTE: { text: 'Sam\'s slot is the only one affected here, Priya, nothing else changes. Rather than the planned sequence, I will reorder things so the exercises happen first and Sam\'s talk shrinks to a brief wrap-up, which sacrifices some depth but protects the finish time. Would you be able to deliver that wrap-up at 11:10 from his slides?' },
     },
     filler: { NOTE: { text: FILLER } },
     copyTarget: { artifact: 'NOTE' },
