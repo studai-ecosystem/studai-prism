@@ -8,9 +8,11 @@
 // report or job row is ever inserted by this test.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import os from 'node:os'
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 
 const isolated = process.env.PRISM_P0_ISOLATED_DATABASE === 'true'
 const skip = !isolated || !process.env.TEST_DATABASE_URL
@@ -41,6 +43,15 @@ const PARTIAL_WORK = {
 test('P2.9 Layer B: action → strict evidence → stable V3 report → separate practice, with fault injection, on real PostgreSQL', {
   skip: skip ? 'Run node scripts/run-experience-baseline-tests.mjs p2 for a newly provisioned throwaway DB.' : false,
 }, async (t) => {
+  const resultPath = join('audit-results', 'p2', 'layer-b.json')
+  await rm(resultPath, { force: true })
+  const failures = []
+  const verify = (name, run) => t.test(name, async () => {
+    try { await run() } catch (err) {
+      failures.push({ name, code: err.code || 'TEST_FAILED' })
+      throw err
+    }
+  })
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
   process.env.NODE_ENV = 'test'
   process.env.PRISM_PG_STORE = 'true'
@@ -68,7 +79,19 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
   // The app's own campus context (real PG wiring), so the test can also drive
   // the same worker the finish route drives. Repositories are used for
   // READS and for the worker's own claim/complete operations only.
-  const campus = createDefaultCampusContext()
+  const { createCompletion } = await import('../services/ai/completionService.js')
+  let afterModel = null
+  let evaluationCalls = 0
+  const campus = createDefaultCampusContext({
+    complete: async (params, options) => {
+      const result = await createCompletion(params, options)
+      if (options?.task === 'evidence_evaluator') {
+        evaluationCalls += 1
+        if (afterModel) await afterModel()
+      }
+      return result
+    },
+  })
   const repos = createPgCampusRepos({ query, getPool, getLockPool: getSessionLockPool })
   const io = repos.sessionIo
   const app = buildApp({ campus })
@@ -172,7 +195,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
   // ── Main chain ───────────────────────────────────────────────────────────────
   const main = await newRun()
   const sid = main.sid
-  await t.test('start: draft run created via the legacy store, pinned, no model history, untimed until Begin', async () => {
+  await verify('start: draft run created via the legacy store, pinned, no model history, untimed until Begin', async () => {
     const session = (await query('SELECT user_id, scenario_id, data FROM v1_sessions WHERE session_id=$1', [sid])).rows[0]
     assert.equal(session.user_id, userId)
     assert.equal(session.scenario_id, CORE_TEAMREADY_A_ID)
@@ -198,7 +221,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     evidence.checks.push({ id: 'P2.1/P3.8', status: 'PASS', draftSessionViaLegacyStore: true, noModelHistory: true, beginIdempotent: true })
   })
 
-  await t.test('actions: meaningful message + learner board owner patch are durable, authored stimulus only', async () => {
+  await verify('actions: meaningful message + learner board owner patch are durable, authored stimulus only', async () => {
     let boardDone = false
     for (let i = 0; i < 12; i += 1) {
       const row = await presented(sid)
@@ -228,7 +251,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
   })
 
   let issued
-  await t.test('finish → EVALUATE_RUN job DONE via worker → strict units with provenance, never non-candidate text (T24/T27/T35)', async () => {
+  await verify('finish → EVALUATE_RUN job DONE via worker → strict units with provenance, never non-candidate text (T24/T27/T35)', async () => {
     const fin = await finish(sid)
     assert.equal(fin.status, 200, JSON.stringify(fin.payload))
     assert.equal(fin.payload.data.state, 'COMPLETE')
@@ -270,7 +293,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     evidence.checks.push({ id: 'T24/T27/T28/T35/CH-21', status: 'PASS', strictUnits: rows.length, quotedUnits: quoted, legacyReportRows: 0, jobState: j.state })
   })
 
-  await t.test('report: purged history, two GETs serve the same stored version and evidence-set hash; verified quote (T32/T36)', async () => {
+  await verify('report: purged history, two GETs serve the same stored version and evidence-set hash; verified quote (T32/T36)', async () => {
     await query("UPDATE v1_sessions SET data = jsonb_set(data, '{history}', '[]'::jsonb) WHERE session_id=$1", [sid])
     const r1 = await request('GET', `/api/v1/assessment-sessions/${sid}/report`, token)
     assert.equal(r1.status, 200, JSON.stringify(r1.payload))
@@ -299,7 +322,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     evidence.checks.push({ id: 'T32/T36/CH-23', status: 'PASS', historyPurged: true, sameVersionTwice: true, evidenceSetHash: Boolean(stored[0].evidence_set_hash), shownObservations: shown.length, versionsRead: true, reviewRequest: review.status })
   })
 
-  await t.test('practice: separate PRACTICE attempts from the moment, criterion feedback, retry; formal report unchanged; history typed and linked', async () => {
+  await verify('practice: separate PRACTICE attempts from the moment, criterion feedback, retry; formal report unchanged; history typed and linked', async () => {
     const answered = (await units(sid)).find((u) => u.candidate_action_json?.dialogue_excerpt)?.provenance_json.opportunityId
     const replay = await request('POST', '/api/v1/development/replay', token, { sessionId: sid, opportunityId: answered }, { 'Idempotency-Key': 'p2-replay-1' })
     assert.equal(replay.status, 201, JSON.stringify(replay.payload))
@@ -341,7 +364,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
   })
 
   // ── Faults (fresh runs) ──────────────────────────────────────────────────────
-  await t.test('fault: provider failure after save → technical, actions durable, retry succeeds, no learner-deficit unit (T25/T31)', async () => {
+  await verify('fault: provider failure after save → technical, actions durable, retry succeeds, no learner-deficit unit (T25/T31)', async () => {
     const { sid: s } = await newRun()
     await act(s)
     fault('throw')
@@ -368,7 +391,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     evidence.checks.push({ id: 'T25/T31/CH-22', status: 'PASS', fault: 'provider-throw', jobFailedTechnical: true, retryAttempt: 2 })
   })
 
-  await t.test('fault: malformed evaluator output → technical, no units', async () => {
+  await verify('fault: malformed evaluator output → technical, no units', async () => {
     const { sid: s } = await newRun()
     await act(s)
     fault('malformed')
@@ -380,7 +403,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     evidence.checks.push({ id: 'T31', status: 'PASS', fault: 'malformed' })
   })
 
-  await t.test('fault: quote mismatch → HUMAN_REVIEW_REQUIRED, no replacement quotation (T32)', async () => {
+  await verify('fault: quote mismatch → HUMAN_REVIEW_REQUIRED, no replacement quotation (T32)', async () => {
     const { sid: s } = await newRun()
     await act(s)
     fault('mismatch')
@@ -402,7 +425,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     evidence.checks.push({ id: 'T32', status: 'PASS', fault: 'quote-mismatch', reviewUnits: rows.length })
   })
 
-  await t.test('fault: evidence-write failure (store rejects a value) → technical, no units', async () => {
+  await verify('fault: evidence-write failure (store rejects a value) → technical, no units', async () => {
     const { sid: s } = await newRun()
     await act(s)
     fault('evidence-write')
@@ -416,7 +439,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     evidence.checks.push({ id: 'T31', status: 'PASS', fault: 'evidence-write' })
   })
 
-  await t.test('fault: worker crash — lease expires, job is reclaimed, stale fencing token rejected, one applied result (T49)', async () => {
+  await verify('fault: worker crash — lease expires, job is reclaimed, stale fencing token rejected, one applied result (T49)', async () => {
     const { sid: s } = await newRun()
     await act(s)
     fault('throw')
@@ -439,18 +462,194 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     evidence.checks.push({ id: 'T49', status: 'PASS', staleTokenRejected: true, reclaimAttempt: j.attempts })
   })
 
-  await t.test('race: concurrent report GETs publish exactly one version (T51)', async () => {
+  await verify('race: concurrent report GETs read the worker publication without creating findings (T51)', async () => {
     const { sid: s } = await newRun()
     await act(s)
     assert.equal((await finish(s)).status, 200)
+    const before = (await query('SELECT * FROM student_report_versions WHERE session_id=$1', [s])).rows
+    assert.equal(before.length, 1, 'publication occurred before any report GET')
     const results = await Promise.all(Array.from({ length: 6 }, () => request('GET', `/api/v1/assessment-sessions/${s}/report`, token)))
     assert.ok(results.every((r) => r.status === 200), JSON.stringify(results.map((r) => r.status)))
     assert.equal(new Set(results.map((r) => r.payload.data.version.number)).size, 1)
     assert.equal((await query('SELECT COUNT(*)::int AS n FROM student_report_versions WHERE session_id=$1', [s])).rows[0].n, 1)
-    evidence.checks.push({ id: 'T51', status: 'PASS', concurrentGets: 6, versions: 1 })
+    assert.deepEqual((await query('SELECT * FROM student_report_versions WHERE session_id=$1', [s])).rows, before)
+    evidence.checks.push({ id: 'T51', status: 'PASS', concurrentGets: 6, versions: 1, publishedBeforeGet: true })
   })
 
-  await t.test('erasure while the job is LEASED → worker completion rejected, no resurrection (T52)', async () => {
+  await verify('mid-batch PostgreSQL insertion fault rolls back all evidence and opportunity transitions; HTTP retry applies one batch', async () => {
+    const { sid: s } = await newRun()
+    await act(s)
+    const before = await io.listOpportunities(s)
+    await query(`CREATE FUNCTION p2_reject_second_unit() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.session_id = TG_ARGV[0] AND EXISTS (
+          SELECT 1 FROM behavioral_evidence_units WHERE session_id = NEW.session_id
+        ) THEN
+          RAISE EXCEPTION 'SYNTHETIC_SECOND_INSERT_FAILURE';
+        END IF;
+        RETURN NEW;
+      END $$`)
+    await query(`CREATE TRIGGER p2_second_insert_fault BEFORE INSERT ON behavioral_evidence_units
+      FOR EACH ROW EXECUTE FUNCTION p2_reject_second_unit('${s}')`)
+    try {
+      const failed = await finish(s)
+      assert.equal(failed.status, 503, JSON.stringify(failed.payload))
+      assert.equal((await job(s)).resultState, 'TECHNICAL_FAILURE')
+      assert.equal((await units(s)).length, 0, 'the first insert was rolled back, not just hidden')
+      const after = await io.listOpportunities(s)
+      assert.equal(after.filter((o) => o.state === 'EVALUATED').length, 0)
+      assert.deepEqual(after.map((o) => o.actionIds), before.map((o) => o.actionIds))
+      assert.equal(await repos.reportVersions.latest(s), null)
+    } finally {
+      await query('DROP TRIGGER p2_second_insert_fault ON behavioral_evidence_units')
+      await query('DROP FUNCTION p2_reject_second_unit()')
+    }
+    assert.equal((await finish(s)).status, 200)
+    const accepted = await units(s)
+    assert.ok(accepted.length >= 2)
+    assert.equal(new Set(accepted.map((u) => u.evidence_id)).size, accepted.length)
+    assert.ok(accepted.every((u) => u.provenance_json.evaluatorAttempt === 2))
+    const calls = evaluationCalls
+    assert.equal((await finish(s)).status, 200)
+    assert.equal(evaluationCalls, calls, 'replaying finish did not call the evaluator')
+    assert.equal((await units(s)).length, accepted.length)
+    evidence.checks.push({ id: 'DB_PARTIAL_BATCH', status: 'PASS', firstInsertRolledBack: true, retrySafe: true })
+  })
+
+  await verify('lease is reclaimed during model computation: stale output never enters the database; the new worker applies one result', async () => {
+    const { sid: s } = await newRun()
+    await act(s)
+    let reclaimed = null
+    afterModel = async () => {
+      afterModel = null
+      await query("UPDATE assessment_jobs SET lease_expires_at = now() - interval '1 second' WHERE session_id=$1", [s])
+      reclaimed = await io.claimJob(DRAFT_EVALUATE_JOB_KIND, 60_000)
+      assert.equal(reclaimed.sessionId, s)
+    }
+    try {
+      const stale = await finish(s)
+      assert.equal(stale.status, 202, JSON.stringify(stale.payload))
+      assert.equal((await units(s)).length, 0)
+      assert.equal(await repos.reportVersions.latest(s), null)
+      assert.equal((await job(s)).fencingToken, reclaimed.fencingToken)
+    } finally { afterModel = null }
+    await query("UPDATE assessment_jobs SET lease_expires_at = now() - interval '1 second' WHERE session_id=$1", [s])
+    assert.equal((await finish(s)).status, 200)
+    const accepted = await units(s)
+    assert.ok(accepted.length >= 2)
+    assert.ok(accepted.every((u) => u.provenance_json.evaluatorAttempt === 3))
+    assert.equal(new Set(accepted.map((u) => u.evidence_id)).size, accepted.length)
+    await assert.rejects(io.applyEvaluation({
+      jobId: reclaimed.jobId, fencingToken: reclaimed.fencingToken, sessionId: s,
+      units: [], writeUnit: async () => { assert.fail('a stale worker reached the writer') },
+    }), (err) => err.code === 'CONFLICT')
+    evidence.checks.push({ id: 'DB_IN_FLIGHT_LEASE', status: 'PASS', staleRows: 0, acceptedAttempt: 3 })
+  })
+
+  await verify('an expired lease without a replacement worker cannot apply evidence', async () => {
+    const { sid: s } = await newRun()
+    await act(s)
+    afterModel = async () => {
+      afterModel = null
+      await query("UPDATE assessment_jobs SET lease_expires_at = now() - interval '1 second' WHERE session_id=$1", [s])
+    }
+    try {
+      const expired = await finish(s)
+      assert.equal(expired.status, 503, 'an expired lease is not ownership, even before another claim')
+      assert.equal((await units(s)).length, 0)
+      assert.equal(await repos.reportVersions.latest(s), null)
+    } finally { afterModel = null }
+    assert.equal((await finish(s)).status, 200)
+    evidence.checks.push({ id: 'DB_EXPIRED_LEASE', status: 'PASS', staleRows: 0, retrySafe: true })
+  })
+
+  await verify('erasure during model computation prevents late evidence and report resurrection', async () => {
+    const { sid: s } = await newRun()
+    await act(s)
+    const { eraseCampusSessionData } = await import('../lib/campusErasure.js')
+    afterModel = async () => {
+      afterModel = null
+      await eraseCampusSessionData(s)
+    }
+    try {
+      await finish(s)
+      assert.equal(await io.hasErasureMarker(s), true)
+      for (const table of ['behavioral_evidence_units', 'assessment_candidate_actions', 'assessment_jobs', 'student_report_versions']) {
+        assert.equal((await query(`SELECT COUNT(*)::int AS n FROM ${table} WHERE session_id=$1`, [s])).rows[0].n, 0)
+      }
+      assert.equal((await request('GET', `/api/v1/assessment-sessions/${s}/report`, token)).status, 409)
+      const retry = await finish(s)
+      assert.ok([404, 409].includes(retry.status), 'retry is refused for erased work')
+      assert.equal((await units(s)).length, 0)
+      assert.equal(await repos.reportVersions.latest(s), null)
+    } finally { afterModel = null }
+    evidence.checks.push({ id: 'DB_IN_FLIGHT_ERASURE', status: 'PASS', lateEvidenceRows: 0, lateReportRows: 0 })
+  })
+
+  await verify('finish waits for an already-accepted message before publishing', async () => {
+    const { sid: s } = await newRun()
+    await act(s)
+    let accepted
+    let release
+    const reached = new Promise((resolve) => { accepted = resolve })
+    const barrier = new Promise((resolve) => { release = resolve })
+    const realAccept = campus.repos.sessionIo.acceptAction
+    const eventId = 'p2-message-races-finish'
+    campus.repos.sessionIo.acceptAction = async function (input) {
+      const row = await realAccept.call(this, input)
+      if (input.clientEventId === eventId) { accepted(); await barrier }
+      return row
+    }
+    const sent = request('POST', `/api/v1/assessment-sessions/${s}/messages`, token, {
+      clientEventId: eventId, text: 'I disagree with dropping materials; keep one page for people without laptops.',
+    })
+    let finishing
+    try {
+      await Promise.race([reached, sent.then(() => { throw new Error('message returned before the acceptance barrier') })])
+      assert.equal((await io.getAction(s, eventId)).state, 'ACCEPTED')
+      finishing = finish(s)
+      release()
+      assert.equal((await sent).status, 201)
+      assert.equal((await finishing).status, 200)
+      const action = await io.getAction(s, eventId)
+      assert.equal(action.state, 'APPLIED')
+      const acceptedRows = await units(s)
+      assert.ok(acceptedRows.some((u) => u.provenance_json.actionId === action.actionId), 'the accepted message was evaluated before publication')
+      assert.equal((await repos.reportVersions.latest(s)).version, 1)
+    } finally {
+      release()
+      campus.repos.sessionIo.acceptAction = realAccept
+      await sent
+      if (finishing) await finishing
+    }
+    evidence.checks.push({ id: 'DB_FINISH_MESSAGE_RACE', status: 'PASS', acceptedMessageReconciled: true })
+  })
+
+  await verify('publication outage is not COMPLETE: evidence stays accepted, GET does not publish, explicit retry makes no new model calls', async () => {
+    const { sid: s } = await newRun()
+    await act(s)
+    const realAppend = campus.repos.reportVersions.append
+    campus.repos.reportVersions.append = async function (input) {
+      if (input.sessionId === s) throw Object.assign(new Error('SYNTHETIC_PUBLICATION_OUTAGE'), { code: 'PUBLICATION_OUTAGE' })
+      return realAppend.call(this, input)
+    }
+    try {
+      const failed = await finish(s)
+      assert.equal(failed.status, 503, 'a student must not be told COMPLETE before publication succeeds')
+      assert.equal((await job(s)).state, 'DONE', 'accepted evidence is retained')
+      assert.ok((await units(s)).length >= 2)
+      assert.equal(await repos.reportVersions.latest(s), null)
+      assert.equal((await request('GET', `/api/v1/assessment-sessions/${s}/report`, token)).status, 409)
+    } finally { campus.repos.reportVersions.append = realAppend }
+    const calls = evaluationCalls
+    assert.equal((await request('GET', `/api/v1/assessment-sessions/${s}/report`, token)).status, 409, 'normal GET still does not publish')
+    assert.equal((await finish(s)).status, 200)
+    assert.equal(evaluationCalls, calls, 'publication retry does not reassess the learner')
+    assert.equal((await repos.reportVersions.latest(s)).version, 1)
+    evidence.checks.push({ id: 'DB_PUBLICATION_OUTAGE', status: 'PASS', falseReadyPrevented: true, retryWithoutModelCalls: true })
+  })
+
+  await verify('erasure while the job is LEASED → worker completion rejected, no resurrection (T52)', async () => {
     const { sid: s } = await newRun()
     await act(s)
     fault('throw')
@@ -472,7 +671,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     evidence.checks.push({ id: 'T52', status: 'PASS', leasedCompletionRejected: true, noResurrection: true })
   })
 
-  await t.test('P9.6 deterministic local pilot load: real HTTP/PostgreSQL with controlled provider', async () => {
+  await verify('P9.6 deterministic local pilot load: real HTTP/PostgreSQL with controlled provider', async () => {
     const concurrency = 5
     const iterations = 20
     const timed = async (fn) => {
@@ -568,7 +767,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     console.log(`P9_LOAD_RESULTS ${JSON.stringify(loadEvidence)}`)
   })
 
-  await t.test('sparse input → honest insufficient (not technical, not fake complete) (T29)', async () => {
+  await verify('sparse input → honest insufficient (not technical, not fake complete) (T29)', async () => {
     const { sid: s } = await newRun()
     assert.equal((await begin(s, `p2-begin-${s}`)).status, 200)
     const row = await presented(s)
@@ -579,7 +778,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
     assert.equal(j.state, 'DONE')
     assert.equal(j.resultState, 'DONE')
     const rows = await units(s)
-    assert.ok(rows.length >= 1)
+    assert.equal(rows.length, 0, 'unclear filler leaves the opportunity unanswered, not a negative observation')
     for (const u of rows) {
       assert.equal(u.evidence_status, 'INSUFFICIENT_EVIDENCE')
       assert.equal(u.rubric_level, null)
@@ -593,5 +792,25 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
   })
 
   await mkdir(join('audit-results', 'p2'), { recursive: true })
-  await writeFile(join('audit-results', 'p2', 'layer-b.json'), JSON.stringify({ ...evidence, runs }, null, 2))
+  const sourceFiles = [
+    join('server', 'domain', 'assessments', 'sessionIoRepository.js'),
+    join('server', 'domain', 'assessments', 'sessionService.js'),
+    join('server', 'domain', 'campusStore', 'defaultContext.js'),
+    join('server', 'domain', 'evidence', 'sliceEvaluator.js'),
+    join('server', 'domain', 'reports', 'v3', 'service.js'),
+    join('server', 'test', 'p2Slice.db.test.js'),
+  ]
+  const sourceHashes = Object.fromEntries(await Promise.all(sourceFiles.map(async (path) => [
+    path, createHash('sha256').update(await readFile(path)).digest('hex'),
+  ])))
+  const pin = (await io.getClientEvent(sid, 'start')).response.runPin
+  const { EVALUATOR_PROMPT, SLICE_EVALUATOR_VERSION } = await import('../domain/evidence/sliceEvaluator.js')
+  await writeFile(resultPath, JSON.stringify({
+    ...evidence, runs, status: failures.length ? 'FAIL' : 'PASS', failures, recordedAt: new Date().toISOString(),
+    buildSha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+    workingTreeChanges: execFileSync('git', ['diff', '--name-only'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean),
+    sourceHashes,
+    method: { formId: pin.formId, scenarioId: pin.scenarioId, snapshotHash: pin.snapshotHash, rubricRef: pin.rubricRef, methodVersion: pin.methodVersion, evaluatorPrompt: EVALUATOR_PROMPT, evaluatorVersion: SLICE_EVALUATOR_VERSION },
+    seededFinalEvidence: false, seededFinalReports: false, liveModelUsed: false,
+  }, null, 2))
 })

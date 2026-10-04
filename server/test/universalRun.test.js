@@ -276,8 +276,9 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
       return listActions.apply(w.repos.sessionIo, args)
     }
     const fin = await w.call('POST', `/assessment-sessions/${sid}/finish`, { early: true })
-    assert.equal(fin.status, 200, JSON.stringify(fin.body))
-    assert.equal(fin.body.data.state, 'COMPLETE')
+    assert.equal(fin.status, 503, JSON.stringify(fin.body))
+    assert.equal(fin.body.error.code, 'UPSTREAM_UNAVAILABLE')
+    assert.match(fin.body.error.message, /could not be published/)
     assert.equal(w.engine.calls.evaluate, 0)
     assert.equal((await w.repos.sessionIo.getJob(evaluateJobKey(sid))).state, 'DONE')
     assert.ok(w.audits.some((a) => a.type === 'report.v3.publish_failed' && a.sid === sid && a.payload.code === 'REPORT_PROCESSING_FAILED'))

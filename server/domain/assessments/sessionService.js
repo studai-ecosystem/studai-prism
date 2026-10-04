@@ -264,6 +264,7 @@ export function createAssessmentSessionService({
     const io = jobs()
     const job = await io.claimJob(DRAFT_EVALUATE_JOB_KIND, EVALUATE_LEASE_MS)
     if (!job) return null
+    let appliedJob = null
     try {
       if (await io.hasErasureMarker(job.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
       const session = await legacy.getSession(job.sessionId)
@@ -287,6 +288,7 @@ export function createAssessmentSessionService({
         writeUnit: (unit, tx) => sliceEvaluator.persistUnit(unit, tx),
         evaluatedOpportunityIds: universal ? opportunities.filter((row) => ['ACTION_RECEIVED', 'EVALUATION_PENDING'].includes(row.state)).map((row) => row.opportunityId) : [],
       })
+      appliedJob = done
       audit('assessment.evaluation_completed', job.sessionId, { sessionId: job.sessionId, jobId: job.jobId, attempt: job.attempts, units: units.length, requestId })
       const disputed = units.filter((u) => (u?.provenance_json || u?.provenance || {}).reason === 'JUDGE_DISAGREEMENT')
       if (disputed.length) {
@@ -301,6 +303,10 @@ export function createAssessmentSessionService({
       await publishFor(job.sessionId, requestId)
       return done
     } catch (err) {
+      // Publication failed after accepted evidence committed. Keep DONE so
+      // finish can retry publication and surface its audited error, not
+      // falsely report a queued job or recompute the evidence.
+      if (appliedJob) return appliedJob
       // Any failure (provider, malformed output, evidence write) is a
       // technical state the learner can retry — never an evidence deficit.
       // A stale lease (CONFLICT) means another holder owns the job now: its
@@ -320,7 +326,7 @@ export function createAssessmentSessionService({
       return await publishReport({ sessionId, requestId })
     } catch (err) {
       audit('report.v3.publish_failed', sessionId, { sessionId, code: err?.code || 'PUBLISH_FAILED', requestId })
-      return null
+      throw new ApiError('UPSTREAM_UNAVAILABLE', 'Your work has been reviewed, but your report could not be published. Your work is saved; please try again.')
     }
   }
 

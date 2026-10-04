@@ -211,6 +211,7 @@ export function createSessionIoRepoMemory(db) {
       if (typeof writeUnit !== 'function') throw new ApiError('VALIDATION_FAILED', 'Invalid evaluation apply.')
       const job = [...db.assessmentJobs.values()].find((j) => j.jobId === jobId)
       if (!job || job.sessionId !== sessionId || job.state !== 'LEASED' || job.fencingToken !== fencingToken) throw STALE()
+      if (!job.leaseExpiresAt || new Date(job.leaseExpiresAt) <= db.clock()) throw STALE()
       if (db.erasureMarkers.has(sessionId)) throw ERASED()
       const stored = []
       for (const unit of units) stored.push(await writeUnit(unit, null))
@@ -470,7 +471,8 @@ export function createSessionIoRepoPg({ query, getPool = null }) {
       if (typeof getPool !== 'function') throw new ApiError('UPSTREAM_UNAVAILABLE', 'The review could not be completed.')
       return withTransaction(getPool, async (client) => {
         const { rows: held } = await client.query(
-          `SELECT * FROM assessment_jobs WHERE job_id = $1 AND session_id = $2 AND state = 'LEASED' AND fencing_token = $3 FOR UPDATE`,
+          `SELECT * FROM assessment_jobs WHERE job_id = $1 AND session_id = $2 AND state = 'LEASED' AND fencing_token = $3
+           AND lease_expires_at > clock_timestamp() FOR UPDATE`,
           [jobId, sessionId, fencingToken],
         )
         if (!held[0]) throw STALE()
@@ -486,7 +488,8 @@ export function createSessionIoRepoPg({ query, getPool = null }) {
         }
         const { rows } = await client.query(
           `UPDATE assessment_jobs SET state = 'DONE', result_state = $3, lease_expires_at = NULL, updated_at = now()
-           WHERE job_id = $1 AND state = 'LEASED' AND fencing_token = $2 RETURNING *`,
+           WHERE job_id = $1 AND state = 'LEASED' AND fencing_token = $2
+             AND lease_expires_at > clock_timestamp() RETURNING *`,
           [jobId, fencingToken, resultState],
         )
         if (!rows[0]) throw STALE()

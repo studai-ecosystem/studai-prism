@@ -10,6 +10,21 @@ operations, measurement or Layer C approval.
 
 The machine-readable authority is `docs/experience/P10_HANDOVER.json`.
 
+### Current verification follow-up - 2026-10-04
+
+Fresh isolated PostgreSQL/HTTP verification passed 27 tests, including
+in-flight lease/erasure, batch rollback, finish/message and publication-outage
+cases. It found and repaired expired-lease acceptance and premature COMPLETE
+on failed publication. The integrated Chromium journey passed 43 tests.
+See [TEST_RESULTS.md](./TEST_RESULTS.md) and
+[verification-follow-up.json](./verification-follow-up.json).
+
+This is software evidence only. The real-model authorization gate is BLOCKED;
+zero live provider calls were made. Qualified human rating, target-user
+comprehension, manual accessibility and physical-device testing remain NOT
+RUN. The previous AI-operated browser walk-through is not independent human
+validation. NO_GO and all external approval gates remain unchanged.
+
 ## 2. Candidate scope and provenance
 
 - Branch: `ui/prism-brand-transformation`.

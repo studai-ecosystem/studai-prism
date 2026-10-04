@@ -290,11 +290,11 @@ Commit: this commit (ui/prism-brand-transformation)
 
 ## Acceptance pass - end-to-end UI/UX walk-through before pilot sign-off
 
-Status: COMPLETE
+Status: SOFTWARE_ACCEPTANCE_COMPLETE; HUMAN_USEFULNESS_NOT_RUN
 Gates: PASS 2026-10-04 (server 904/878/0, vitest 519 (3 load-induced timeouts pass alone), build, static audit, playwright p10 handover journey 43 passed, p3 real journey 164 passed)
 Commit: the commit after 157e743 (ui/prism-brand-transformation)
 
-Method: the campus audit server (flags, draft content and preparation on, throwaway embedded Postgres) was driven in a real browser at 730 and 1440 px as an unassisted learner: register, Home, briefing, system check, scenario intro, timed start, six universal-form stages with board edits, finish, report, moment panel, Practise this, Your Prism, History, Prepare, a practice mission with feedback. Findings were fixed, re-verified live, and pinned with tests.
+Method: the campus audit server (flags, draft content and preparation on, throwaway embedded Postgres) was driven by the AI coding assistant in a real browser at 730 and 1440 px with a synthetic learner account: register, Home, briefing, system check, scenario intro, timed start, six universal-form stages with board edits, finish, report, moment panel, Practise this, Your Prism, History, Prepare, a practice mission with feedback. Findings were fixed, re-verified locally, and pinned with tests. This was not an unassisted target-student/professional study, manual assistive-technology testing or qualified measurement review.
 
 - [x] Home: one dominant action (Open briefing / Open my report), latest report, recent activity, snapshot with honest "Insufficient evidence" (no red failure, no numbers). Added a "Where to go next" row naming Understand (My Prism), Practise and Prepare in words; Prepare is a link only when PRISM_PREPARATION_V1 is on, otherwise an honest "not yet available" - evidence: src/features/home/pages/HomePage.jsx; test studentPages.test.jsx (Student Home)
 - [x] Assessment funnel: briefing -> system check -> consent -> scenario introduction (situation, role, people, "you reply by typing; speech input is not part of this assessment version", timing) -> explicit "Begin timed assessment". FIXED: the system check said "You can speak your answers or type them" for the V3 text-and-board workspace; it now says the microphone is not needed and spoken answers are not part of this version, and the "Test microphone" button is not offered - evidence: src/lib/deviceCheck.js, SystemCheckPage.jsx; test studentPages.test.jsx (device check helpers)
@@ -308,3 +308,16 @@ Method: the campus audit server (flags, draft content and preparation on, throwa
 - [x] Data boundary: no numeric growth, no red "not measured", formal and practice evidence never blended (practice carries its own label and ledger)
 
 Content-review notes (not changed: stimulus text is protected by the hard laws): Sam's world-change line reads "Change of plan on my side: New: Sam cannot work…" (third person inside Sam's own message). The deterministic test provider labels every observed behaviour "The candidate addressed the opportunity in their own words"; production uses the model's description.
+
+## Three-level verification follow-up - 2026-10-04
+
+Status: SOFTWARE_VERIFIED; LIVE_MODEL_BLOCKED; HUMAN_NOT_RUN
+Release verdict: NO_GO
+
+- [x] Software: real buildApp HTTP routes and disposable PostgreSQL, 27/27; no final evidence/report seeds. Added deliberate in-flight lease/erasure, second-insert rollback, accepted-message/finish and publication-outage tests; repaired lease expiry and premature COMPLETE. Integrated Chromium journey: 43/43; server regression: 878 passed, 26 DB-only skips. Evidence: server/test/p2Slice.db.test.js and docs/experience/TEST_RESULTS.md.
+- [ ] Authorized live model: no approval record, staging target or approved spending cap supplied. Gate reports BLOCKED; no live provider calls. The existing smoke script is a manifest, not an executor.
+- [ ] Qualified content/measurement and held-out response review: no independent raters or completed reviews supplied.
+- [ ] Target students/professionals without founder coaching: no participant sessions supplied.
+- [ ] Manual accessibility and physical-device checks: NOT RUN. Automated axe/keyboard/viewport tests do not substitute.
+
+The prior browser pass establishes software interaction only; it does not establish that an unassisted human can explain the finding, moment and next practice. That remains a real-user acceptance question.

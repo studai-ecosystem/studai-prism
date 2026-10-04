@@ -1,5 +1,79 @@
 # P0 - Verification results
 
+## Current three-level verification follow-up - 2026-10-04
+
+**Software verified; live-model and human evidence not executed. Pilot verdict
+remains NO_GO.** This section supersedes no historical result below. The prior
+AI-operated browser walk-through was software acceptance with synthetic
+accounts, not an unassisted target-user study or qualified measurement review.
+
+| Evidence level | Fresh result | Boundary |
+| --- | --- | --- |
+| Software: `node scripts/run-experience-baseline-tests.mjs database` | 27 passed, 0 failed, 0 skipped; disposable PostgreSQL and real `buildApp()` HTTP routes | Only the external model adapter was stubbed. Fifteen synthetic runs; no preloaded final evidence or reports. |
+| Software: `npm --prefix server test` | 878 passed, 26 skipped, 0 failed (904 total) | DB-only tests skip in this command; they ran separately above. |
+| Software: focused worker regressions | 30 passed, 0 failed | Memory adapters, universal run, fault injection and durable actions. |
+| Software: `CI=1 node scripts/run-experience-baseline-tests.mjs p10` | 43 passed, 0 failed | Chromium automation: previous-report reader, new assessment/report, separate practice/retry/fresh challenge, preparation and Campus/share journeys. Some reader states are explicitly labelled API fixtures; not every browser test is an integrated data path. |
+| Live-model staging | BLOCKED; zero live provider calls | No approved staging authorization record, spending cap, target or approval references supplied. |
+| Qualified measurement review / held-out rating | NOT RUN | No recruited/trained independent raters or signed review results supplied. |
+| Target student/professional comprehension | NOT RUN | No consented participant sessions supplied; automation cannot establish usefulness. |
+| Manual accessibility / real-device | NOT RUN | Browser engines, axe and viewport emulation are not screen-reader, voice-control or physical-device evidence. |
+
+### Fault evidence that actually interrupted the current pipeline
+
+The expanded [PostgreSQL/HTTP test](../../server/test/p2Slice.db.test.js)
+deliberately exercised a second-insert database failure, lease reclamation
+after model computation started, lease expiry before replacement, erasure
+while model computation was in flight, and a message durably accepted before
+finish. It also interrupted report publication after evidence application:
+the owner receives an explicit recoverable error, GET remains read-only, and
+retry publishes without another model call.
+
+Two production defects were reproduced and repaired before the passing run:
+
+- An expired but not-yet-reclaimed lease could write accepted evidence. Apply
+  now checks expiry at the transactional claim guard and final completion;
+  PostgreSQL rolls back the batch if the lease expires before completion.
+- Publication failure could return COMPLETE. Evidence remains DONE, but
+  finish surfaces the publication error and explicitly retries publication;
+  the worker does not recompute already-accepted evidence.
+
+A stale sparse-input assertion was corrected: an unclear reply leaves the
+opportunity unanswered and creates zero observation rows. The test still
+checks an honest no-level report and successful technical completion.
+
+Generated evidence: `audit-results/p2/layer-b.json` records outcome, timestamp,
+base commit, modified paths, source SHA-256 hashes and the actual pinned
+form/rubric/method/prompt. A failed subtest now makes this artifact FAIL;
+previous output is removed before the run. The safe checked-in summary is
+[verification-follow-up.json](./verification-follow-up.json). No transcripts,
+credentials, tokens or participant contacts are included.
+
+### What is still necessary, not signed off
+
+The declaration in [modelRouter.js](../../server/services/ai/modelRouter.js)
+defaults to AWS Bedrock / `mistral.mistral-large-3-675b-instruct` for evaluation.
+That is local configuration, not a verified staging fingerprint.
+`node scripts/live-model-smoke.mjs` returned BLOCKED (exit 3). It is an
+authorization/lineage manifest, **not an implemented automated live-run
+executor**; even a READY manifest would not itself be live-model evidence.
+The current draft form remains unapproved.
+
+The missing authorization must identify the actual staging target, provider
+and model, exact reviewed content/method/prompt package, synthetic-only or
+consented data permissions, and maximum spend. Credentials must be supplied
+through the operator environment, never committed or pasted into records.
+Only then can the concise/vague/clarification/alternative/disagreement/
+nonsense/changed-fact cases be run, their evidence and reports inspected, and
+actual latency, usage/cost, rejection and recovery records collected.
+
+[VALIDATION_PLAN.md](./VALIDATION_PLAN.md),
+[RESEARCH_PROTOCOLS.md](./RESEARCH_PROTOCOLS.md) and
+[MANUAL_JOURNEYS.md](./MANUAL_JOURNEYS.md) remain prepared protocols, not
+completed studies. Measurement and research owners must recruit the reviewers
+and target users, preserve a held-out response split, obtain consent, and
+record the previous-history -> new report -> practice journey without founder
+coaching. No human or scientific sign-off was supplied or fabricated here.
+
 ## P10 controlled-rollout verification - code-safe complete
 
 Preserved P9 baseline: build PASS; unit 516; server 858 pass / 26 skip; static

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "verification-follow-up.v1",
+  "date": "2026-10-04",
+  "verdict": "NO_GO",
+  "software": {
+    "status": "PASS",
+    "baseCommit": "b45954f9d8c2bddb66c42d8f1b0664be5ae88764",
+    "recordedAt": "2026-10-04T18:16:57.848Z",
+    "environment": "LOCAL_ISOLATED_POSTGRESQL_HTTP",
+    "modelBoundary": "AUDIT_PROVIDER_STUB_ONLY",
+    "syntheticRuns": 15,
+    "seededFinalEvidence": false,
+    "seededFinalReports": false,
+    "liveModelUsed": false,
+    "commands": [
+      { "command": "node scripts/run-experience-baseline-tests.mjs database", "passed": 27, "failed": 0, "skipped": 0 },
+      { "command": "npm --prefix server test", "passed": 878, "failed": 0, "skipped": 26 },
+      { "command": "node --test server/test/universalRun.test.js server/test/faultInjection.test.js server/test/durableActions.test.js", "passed": 30, "failed": 0, "skipped": 0 },
+      { "command": "CI=1 node scripts/run-experience-baseline-tests.mjs p10", "passed": 43, "failed": 0, "browser": "chromium" }
+    ],
+    "newFaultChecks": [
+      "DB_PARTIAL_BATCH",
+      "DB_IN_FLIGHT_LEASE",
+      "DB_EXPIRED_LEASE",
+      "DB_IN_FLIGHT_ERASURE",
+      "DB_FINISH_MESSAGE_RACE",
+      "DB_PUBLICATION_OUTAGE"
+    ],
+    "method": {
+      "formId": "draft-core-teamready-a:0.1.0-draft",
+      "snapshotHash": "3fb2f27390e03e89c1deed8b134a4955d4dea02fe844c2a2e05f930ec7b5c745",
+      "rubricRef": "draft-teamready-rubric.v0.1",
+      "methodVersion": "v3-slice-0.1",
+      "evaluatorPrompt": "evidence_evaluator.v2",
+      "evaluatorVersion": "slice-evaluator.v2"
+    },
+    "sourceHashes": {
+      "server/domain/assessments/sessionIoRepository.js": "fae06015343fac0081d58e2d21687ee1fb4aa1df9c57660fe102da40b16b64cd",
+      "server/domain/assessments/sessionService.js": "ce4c3d45ca1f8205c6454076a2e22bcb6a8adc1667a7fab8ede374b9d163f100",
+      "server/domain/campusStore/defaultContext.js": "5e92b9872b7a5a33b90f5f7aa70da94043e6573349bf7fc4be7a756c2ca30694",
+      "server/domain/evidence/sliceEvaluator.js": "7e5dcfdd729ab44a576c834d4822a10f991ae8fd11c9c8c11b4ca30081553285",
+      "server/domain/reports/v3/service.js": "3b04d063e68c4d5466bf9aa15a40f9e6cfc24044feb8c5a7ce9ed4cd80638ea0",
+      "server/test/p2Slice.db.test.js": "75afe9c41de8cf8befb6b3b2f89c2f39d9eee21afb0b141f1392a0d4bca2adf3"
+    },
+    "artifact": "audit-results/p2/layer-b.json",
+    "latencyEvidence": "audit-results/ui/p9/pilot-load-results.json",
+    "latencyBoundary": "Loopback controlled-adapter measurements; not real-provider latency or an SLA"
+  },
+  "liveModel": {
+    "status": "BLOCKED",
+    "providerCalls": 0,
+    "localDeclaredProvider": "aws-bedrock",
+    "localDeclaredEvaluatorModel": "mistral.mistral-large-3-675b-instruct",
+    "verifiedStagingModel": null,
+    "approvedSpendLimitUsd": null,
+    "actualLatencyMs": null,
+    "actualProviderCostUsd": null,
+    "rejectedClaims": null,
+    "gateCommand": "node scripts/live-model-smoke.mjs",
+    "gateExitCode": 3,
+    "automatedExecutorImplemented": false,
+    "blockers": [
+      "NO_OPERATOR_AUTHORIZATION",
+      "NO_PROVIDER_CREDENTIALS_IN_OPERATOR_ENVIRONMENT",
+      "NO_SPEND_LIMIT",
+      "NO_CONSENT_DATA_CLASS",
+      "NO_CONTENT_APPROVAL",
+      "NO_MEASUREMENT_APPROVAL",
+      "NO_SECURITY_PRIVACY_APPROVAL",
+      "NO_TARGET",
+      "FORM_NOT_APPROVED"
+    ]
+  },
+  "human": {
+    "qualifiedReview": "NOT_RUN",
+    "heldOutResponseRating": "NOT_RUN",
+    "targetStudentProfessionalComprehension": "NOT_RUN",
+    "manualAccessibility": "NOT_RUN",
+    "physicalDevices": "NOT_RUN",
+    "participantsTestedInThisFollowUp": 0,
+    "ratersUsedInThisFollowUp": 0,
+    "manualApprovalClaimed": false,
+    "priorAiOperatedBrowserPassCountsAsHumanStudy": false
+  }
+}

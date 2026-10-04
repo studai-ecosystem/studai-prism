@@ -40,7 +40,7 @@ const legacyPaths = {
     : `/verify-identity?session=${encodeURIComponent(sessionId)}`),
 }
 
-export function createDefaultCampusContext() {
+export function createDefaultCampusContext({ complete = completeViaGateway } = {}) {
   const base = (process.env.PUBLIC_APP_URL || '').replace(/\/$/, '')
   return createCampusContext({
     repos: isDbConfigured() ? createPgCampusRepos({ query, getPool, getLockPool: getSessionLockPool }) : null,
@@ -87,8 +87,8 @@ export function createDefaultCampusContext() {
     evidence: { units: (sessionId) => evidenceGraph.getEvidenceUnits(sessionId) },
     roles: { evaluate: ({ capabilityProfile, candidateInterests }) => roleAffinityEngine.computeRoleAffinity(capabilityProfile, candidateInterests) },
     engine: createEngineAdapter({ invoke: invokeEngine }),
-    missionEvaluator: createMissionEvaluator({ complete: completeViaGateway }),
-    sliceEvaluator: createSliceEvaluator({ complete: completeViaGateway, recordUnit: (unit, tx) => evidenceGraph.recordEvidenceUnit(unit, tx) }),
-    preparationComplete: completeViaGateway,
+    missionEvaluator: createMissionEvaluator({ complete }),
+    sliceEvaluator: createSliceEvaluator({ complete, recordUnit: (unit, tx) => evidenceGraph.recordEvidenceUnit(unit, tx) }),
+    preparationComplete: complete,
   })
 }
