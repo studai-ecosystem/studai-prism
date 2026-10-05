@@ -15,7 +15,8 @@ if (TEST_DB) {
 
 const { migrateUp } = skip ? {} : await import('../db/migrate.js')
 const { query, closePool } = skip ? {} : await import('../db/pool.js')
-const { createSession } = skip ? {} : await import('../lib/store.js')
+const { createSession, getSession, saveReport } = skip ? {} : await import('../lib/store.js')
+const { captureIssuedLegacyViews } = skip ? {} : await import('../lib/reportV2.js')
 const { default: router } = skip ? {} : await import('../routes/assessment.js')
 
 async function auditRows(sessionId) {
@@ -33,6 +34,9 @@ test('report V2 and the workplace view both audit their sufficiency decisions', 
   await migrateUp()
   const sessionId = randomUUID()
   await createSession(sessionId, { history: [{ role: 'user', content: '[Candidate]: synthetic answer' }] })
+  const original = { issuedAt: new Date().toISOString() }
+  original.issuedViews = await captureIssuedLegacyViews(sessionId, await getSession(sessionId), original)
+  await saveReport(sessionId, original)
 
   const app = express()
   app.use('/api/assessment', router)

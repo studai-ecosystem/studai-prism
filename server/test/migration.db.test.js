@@ -64,12 +64,13 @@ test('migration up creates Part C tables, telemetry inserts, down drops them', {
   // (the most recent), so walk all the way down — this validates every
   // .down.sql in the chain, not just the newest one.
   let steps = 0
-  while (steps < 50) {
+  const { rows: applied } = await query('SELECT name FROM schema_migrations')
+  while (steps < applied.length) {
     const rolled = await migrateDown()
     if (!rolled) break
     steps++
   }
-  assert.ok(steps > 0, 'at least one migration rolled back')
+  assert.equal(steps, applied.length, 'every applied migration rolled back')
   const after = await query(
     `SELECT table_name FROM information_schema.tables
      WHERE table_schema='public' AND table_name='items'`,

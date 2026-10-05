@@ -29,16 +29,19 @@ try {
   await client.connect()
   await client.query('SELECT 1')
   await client.end()
-  const code = await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--test', 'server/test/cr03Runtime.db.test.js'], {
+  for (const testFile of ['server/test/migration.db.test.js', 'server/test/evidenceAudit.db.test.js', 'server/test/cr03Runtime.db.test.js']) {
+    const code = await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['--test', testFile], {
       cwd: root, stdio: 'inherit', env: { ...process.env, NODE_ENV: 'test', CI: '1', DATABASE_URL: connection,
         TEST_DATABASE_URL: connection, PRISM_P0_ISOLATED_DATABASE: 'true', PGSSLMODE: '', DATA_DIR: join(dir, 'data'),
         AWS_SECRETS_MANAGER_SECRET_ID: '', AWS_SECRETS_MANAGER_SECRET_IDS: '', AWS_SECRETS_MANAGER_REQUIRED: 'false' },
     })
     child.once('error', reject)
     child.once('exit', (exitCode, signal) => resolve(signal ? 1 : exitCode ?? 1))
-  })
-  process.exitCode = code
+    })
+    process.exitCode = code
+    if (code !== 0) break
+  }
 } finally {
   if (cluster) { await cluster.stop(); stopped = true }
   if (stopped || !cluster) await rm(dir, { recursive: true, force: true })
