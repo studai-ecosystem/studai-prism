@@ -13,7 +13,9 @@ import { createV1Router } from '../routes/v1/index.js'
 import { createMemoryCampusRepos } from '../domain/campusStore/index.js'
 import { createCampusContext } from '../domain/campusStore/context.js'
 import { ApiError } from '../domain/http/errors.js'
-import { PRIMARY_CAPABILITY_IDS } from '../domain/assessments/catalog.js'
+import { PRIMARY_CAPABILITY_IDS, buildCatalog, CORE_DEFINITION_ID } from '../domain/assessments/catalog.js'
+import { buildStudentReportV3, reportContentHash, REPORT_V3_BUILDER_VERSION } from '../domain/reports/v3/build.js'
+import { assertReportSafe } from '../domain/reports/v3/schema.js'
 import { compareCapability, choosePair, canonicalPair } from '../domain/growth/snapshot.js'
 import { createGrowthService } from '../domain/growth/service.js'
 import { createSessionEntryLoader } from '../domain/growth/entries.js'
@@ -22,6 +24,7 @@ import { createSessionEntryLoader } from '../domain/growth/entries.js'
 process.env.PRISM_CAMPUS_ENABLED = 'true'
 process.env.PRISM_APP_SHELL_V3 = 'true'
 process.env.PRISM_GROWTH_ENABLED = 'true'
+process.env.PRISM_STUDENT_REPORT_V3 = 'true'
 
 const SCENARIOS = { generalScenarios: [{ id: 'syn-growth-a' }, { id: 'syn-growth-b' }], bankScenarios: {} }
 const FORM_A = 'prism-workplace-core:syn-growth-a:1.0.0'
@@ -54,7 +57,7 @@ const legacy = {
   paths: { purchase: '/payment', start: () => '/', resume: () => '/', report: () => '/' },
 }
 
-async function world() {
+async function world({ publishedSnapshots = true } = {}) {
   let now = new Date('2026-10-10T09:00:00Z')
   const repos = createMemoryCampusRepos({ clock: () => now })
   const org = await repos.organizations.createOrganization({ name: 'Synthetic Growth University', slug: 'syn-growth-u', organizationType: 'UNIVERSITY', status: 'ACTIVE' })
@@ -75,6 +78,28 @@ async function world() {
     users: { findById: async (id) => byId.get(id) || null, findByEmail: async (e) => [...byId.values()].find((x) => x.email === e) || null },
     audit: (type, sid, payload) => audits.push({ type, sid, payload }),
   })
+  // Synthetic published-state fixtures have known allocated forms and no
+  // judged evidence. They do not reinterpret or migrate an unsupported run.
+  if (publishedSnapshots) {
+    const definition = buildCatalog(SCENARIOS).definitions.find((d) => d.id === CORE_DEFINITION_ID)
+    for (const [sessionId, session] of Object.entries(SESSIONS)) {
+      const allocation = {
+        fixture: 'campus-growth-published-snapshot', methodVersion: 'synthetic-growth-allocation.v1',
+        scenarioId: session.scenarioId, scenarioVersion: '1.0.0',
+        formId: session.scenarioId === 'syn-growth-a' ? FORM_A : FORM_B,
+        measures: [...PRIMARY_CAPABILITY_IDS], evidenceIds: [],
+      }
+      const report = assertReportSafe(buildStudentReportV3({
+        sessionId, definition, formId: allocation.formId, units: [], turns: [],
+        header: { assessmentTitle: definition.title, completedAt: session.completedAt, scope: 'PERSONAL' },
+      }))
+      await repos.sessionIo.putClientEvent({ sessionId, clientEventId: 'start', kind: 'START', response: { fixtureAllocationArchive: allocation } })
+      await repos.reportVersions.append({
+        sessionId, version: 1, contentHash: reportContentHash(report), builderVersion: REPORT_V3_BUILDER_VERSION,
+        report, issuedAt: session.completedAt, reason: 'INITIAL',
+      })
+    }
+  }
   const requireUser = (req, _res, next) => {
     const user = USERS[req.get('x-test-user')]
     if (!user) return next(new ApiError('UNAUTHENTICATED', 'Sign in to continue.'))
@@ -106,6 +131,34 @@ const decision = (band, status = 'SUFFICIENT') => ({ status, level: { band, labe
 const entry = (sessionId, completedAt, formId, band, status) => ({
   session: { sessionId, completedAt }, definition: { title: 'Synthetic assessment', measures: [CAP] }, form: { id: formId, version: '1.0.0' },
   decisions: band ? { [CAP]: decision(band, status) } : {},
+})
+
+test('growth legacy-only fixture: original histories remain reachable but unsupported allocations produce no V3 comparison', async () => {
+  const w = await world({ publishedSnapshots: false })
+  try {
+    for (const [sessionId, session] of Object.entries(SESSIONS)) await w.repos.sessionIo.putClientEvent({
+      sessionId, clientEventId: 'start', kind: 'START',
+      response: { runPin: { scenarioId: session.scenarioId, methodVersion: 'unsupported-historical-method', snapshotVersion: 'unsupported-old-allocation' } },
+    })
+    await w.campus.growth.decide({ formAId: FORM_A, formBId: FORM_B, status: 'APPROVED', evidenceRef: 'equating-run-9', reason: 'Equating run frozen and reviewed', decidedBy: 'adm-2', approvalId: 'appr-2' })
+    const history = await w.call('p1', 'GET', '/me/history')
+    assert.deepEqual(history.body.data.items.map((item) => item.sourceId).sort(), ['sess-g-1', 'sess-g-2'])
+    assert.ok(history.body.data.items.every((item) => item.status === 'COMPLETED'))
+    const growth = (await w.call('p1', 'GET', '/me/growth')).body.data
+    assert.equal(growth.comparable, false)
+    assert.equal(growth.reason, 'NEEDS_COMPARABLE_REASSESSMENT')
+    assert.deepEqual(growth.assessments, [])
+    assert.deepEqual(growth.changes, [])
+    const originals = await Promise.all(Object.keys(SESSIONS).map((id) => legacy.getReport(id)))
+    await assert.rejects(w.campus.reports.publish('sess-g-1'), { code: 'PINNED_METHOD_UNAVAILABLE' })
+    assert.deepEqual(await Promise.all(Object.keys(SESSIONS).map((id) => legacy.getReport(id))), originals)
+    assert.equal(w.repos.db.reportVersions.length, 0)
+    assert.equal((await w.repos.growth.listSnapshots({ userId: USERS.p1.id })).length, 0)
+    for (const item of history.body.data.items) {
+      assert.equal(item.permittedAction.to, legacy.paths.report(item.sourceId, false), 'no-snapshot histories retain the original report reader')
+      assert.notEqual(item.reportFormat, 'V3')
+    }
+  } finally { w.close() }
 })
 
 test('flag off: reassessment and growth analytics routes are dark; /me/growth keeps the not-comparable shape', async () => {

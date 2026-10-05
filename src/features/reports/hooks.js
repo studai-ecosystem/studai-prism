@@ -6,13 +6,13 @@ import { fetchStudentReport, fetchSharedReport, createReportShare, deleteShareGr
 
 const noRetry = (count, err) => !['FORBIDDEN', 'NOT_FOUND', 'VALIDATION_FAILED', 'REPORT_NOT_READY', 'REPORT_UNDER_REVIEW', 'REPORT_PROCESSING_FAILED'].includes(err?.code) && err?.status !== 404 && count < 1
 
-export function useStudentReport(sessionId, { enabled = true } = {}) {
+export function useStudentReport(sessionId, { enabled = true, version = null } = {}) {
   const { active } = useWorkspace()
-  return useQuery({ queryKey: wsKey(active.id, 'report', sessionId), queryFn: () => fetchStudentReport(sessionId), retry: noRetry, enabled })
+  return useQuery({ queryKey: wsKey(active.id, 'report', sessionId, version), queryFn: () => fetchStudentReport(sessionId, { version }), retry: noRetry, enabled })
 }
 
-export function useSharedReport(token) {
-  return useQuery({ queryKey: ['shared-report', token], queryFn: () => fetchSharedReport(token), retry: noRetry })
+export function useSharedReport(token, { version = null } = {}) {
+  return useQuery({ queryKey: ['shared-report', token, version], queryFn: () => fetchSharedReport(token, { version }), retry: noRetry })
 }
 
 export function useCreateShare(sessionId) {

@@ -91,7 +91,7 @@ async function world() {
   }
   const engine = fakeEngine(state, clock)
   const audits = []
-  const sliceEvaluator = createSliceEvaluator({ complete: createCompletion, recordUnit: (unit) => evidenceGraph.recordEvidenceUnit(unit) })
+  const sliceEvaluator = createSliceEvaluator({ complete: createCompletion, recordUnit: (unit, tx) => evidenceGraph.recordEvidenceUnit(unit, tx) })
   const campus = createCampusContext({
     repos, clock, legacy, engine, sliceEvaluator,
     scenarioSource: async () => ({ generalScenarios: [], bankScenarios: { ...draftBankScenarios(), ...LEGACY_BANK } }),

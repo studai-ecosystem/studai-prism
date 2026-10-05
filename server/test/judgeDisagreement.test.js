@@ -14,6 +14,7 @@ import { createMemoryCampusRepos } from '../domain/campusStore/index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from '../domain/campusStore/context.js'
 import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../domain/sharing/copyVersions.js'
 import { draftBankScenarios, buildRunPin, UNIVERSAL_SNAPSHOT } from '../domain/assessments/draftSegments.js'
+import { EVIDENCE_PROMPT, EVIDENCE_EVALUATOR } from '../domain/assessments/frozenMethod.js'
 import { CORE_TEAMREADY_A, CORE_TEAMREADY_A_FORM_ID } from '../domain/assessments/universalForm.js'
 import { createSliceEvaluator, reconcileSamples, hasAmbiguityMarker, MAX_JUDGE_SAMPLES, JUDGE_DISAGREEMENT } from '../domain/evidence/sliceEvaluator.js'
 import { ratingItemFrom } from '../domain/validation/ratingQueue.js'
@@ -64,7 +65,7 @@ test('evaluator: a flagged unit costs exactly two provider calls; the stored uni
   const recorded = []
   const ev = createSliceEvaluator({
     complete: async (params, options) => { calls.push(options.task); return createCompletion(params, options) },
-    recordUnit: async (unit) => { recorded.push(unit); return evidenceGraph.recordEvidenceUnit(unit) },
+    recordUnit: async (unit, tx) => { recorded.push(unit); return evidenceGraph.recordEvidenceUnit(unit, tx) },
   })
   const sessionId = `disagree-${Math.random().toString(36).slice(2, 8)}`
   const pin = buildRunPin({ formId: CORE_TEAMREADY_A_FORM_ID, scenarioId: CORE_TEAMREADY_A.id })
@@ -78,12 +79,14 @@ test('evaluator: a flagged unit costs exactly two provider calls; the stored uni
         informationAccess: { revealedFactIds: [] },
         learnerAction: { actionId: 'act-1', kind: 'MESSAGE', sequence: 1 },
         workState: { before: { rows: CORE_TEAMREADY_A.board.rows }, after: { rows: CORE_TEAMREADY_A.board.rows } },
-        method: { behaviourIds: ['QUESTION_ASSUMPTION'], rubricRef: CORE_TEAMREADY_A.rubric.ref, promptVersion: 'evidence_evaluator.v2', evaluatorVersion: 'slice-evaluator.v2', methodVersion: pin?.methodVersion || null },
+        method: { behaviourIds: ['QUESTION_ASSUMPTION'], rubricRef: CORE_TEAMREADY_A.rubric.ref, promptVersion: EVIDENCE_PROMPT, evaluatorVersion: EVIDENCE_EVALUATOR, methodVersion: pin.methodVersion },
       },
     },
   }]
   const opportunities = [{ opportunityId: 'OPP-REASON-FACTS-ASSUMPTIONS', state: 'EVALUATION_PENDING', actionIds: ['act-1'] }]
-  const { units } = await ev.evaluateRun({ sessionId, actions, snapshot: UNIVERSAL_SNAPSHOT, pin, formId: CORE_TEAMREADY_A_FORM_ID, opportunities })
+  const { units } = await ev.evaluateRun({ sessionId, actions, snapshot: UNIVERSAL_SNAPSHOT, pin, formId: CORE_TEAMREADY_A_FORM_ID, opportunities, apply: false })
+  assert.deepEqual(recorded, [], 'compute-only evaluation never reaches the writer')
+  assert.deepEqual(await evidenceGraph.getEvidenceUnits(sessionId), [], 'proposed units are not accepted evidence')
   assert.equal(calls.length, 2, 'one behaviour targeted, one marker → exactly one extra sample')
   assert.equal(units.length, 1)
   const u = units[0]
@@ -137,7 +140,7 @@ async function world() {
   const users = { findById: async (id) => (id === USER.id ? USER : null) }
   const campus = createCampusContext({
     repos, clock: () => NOW, legacy, engine: fakeEngine(state), users,
-    sliceEvaluator: createSliceEvaluator({ complete: (p, o) => createCompletion(p, o), recordUnit: (unit) => evidenceGraph.recordEvidenceUnit(unit) }),
+    sliceEvaluator: createSliceEvaluator({ complete: (p, o) => createCompletion(p, o), recordUnit: (unit, tx) => evidenceGraph.recordEvidenceUnit(unit, tx) }),
     scenarioSource: async () => ({ generalScenarios: [], bankScenarios: draftBankScenarios() }),
     evidence: { units: (sid) => evidenceGraph.getEvidenceUnits(sid) },
     audit: (type, sid, payload) => audits.push({ type, sid, payload }),

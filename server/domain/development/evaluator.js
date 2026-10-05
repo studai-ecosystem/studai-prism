@@ -1,5 +1,5 @@
 // Structured mission evaluator (spec §16.3 step 3; C8.04). Calls the AI
-// gateway with the versioned prompt `mission_evaluator.v1` and a JSON output
+// gateway with a versioned practice prompt and a JSON output
 // schema. The payload is identity-free: the learner is `{{candidate}}`, their
 // name is tokenised out of their own text, and no organization, cohort or
 // program name is ever included (K8). Any failure — timeout, provider error,
@@ -7,13 +7,12 @@
 import { renderPrompt } from '../../engine/prompts.js'
 import { sanitizeCandidateText } from '../../lib/promptSecurity.js'
 import { tokenizeForModel } from '../../lib/identityIsolation.js'
+import { structuredWorkFor, candidateTextFor } from './validators.js'
 
-export const EVALUATOR_PROMPT = 'mission_evaluator.v1'
-export const MEANING_PROMPT = 'mission_meaning.v2'
-// Work shorter than this (all artifacts together) is never sent to the model
-// for a meaning check: it is "not met — EMPTY_WORK", not guessed feedback.
-export const MIN_MEANING_CHARS = 20
-export const MEANING_REASONS = Object.freeze(['EXPRESSED', 'NOT_EXPRESSED', 'KEYWORDS_ONLY', 'CONTRADICTED'])
+export const EVALUATOR_PROMPT = 'mission_evaluator.v2'
+export const MEANING_PROMPT = 'mission_meaning.v3'
+export const MEANING_REASONS = Object.freeze(['EXPRESSED', 'NOT_EXPRESSED', 'KEYWORDS_ONLY', 'CONTRADICTED', 'NOT_JUDGEABLE'])
+const EVALUATOR_REASONS = ['OBSERVED', 'NOT_OBSERVED', 'NOT_JUDGEABLE']
 const MEANING_SCHEMA = {
   name: 'mission_meaning',
   description: 'Per-criterion meaning decisions with verbatim quotes.',
@@ -58,6 +57,7 @@ const OUTPUT_SCHEMA = {
             observed: { type: 'boolean' },
             confidence: { type: 'number', minimum: 0, maximum: 1 },
             quote: { type: 'string' },
+            reason: { type: 'string', enum: EVALUATOR_REASONS },
           },
         },
       },
@@ -67,12 +67,29 @@ const OUTPUT_SCHEMA = {
 
 // Builds the model messages. Exported so tests can prove the payload carries
 // no identity.
-export function buildEvaluatorMessages({ mission, criteria, workTexts, candidateName }) {
-  const text = workTexts.map((t) => sanitizeCandidateText(tokenizeForModel(t, candidateName), 4000)).join('\n\n---\n\n')
+function promptData({ mission, criteria, work, candidateName }) {
+  const sanitize = (value) => typeof value === 'string' ? sanitizeCandidateText(tokenizeForModel(value, candidateName), 8000) : value
+  const artifacts = structuredWorkFor(mission, work).map((a) => ({
+    ...a,
+    entries: a.entries.map((e) => ({ ...e, value: sanitize(e.value) })),
+  }))
+  return {
+    CONTEXT_JSON: JSON.stringify({
+      setting: mission.scenario_context.setting,
+      objective: mission.scenario_context.objective,
+      situation_facts: mission.situation_facts || [],
+      constraints: mission.constraints,
+    }),
+    WORK_JSON: JSON.stringify(artifacts),
+    criteria: criteria.map((c) => ({ criterion_id: c.criterion_id, artifact_ids: c.artifact_ids, work_paths: c.work_paths || [] })),
+  }
+}
+
+export function buildEvaluatorMessages({ mission, criteria, work, candidateName }) {
+  const data = promptData({ mission, criteria, work, candidateName })
   const prompt = renderPrompt(EVALUATOR_PROMPT, {
-    MISSION_OBJECTIVE: mission.scenario_context.objective,
-    CRITERIA_JSON: JSON.stringify(criteria.map((c) => ({ criterion_id: c.criterion_id, description: c.description, guidance: c.evaluator_guidance }))),
-    WORK_TEXT: text,
+    ...data,
+    CRITERIA_JSON: JSON.stringify(criteria.map((c, i) => ({ ...data.criteria[i], description: c.description, guidance: c.evaluator_guidance }))),
   })
   return [
     { role: 'system', content: prompt },
@@ -88,24 +105,26 @@ function parseOutput(content) {
     try { data = JSON.parse(m[0]) } catch { return null }
   }
   if (!data || !Array.isArray(data.criteria)) return null
+  if (data.criteria.some((c) => !c || typeof c.criterion_id !== 'string' || typeof c.observed !== 'boolean' || typeof c.confidence !== 'number' || !Number.isFinite(c.confidence) || c.confidence < 0 || c.confidence > 1 || typeof c.quote !== 'string')) return null
+  if (data.criteria.some((c) => c.reason !== undefined && (!EVALUATOR_REASONS.includes(c.reason) || c.observed !== (c.reason === 'OBSERVED')))) return null
+  if (new Set(data.criteria.map((c) => c.criterion_id)).size !== data.criteria.length) return null
   return data.criteria
-    .filter((c) => c && typeof c.criterion_id === 'string' && typeof c.observed === 'boolean')
     .map((c) => ({
       criterionId: c.criterion_id,
       observed: c.observed,
-      confidence: Number.isFinite(Number(c.confidence)) ? Math.min(1, Math.max(0, Number(c.confidence))) : 0,
-      quote: typeof c.quote === 'string' ? c.quote : '',
+      confidence: c.confidence,
+      quote: c.quote,
+      ...(c.reason !== undefined ? { reason: c.reason } : {}),
     }))
 }
 
 // P6.4 meaning messages: intent + example phrasings per criterion. Exported
 // so tests can prove the payload is identity-free.
-export function buildMeaningMessages({ mission, criteria, workTexts, candidateName }) {
-  const text = workTexts.map((t) => sanitizeCandidateText(tokenizeForModel(t, candidateName), 4000)).join('\n\n---\n\n')
+export function buildMeaningMessages({ mission, criteria, work, candidateName }) {
+  const data = promptData({ mission, criteria, work, candidateName })
   const prompt = renderPrompt(MEANING_PROMPT, {
-    MISSION_OBJECTIVE: mission.scenario_context.objective,
-    MEANING_JSON: JSON.stringify(criteria.map((c) => ({ criterion_id: c.criterion_id, intent: c.meaning.intent, phrasings: c.meaning.synonyms, guidance: c.evaluator_guidance }))),
-    WORK_TEXT: text,
+    ...data,
+    MEANING_JSON: JSON.stringify(criteria.map((c, i) => ({ ...data.criteria[i], intent: c.meaning.intent, phrasings: c.meaning.synonyms, guidance: c.evaluator_guidance }))),
   })
   return [
     { role: 'system', content: prompt },
@@ -121,31 +140,36 @@ function parseMeaningOutput(content) {
     try { data = JSON.parse(m[0]) } catch { return null }
   }
   if (!data || !Array.isArray(data.criteria)) return null
+  if (data.criteria.some((c) => !c || typeof c.criterion_id !== 'string' || typeof c.met !== 'boolean' || typeof c.quote !== 'string' || !MEANING_REASONS.includes(c.reason) || c.met !== (c.reason === 'EXPRESSED'))) return null
+  if (new Set(data.criteria.map((c) => c.criterion_id)).size !== data.criteria.length) return null
   return data.criteria
-    .filter((c) => c && typeof c.criterion_id === 'string' && typeof c.met === 'boolean')
     .map((c) => ({
       criterionId: c.criterion_id,
       met: c.met,
-      quote: typeof c.quote === 'string' ? c.quote : '',
-      reason: MEANING_REASONS.includes(c.reason) ? c.reason : (c.met ? 'EXPRESSED' : 'NOT_EXPRESSED'),
+      quote: c.quote,
+      reason: c.reason,
     }))
 }
 
-export const meaningWorkTooShort = (workTexts) => workTexts.join(' ').replace(/\s+/g, ' ').trim().length < MIN_MEANING_CHARS
+export const meaningWorkEmpty = (workTexts) => !workTexts.some((text) => text.trim())
 
 export function createMissionEvaluator({ complete, timeoutMs = 20_000 } = {}) {
-  const withTimeout = (call) => {
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'TIMEOUT' })), timeoutMs).unref?.())
-    return Promise.race([call, timeout])
+  const withTimeout = async (call) => {
+    let timer
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'TIMEOUT' })), timeoutMs)
+      timer.unref?.()
+    })
+    try { return await Promise.race([call, timeout]) } finally { clearTimeout(timer) }
   }
   return {
     promptVersion: EVALUATOR_PROMPT,
     meaningPromptVersion: MEANING_PROMPT,
-    async evaluate({ mission, criteria, workTexts, candidateName }) {
+    async evaluate({ mission, criteria, work, candidateName }) {
       if (!criteria.length) return { available: true, results: [], model: null }
       if (!complete) return { available: false, reason: 'EVALUATOR_NOT_CONFIGURED' }
       try {
-        const messages = buildEvaluatorMessages({ mission, criteria, workTexts, candidateName })
+        const messages = buildEvaluatorMessages({ mission, criteria, work, candidateName })
         const call = complete({ messages, temperature: 0, max_completion_tokens: 800, json_schema: OUTPUT_SCHEMA }, { task: 'mission_evaluator', retries: 1 })
         const out = await withTimeout(call)
         const content = out?.choices?.[0]?.message?.content ?? out?.content ?? out
@@ -156,20 +180,23 @@ export function createMissionEvaluator({ complete, timeoutMs = 20_000 } = {}) {
         return { available: false, reason: err?.code === 'TIMEOUT' ? 'TIMEOUT' : 'PROVIDER_ERROR' }
       }
     },
-    // P6.4 — semantic equivalence. Empty or very short work never reaches the
-    // model: every criterion is "not met, EMPTY_WORK" and nothing is invented.
-    async evaluateMeaning({ mission, criteria, workTexts, candidateName }) {
+    // Only empty work is decided locally. Courtesy, nonsense and concise
+    // meaningful replies require the criterion's contextual meaning decision.
+    async evaluateMeaning({ mission, criteria, work, candidateName }) {
       if (!criteria.length) return { available: true, results: [], model: null }
-      if (meaningWorkTooShort(workTexts)) return { available: true, results: criteria.map((c) => ({ criterionId: c.criterion_id, met: false, quote: '', reason: 'EMPTY_WORK' })), model: null }
+      const empty = criteria.filter((c) => meaningWorkEmpty(candidateTextFor(mission, work, c.artifact_ids, c.work_paths)))
+      const active = criteria.filter((c) => !empty.includes(c))
+      const emptyResults = empty.map((c) => ({ criterionId: c.criterion_id, met: false, quote: '', reason: 'EMPTY_WORK' }))
+      if (!active.length) return { available: true, results: emptyResults, model: null }
       if (!complete) return { available: false, reason: 'EVALUATOR_NOT_CONFIGURED' }
       try {
-        const messages = buildMeaningMessages({ mission, criteria, workTexts, candidateName })
+        const messages = buildMeaningMessages({ mission, criteria: active, work, candidateName })
         const call = complete({ messages, temperature: 0, max_completion_tokens: 800, json_schema: MEANING_SCHEMA }, { task: 'mission_evaluator', retries: 1 })
         const out = await withTimeout(call)
         const content = out?.choices?.[0]?.message?.content ?? out?.content ?? out
         const results = parseMeaningOutput(content)
         if (!results) return { available: false, reason: 'UNPARSEABLE_OUTPUT' }
-        return { available: true, results, model: out?.model || null }
+        return { available: true, results: [...emptyResults, ...results], model: out?.model || null }
       } catch (err) {
         return { available: false, reason: err?.code === 'TIMEOUT' ? 'TIMEOUT' : 'PROVIDER_ERROR' }
       }

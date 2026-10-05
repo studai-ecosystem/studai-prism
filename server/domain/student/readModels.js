@@ -6,10 +6,8 @@
 //   - no admissible evidence → INSUFFICIENT_EVIDENCE, level null
 //   - change across assessments → null until comparable forms exist (Phase 9)
 //   - practice evidence is a separate kind and never alters formal status
-import { evaluateProfile } from '../evidence/sufficiency.js'
 import { LEVEL_LABELS_STATUS } from '../evidence/levels.js'
 import { buildClaim, validateClaims, candidateTurnsUnion } from '../reports/claims.js'
-import { buildStudentReportV3 } from '../reports/v3/build.js'
 import { behaviourGaps } from '../development/recommendations.js'
 import { ApiError } from '../http/errors.js'
 import { PRIMARY_CAPABILITY_IDS, CORE_DEFINITION_ID, capabilityInfo, definitionForScenario, formForSession } from '../assessments/catalog.js'
@@ -17,6 +15,7 @@ import { playerPath } from '../assessments/assignmentService.js'
 import { isEnabled } from '../flags/index.js'
 import { RIASEC_KEYS, sanitizeInterests } from '../../lib/roleAffinityEngine.js'
 import { PROCESSING_GRACE_MS } from './history.js'
+import { anchorFromEvidence } from '../assessments/frozenMethod.js'
 
 const ADMISSIBLE = new Set(['PROVISIONAL', 'SUFFICIENT'])
 const GROWTH_BANDS = new Set(['EARLY', 'DEVELOPING'])
@@ -34,13 +33,7 @@ function verifiedQuote(unit, turns) {
 export function createStudentReadModels({ directory, catalog, assignments, evidence, practice = { list: async () => [] }, development = { enabled: () => false }, growth = { enabled: () => false }, preparation = { enabled: () => false }, roles, legacy, clock = () => new Date(), repos = null }) {
   // Accepted candidate actions: the quote source that survives a history purge (T32).
   const actionsFor = async (sessionId) => (repos?.sessionIo && typeof repos.sessionIo.listActions === 'function'
-    ? repos.sessionIo.listActions(sessionId).catch(() => [])
-    : [])
-  // P5.7: evidence ids withheld from a session by a reviewed correction. The
-  // units stay stored; every downstream read model recomputes without them,
-  // exactly as the corrected report version does.
-  const withheldFor = async (sessionId) => (repos?.reportReviews && typeof repos.reportReviews.listWithheldEvidenceIds === 'function'
-    ? repos.reportReviews.listWithheldEvidenceIds(sessionId).catch(() => [])
+    ? repos.sessionIo.listActions(sessionId)
     : [])
   // One entry per completed formal session in the workspace (newest first).
   // Held or invalidated sessions are never formal evidence (K59).
@@ -51,18 +44,32 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
     const out = []
     out.excludedCount = completed.length - sessions.length
     for (const s of sessions) {
+      const published = repos?.reportVersions ? await repos.reportVersions.latest(s.sessionId) : null
+      // Historical original reports remain in History and their original
+      // reader. They do not become new V3 findings during a capability GET.
+      if (!published) continue
+      const report = published.report
       const definitionId = definitionForScenario(cat, s.scenarioId)
       const definition = cat.definitions.find((d) => d.id === definitionId) || null
-      const withheld = new Set(await withheldFor(s.sessionId))
-      const units = (await evidence.units(s.sessionId)).filter((u) => !withheld.has(u.evidence_id))
-      const capabilityIds = definition?.measures || PRIMARY_CAPABILITY_IDS
+      const cited = new Set([
+        ...(report.summary?.capabilities || []).flatMap((c) => c.summary?.evidenceIds || []),
+        ...(report.evidence || []).map((e) => e.id),
+        ...(report.moments || []).map((e) => e.id),
+        ...(report.boundedObservations || []).map((e) => e.id),
+      ])
+      const units = (await evidence.units(s.sessionId)).filter((u) => cited.has(u.evidence_id))
       out.push({
         session: s,
         definition,
         form: formForSession(cat, s.scenarioId),
+        published,
         units,
         turns: candidateTurnsUnion(s.history, await actionsFor(s.sessionId)),
-        decisions: evaluateProfile(units, { capabilityIds }),
+        decisions: Object.fromEntries((report.summary?.capabilities || []).map((c) => [c.id, {
+          capabilityId: c.id, status: c.status, reasons: c.statusReasons, level: c.level,
+          unitIds: c.summary?.evidenceIds || [], consideredUnitIds: units.filter((u) => u.capability_id === c.id).map((u) => u.evidence_id),
+          rulesVersion: report.methodology?.sufficiencyRulesVersion,
+        }])),
       })
     }
     return out
@@ -71,7 +78,7 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
   function summaryClaim(cap, entry, decision) {
     if (!entry) return { text: 'No completed assessment has measured this yet.', status: 'INSUFFICIENT', evidenceIds: [] }
     if (decision?.status === 'HUMAN_REVIEW_REQUIRED') {
-      return { text: 'A person is reviewing the evidence for this before it is described.', status: 'INSUFFICIENT', evidenceIds: [] }
+      return { text: 'This evidence needs review before it can be described.', status: 'INSUFFICIENT', evidenceIds: [] }
     }
     if (!decision || !ADMISSIBLE.has(decision.status) || !decision.level) {
       return { text: `There was not enough evidence in ${entry.definition?.title || 'your assessment'} to describe this.`, status: 'INSUFFICIENT', evidenceIds: [] }
@@ -160,7 +167,7 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
     // learner's own verified moments -> one next behaviour -> a reachable
     // reviewed practice or an honest "none yet" -> scope, date, method and
     // limitation -> review. Everything comes from the stored report version
-    // of that session (or the same pure builder when no version is stored);
+    // of that session (no read-time builder when no version is stored);
     // nothing is invented when evidence is thin.
     async capabilityDetail(user, workspace, capabilityId) {
       const cap = capabilityInfo(capabilityId)
@@ -171,11 +178,8 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
       const base = { ...view, latestSnapshot: null, moments: [], evidence: [], boundedObservation: null, nextBehavior: null, whyItMatters: cap.description || null, recommendation: null, review: { openRequests: 0, pending: false }, limitation: null }
       if (!current) return { ...base, state: 'NOT_MEASURED', limitation: view.evidenceSummary.text }
       const sid = current.session.sessionId
-      const latest = repos?.reportVersions && typeof repos.reportVersions.latest === 'function' ? await repos.reportVersions.latest(sid).catch(() => null) : null
-      const report = latest?.report || buildStudentReportV3({
-        sessionId: sid, definition: current.definition, formId: current.form?.id || null, units: current.units, turns: current.turns,
-        header: { assessmentTitle: current.definition?.title || null, completedAt: current.session.completedAt, scope: current.session.scope },
-      })
+      const latest = current.published
+      const report = latest.report
       const card = (report.summary?.capabilities || []).find((c) => c.id === capabilityId) || null
       const moments = (report.moments || []).filter((m) => m.capability?.id === capabilityId)
       const evidenceItems = (report.evidence || []).filter((e) => e.capability?.id === capabilityId).slice(0, 3)
@@ -193,7 +197,7 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
       const recommendation = gap && typeof development.recommendFor === 'function'
         ? (await development.recommendFor(user, workspace, [gap]).catch(() => []))[0] || null
         : null
-      const reviews = repos?.reportReviews && typeof repos.reportReviews.listForSession === 'function' ? await repos.reportReviews.listForSession(sid).catch(() => []) : []
+      const reviews = repos?.reportReviews && typeof repos.reportReviews.listForSession === 'function' ? await repos.reportReviews.listForSession(sid) : []
       const openRequests = reviews.filter((r) => r.state === 'OPEN').length
       const title = current.definition?.title || 'this assessment'
       // Plain limitation; the sufficiency reason codes stay in statusReasons
@@ -237,7 +241,7 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
         for (const u of e.units) {
           const cap = capabilityInfo(u.capability_id)
           const admissible = ADMISSIBLE.has(u.evidence_status) && Number.isFinite(u.rubric_level)
-          const anchor = admissible && cap?.anchors?.[Math.round(u.rubric_level)]
+          const anchor = admissible ? anchorFromEvidence(u, Math.round(u.rubric_level)) : null
           formal.push({
             id: u.evidence_id,
             kind: 'FORMAL',

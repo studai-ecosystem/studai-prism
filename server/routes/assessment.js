@@ -72,7 +72,7 @@ import { equateScore, isEquatingEnabled } from '../scoring/equating.js'
 import { isLangEnabled, resolveLanguage, scoringStatusFor, asrHintFor, languageOptions } from '../lib/lang.js'
 import { isVelocityEnabled, thetaFromReport, velocityView } from '../lib/velocity.js'
 import { getScenarioByAssessmentId } from '../lib/scenarioBank.js'
-import { buildStudentReportV2, buildEmployeeReportV2 } from '../lib/reportV2.js'
+import { buildStudentReportV2, buildEmployeeReportV2, captureIssuedLegacyViews } from '../lib/reportV2.js'
 import evidenceGraph from '../lib/evidenceGraph.js'
 import { draftSegmentFor } from '../domain/assessments/draftSegments.js'
 
@@ -1531,6 +1531,7 @@ async function runEvaluation({ sessionId, session, requestId }) {
     report.userId = persisted?.userId || null
     report.userEmail = persisted?.userEmail || null
 
+    report.issuedViews = await captureIssuedLegacyViews(sessionId, { ...session, ...persisted }, report)
     // Persist the report (durable, verifiable) and free the live cache.
     const saved = await saveReport(sessionId, report)
     await sessions.delete(sessionId)
@@ -1862,6 +1863,7 @@ router.get('/report/:sessionId/v2', async (req, res) => {
     auditSufficiencyDecisions('report_v2', req.params.sessionId, v2Report)
     res.json(v2Report)
   } catch (err) {
+    if (err.code === 'LEGACY_VIEW_UNAVAILABLE') return res.status(409).json({ error: err.message, code: err.code, details: { originalReportPath: `/score?session=${encodeURIComponent(req.params.sessionId)}` } })
     logger.captureException(err, { msg: 'report_v2_generation_failed', sessionId: req.params.sessionId })
     res.status(500).json({ error: 'Failed to generate Report V2' })
   }
@@ -1879,6 +1881,7 @@ router.get('/report/:sessionId/employee', async (req, res) => {
     auditSufficiencyDecisions('report_employee', req.params.sessionId, employeeReport)
     res.json(employeeReport)
   } catch (err) {
+    if (err.code === 'LEGACY_VIEW_UNAVAILABLE') return res.status(409).json({ error: err.message, code: err.code, details: { originalReportPath: `/score?session=${encodeURIComponent(req.params.sessionId)}` } })
     logger.captureException(err, { msg: 'report_employee_generation_failed', sessionId: req.params.sessionId })
     res.status(500).json({ error: 'Failed to generate Employee Report' })
   }

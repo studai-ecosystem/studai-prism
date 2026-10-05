@@ -144,9 +144,10 @@ export function buildApp(v1Deps = {}) {
   // The legacy report JSON routes check no identity; only the session owner
   // may read them (Campus Phase 12, S7). The legacy router is unchanged.
   const campus = v1Deps.campus || createDefaultCampusContext()
+  app.locals.campus = campus
   const ownerOf = sessionOwnerFrom({ getSession: storeGetSession, getReport: storeGetReport })
   app.get(
-    ['/api/assessment/report/:sessionId/v2', '/api/assessment/report/:sessionId/employee'],
+    ['/api/assessment/report/:sessionId', '/api/assessment/report/:sessionId/v2', '/api/assessment/report/:sessionId/employee'],
     createLegacyReportGuard({ ownerOf }),
   )
   // Sessions whose id campus staff can know (V3/sponsored, or shared) are

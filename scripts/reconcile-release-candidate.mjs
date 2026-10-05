@@ -48,7 +48,7 @@ try {
     kind: 'P10_RELEASE_CANDIDATE_RECONCILIATION',
     mode: 'READ_ONLY',
     migrationHead,
-    expectedMigrationHead: '0053_intent_display_and_research',
+    expectedMigrationHead: '0054_report_publication_note',
     tables,
     rawRowsIncluded: false,
   }))

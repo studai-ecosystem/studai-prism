@@ -116,9 +116,8 @@ export function createCampusContext({
         const formId = (await catalog.getCatalog()).forms.find((f) => f.scenarioId === scenarioId)?.id || null
         return formId ? contentRegistry.stateOf(formId) : null
       },
-      // The evaluation worker runs in-process from finish(); it is reachable
-      // exactly when the evaluator and the durable job store are present.
-      worker: () => (sliceEvaluator && hasFns(liveRepos()?.sessionIo, ['claimJob', 'completeJob']) ? true : null),
+      // Server startup drains durable work; finish uses the same worker.
+      worker: () => (sliceEvaluator && hasFns(liveRepos()?.sessionIo, ['claimJob', 'captureEvaluationInput', 'applyEvaluation', 'renewJobLease', 'listPublicationPendingJobs']) ? true : null),
     },
   })
   const developmentOn = () => isEnabled('PRISM_DEVELOPMENT_V2') && Boolean(liveRepos())

@@ -13,8 +13,8 @@ export const CHECK_STATES = Object.freeze(['READY', 'NOT_READY', 'UNVERIFIED'])
 export const READINESS_CHECKS = Object.freeze([
   'COMPATIBLE_PLAYER', 'DURABLE_WRITER', 'EVALUATOR', 'PUBLICATION', 'APPROVED_CONTENT', 'WORKER_REACHABILITY',
 ])
-// The lowest migration a universal/draft run needs (actions, jobs, erasure markers).
-export const REQUIRED_MIGRATION_FLOOR = '0040'
+// Accepted-batch/publication receipts and frozen rater context require 0054.
+export const REQUIRED_MIGRATION_FLOOR = '0054'
 
 const CORE_CHAIN = ['PRISM_ASSESSMENT_WORKSPACE_V3', 'PRISM_STUDENT_REPORT_V3', 'PRISM_EVIDENCE_FAIL_CLOSED']
 const ALL_CHECKS = [...READINESS_CHECKS]

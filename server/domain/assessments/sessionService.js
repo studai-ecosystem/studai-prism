@@ -12,7 +12,8 @@ import { draftSegmentFor, buildRunPin, evaluateJobKey, DRAFT_EVALUATE_JOB_KIND, 
 import { timingPolicyFor, legacyPolicy, isLegacyPolicy, deadlinesFor } from './timingPolicy.js'
 import { selectNext, stageStrip, coverageReport, parentOpportunityId } from './director.js'
 import { BOARD_ARTIFACT_ID, validateBoardPatch, worldStateFor } from './universalForm.js'
-import { answerFactQuestion, boardReviewReadiness, interpretLearnerMessage, LEARNER_INTENT, stakeholderReaction } from './factBoundary.js'
+import { answerFactQuestion, boardReviewReadiness, interpretLearnerMessage, LEARNER_INTENT, stakeholderReaction, isInformationRequest } from './factBoundary.js'
+import { resolvePinnedMethod } from './frozenMethod.js'
 
 const START_EVENT = 'start'
 const BEGIN_EVENT = 'begin'
@@ -79,7 +80,13 @@ export function createAssessmentSessionService({
     if (action) await repos.sessionIo.applyAction(action.actionId, result)
   }
   async function failed(action, err) {
-    if (action) await repos.sessionIo.failAction(action.actionId, err?.code || 'ENGINE_FAILED').catch(() => {})
+    if (!action) return
+    try {
+      await repos.sessionIo.failAction(action.actionId, err?.code || 'ENGINE_FAILED')
+    } catch (failure) {
+      audit('assessment.action_failure_state_unavailable', action.sessionId, { code: failure.code || 'FAILURE_STATE_WRITE_FAILED' })
+      if (!['CONFLICT', 'NOT_FOUND'].includes(failure.code)) throw new ApiError('UPSTREAM_UNAVAILABLE', 'The processing state could not be saved. Your accepted work is preserved; please try again.')
+    }
   }
 
   // --- P2.1/P2.6 draft-segment runs ------------------------------------------
@@ -89,15 +96,18 @@ export function createAssessmentSessionService({
   // asked for a score on their behalf.
   const jobs = () => (repos.sessionIo && typeof repos.sessionIo.enqueueJob === 'function' ? repos.sessionIo : null)
   async function draftRun(sessionId, session) {
-    const snapshot = draftSegmentFor(session?.scenarioId)
-    if (!snapshot || !jobs()) return null
+    if (!jobs()) return null
     const startEvent = await repos.sessionIo.getClientEvent(sessionId, START_EVENT)
     const pin = startEvent?.response?.runPin
-    if (!pin || pin.methodVersion !== SLICE_METHOD_VERSION || pin.snapshotHash !== buildRunPin({ formId: pin.formId, engineVersion: pin.engineVersion, scenarioId: pin.scenarioId || DRAFT_SEGMENT_ID }).snapshotHash) {
-      // Pinned to a snapshot/method this code no longer carries: never re-interpret.
-      return pin ? { snapshot: null, pin } : null
+    if (!pin) return draftSegmentFor(session?.scenarioId) ? { snapshot: null, pin: null } : null
+    try {
+      const method = resolvePinnedMethod(pin)
+      if (method.snapshot.id !== session.scenarioId) return { snapshot: null, pin }
+      return { snapshot: method.snapshot, pin, method }
+    } catch (err) {
+      if (err.code !== 'PINNED_METHOD_UNAVAILABLE') throw err
+      return { snapshot: null, pin }
     }
-    return { snapshot, pin }
   }
   // P10.5: a pinned run this build cannot serve fails closed. It is never
   // handed to the legacy engine and its timer is never reset by a new Start.
@@ -160,6 +170,9 @@ export function createAssessmentSessionService({
         promptVersion: sliceEvaluator?.promptVersion || null,
         evaluatorVersion: sliceEvaluator?.evaluatorVersion || null,
         methodVersion: run.pin.methodVersion,
+        methodHash: run.pin.methodHash,
+        rubricHash: run.method?.rubricHash || run.pin.methodSnapshot?.rubricHash || null,
+        anchorsByBehaviour: Object.fromEntries((definition?.behaviourIds || []).map((id) => [id, run.pin.methodSnapshot.snapshot.form.rubric.anchorsByBehaviour[id]])),
       },
     }
   }
@@ -170,7 +183,7 @@ export function createAssessmentSessionService({
     }
   }
   // Present the Director's next allowed event; returns the messages shown.
-  async function presentNext(sessionId, run, { requestId } = {}) {
+  async function presentNext(sessionId, run, { requestId, afterActionId = null } = {}) {
     const io = ledgerStore()
     const form = run.snapshot.form
     const timing = await runTimingOf(sessionId)
@@ -203,7 +216,7 @@ export function createAssessmentSessionService({
         messages.push({ speaker: 'Update', role: null, actorKind: 'SYSTEM', content: `What changed: ${wc.description} Your board is unchanged; you can revise it.` })
       }
       messages.push(next.stimulus.message)
-      await io.setOpportunityState(sessionId, id, 'PRESENTED', { presentedAt: at, renderHash: next.stimulus.renderHash, stimulus: { messages, worldChangeId: next.worldChangeId || null, decision: next.decision } })
+      await io.setOpportunityState(sessionId, id, 'PRESENTED', { presentedAt: at, renderHash: next.stimulus.renderHash, stimulus: { messages, worldChangeId: next.worldChangeId || null, decision: next.decision, afterActionId } })
       shown.push(...messages)
       break
     }
@@ -265,17 +278,32 @@ export function createAssessmentSessionService({
     const job = await io.claimJob(DRAFT_EVALUATE_JOB_KIND, EVALUATE_LEASE_MS)
     if (!job) return null
     let appliedJob = null
+    let renewal = null
+    let leaseLost = false
+    const heartbeat = setInterval(() => {
+      if (renewal || leaseLost) return
+      renewal = io.renewJobLease(job.jobId, job.fencingToken, EVALUATE_LEASE_MS).catch((err) => {
+        leaseLost = true
+        audit('assessment.evaluation_lease_lost', job.sessionId, { sessionId: job.sessionId, code: err.code || 'LEASE_RENEWAL_FAILED' })
+      }).finally(() => { renewal = null })
+    }, EVALUATE_LEASE_MS / 3)
+    heartbeat.unref?.()
     try {
       if (await io.hasErasureMarker(job.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
       const session = await legacy.getSession(job.sessionId)
-      const run = session ? await draftRun(job.sessionId, session) : null
-      if (!run?.snapshot) throw new ApiError('UPSTREAM_UNAVAILABLE', 'The review could not be completed.')
+      if (!session) throw new ApiError('UPSTREAM_UNAVAILABLE', 'The review could not be completed.')
       if (!sliceEvaluator) throw new ApiError('UPSTREAM_UNAVAILABLE', 'The review could not be completed.')
-      const actions = await io.listActions(job.sessionId)
+      const input = await io.captureEvaluationInput(job.sessionId)
+      const method = resolvePinnedMethod(input.runPin)
+      if (method.snapshot.id !== session.scenarioId) throw new ApiError('PINNED_METHOD_UNAVAILABLE', 'The assessment method does not match the recorded situation.')
+      const run = { snapshot: method.snapshot, pin: input.runPin, method }
+      const expectedInputHash = input.expectedInputHash
+      const actions = input.actions
       const universal = isUniversalRun(run)
-      const opportunities = universal ? await io.listOpportunities(job.sessionId) : null
+      const opportunities = universal ? input.opportunities : null
       const { units: proposed } = await sliceEvaluator.evaluateRun({
         sessionId: job.sessionId, actions, snapshot: run.snapshot, pin: run.pin, formId: run.pin.formId || null, attempt: job.attempts,
+        inputRevision: expectedInputHash,
         ...(universal ? { opportunities } : {}),
         apply: false,
       })
@@ -283,8 +311,11 @@ export function createAssessmentSessionService({
       // written back (tombstone check on both sides of the external call,
       // and again inside the apply transaction).
       if (await io.hasErasureMarker(job.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
+      clearInterval(heartbeat)
+      if (renewal) await renewal
+      if (leaseLost) throw new ApiError('CONFLICT', 'The review lease was lost; the stale result was not applied.')
       const { job: done, units } = await io.applyEvaluation({
-        jobId: job.jobId, fencingToken: job.fencingToken, sessionId: job.sessionId, units: proposed,
+        jobId: job.jobId, fencingToken: job.fencingToken, sessionId: job.sessionId, expectedInputHash, units: proposed,
         writeUnit: (unit, tx) => sliceEvaluator.persistUnit(unit, tx),
         evaluatedOpportunityIds: universal ? opportunities.filter((row) => ['ACTION_RECEIVED', 'EVALUATION_PENDING'].includes(row.state)).map((row) => row.opportunityId) : [],
       })
@@ -311,9 +342,17 @@ export function createAssessmentSessionService({
       // technical state the learner can retry — never an evidence deficit.
       // A stale lease (CONFLICT) means another holder owns the job now: its
       // own outcome stands and this worker records nothing.
-      const failedJob = await io.failJob(job.jobId, job.fencingToken, { resultState: 'TECHNICAL_FAILURE' }).catch(() => null)
       audit('assessment.evaluation_failed', job.sessionId, { sessionId: job.sessionId, jobId: job.jobId, attempt: job.attempts, code: err?.code || 'EVALUATION_FAILED', requestId })
-      return failedJob
+      try {
+        return await io.failJob(job.jobId, job.fencingToken, { resultState: 'TECHNICAL_FAILURE' })
+      } catch (failure) {
+        audit('assessment.evaluation_failure_state_unavailable', job.sessionId, { code: failure.code || 'FAILURE_STATE_WRITE_FAILED', requestId })
+        if (['CONFLICT', 'NOT_FOUND'].includes(failure.code)) return null
+        throw new ApiError('UPSTREAM_UNAVAILABLE', 'The review state could not be saved. Your work is preserved; please try again.')
+      }
+    } finally {
+      clearInterval(heartbeat)
+      if (renewal) await renewal
     }
   }
 
@@ -323,11 +362,32 @@ export function createAssessmentSessionService({
   async function publishFor(sessionId, requestId) {
     if (typeof publishReport !== 'function') return null
     try {
-      return await publishReport({ sessionId, requestId })
+      const report = await publishReport({ sessionId, requestId })
+      const session = await legacy.getSession(sessionId)
+      if (!session?.userId) throw new ApiError('NOT_FOUND', 'Not found')
+      await settle(sessionId, { id: session.userId })
+      await repos.sessionIo.putClientEvent({ sessionId, clientEventId: 'publish', kind: 'PUBLICATION', response: { state: 'COMPLETE' } })
+      return report
     } catch (err) {
       audit('report.v3.publish_failed', sessionId, { sessionId, code: err?.code || 'PUBLISH_FAILED', requestId })
       throw new ApiError('UPSTREAM_UNAVAILABLE', 'Your work has been reviewed, but your report could not be published. Your work is saved; please try again.')
     }
+
+  }
+
+  async function runPublicationWorkerOnce({ requestId } = {}) {
+    if (typeof publishReport !== 'function') return 0
+    const pending = await jobs().listPublicationPendingJobs(DRAFT_EVALUATE_JOB_KIND)
+    let published = 0
+    for (const job of pending) {
+      try {
+        await publishFor(job.sessionId, requestId)
+        published += 1
+      } catch (err) {
+        audit('assessment.publication_retry_failed', job.sessionId, { code: err.code || 'PUBLICATION_FAILED', requestId })
+      }
+    }
+    return published
   }
 
   // The session, if and only if the caller owns it in this workspace.
@@ -525,7 +585,7 @@ export function createAssessmentSessionService({
         // P2.1: a run on a DRAFT segment is pinned to the exact snapshot,
         // form, method and rubric reference it was started with.
         const draft = draftSegmentFor(scenarioId)
-        const runPin = draft ? buildRunPin({ formId: (await catalog.getCatalog()).forms.find((f) => f.scenarioId === scenarioId)?.id || null, scenarioId }) : undefined
+        const runPin = draft ? buildRunPin({ formId: item.assignment?.formId || (await catalog.getCatalog()).forms.find((f) => f.scenarioId === scenarioId)?.id || null, scenarioId }) : undefined
         await repos.sessionIo.putClientEvent({
           sessionId, clientEventId: START_EVENT, kind: 'START',
           response: { assignmentId, sponsored, entitlementId, idempotencyKey: String(idempotencyKey).slice(0, 80), ...(runPin ? { runPin } : {}) },
@@ -551,18 +611,21 @@ export function createAssessmentSessionService({
     async get({ user, workspace, sessionId, requestId }) {
       requireStore()
       const { session, sponsored } = await authorize(user, workspace, sessionId)
-      const [cat, scenarios, versions, report, job, actions, runTiming] = await Promise.all([
+      const [cat, scenarios, versions, report, job, actions, runTiming, published] = await Promise.all([
         catalog.getCatalog(), scenarioSource(), repos.sessionIo.listLatestArtifactVersions(sessionId), legacy.getReport(sessionId), evaluationJob(sessionId),
         jobs() ? repos.sessionIo.listActions(sessionId) : [],
         runTimingOf(sessionId),
+        repos.reportVersions ? repos.reportVersions.latest(sessionId) : null,
       ])
-      const processing = processingOf(job)
+      const publicationPending = job?.state === 'DONE' && !published && !report
+      const processing = publicationPending ? { state: 'FAILED', resultState: 'PUBLICATION_PENDING', retryable: true } : processingOf(job)
       const run = jobs() ? await draftRun(sessionId, session) : null
+      if (!report && !published) assertRunSupported(run)
       // A draft run never asks the legacy engine for a scoring status.
       const engineStatus = report ? 'COMPLETE'
         : processing ? (processing.state === 'DONE' ? 'COMPLETE' : processing.state === 'FAILED' ? 'FAILED' : 'SCORING')
           : run ? 'IDLE' : await engine.evaluateStatus({ sessionId, requestId })
-      if (report || processing?.state === 'DONE') await settle(sessionId, user)
+      if (report || published) await settle(sessionId, user)
       // P4: a universal run shows its recorded authored transcript and the
       // task-only stage strip; the engine's history is never shown.
       let universal = null
@@ -575,13 +638,29 @@ export function createAssessmentSessionService({
       }
       return buildSessionContract({
         session: { ...session, sessionId },
-        hasReport: Boolean(report) || processing?.state === 'DONE',
+        hasReport: Boolean(report) || Boolean(published),
         engineStatus,
         processing: { ...(processing || { state: 'NONE', resultState: null, retryable: false }), acceptedActions: actions.filter((a) => a.state === 'APPLIED').length },
         scope: sponsored ? 'SPONSORED' : 'PERSONAL',
         sponsorName: sponsored ? workspace.organizationName || workspace.name || null : null,
         catalog: cat,
-        scenarios,
+        scenarios: run?.snapshot?.universal ? {
+          ...scenarios,
+          bankScenarios: {
+            ...scenarios.bankScenarios,
+            [session.scenarioId]: {
+              title: run.snapshot.title,
+              briefing: {
+                role: run.snapshot.form.briefing.role,
+                background: [run.snapshot.form.briefing.background, ...run.snapshot.form.publicFacts.map((f) => f.text)].join(' '),
+                objective: run.snapshot.form.briefing.objective,
+                characters: run.snapshot.participants.map((p) => ({ name: p.name, role: p.role })),
+              },
+              probingTree: { turns: run.snapshot.form.stages.map((_, i) => ({ turn: i + 1 })) },
+              interactiveArtifacts: session.artifacts,
+            },
+          },
+        } : scenarios,
         versions,
         limitMs,
         runTiming,
@@ -625,18 +704,41 @@ export function createAssessmentSessionService({
     },
 
     async sendMessage({ user, workspace, sessionId, clientEventId, text, authorization, client, requestId }) {
+      if (['start', 'begin', 'finish', 'publish'].includes(clientEventId) || clientEventId?.startsWith('review:')) throw new ApiError('VALIDATION_FAILED', 'Choose a different client event id.')
       requireStore()
       const { session } = await authorize(user, workspace, sessionId)
       await rejectErased(sessionId)
-      // An already-accepted answer replays (or conflicts) even after cutoff;
-      // a NEW one is accepted only inside the timed window (P3.8).
-      if (!(await alreadyAccepted(sessionId, clientEventId))) await guardTimed(sessionId)
-      const action = await accept({ sessionId, clientEventId, kind: 'MESSAGE', payload: { text } })
-      const replay = await repos.sessionIo.getClientEvent(sessionId, clientEventId)
-      if (replay) return { ...replay.response, replayed: true }
       return withLock(sessionId, async () => {
+        await rejectErased(sessionId)
+        const existingAction = await alreadyAccepted(sessionId, clientEventId)
+        if (!existingAction) {
+          if (await isClosed(sessionId)) throw new ApiError('ASSESSMENT_COMPLETED', 'This assessment has already been completed.')
+          await guardTimed(sessionId)
+        }
+        const action = await accept({ sessionId, clientEventId, kind: 'MESSAGE', payload: { text } })
         const again = await repos.sessionIo.getClientEvent(sessionId, clientEventId)
         if (again) return { ...again.response, replayed: true }
+        if (action?.state === 'APPLIED' && action.result?.response) {
+          const receipt = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response: action.result.response })
+          return { ...receipt.response, replayed: true }
+        }
+        if (action?.state === 'APPLIED' && action.result?.evaluationContext) {
+          const run = assertRunSupported(await draftRun(sessionId, session))
+          let ledger = await repos.sessionIo.listOpportunities(sessionId)
+          let next = ledger.find((row) => row.stimulus?.afterActionId === action.actionId)
+          if (action.result.completedOpportunity && !next) {
+            await presentNext(sessionId, run, { requestId, afterActionId: action.actionId })
+            ledger = await repos.sessionIo.listOpportunities(sessionId)
+            next = ledger.find((row) => row.stimulus?.afterActionId === action.actionId)
+          }
+          const response = {
+            messages: [...(action.result.messages || []), ...(action.result.completedOpportunity ? next?.stimulus?.messages || [] : [])],
+            exchanges: action.result.exchanges, stages: stageStrip(run.snapshot.form, ledger),
+          }
+          await repos.sessionIo.saveActionResponse(action.actionId, response)
+          const receipt = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
+          return { ...receipt.response, replayed: true }
+        }
         if (await isClosed(sessionId)) {
           const err = new ApiError('ASSESSMENT_COMPLETED', 'This assessment has already been completed.')
           await failed(action, err)
@@ -667,7 +769,7 @@ export function createAssessmentSessionService({
           })
           const messages = []
           let answer = { kind: 'NONE', factId: null, text: null }
-          if (/\?/.test(String(text))) {
+          if (isInformationRequest(text)) {
             answer = answerFactQuestion({ form: run.snapshot.form, worldState: world, text })
             if (answer.text) messages.push({ speaker: 'Priya', role: 'Coordinating colleague', actorKind: 'AI_PARTICIPANT', content: answer.text, factAnswer: answer.kind })
           }
@@ -675,14 +777,21 @@ export function createAssessmentSessionService({
           const boardState = boardVersion?.content?.data ?? initialBoardState(run.snapshot.form)
           const reaction = stakeholderReaction({ form: run.snapshot.form, opportunity: definition, interpretation, action, boardState, worldState: world })
           if (reaction?.content) messages.push({ ...reaction, stakeholderReaction: true })
-          if (interpretation.kind === LEARNER_INTENT.UNCLEAR) {
+          const clarificationCount = actions.filter((a) => current?.actionIds?.includes(a.actionId) && a.result?.messages?.some((m) => m.clarification)).length
+          const clarify = (content) => {
+            if (clarificationCount >= run.snapshot.form.director.maxClarificationsPerOpportunity) {
+              messages.push({ speaker: 'System', actorKind: 'SYSTEM', content: 'Your response is saved. You can keep working on this task or finish the assessment with the work already saved.' })
+              return
+            }
             messages.push({
               speaker: definition?.stimulus?.speaker || 'Colleague',
               role: definition?.stimulus?.role || null,
               actorKind: definition?.stimulus?.actorKind || 'AI_PARTICIPANT',
-              content: definition?.clarification?.template || 'I am not sure what action you want to take yet. What would you do next?',
-              clarification: true,
+              content, clarification: true,
             })
+          }
+          if (interpretation.kind === LEARNER_INTENT.UNCLEAR) {
+            clarify(definition?.clarification?.template || 'I am not sure what action you want to take yet. What would you do next?')
           }
           // A work-material opportunity is served by a message only when the
           // board already carries the requested plan (ready for review) or a
@@ -691,16 +800,10 @@ export function createAssessmentSessionService({
           // concrete" again; one whose board is not is told what is missing.
           const needsConcreteWorkProposal = Boolean(definition?.reviewReadiness)
           const boardReady = needsConcreteWorkProposal ? boardReviewReadiness(run.snapshot.form, definition, boardState).ready : true
-          if (needsConcreteWorkProposal && interpretation.kind !== LEARNER_INTENT.UNCLEAR && !reaction && !boardReady) {
-            messages.push({
-              speaker: definition?.stimulus?.speaker || 'Colleague',
-              role: definition?.stimulus?.role || null,
-              actorKind: definition?.stimulus?.actorKind || 'AI_PARTICIPANT',
-              content: definition?.clarification?.template || (definition?.reviewReadiness?.edited?.length
+          if (needsConcreteWorkProposal && ![LEARNER_INTENT.UNCLEAR, LEARNER_INTENT.INFORMATION_REQUEST].includes(interpretation.kind) && !reaction && !boardReady) {
+            clarify(definition?.clarification?.template || (definition?.reviewReadiness?.edited?.length
                 ? 'Please finish it on the board too: every task needs an owner, a due point and a status we can run from.'
-                : 'Please make the ownership and order concrete on the board: who will take each open task, and which should happen first?'),
-              clarification: true,
-            })
+                : 'Please make the ownership and order concrete on the board: who will take each open task, and which should happen first?'))
           }
           const serves = interpretation.servesOpportunity && !reaction?.continue && (!needsConcreteWorkProposal || Boolean(reaction) || boardReady)
           const attached = await attachAction(sessionId, run, action, { serves })
@@ -716,27 +819,44 @@ export function createAssessmentSessionService({
           const actionResponse = { messages, exchanges: messageActions(actions).length + 1 }
           const actionResult = {
             ...actionResponse,
+            completedOpportunity: completed,
             interpretation,
             revealedFactId: revealedFactIdsForAction[0] || null,
             revealedFactIds: revealedFactIdsForAction,
             evaluationContext,
           }
           await applied(action, actionResult)
-          const shown = completed ? await presentNext(sessionId, run, { requestId }) : []
+          const shown = completed ? await presentNext(sessionId, run, { requestId, afterActionId: action.actionId }) : []
           // The task-only stage strip after the Director moved on (names and
           // position only, as in the contract), so the player can update it
           // without a second round trip.
           const stages = stageStrip(run.snapshot.form, await repos.sessionIo.listOpportunities(sessionId))
           const response = { ...actionResponse, messages: [...messages, ...shown], stages }
+          await repos.sessionIo.saveActionResponse(action.actionId, response)
           const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
           return { ...stored.response, replayed: false }
         }
         if (run?.snapshot) {
           // The handover segment: authored replies from pinned facts only.
-          const exchanges = messageActions(await repos.sessionIo.listActions(sessionId)).length + 1
+          const prior = await repos.sessionIo.listActions(sessionId)
+          const exchanges = messageActions(prior).length + 1
+          const board = await repos.sessionIo.latestArtifactVersion(sessionId, run.snapshot.artifactSchema.artifactId)
+          const presented = messageActions(prior).flatMap((a) => a.result?.messages || [])
+          const evaluationContext = {
+            schemaVersion: 'assessment-action-context.v1',
+            situation: {
+              scenarioId: run.snapshot.id, scenarioVersion: run.snapshot.version,
+              applicableFacts: [...run.snapshot.publicFacts, ...presented.filter((m) => m.factAnswer).map((m) => m.content)],
+              appliedWorldChangeIds: [],
+            },
+            stimulus: { opportunityId: null, messages: presented.length ? [presented.at(-1)] : [{ actorKind: 'SYSTEM', content: run.snapshot.publicFacts.join(' ') }], renderHash: run.pin.snapshotHash },
+            learnerAction: { actionId: action.actionId, kind: action.kind, sequence: action.sequence },
+            workState: { before: board?.content?.data || { rows: run.snapshot.artifactSchema.rows }, after: board?.content?.data || { rows: run.snapshot.artifactSchema.rows } },
+            method: { methodHash: run.pin.methodHash, rubricRef: run.pin.rubricRef },
+          }
           const response = { messages: answerSegmentQuestion(run.snapshot, text), exchanges }
+          await applied(action, { ...response, response, evaluationContext })
           const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
-          await applied(action, stored.response)
           if (typeof legacy.updateSession === 'function') await legacy.updateSession(sessionId, { exchangeCount: exchanges }).catch(() => {})
           return { ...stored.response, replayed: false }
         }
@@ -750,30 +870,36 @@ export function createAssessmentSessionService({
         }
         const after = await legacy.getSession(sessionId)
         const response = { messages, exchanges: Number(after?.exchangeCount) || 0 }
+        await applied(action, { ...response, response })
         const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'MESSAGE', response })
-        await applied(action, stored.response)
         return { ...stored.response, replayed: false }
       })
     },
 
     async saveArtifact({ user, workspace, sessionId, artifactId, ifMatch, clientEventId = null, updates, notes, authorization, client, requestId }) {
+      if (['start', 'begin', 'finish', 'publish'].includes(clientEventId) || clientEventId?.startsWith('review:')) throw new ApiError('VALIDATION_FAILED', 'Choose a different client event id.')
       requireStore()
       const { session } = await authorize(user, workspace, sessionId)
       await rejectErased(sessionId)
       if (!Number.isInteger(ifMatch) || ifMatch < 0) throw new ApiError('IF_MATCH_REQUIRED', 'Send the version you are changing (If-Match).')
-      if (!clientEventId || !(await alreadyAccepted(sessionId, clientEventId))) await guardTimed(sessionId)
-      const action = clientEventId
-        ? await accept({ sessionId, clientEventId, kind: 'ARTIFACT', payload: { artifactId, ifMatch, updates: updates ?? null, notes: notes ?? null } })
-        : null
-      if (clientEventId) {
-        const replay = await repos.sessionIo.getClientEvent(sessionId, clientEventId)
-        if (replay) return { ...replay.response, replayed: true }
-      }
       if (!(session.artifacts || []).some((a) => a.artifactId === artifactId)) throw new ApiError('NOT_FOUND', 'This work material is not part of the session.')
       return withLock(sessionId, async () => {
+        await rejectErased(sessionId)
+        const existingAction = clientEventId ? await alreadyAccepted(sessionId, clientEventId) : null
+        if (!existingAction) {
+          if (await isClosed(sessionId)) throw new ApiError('ASSESSMENT_COMPLETED', 'This assessment has already been completed.')
+          await guardTimed(sessionId)
+        }
+        const action = clientEventId
+          ? await accept({ sessionId, clientEventId, kind: 'ARTIFACT', payload: { artifactId, ifMatch, updates: updates ?? null, notes: notes ?? null } })
+          : null
         if (clientEventId) {
           const replay = await repos.sessionIo.getClientEvent(sessionId, clientEventId)
           if (replay) return { ...replay.response, replayed: true }
+        }
+        if (action?.state === 'APPLIED' && action.result?.response) {
+          const stored = await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'ARTIFACT', response: action.result.response })
+          return { ...stored.response, replayed: true }
         }
         if (await isClosed(sessionId)) {
           const err = new ApiError('ASSESSMENT_COMPLETED', 'This assessment has already been completed.')
@@ -864,16 +990,25 @@ export function createAssessmentSessionService({
             workStateAfter: artifact.data ?? null,
           })
           const reactionMessages = reaction?.content ? [{ ...reaction, stakeholderReaction: true }] : []
-          const actionResult = { ...response, messages: reactionMessages, interpretation, reviewReadiness: effectiveReadiness, revealedFactIds: reaction?.revealedFactIds || [], evaluationContext }
+          const actionResult = { ...response, completedOpportunity: completed, messages: reactionMessages, interpretation, reviewReadiness: effectiveReadiness, revealedFactIds: reaction?.revealedFactIds || [], evaluationContext }
           await applied(action, actionResult)
-          const shown = completed ? await presentNext(sessionId, run, { requestId }) : []
+          const shown = completed ? await presentNext(sessionId, run, { requestId, afterActionId: action.actionId }) : []
           const stages = stageStrip(run.snapshot.form, await repos.sessionIo.listOpportunities(sessionId))
           const finalResponse = { ...response, messages: [...reactionMessages, ...shown], stages, reviewReadiness: effectiveReadiness }
+          await repos.sessionIo.saveActionResponse(action.actionId, finalResponse)
           if (clientEventId) await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'ARTIFACT', response: finalResponse })
           return { ...finalResponse, replayed: false }
         }
+        const evaluationContext = run?.snapshot ? {
+          schemaVersion: 'assessment-action-context.v1',
+          situation: { scenarioId: run.snapshot.id, scenarioVersion: run.snapshot.version, applicableFacts: run.snapshot.publicFacts, appliedWorldChangeIds: [] },
+          stimulus: { opportunityId: null, renderHash: run.pin.snapshotHash, messages: [{ actorKind: 'SYSTEM', content: run.snapshot.publicFacts.join(' ') }] },
+          learnerAction: { actionId: action?.actionId, kind: 'ARTIFACT', sequence: action?.sequence },
+          workState: { before: current?.content?.data || { rows: run.snapshot.artifactSchema.rows }, after: artifact.data },
+          method: { methodHash: run.pin.methodHash, rubricRef: run.pin.rubricRef },
+        } : null
+        await applied(action, { ...response, response, ...(evaluationContext ? { evaluationContext } : {}) })
         if (clientEventId) await repos.sessionIo.putClientEvent({ sessionId, clientEventId, kind: 'ARTIFACT', response })
-        await applied(action, response)
         return { ...response, replayed: false }
       })
     },
@@ -893,38 +1028,26 @@ export function createAssessmentSessionService({
       // a leased job; the legacy engine is never asked to score it.
       const run = await draftRun(sessionId, session)
       if (run) {
-        const existing = await evaluationJob(sessionId)
-        if (existing?.state === 'DONE') {
-          // Evidence already applied: make sure the report is published
-          // (idempotent) before the learner is told it is ready.
-          if (typeof publishReport === 'function') await publishFor(sessionId, requestId)
-          await settle(sessionId, user)
-          return { state: 'COMPLETE' }
-        }
-        // A universal run counts the learner's own accepted messages; the
-        // engine's exchange counter is never consulted for it.
-        const universal = isUniversalRun(run)
-        const exchanges = messageActions(await repos.sessionIo.listActions(sessionId)).length
-        if (!existing && exchanges < required && !early) {
-          throw new ApiError('FINISH_CONFIRMATION_REQUIRED', 'You have not reached every part of this assessment yet.', { details: { exchanges, requiredExchanges: required } })
-        }
-        assertRunSupported(run)
         const io = jobs()
-        if (!existing) {
-          await io.acceptAction({ sessionId, clientEventId: 'finish', kind: 'FINISH', payload: { early: exchanges < required } }).catch((err) => { if (err?.code !== 'CONFLICT') throw err })
-          if (universal) {
-            // Answered opportunities move to EVALUATION_PENDING; presented-but-
-            // unanswered and never-presented ones stay as they are (no unit).
-            for (const row of await io.listOpportunities(sessionId)) if (row.state === 'ACTION_RECEIVED') await io.setOpportunityState(sessionId, row.opportunityId, 'EVALUATION_PENDING')
+        const queued = await withLock(sessionId, async () => {
+          await rejectErased(sessionId)
+          const existing = await evaluationJob(sessionId)
+          if (existing?.state === 'DONE') return existing
+          assertRunSupported(run)
+          const universal = isUniversalRun(run)
+          const exchanges = messageActions(await io.listActions(sessionId)).length
+          if (!existing && exchanges < required && !early) {
+            throw new ApiError('FINISH_CONFIRMATION_REQUIRED', 'You have not reached every part of this assessment yet.', { details: { exchanges, requiredExchanges: required } })
           }
-          await io.enqueueJob({ taskKey: evaluateJobKey(sessionId), sessionId, kind: DRAFT_EVALUATE_JOB_KIND })
-          audit('assessment.finish_requested', sessionId, { sessionId, early: exchanges < required, exchanges, requiredExchanges: required, requestId })
-        } else if (existing.state === 'FAILED') {
-          await io.retryJob(evaluateJobKey(sessionId))
-        }
+          if (!existing) {
+            await io.requestEvaluation({ sessionId, taskKey: evaluateJobKey(sessionId), kind: DRAFT_EVALUATE_JOB_KIND, payload: { early: exchanges < required }, universal })
+            audit('assessment.finish_requested', sessionId, { sessionId, early: exchanges < required, exchanges, requiredExchanges: required, requestId })
+          } else if (existing.state === 'FAILED') await io.retryJob(evaluateJobKey(sessionId))
+          return evaluationJob(sessionId)
+        })
         // Drive the worker until this session's job has settled (other
         // claimable jobs of the same kind are processed on the way).
-        let job = await evaluationJob(sessionId)
+        let job = queued
         for (let i = 0; i < 25 && job && (job.state === 'QUEUED' || (job.state === 'LEASED' && new Date(job.leaseExpiresAt) <= clock())); i += 1) {
           if (!(await runEvaluationWorkerOnce({ requestId }))) break
           job = await evaluationJob(sessionId)
@@ -954,15 +1077,16 @@ export function createAssessmentSessionService({
   }
   return {
     ...service,
-    // One evaluation worker pass (operators/tests drive it; finish() drives it inline).
+    // The server worker and finish() use the same fenced computation path.
     runEvaluationWorkerOnce,
+    runPublicationWorkerOnce,
     start(args) {
       requireStore()
       return withLock(`assignment:${args.assignmentId}:${args.user.id}`, () => service.start(args))
     },
     finish(args) {
       requireStore()
-      return withLock(args.sessionId, () => service.finish(args))
+      return service.finish(args)
     },
   }
 }

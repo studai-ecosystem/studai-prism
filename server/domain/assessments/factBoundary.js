@@ -49,6 +49,10 @@ export function verifyRender(intendedHash, shownHash) {
 }
 
 const norm = (s) => String(s || '').toLowerCase()
+export function isInformationRequest(text) {
+  return /\?/.test(String(text))
+    || /\b(?:please\s+(?:confirm|check|tell)|(?:can|could|would)\s+you\s+(?:confirm|check|tell)|let me know|(?:what|which|who|when|where|how (?:many|much|long))\b|(?:do we|do you|is the|are the|is \d+)\b)/i.test(String(text))
+}
 // Triggers of `fact` that appear in `text`, most specific first ("confirmed
 // number" beats a bare "support"). Empty = no match.
 function matchedTriggers(text, fact) {
@@ -70,8 +74,12 @@ export function answerFactQuestion({ form, worldState, text }) {
   if (typeof text !== 'string' || !text.trim()) return { kind: 'UNKNOWN', factId: null, factIds: [], revealedFactIds: [], text: null }
   // Only the question sentences are matched: a plan that merely mentions the
   // venue while stating a decision is not a request for information.
-  const questions = String(text).split(/(?<=[.!?])\s+/).filter((s) => /\?\s*$/.test(s))
+  if (!isInformationRequest(text)) return { kind: 'NONE', factId: null, factIds: [], revealedFactIds: [], text: null }
+  const questions = String(text).split(/(?<=[.!?])\s+/).filter(isInformationRequest)
   const asked = questions.length ? questions.join(' ') : text
+  if (/\b(cost|price|budget|funding)\b/i.test(asked)) {
+    return { kind: 'UNKNOWN', factId: null, factIds: [], revealedFactIds: [], text: 'That is not known at this point; nobody on the team has that information.' }
+  }
   // A request to a colleague ("can you cover…?", "would you take…?") is a
   // proposal, not a fact lookup: the Director handles it, not the fact table.
   const infoQuestion = /\b(what|which|how (?:many|much|long)|when|where|who|is there|are there|do we|does the|did|is \d+|is the|are the)\b/i.test(asked)
@@ -93,6 +101,10 @@ export function answerFactQuestion({ form, worldState, text }) {
     if (own.length && own[0].length >= MIN_SECOND_TRIGGER) chosen.push({ ...m, triggers: own })
   }
   if (chosen.length) {
+    const change = worldState?.facts?.['F-FACILITATOR-CHANGE']
+    if (change && /\bsam\b/i.test(asked) && chosen.some((m) => m.fact.id === 'CF-FACILITATOR-HOURS') && !chosen.some((m) => m.fact.id === change.id)) {
+      chosen.push({ fact: change, kind: 'ALREADY_GIVEN', triggers: [] })
+    }
     const revealed = chosen.filter((m) => m.kind === 'AUTHORED').map((m) => m.fact.id)
     const parts = chosen.map((m) => (m.kind === 'ALREADY_GIVEN' ? `That is already in the brief: ${m.fact.text}` : m.fact.text))
     return {
@@ -126,15 +138,18 @@ const meaningful = (text, pattern) => pattern.test(String(text || '').toLowerCas
 // never infers personality, quality or a rubric level.
 export function interpretLearnerMessage({ text, opportunity, factAnswer = null }) {
   const raw = String(text || '').trim()
+  const actionText = raw.split(/(?<=[.!?])\s+/).filter((s) =>
+    !isInformationRequest(s) || /\b(?:i|we)\s+(?:will|would|choose|recommend|prefer|plan|cannot|can't|won't|can\s+(?:take|assign|handle|cover))\b/i.test(s)).join(' ')
   const inquiryOpportunity = (opportunity?.behaviourIds || []).some((id) => INQUIRY_BEHAVIOURS.has(id))
   const hasFactRequest = Boolean(factAnswer && !['NONE'].includes(factAnswer.kind))
-  const scopeDecision = meaningful(raw, /\b(postpone|delay|defer|reduce|reduced|trim|smaller|drop|skip|go ahead|proceed|keep)\b/)
-  const helpRequest = meaningful(raw, /\b(ask|need|request|could|can|would)\b.{0,50}\b(priya|sam|help|cover|support|take)\b|\b(priya|sam)\b.{0,30}\b(help|cover|take)\b/)
-  const refusal = meaningful(raw, /\b(i|we)\s+(?:cannot|can't|won't|will not|would not|decline|refuse)\b|\bnot workable\b/)
-  const decision = scopeDecision || meaningful(raw, /\b(i|we)\s+(?:will|would|choose|recommend|prefer|plan|can take|can handle)\b|\b(first|then|priority|prioriti[sz]e|assign|owner|move|schedule|by day|due)\b/)
-  const proposal = meaningful(raw, /\b(should|could|let'?s|how about|proposal|option)\b/)
+  const scopeDecision = meaningful(actionText, /\b(postpone|delay|defer|reduce|reduced|trim|smaller|drop|skip|go ahead|proceed|keep)\b/)
+  const helpRequest = meaningful(actionText || (!hasFactRequest ? raw : ''), /\b(ask|need|request|could|can|would)\b.{0,50}\b(priya|sam|help|cover|support|take)\b|\b(priya|sam)\b.{0,30}\b(help|cover|take)\b/)
+  const refusal = meaningful(actionText, /\b(i|we)\s+(?:cannot|can't|won't|will not|would not|decline|refuse)\b|\bnot workable\b/)
+  const decision = scopeDecision || meaningful(actionText, /\b(i|we)\s+(?:will|would|choose|recommend|prefer|plan|can take|can handle)\b|\b(first|then|priority|prioriti[sz]e|assign|owner|move|schedule|by day|due)\b/)
+  const proposal = meaningful(actionText || (!hasFactRequest ? raw : ''), /\b(should|could|let'?s|how about|proposal|option)\b/)
   const acceptance = meaningful(raw, /\b(i agree|that works|accept|go with)\b/)
-  const fillerOnly = /^(?:(?:ok(?:ay)?|sure|maybe|fine|yes|no)(?:[ ,]+(?:ok(?:ay)?|sure|maybe|fine|yes|no))*|i don'?t know|not sure)[.! ]*$/i.test(raw)
+  const contextualStatement = /\b(room|materials?|handouts?|participants?|sign.?ups?|attendance|printing|capacity|list|sam|priya)\b/i.test(actionText)
+    && /\b(is|are|has|have|needs?|takes?|fits?|depends|means|confirmed|unconfirmed|tomorrow|morning|afternoon)\b|[:;]/i.test(actionText)
 
   let kind
   if (refusal) kind = LEARNER_INTENT.REFUSAL
@@ -142,7 +157,7 @@ export function interpretLearnerMessage({ text, opportunity, factAnswer = null }
   else if (scopeDecision || decision || acceptance) kind = LEARNER_INTENT.DECISION
   else if (proposal) kind = LEARNER_INTENT.PROPOSAL
   else if (hasFactRequest) kind = LEARNER_INTENT.INFORMATION_REQUEST
-  else kind = fillerOnly || !raw ? LEARNER_INTENT.UNCLEAR : LEARNER_INTENT.PROPOSAL
+  else kind = contextualStatement ? LEARNER_INTENT.PROPOSAL : LEARNER_INTENT.UNCLEAR
 
   return {
     kind,
@@ -216,8 +231,12 @@ export function stakeholderReaction({ form, opportunity, interpretation, action,
   const text = String(action?.payload?.text || '')
   if (opportunity?.id === 'OPP-EXEC-BOARD-OWNERS') {
     const rows = materializeBoard(form, boardState)
-    const overloadsSam = rows.filter((row) => row.owner === 'Sam').length >= 3
-      || /\bsam\b.{0,60}\b(both|all|two)\b|\b(both|all|two)\b.{0,60}\bsam\b/i.test(text)
+    const unresolvedBoardCapacity = action?.kind === 'ARTIFACT' && rows.filter((row) => row.owner === 'Sam').length >= 3
+      && rows.some((row) => !String(row.rationale || '').trim())
+    const proposesBothToSam = text.split(/(?<=[.!?])\s+/).some((sentence) =>
+      /\bsam\b.{0,30}\b(?:handle|take|own|cover|do|both|all|two)\b.{0,30}\b(?:both|all|two)\b|\b(?:assign|give)\b.{0,30}\b(?:both|all|two)\b.{0,30}\bsam\b/i.test(sentence)
+      && !/\b(?:not|cannot|can't|won't|instead|avoid|no longer)\b/i.test(sentence))
+    const overloadsSam = unresolvedBoardCapacity || proposesBothToSam
     if (overloadsSam && authored.OVERLOADED_SAM) return { ...authored.OVERLOADED_SAM, revealedFactIds: ['CF-FACILITATOR-HOURS'], continue: true }
     const namesWork = /\b(priya|sam|i|me|you)\b.{0,45}\b(handle|take|own|assign|cover|responsible)\b|\b(handle|take|own|assign|cover)\b.{0,45}\b(priya|sam|me|you)\b/i.test(text)
     const taskReferences = text.match(/\b(room|setup|materials?|handouts?|participant list|list|needs)\b/gi) || []
@@ -230,7 +249,8 @@ export function stakeholderReaction({ form, opportunity, interpretation, action,
     // sentence actually assigns Sam afternoon work ("Sam takes … afternoon",
     // "move … to Sam … afternoon"); mentioning Sam and the afternoon in one
     // breath ("…afternoon so Sam has the morning free") is not an assignment.
-    const boardAssignsSamAfternoon = materializeBoard(form, boardState)
+    const confirmsBoard = action?.kind === 'ARTIFACT' || /\bboard\s+(?:updated|ready|complete)\b/i.test(text)
+    const boardAssignsSamAfternoon = confirmsBoard && materializeBoard(form, boardState)
       .some((row) => row.owner === 'Sam' && /\bday\s*1\b/i.test(String(row.due || '')) && /\bafternoon\b/i.test(String(row.due || '')))
     const sentences = text.split(/(?<=[.!?])\s+/)
     const textAssignsSamAfternoon = sentences.some((s) => /\bafternoon\b/i.test(s)

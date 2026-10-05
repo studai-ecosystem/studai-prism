@@ -5,6 +5,8 @@ import { isDbConfigured, getPool } from '../db/pool.js'
 import logger from './logger.js'
 import { normalizeEvidenceUnit, readEvidenceRow } from '../domain/evidence/evidenceUnit.js'
 import { evaluateProfile } from '../domain/evidence/sufficiency.js'
+import { ApiError } from '../domain/http/errors.js'
+import { assertSessionNotErased, isMemorySessionErased, lockPublication, withMemoryPublicationFence, withPublicationTransaction } from '../domain/assessments/publicationFence.js'
 
 // In-memory ledger used when no database is configured (and in unit tests).
 const memoryEvidenceStore = new Map()
@@ -23,27 +25,32 @@ export class EvidenceGraph {
 
     if (isDbConfigured()) {
       try {
-        const runner = tx?.client || getPool()
-        const { rows } = await runner.query(
-          `INSERT INTO behavioral_evidence_units (
-            evidence_id, session_id, attempt_id, blueprint_id, capability_id, capability_layer,
-            source_type, source_turn, source_artifact_id, behavior_anchor_id,
-            candidate_action, candidate_action_json, observable_behavior, rubric_level, rubric_label,
-            confidence_status, judge_agreement, judge_agreement_json, human_review_status,
-            provenance, provenance_json, assessment_form_id, evidence_status, legacy_row, created_at
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$12,$13,$14,$15,$16,$16,$17,$18,$18,$19,$20,false,$21)
-          ON CONFLICT (evidence_id) DO NOTHING RETURNING evidence_id`,
-          [
-            unit.evidence_id, unit.session_id, unit.attempt_id, unit.blueprint_id, unit.capability_id, unit.capability_layer,
-            unit.source_type, unit.source_turn, unit.source_artifact_id, unit.behavior_anchor_id,
-            json(unit.candidate_action_json), unit.observable_behavior, unit.rubric_level, unit.rubric_label,
-            unit.evidence_status, json(unit.judge_agreement_json), unit.human_review_status,
-            json(unit.provenance_json), unit.assessment_form_id, unit.evidence_status, unit.created_at,
-          ],
-        )
-        if (rows.length) return unit
-        const { rows: existing } = await runner.query('SELECT * FROM behavioral_evidence_units WHERE evidence_id = $1', [unit.evidence_id])
-        return existing[0] ? readEvidenceRow(existing[0]) : unit
+        const write = async (runner) => {
+          await lockPublication(runner, unit.session_id)
+          await assertSessionNotErased(runner, unit.session_id)
+          const { rows } = await runner.query(
+            `INSERT INTO behavioral_evidence_units (
+              evidence_id, session_id, attempt_id, blueprint_id, capability_id, capability_layer,
+              source_type, source_turn, source_artifact_id, behavior_anchor_id,
+              candidate_action, candidate_action_json, observable_behavior, rubric_level, rubric_label,
+              confidence_status, judge_agreement, judge_agreement_json, human_review_status,
+              provenance, provenance_json, assessment_form_id, evidence_status, legacy_row, created_at
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$12,$13,$14,$15,$16,$16,$17,$18,$18,$19,$20,false,$21)
+            ON CONFLICT (evidence_id) DO NOTHING RETURNING evidence_id`,
+            [
+              unit.evidence_id, unit.session_id, unit.attempt_id, unit.blueprint_id, unit.capability_id, unit.capability_layer,
+              unit.source_type, unit.source_turn, unit.source_artifact_id, unit.behavior_anchor_id,
+              json(unit.candidate_action_json), unit.observable_behavior, unit.rubric_level, unit.rubric_label,
+              unit.evidence_status, json(unit.judge_agreement_json), unit.human_review_status,
+              json(unit.provenance_json), unit.assessment_form_id, unit.evidence_status, unit.created_at,
+            ],
+          )
+          if (rows.length) return unit
+          const { rows: existing } = await runner.query('SELECT * FROM behavioral_evidence_units WHERE evidence_id = $1', [unit.evidence_id])
+          if (!existing[0] || existing[0].session_id !== unit.session_id) throw new ApiError('CONFLICT', 'This evidence key belongs to another observation.')
+          return readEvidenceRow(existing[0])
+        }
+        return tx?.client ? await write(tx.client) : await withPublicationTransaction(getPool, unit.session_id, write)
       } catch (err) {
         // With a database configured, a rejected write is an error, never a
         // silent memory fallback that bypasses the schema checks (fail closed).
@@ -52,12 +59,30 @@ export class EvidenceGraph {
       }
     }
 
-    const list = memoryEvidenceStore.get(unit.session_id) || []
-    const existing = list.find((u) => u.evidence_id === unit.evidence_id)
-    if (existing) return existing
-    list.push(unit)
-    memoryEvidenceStore.set(unit.session_id, list)
-    return unit
+    const write = () => {
+      if (isMemorySessionErased(unit.session_id)) throw new ApiError('NOT_FOUND', 'Not found')
+      const list = memoryEvidenceStore.get(unit.session_id) || []
+      const k = `evidence:${unit.session_id}:${unit.evidence_id}`
+      const existing = tx?.memory?.values.get(k) || list.find((u) => u.evidence_id === unit.evidence_id)
+      if (existing) return existing
+      if (tx?.memory) {
+        tx.memory.values.set(k, unit)
+        tx.memory.stage({
+          commit: () => {
+            const current = memoryEvidenceStore.get(unit.session_id) || []
+            memoryEvidenceStore.set(unit.session_id, [...current, unit])
+          },
+          rollback: () => {
+            const current = memoryEvidenceStore.get(unit.session_id) || []
+            memoryEvidenceStore.set(unit.session_id, current.filter((u) => u !== unit))
+          },
+        })
+      } else {
+        memoryEvidenceStore.set(unit.session_id, [...list, unit])
+      }
+      return unit
+    }
+    return tx?.memory ? write() : withMemoryPublicationFence(unit.session_id, write)
   }
 
   /** All evidence units for a session, legacy rows read through the adapter. */
@@ -65,10 +90,12 @@ export class EvidenceGraph {
     if (isDbConfigured()) {
       try {
         const { rows } = await getPool().query(
-          'SELECT * FROM behavioral_evidence_units WHERE session_id = $1 ORDER BY source_turn ASC NULLS LAST, created_at ASC',
+          `SELECT * FROM behavioral_evidence_units WHERE session_id = $1
+           AND NOT EXISTS (SELECT 1 FROM assessment_erasure_markers WHERE session_id = $1)
+           ORDER BY source_turn ASC NULLS LAST, created_at ASC`,
           [sessionId],
         )
-        if (rows.length > 0) return rows.map(readEvidenceRow)
+        return rows.map(readEvidenceRow)
       } catch (err) {
         // A read failure is an outage, not missing evidence: never let it
         // surface as INSUFFICIENT_EVIDENCE on a report or in the audit trail.
@@ -76,7 +103,7 @@ export class EvidenceGraph {
         throw err
       }
     }
-    return (memoryEvidenceStore.get(sessionId) || []).map(readEvidenceRow)
+    return isMemorySessionErased(sessionId) ? [] : (memoryEvidenceStore.get(sessionId) || []).map(readEvidenceRow)
   }
 
   async getEvidenceUnits(sessionId) {

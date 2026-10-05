@@ -53,11 +53,17 @@ async function personalJourney(page, { mobile = false } = {}) {
   expect(dev.body.sessionId).toBeTruthy()
   await check()
 
-  // Capabilities: nothing completed → honest empty state, every capability insufficient.
+  // No published measurement is not the same as a measured insufficient result.
   await page.goto(`${CAMPUS_BASE_URL}/app/capabilities`)
   await expect(page.getByText('You do not have a formal capability profile yet.')).toBeVisible()
   await expect(page.getByTestId('capability-card')).toHaveCount(5)
-  await expect(page.getByTestId('capability-card').first()).toContainText('Insufficient evidence')
+  for (const capability of await page.getByTestId('capability-card').all()) {
+    await expect(capability).toContainText('Not yet measured')
+    await expect(capability).toHaveAttribute('data-described', 'false')
+  }
+  const capabilities = await api(page, '/api/v1/me/capabilities', { token: student.token })
+  expect(capabilities.status).toBe(200)
+  expect(capabilities.body.data.assessedCount).toBe(0)
   await check()
 
   // Evidence: filters in the URL are honoured (and junk is ignored).

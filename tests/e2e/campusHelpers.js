@@ -56,7 +56,7 @@ export async function api(page, path, { method = 'GET', token, body, headers = {
 // Registers a synthetic user through the real API and stores the session the
 // same way the app does (lib/session.js keys).
 export async function signInSynthetic(page, baseURL, label = 'campus') {
-  await page.goto(`${baseURL}/`)
+  await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded' })
   const email = syntheticEmail(label)
   const reg = await api(page, '/api/auth/register', {
     method: 'POST',
@@ -79,4 +79,21 @@ export async function expectNoSeriousAxe(page) {
 export async function expectNoHorizontalOverflow(page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(1)
+}
+
+export async function continueAssessmentOnSmallScreen(page) {
+  const continuation = page.getByRole('button', { name: 'Continue on this device' })
+  await expect(page.getByLabel('Your answer').or(continuation)).toBeVisible()
+  if (await continuation.isVisible()) await continuation.click()
+}
+
+export async function completeLegacyAssessment(page, token, sessionId) {
+  const submitted = await api(page, '/api/assessment/evaluate', { method: 'POST', token, body: { sessionId } })
+  expect([200, 202], JSON.stringify(submitted.body)).toContain(submitted.status)
+  await expect.poll(async () => {
+    const status = await api(page, `/api/assessment/evaluate-status/${sessionId}`, { token })
+    expect(status.status, JSON.stringify(status.body)).toBe(200)
+    expect(status.body.status, 'legacy evaluation must not fail').not.toBe('failed')
+    return status.body.status
+  }, { timeout: 30_000 }).toBe('complete')
 }

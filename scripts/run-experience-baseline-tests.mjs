@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'browser', 'browser-smoke', 'browser-critical', 'browser-all', 'browser-p1', 'browser-sync'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, p2, p3, p4, p5, p6, p7, p8, p9, p10, browser, browser-smoke, browser-critical, browser-all, browser-p1 or browser-sync mode; connection strings are never arguments.')
+if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'browser', 'browser-smoke', 'browser-critical', 'browser-all', 'browser-p1', 'browser-sync', 'browser-journey-a', 'browser-mobile-correction'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, p3, p4, p5, p6, p7, p8, p9, p10, browser, browser-smoke, browser-critical, browser-all, browser-p1, browser-sync, browser-journey-a or browser-mobile-correction mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -82,6 +82,22 @@ try {
   if (mode === 'browser-sync') browserArgs.splice(2, browserArgs.length, 'campus-journey-a.spec.js', 'campus-shell.spec.js', 'ui-matrix.spec.js', 'flow-recovery.spec.js')
   if (mode === 'browser-smoke') browserArgs.push('--grep', 'returning login|pending report')
   if (mode === 'browser-critical') browserArgs.splice(2, browserArgs.length, '--grep', '@critical')
+  if (mode === 'browser-journey-a') browserArgs.splice(2, browserArgs.length,
+    'campus-journey-a.spec.js', 'cr05-returning-loop.spec.js', '--grep', 'register → personal entitlement|@cr05', '--project=chromium')
+  if (mode === 'browser-mobile-correction') browserArgs.splice(2, browserArgs.length,
+    'campus-workspace.spec.js', 'cr05-returning-loop.spec.js', '--grep', 'connection drop|@cr05', '--project=mobile-chromium')
+  // Connected correction acceptance uses the pinned universal form. These
+  // flags are consumed only by the isolated 4174 audit server, not 4173.
+  if (['browser-critical', 'browser-all', 'browser-sync', 'browser-journey-a', 'browser-mobile-correction'].includes(mode)) {
+    env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
+  }
+  // The old audit provider expects pooled text, while correction practice
+  // sends criterion-scoped structured artifacts. Use the existing controlled
+  // adapter only in these disposable browser processes; runtime is untouched.
+  if (mode.startsWith('browser') || ['p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'].includes(mode)) {
+    const preload = new URL('../tests/fixtures/registerBrowserAuditProvider.mjs', import.meta.url).href
+    env.NODE_OPTIONS = `${env.NODE_OPTIONS || ''} --import=${preload}`.trim()
+  }
   // P3: the real-browser canonical journey (draft content on the 4174 audit
   // server only) plus the player frame, recovery and shell specs, all projects.
   if (mode === 'p3') {

@@ -2,12 +2,73 @@
 
 ## Current correction cycle - 2026-10-05
 
-State: **REOPENED - 0 of 7 exit conditions signed off.** Current source
-candidate: `8962b09667ec15bb4f3cef226e0084ec72f99803`. Release remains **NO_GO**.
+State: **IMPLEMENTING AND VERIFYING - 0 of 7 exit conditions signed off.**
+Starting HEAD: `12bc65e`; current candidate is its uncommitted correction
+worktree on `ui/prism-brand-transformation`. Release remains **NO_GO**.
 This is the current requirements tracker; historical P0-P10 and UI A-M
 implementation checkpoints below remain preserved, not restarted or promoted
 into acceptance. Existing files and positive fixture tests do not close an
 item.
+
+### Runtime checkpoint (in progress, not release acceptance)
+
+- CR-01: START now archives the complete actual form, behaviour rubric,
+  prompt text, evaluator/model policy, timing and interpretation rules.
+  Missing/mismatched anchors, forms, provider policy or required presented
+  stimulus reject before inference. Prompt/evaluator are now v3; method is
+  `v3-slice-0.2`. Original form `0.1.0-draft` remains available in the content
+  archive; `0.2.0-draft` is a separate **unapproved DRAFT**.
+- CR-02: punctuation-free inquiries, mixed inquiry/decision handling,
+  bounded neutral clarification, cumulative board readiness, grounded
+  capacity questions and response/receipt recovery are integrated. A count
+  of tasks is not presented as proof of infeasibility; supplied work and
+  respectful alternatives remain available for interpretation.
+- CR-03: computation proposes only. Fenced acceptance atomically records the
+  accepted input/method/evidence membership alongside job completion.
+  Publication renders that accepted batch, not unaccepted late graph rows.
+  Server startup drains queued work and retries publication independently
+  of an open browser. Heartbeats continue during inference. Ordinary V3,
+  legacy V2 and employee reads select stored snapshots; unsupported legacy
+  formatted views lead to the preserved original report, not new findings.
+  Owner/sponsor/share version selection is wired through HTTP and UI.
+- CR-04: ten new mission revisions remain unapproved DRAFTs; historical
+  mission bodies/attempts are retained. Effective setting, objective, facts,
+  constraints and attributed structured work reach semantic interpretation.
+  NOT_JUDGEABLE is distinct and neutral in the player. Frozen rubric/context
+  also accompanies qualified blinded review without exposing model ratings.
+- Schema: additive `0054_report_publication_note` includes publication notes,
+  accepted/publication receipt kinds and frozen rater context. New
+  allocations require schema floor 0054. Production migrations, backfills,
+  activation, payments and deployment have **not** been run.
+- Executable checkpoints: missing-anchor and omitted-practice-context tests
+  each reproduced two initial failures before correction. Combined focused
+  checkpoint subsequently passed **20/20**; later context/allocation guards
+  have additional tests. The integrated server milestone was **938 pass,
+  27 disposable-database skips, zero failures** before the subsequent legacy
+  immutable-view changes; it is not the final candidate result.
+- Latest real database/HTTP loop: **27/27 pass, zero skips**, through actual
+  routes, model fixtures, accepted actions, evaluation/application,
+  publication, practice, faults and erasure; no final report/evidence preload.
+  Dedicated PostgreSQL fencing checkpoint: **17/17 pass**. These are
+  controlled-provider software checks, not live-model interpretation.
+- Build, frontend, static and calibration milestones passed. Final full
+  suites, migration re-rehearsal after the last schema change, rollback,
+  complete browser acceptance and screenshot inspection have been reconciled.
+  Final critical corpus: 224 passing outcomes, zero failures/skips, five
+  recovered retries. Full corpus: 875 passing outcomes, zero final failures,
+  25 existing project/configuration skips, five recovered retries. The real
+  returning-user loop passed first attempt in all four browser projects.
+  Report/practice/history screenshots were inspected at 1440/1024/768/390.
+  Latest server checkpoint: 941 pass, zero failures, 27 default DB skips;
+  frontend 521 pass; actual mixed-store PG fault corpus 18/18.
+- Hosted CI, authorized live-model calls, qualified content/measurement
+  sign-off, real users, manual assistive technology, physical-device checks,
+  live payments and production activation: **NOT RUN**. Paid offers and
+  formal growth remain gated; no owner approval is inferred from these tests.
+
+The reopened table and historical evidence below explain why corrections
+were required. Its original failure descriptions are superseded by this
+runtime checkpoint, **not** by a claim that external exit conditions passed.
 
 Immediate target: **meaningful situation -> real learner action -> correct
 evidence -> understandable finding -> useful practice -> preserved history**.

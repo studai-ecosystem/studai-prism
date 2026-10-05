@@ -108,7 +108,7 @@ const CounterpartSchema = z.object({
   lines: z.array(z.object({ criterionId: z.string(), when: z.enum(['OBSERVED', 'NOT_OBSERVED']), text: z.string() })),
   closing: nullableStr.optional(), note: z.string(),
 })
-export const CRITERION_RESULTS = ['OBSERVED', 'NOT_OBSERVED', 'UNCERTAIN', 'COPIED_ASSISTANCE']
+export const CRITERION_RESULTS = ['OBSERVED', 'NOT_OBSERVED', 'NOT_JUDGEABLE', 'UNCERTAIN', 'COPIED_ASSISTANCE']
 const ResultSchema = z.object({
   status: z.enum(['EVALUATED', 'EVALUATION_UNAVAILABLE']),
   verified: z.boolean(),

@@ -3,6 +3,8 @@
 // below checks what the system truthfully does — no scripted scenario, no
 // default rubric level, no fabricated report sections, no practice "levels".
 import { test, expect } from '@playwright/test'
+import { storeSyntheticInsufficientViews } from '../fixtures/issuedLegacyViews.mjs'
+import { completeLegacyAssessment } from './campusHelpers.js'
 
 const AUDIT_SESSION = 'reality-audit-sess-' + Date.now()
 const CONSENT_SCOPES = ['data_processing', 'ai_disclosure', 'ai_scoring_oversight', 'proctoring', 'face_analysis', 'own_work']
@@ -36,13 +38,18 @@ async function seedSession(request, { consent = true } = {}) {
 
 // Legacy reports are readable only by the session owner (Campus Phase 12,
 // S7): sign the browser in as the seeded owner, then open the report.
+// These report-state tests explicitly store SYNTHETIC empty-evidence views;
+// PN-E2E-30 below instead completes a real controlled-provider legacy run.
 async function openOwnReport(page, request, view = 'v2') {
   const sessionId = await seedSession(request)
+  if (!owners[sessionId].issuedViews) {
+    owners[sessionId].issuedViews = await storeSyntheticInsufficientViews(sessionId)
+  }
   await page.goto('/')
   await page.evaluate(({ token, user }) => {
     localStorage.setItem('prism_token', token)
     localStorage.setItem('prism_user', JSON.stringify(user))
-  }, owners[sessionId])
+  }, { token: owners[sessionId].token, user: owners[sessionId].user })
   await page.goto(`/report/${sessionId}/${view}`)
   return sessionId
 }
@@ -317,6 +324,8 @@ test.describe('Reality & truth audit (PN-E2E-01 to PN-E2E-30)', () => {
     await page.getByLabel('Your answer').fill('I would check which channel changed before moving budget.')
     await page.getByRole('button', { name: 'Send' }).click()
     await expect(page.getByLabel('Your answer')).toHaveValue('', { timeout: 15000 })
+    const token = await page.evaluate(() => localStorage.getItem('prism_token'))
+    await completeLegacyAssessment(page, token, sessionId)
     await page.goto(`/report/${sessionId}/v2`)
     await expect(page.getByRole('heading', { name: 'Capability report' })).toBeVisible({ timeout: 10000 })
     expect(await page.innerText('main')).not.toMatch(FABRICATED)

@@ -8,23 +8,24 @@
 //   EVALUATOR      the evaluator observed it with confidence ≥ threshold AND
 //                  quoted the learner's own words verbatim
 //   BOTH           both of the above; disagreement is UNCERTAIN, not a claim
-import { runDeterministicChecks, candidateTextFor, VALIDATORS_VERSION } from './validators.js'
+import { normaliseWork, runDeterministicChecks, candidateEntriesFor, VALIDATORS_VERSION } from './validators.js'
 import { MISSION_SCHEMA_VERSION } from './missionSchema.js'
-import { meaningWorkTooShort } from './evaluator.js'
+import { meaningWorkEmpty } from './evaluator.js'
 import { copiedFrom, buildFocus, FEEDBACK_VERSION } from './feedback.js'
 
-export const PIPELINE_VERSION = 'mission-pipeline.v4'
+export const PIPELINE_VERSION = 'mission-pipeline.v6'
 export const CONFIDENCE_THRESHOLD = 0.7
 const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase()
 
-// A quote grounds a decision only if it is a real phrase (≥ 3 words and
-// ≥ 12 characters) found verbatim in the learner's own text.
+// Concise whole-cell evidence needs no style floor. Short fragments of a
+// longer cell still cannot establish what the evaluator claims.
 export const MIN_QUOTE_WORDS = 3
 export const MIN_QUOTE_CHARS = 12
-function quoteVerified(quote, texts) {
+function quoteSource(quote, entries) {
   const q = norm(quote)
-  if (q.length < MIN_QUOTE_CHARS || q.split(' ').length < MIN_QUOTE_WORDS) return false
-  return texts.some((t) => norm(t).includes(q))
+  if (!q) return null
+  const entry = entries.find((e) => norm(e.value) === q || q.length >= MIN_QUOTE_CHARS && q.split(' ').length >= MIN_QUOTE_WORDS && norm(e.value).includes(q))
+  return entry ? { artifactId: entry.artifact_id, path: entry.path, rowId: entry.row_id || null, coverage: norm(entry.value) === q ? 'WHOLE_VALUE' : 'EXCERPT' } : null
 }
 
 // `exposed`: sentences the learner was shown before submitting (scaffold
@@ -32,22 +33,20 @@ function quoteVerified(quote, texts) {
 // criterion whose text reproduces one of them is COPIED_ASSISTANCE: shown
 // honestly, never praised, never counted as the learner's own behaviour.
 export async function evaluateMissionWork({ mission, work, evaluator, candidateName = null, exposed = [] }) {
+  work = normaliseWork(mission, work)
   const det = runDeterministicChecks(mission, work)
   const needEvaluator = mission.rubric.criteria.filter((c) => c.check === 'EVALUATOR' || (c.check === 'BOTH' && det.get(c.criterion_id).observed))
-  const needMeaning = mission.rubric.criteria.filter((c) => c.check === 'MEANING')
-  const texts = new Map(mission.rubric.criteria.map((c) => [c.criterion_id, candidateTextFor(mission, work, c.artifact_ids)]))
-  const allTexts = [...new Set([...texts.values()].flat())]
+  const entries = new Map(mission.rubric.criteria.map((c) => [c.criterion_id, candidateEntriesFor(mission, work, c.artifact_ids, c.work_paths).filter((e) => e.kind === 'text' && e.value.trim())]))
+  const texts = new Map([...entries].map(([id, cells]) => [id, cells.map((e) => e.value)]))
+  const needMeaning = mission.rubric.criteria.filter((c) => c.check === 'MEANING' && !meaningWorkEmpty(texts.get(c.criterion_id)))
   const ev = needEvaluator.length && evaluator
-    ? await evaluator.evaluate({ mission, criteria: needEvaluator, workTexts: allTexts, candidateName })
+    ? await evaluator.evaluate({ mission, criteria: needEvaluator, work, candidateName })
     : { available: needEvaluator.length === 0, results: [], reason: needEvaluator.length ? 'EVALUATOR_NOT_CONFIGURED' : null }
-  // P6.4 — meaning (paraphrase) checks. Short work is decided locally as
-  // "not met, EMPTY_WORK" even when no evaluator is configured.
-  const meaningTexts = [...new Set(needMeaning.flatMap((c) => texts.get(c.criterion_id)))]
+  // Nonempty work is judged contextually, regardless of character count.
   const mv = !needMeaning.length ? { available: true, results: [] }
-    : meaningWorkTooShort(meaningTexts) ? { available: true, results: needMeaning.map((c) => ({ criterionId: c.criterion_id, met: false, quote: '', reason: 'EMPTY_WORK' })) }
-      : evaluator && typeof evaluator.evaluateMeaning === 'function'
-        ? await evaluator.evaluateMeaning({ mission, criteria: needMeaning, workTexts: meaningTexts, candidateName })
-        : { available: false, results: [], reason: 'EVALUATOR_NOT_CONFIGURED' }
+    : evaluator && typeof evaluator.evaluateMeaning === 'function'
+      ? await evaluator.evaluateMeaning({ mission, criteria: needMeaning, work, candidateName })
+      : { available: false, results: [], reason: 'EVALUATOR_NOT_CONFIGURED' }
   // Only answers for criteria we asked about count; anything else is ignored.
   const asked = new Set(needEvaluator.map((c) => c.criterion_id))
   const answers = new Map()
@@ -62,40 +61,47 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
     const decided = (() => {
       if (c.check === 'DETERMINISTIC') return { ...base, result: d.observed ? 'OBSERVED' : 'NOT_OBSERVED', reason: d.observed ? 'RULES_PASSED' : 'RULES_NOT_MET' }
       if (c.check === 'MEANING') {
+        if (meaningWorkEmpty(texts.get(c.criterion_id))) return { ...base, result: 'NOT_OBSERVED', reason: 'EMPTY_WORK' }
         if (!mv.available) return { ...base, result: 'UNCERTAIN', reason: 'EVALUATION_UNAVAILABLE' }
         const m = meanings.get(c.criterion_id)
         if (!m) return { ...base, result: 'UNCERTAIN', reason: 'NO_EVALUATOR_DECISION' }
+        if (m.met && m.reason !== 'EXPRESSED') return { ...base, result: 'UNCERTAIN', reason: 'INVALID_EVALUATOR_DECISION' }
+        if (m.reason === 'NOT_JUDGEABLE') return { ...base, result: 'NOT_JUDGEABLE', reason: 'MEANING_NOT_JUDGEABLE' }
         if (!m.met) return { ...base, result: 'NOT_OBSERVED', reason: m.reason === 'EMPTY_WORK' ? 'EMPTY_WORK' : `MEANING_${m.reason}` }
-        if (!quoteVerified(m.quote, texts.get(c.criterion_id))) return { ...base, result: 'UNCERTAIN', reason: 'QUOTE_NOT_VERIFIED' }
-        return { ...base, result: 'OBSERVED', reason: 'MEANING_EXPRESSED', quote: m.quote.trim() }
+        const source = quoteSource(m.quote, entries.get(c.criterion_id))
+        if (!source) return { ...base, result: 'UNCERTAIN', reason: 'QUOTE_NOT_VERIFIED' }
+        return { ...base, result: 'OBSERVED', reason: 'MEANING_EXPRESSED', quote: m.quote.trim(), quoteSource: source }
       }
       if (c.check === 'BOTH' && !d.observed) return { ...base, result: 'NOT_OBSERVED', reason: 'RULES_NOT_MET' }
       if (!ev.available) return { ...base, result: 'UNCERTAIN', reason: 'EVALUATION_UNAVAILABLE' }
       const a = answers.get(c.criterion_id)
       if (!a) return { ...base, result: 'UNCERTAIN', reason: 'NO_EVALUATOR_DECISION' }
+      if (a.reason === 'NOT_JUDGEABLE' && !a.observed) return { ...base, result: 'NOT_JUDGEABLE', reason: 'EVALUATOR_NOT_JUDGEABLE' }
       if (a.confidence < CONFIDENCE_THRESHOLD) return { ...base, result: 'UNCERTAIN', reason: 'LOW_CONFIDENCE' }
       if (!a.observed) {
         // BOTH: rules passed but the evaluator disagrees → uncertain, never a verdict.
         return c.check === 'BOTH' ? { ...base, result: 'UNCERTAIN', reason: 'CHECKS_DISAGREE' } : { ...base, result: 'NOT_OBSERVED', reason: 'EVALUATOR_NOT_OBSERVED' }
       }
-      if (!quoteVerified(a.quote, texts.get(c.criterion_id))) return { ...base, result: 'UNCERTAIN', reason: 'QUOTE_NOT_VERIFIED' }
-      return { ...base, result: 'OBSERVED', reason: c.check === 'BOTH' ? 'RULES_AND_EVALUATOR_AGREE' : 'EVALUATOR_OBSERVED', quote: a.quote.trim() }
+      const source = quoteSource(a.quote, entries.get(c.criterion_id))
+      if (!source) return { ...base, result: 'UNCERTAIN', reason: 'QUOTE_NOT_VERIFIED' }
+      return { ...base, result: 'OBSERVED', reason: c.check === 'BOTH' ? 'RULES_AND_EVALUATOR_AGREE' : 'EVALUATOR_OBSERVED', quote: a.quote.trim(), quoteSource: source }
     })()
-    if (decided.result === 'UNCERTAIN' || !exposed.length) return decided
+    if (decided.result === 'UNCERTAIN' || decided.result === 'NOT_JUDGEABLE' || !exposed.length) return decided
     const copied = copiedFrom(texts.get(c.criterion_id), exposed)
-    return copied ? { ...decided, result: 'COPIED_ASSISTANCE', reason: 'COPIED_ASSISTANCE', quote: null, copiedFrom: { source: copied.source, id: copied.id } } : decided
+    return copied ? { ...decided, result: 'COPIED_ASSISTANCE', reason: 'COPIED_ASSISTANCE', quote: null, quoteSource: null, copiedFrom: { source: copied.source, id: copied.id } } : decided
   })
 
   const behaviors = mission.target_behavior_ids.map((b) => {
     const cs = criteria.filter((c) => c.behaviorId === b)
-    const result = cs.some((c) => c.result === 'UNCERTAIN') ? 'UNCERTAIN' : cs.every((c) => c.result === 'OBSERVED') ? 'DEMONSTRATED' : 'NOT_YET'
+    const result = cs.some((c) => c.result === 'UNCERTAIN') ? 'UNCERTAIN' : cs.some((c) => c.result === 'NOT_JUDGEABLE') ? 'NOT_JUDGEABLE' : cs.every((c) => c.result === 'OBSERVED') ? 'DEMONSTRATED' : 'NOT_YET'
     return { behaviorId: b, result }
   })
   const demonstrated = behaviors.filter((b) => b.result === 'DEMONSTRATED').length
   const uncertain = behaviors.filter((b) => b.result === 'UNCERTAIN').length
+  const notJudgeable = behaviors.filter((b) => b.result === 'NOT_JUDGEABLE').length
   const copied = criteria.filter((c) => c.result === 'COPIED_ASSISTANCE').length
   const status = ev.available && mv.available ? 'EVALUATED' : 'EVALUATION_UNAVAILABLE'
-  const verified = status === 'EVALUATED' && uncertain === 0
+  const verified = status === 'EVALUATED' && uncertain === 0 && notJudgeable === 0
   const total = behaviors.length
   const noun = (n) => (n === 1 ? 'behaviour' : 'behaviours')
   const copiedNote = copied ? ` ${copied} ${copied === 1 ? 'check matches' : 'checks match'} an example or hint you were shown and ${copied === 1 ? 'is' : 'are'} not counted as your own.` : ''
@@ -105,8 +111,8 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
       : demonstrated === total
         ? `Mission completed — ${demonstrated} of ${total} target ${noun(total)} demonstrated.`
         : `Attempt reviewed — ${demonstrated} of ${total} target ${noun(total)} demonstrated.`)
-    : `${demonstrated} of ${total} target ${noun(total)} demonstrated so far; ${uncertain} could not be checked reliably this time.`) + copiedNote
-  const focus = buildFocus({ mission, criteria, status, learnerTextFor: (c) => candidateTextFor(mission, work, mission.rubric.criteria.find((x) => x.criterion_id === c.criterionId)?.artifact_ids || []) })
+    : `${demonstrated} of ${total} target ${noun(total)} demonstrated so far.${uncertain ? ` ${uncertain} could not be checked reliably this time.` : ''}${notJudgeable ? ` ${notJudgeable} could not be judged from this work and context, and are not counted either way.` : ''}`) + copiedNote
+  const focus = buildFocus({ mission, criteria, status, learnerTextFor: (c) => texts.get(c.criterionId) })
   const counterpart = counterpartReply({ mission, criteria, status })
 
   return {
@@ -117,7 +123,7 @@ export async function evaluateMissionWork({ mission, work, evaluator, candidateN
     counterpart,
     criteria,
     behaviors,
-    counts: { demonstrated, uncertain, total, copied },
+    counts: { demonstrated, uncertain, notJudgeable, total, copied },
     evaluator: {
       used: needEvaluator.length > 0 || needMeaning.length > 0, available: ev.available && mv.available,
       reason: ev.available ? (mv.available ? null : mv.reason) : ev.reason,
@@ -165,6 +171,6 @@ export function practiceUnitsFrom({ evaluation, mission, attempt }) {
     sourceType: 'MISSION_PRACTICE',
     checkType: c.check,
     excerpt: c.quote,
-    provenance: { ...evaluation.versions, reason: c.reason, evaluatorPrompt: c.check === 'DETERMINISTIC' ? null : c.check === 'MEANING' ? (evaluation.evaluator.meaningPromptVersion || null) : evaluation.evaluator.promptVersion, model: c.check === 'DETERMINISTIC' ? null : evaluation.evaluator.model },
+    provenance: { ...evaluation.versions, reason: c.reason, ...(c.quoteSource ? { quoteSource: c.quoteSource } : {}), evaluatorPrompt: c.check === 'DETERMINISTIC' ? null : c.check === 'MEANING' ? (evaluation.evaluator.meaningPromptVersion || null) : evaluation.evaluator.promptVersion, model: c.check === 'DETERMINISTIC' ? null : evaluation.evaluator.model },
   }))
 }

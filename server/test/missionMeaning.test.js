@@ -13,7 +13,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createCompletionService } from '../services/ai/completionService.js'
-import { auditConverse } from '../services/ai/auditConverse.js'
+import { auditConverse } from './fixtures/missionAuditConverse.js'
 import { createMissionEvaluator } from '../domain/development/evaluator.js'
 import { evaluateMissionWork, counterpartReply, COUNTERPART_NOTE } from '../domain/development/evaluate.js'
 import { runDeterministicChecks, VALIDATORS_VERSION } from '../domain/development/validators.js'
@@ -38,7 +38,6 @@ const REVIEWED_DETERMINISTIC = {
   'MIS-CORE-HANDOVER-01': { 'C-OWNERSHIP': 'REFERENCE', 'C-CHECKPOINT': 'CONSTRAINT' },
   'MIS-CORE-BOUNDARY-01': { 'C-DECIDER': 'REFERENCE' },
   'MIS-CORE-REPLAN-01': { 'C-OWNERS': 'REFERENCE' },
-  'MIS-CORE-REPAIR-01': { 'C-CORRECT': 'CONSTRAINT' },
   'MIS-CORE-USABLE-HANDOVER-01': { 'C-OWNERS': 'REFERENCE', 'C-DONE': 'ENTERED' },
   'MIS-CORE-NOT-TO-DO-01': { 'C-ORDER': 'CONSTRAINT', 'C-DECISIONS': 'REFERENCE' },
 }
@@ -69,7 +68,7 @@ test('P6.8: every deterministic criterion across the ten missions is on the revi
     assert.deepEqual(missionPackageGaps(m), [], `${m.display_code} package is complete`)
     assert.ok(m.rubric.criteria.some((c) => c.check === 'MEANING'), `${m.display_code} checks meaning`)
   }
-  assert.equal(VALIDATORS_VERSION, 'mission-validators.v2')
+  assert.equal(VALIDATORS_VERSION, 'mission-validators.v3')
 })
 
 test('P6.8: the schema refuses a punctuation-only pattern and a ONE_OF rule without options', () => {
@@ -169,11 +168,11 @@ test('P6.8 M05/M06: the counterpart replies in character from what the message a
 
 test('P6.8 M04 v3: a reworded task name counts, an owner must be a person in the situation; v1 and v2 are untouched', async () => {
   const versions = MISSION_LIBRARY.filter((m) => m.mission_id === 'MIS-CORE-HANDOVER-01').map((m) => m.version)
-  assert.deepEqual(versions, [1, 2, 3])
+  assert.deepEqual(versions, [1, 2, 3, 4])
   const v2 = MISSION_LIBRARY.find((m) => m.mission_id === 'MIS-CORE-HANDOVER-01' && m.version === 2)
   assert.equal(v2.rubric.criteria.find((c) => c.criterion_id === 'C-NAMES-TASKS').check, 'DETERMINISTIC', 'v2 keeps its stored checks')
   const M04 = latest('MIS-CORE-HANDOVER-01')
-  assert.equal(M04.version, 3)
+  assert.equal(M04.version, 4)
   assert.equal(M04.rubric.criteria.find((c) => c.criterion_id === 'C-NAMES-TASKS').check, 'MEANING')
   assert.equal(M04.rubric.criteria.find((c) => c.criterion_id === 'C-FIRST-STEP').check, 'MEANING')
   assert.ok(!M04.deterministic_validation_rules.some((r) => r.type === 'TEXT_PATTERN' && /vendor|checklist/.test(r.params.pattern)), 'no required phrase stands in for naming the tasks')

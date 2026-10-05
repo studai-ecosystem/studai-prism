@@ -1,9 +1,10 @@
 // Prism Campus C2.16 — Journey D (spec §43) in the browser: a real session
-// with incomplete evidence renders an honest insufficient-evidence report —
+// with an explicitly stored SYNTHETIC insufficient snapshot renders a report —
 // no scores, percentages, precision, strengths or role matches — and the
 // legacy surfaces rebuilt in Phase 2 fail closed. Synthetic users only.
 import { test, expect } from '@playwright/test'
 import { LEGACY_BASE_URL, api, signInSynthetic, expectNoSeriousAxe, expectNoHorizontalOverflow } from './campusHelpers.js'
+import { storeSyntheticInsufficientViews } from '../fixtures/issuedLegacyViews.mjs'
 
 const CONSENT_SCOPES = ['data_processing', 'ai_disclosure', 'ai_scoring_oversight', 'proctoring', 'face_analysis', 'own_work']
 const FABRICATED = /\d+\s*%|±|Score:|Rubric Level|Standard Error|Confidence Interval|Readiness (Level|Score)|Mobility Readiness|Level \d Achieved/i
@@ -27,8 +28,13 @@ async function startedSession(page) {
 test.describe('@critical campus Journey D — insufficient evidence fails closed', () => {
   test('report V2 for an incomplete session shows insufficient evidence and no numbers', async ({ page }) => {
     const { token, sessionId } = await startedSession(page)
+    const unpublished = await api(page, `/api/assessment/report/${sessionId}/v2`, { token })
+    expect(unpublished.status).toBe(409)
+    expect(unpublished.body.code).toBe('LEGACY_VIEW_UNAVAILABLE')
+    const issued = await storeSyntheticInsufficientViews(sessionId)
     const apiReport = await api(page, `/api/assessment/report/${sessionId}/v2`, { token })
     expect(apiReport.status).toBe(200)
+    expect(apiReport.body).toEqual(issued.studentV2)
     expect(apiReport.body.status).toBe('INSUFFICIENT_EVIDENCE')
     expect(apiReport.body.section9_strengthsAndGrowth.strengths).toEqual([])
     expect(apiReport.body.section7_careerExploration.roles).toEqual([])
@@ -46,6 +52,8 @@ test.describe('@critical campus Journey D — insufficient evidence fails closed
     await page.goto(`${LEGACY_BASE_URL}/report/${sessionId}/employee`)
     await expect(page.getByRole('heading', { name: 'Workplace view' })).toBeVisible()
     expect(await page.locator('main').innerText()).not.toMatch(FABRICATED)
+    expect((await api(page, `/api/assessment/report/${sessionId}/v2`, { token })).body).toEqual(issued.studentV2)
+    expect((await api(page, `/api/assessment/report/${sessionId}/employee`, { token })).body).toEqual(issued.employeeV2)
   })
 
   test('an unknown report is "not found", never a sample report', async ({ page }) => {

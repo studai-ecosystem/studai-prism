@@ -999,3 +999,78 @@ export function handoverRevisionV3(v2) {
     },
   })
 }
+
+const WORK_BINDINGS = {
+  M02: { 'C-CLAIM': ['CHECK:fields.claim_checked'], 'C-CONFLICT': ['CHECK:fields.what_found'], 'C-UNCERTAIN': ['CHECK:fields.uncertain'], 'C-ALT': ['CHECK:fields.alternative'] },
+  M04: { 'C-FIRST-STEP': ['PLAN:fields.first_step', 'MESSAGE:text'], 'C-CHECKPOINT': ['PLAN:fields.checkpoint'], 'C-OWNERSHIP': ['BOARD:rows.owner'] },
+  M06: { 'C-LIMIT': ['REPLY:fields.cannot_do'], 'C-WHY': ['REPLY:fields.cannot_do'], 'C-INSTEAD': ['REPLY:fields.instead'], 'C-DECIDER': ['REPLY:fields.who_decides'] },
+  M09: { 'C-OWNERS': ['BOARD:rows.owner'], 'C-DONE': ['BOARD:rows.done_when'], 'C-REALISTIC': ['BOARD:rows.owner', 'HANDOVER:text'], 'C-VERIFIABLE': ['BOARD:rows.done_when'] },
+  M10: { 'C-ORDER': ['BOARD:rows.order'], 'C-DECISIONS': ['BOARD:rows.decision'] },
+}
+
+// New unapproved versions only: earlier mission bodies remain seedable unchanged.
+export function runtimeRevision(mission) {
+  let criteria = mission.rubric.criteria.map((c) => {
+    const locations = WORK_BINDINGS[mission.display_code]?.[c.criterion_id]
+    const work_paths = locations ? locations.map((s) => {
+      const [artifact_id, path] = s.split(':')
+      return { artifact_id, path }
+    }) : mission.artifacts.filter((a) => c.artifact_ids.includes(a.artifact_id)).flatMap((a) => {
+      const paths = a.type === 'TEXT_RESPONSE' ? ['text'] : a.type === 'FIELD_SHEET' ? a.fields.map((f) => `fields.${f.key}`) : a.columns.filter((col) => col.editable).map((col) => `rows.${col.key}`)
+      return paths.map((path) => ({ artifact_id: a.artifact_id, path }))
+    })
+    return { ...c, work_paths }
+  })
+  let rules = mission.deterministic_validation_rules.map((r) => {
+    if (r.type === 'ONE_OF') return { ...r, params: { ...r.params, match: r.path === 'rows.decision' ? 'DECISION' : 'REFERENCE', ...(mission.display_code === 'M09' ? { named_decider: true } : {}) } }
+    if (mission.display_code === 'M10' && r.rule_id === 'R-ORDER') return { ...r, params: { ...r.params, integer: true, unique: true } }
+    return r
+  })
+  const overrides = [...(mission.transfer.meaning_overrides || [])]
+  const addOverride = (criterion_id, intent, synonyms, evaluator_guidance) => {
+    const index = overrides.findIndex((o) => o.criterion_id === criterion_id)
+    const value = { criterion_id, intent, synonyms, evaluator_guidance }
+    if (index < 0) overrides.push(value); else overrides[index] = value
+  }
+  if (mission.display_code === 'M01') {
+    addOverride('C-ASKS', 'Asks Jo for the total box weight needed before confirming the courier slot.', ['please weigh', 'could you', 'can you', 'please check'], 'Met for a direct or indirect request for the missing weight, in any wording. Not met for merely confirming the slot or asking about the base room booking.')
+    addOverride('C-HOLDS', 'Defers or conditions confirmation of the courier slot until the missing weight is known.', ['once I know', 'until I know', 'provisional', 'hold the slot'], 'Met if the slot is held or its confirmation depends on knowing the weight. Not met if the standard van is confirmed regardless of weight.')
+  }
+  if (mission.display_code === 'M03') addOverride('C-DEADLINE', 'Gives Mr Okafor a deadline for the requested confirmation.', ['by thursday', 'by friday', 'by tomorrow', 'let me know by'], 'Met if a time by which Mr Okafor should confirm is given, in any wording. Not met if 2 pm is mentioned only as the tour time, or if no confirmation deadline is given.')
+  if (mission.display_code === 'M04') addOverride('C-FIRST-STEP', 'Names one concrete first action for Sam that includes resolving the unsettled comms-pack scope.', ['first', 'start by', 'agree the scope', 'settle what'], 'Met if the first action concretely addresses what the comms pack includes. Not met for a vague instruction to get up to speed or a first step that ignores the unsettled scope.')
+  if (mission.display_code === 'M06') {
+    addOverride('C-LIMIT', 'States the limit on taking the visitor tour at 11:00 while running the fixed feedback session.', ['cannot', 'not able to', 'not realistic', 'cannot take'], 'Met if the conflicting tour is clearly refused or bounded, in any wording. Not met for only describing the clash or refusing the unrelated base sign-in desk.')
+    addOverride('C-INSTEAD', 'Offers a concrete alternative for the visitor tour without moving the fixed feedback session or ignoring the noon departure.', ['i can offer', 'instead', 'brief a stand-in', 'after 11:30'], 'Met for a specific feasible time slice, substitute or handover. Not met for moving the fixed session, a tour after departure, or vague help.')
+  }
+  if (mission.display_code === 'M07') addOverride('C-REPLAN', 'Changes the room-dependent setup or start to handle the room being unavailable until 10:00, stays within the 11:30 finish and states the cost.', ['another room', 'shorten', 'move', 'we lose'], 'Met only for a concrete feasible change with its scope, time or quality cost. Not met for using the booked room before 10:00, finishing after 11:30, or a change that only fixes the base absent-speaker problem.')
+  if (mission.display_code === 'M08') {
+    criteria = criteria.map((c) => c.criterion_id === 'C-CORRECT' ? {
+      ...c, check: 'MEANING',
+      meaning: { intent: 'Communicates that 9:30 is the correct start, replacing the erroneous 10:00 message.', synonyms: ['starts at 9:30', 'correct time', 'half past nine', 'nine-thirty'] },
+      evaluator_guidance: 'Met only if the reader is told to use the authoritative 9:30 start, in any wording. Not met for merely mentioning 9:30, negating it, or reaffirming 10:00.',
+    } : c)
+    rules = rules.filter((r) => r.criterion_id !== 'C-CORRECT')
+    addOverride('C-CORRECT', 'Communicates that the authoritative venue start is 14:00, replacing the erroneous 14:30 message.', ['starts at 14:00', 'correct time', '2 pm', 'two o\'clock'], 'Met only if the reader is told to use the authoritative 14:00 start, in any wording. Not met for merely mentioning or negating it, or reaffirming 14:30.')
+  }
+  return Object.freeze({
+    ...mission,
+    version: mission.version + 1,
+    rubric: { criteria },
+    deterministic_validation_rules: rules,
+    transfer: {
+      ...mission.transfer,
+      meaning_overrides: overrides.map((o) => ({ ...o, description: o.intent })),
+      ...(mission.display_code === 'M08' ? { rule_overrides: [] } : {}),
+      ...(mission.display_code === 'M06' ? { counterpart: {
+        ...mission.transfer.counterpart,
+        reactions: mission.transfer.counterpart.reactions.map((r) => r.criterion_id === 'C-LIMIT' ? {
+          ...r,
+          text: r.when === 'OBSERVED' ? 'OK - the conflicting 11:00 tour is a no from you. That is a clear limit.' : 'I still do not have a clear limit on the 11:00 tour from you.',
+        } : r),
+        all_met: 'Clear: what you can and cannot do, why, an alternative, and who decides. Thank you.',
+        none_met: 'I am no clearer on what you can do, what clashes, or what happens instead.',
+      } } : {}),
+    },
+    review_record: { ...mission.review_record, authored_on: '2026-10-05', notes: 'CR04 DRAFT revision: structured-work attribution, effective transfer criteria and honest structural checks. Not reviewed or approved; requires content and measurement review before publication.' },
+  })
+}

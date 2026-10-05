@@ -50,6 +50,14 @@ async function start() {
   const server = app.listen(PORT, () => {
     logger.info('server_listening', { url: `http://localhost:${PORT}` })
   })
+  const { startEvaluationWorker } = await import('./domain/assessments/evaluationWorker.js')
+  const campus = app.locals.campus
+  const worker = startEvaluationWorker({
+    sessions: campus.sessions,
+    available: () => Boolean(campus.sessions && campus.storeAvailable()),
+    onError: (error) => logger.error('assessment_worker_failed', { code: error.code || 'WORKER_FAILED' }),
+  })
+  server.once('close', () => { void worker.stop() })
 
   // Behind a load balancer: keep-alive must OUTLIVE the LB idle timeout (ALB
   // default 60s) or the LB reuses a socket the app just closed → intermittent

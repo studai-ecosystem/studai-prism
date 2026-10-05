@@ -78,7 +78,7 @@ async function shoot(page, testInfo, name, { prepare } = {}) {
   if (testInfo.project.name !== 'chromium') return
   mkdirSync(SHOTS, { recursive: true })
   const original = page.viewportSize()
-  for (const width of [1440, 390]) {
+  for (const width of [1440, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
     await page.waitForTimeout(300)
     if (prepare) await prepare(width)
@@ -146,6 +146,7 @@ test('P4 six stages in the browser: ordered stage strip, stage-3 change notice k
   expect(currentStage(strip)).toBe(1)
   expect(strip[0]).toMatch(/\(done\)$/)
 
+  await answer(page, ANSWERS[1])
   // ── Stage 2: one keyboard-reachable board edit, then the text answers ────
   await continueOnSmall(page)
   await choosePane(page, /^Workspace/)
@@ -156,7 +157,12 @@ test('P4 six stages in the browser: ordered stage strip, stage-3 change notice k
   await expect(page.locator('[data-save-state="SAVED"]')).toBeVisible({ timeout: 15_000 })
   await expect(page.locator('[data-row="R2"] [data-field="due"]')).toHaveAttribute('data-origin', 'LEARNER')
   expect((await contractOf(page, token, sid)).artifacts[0].data['R2.due'], 'the edit is on the server before the next answer').toBe(DUE)
-  for (const text of ANSWERS.slice(1, 5)) await answer(page, text)
+  await page.getByLabel('Owner for Prepare participant materials').selectOption('Priya')
+  await page.getByLabel('Owner for Confirm the participant list and needs').selectOption('You')
+  await expect(page.locator('[data-save-state="SAVED"]')).toBeVisible({ timeout: 15_000 })
+  await choosePane(page, 'Conversation')
+  await expect(page.getByRole('log', { name: 'Assessment conversation' })).toContainText('I have seen the board change.')
+  for (const text of ANSWERS.slice(3, 5)) await answer(page, text)
   strip = await stripText(page)
   expect(currentStage(strip)).toBe(2)
   expect(strip.slice(0, 2).every((t) => /\(done\)$/.test(t))).toBe(true)
@@ -221,7 +227,7 @@ test('P4 six stages in the browser: ordered stage strip, stage-3 change notice k
   const serialised = JSON.stringify(r)
   for (const id of UNPRESENTED) expect(serialised, `${id} was never answered: no unit, no claim`).not.toContain(id)
   for (const o of [...(r.boundedObservations || []), ...(r.moments || [])]) {
-    expect(ANSWERS.some((own) => own.includes(o.quote)) || DUE.includes(o.quote), 'every quote is the learner\'s own words').toBe(true)
+    expect([...ANSWERS, DUE, 'Priya', 'You'].some((own) => own.includes(o.quote)), 'every quote is the learner\'s own words').toBe(true)
   }
   // Only Reasoning had three independent answered groups (stages 1, 2, 4);
   // every other family had one and stays an honest insufficient state.

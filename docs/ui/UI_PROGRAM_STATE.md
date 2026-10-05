@@ -16,16 +16,23 @@ UI-STATE:END -->
 The current authoritative ordered checklist is
 [Experience programme: current correction cycle](../experience/IMPLEMENTATION_STATE.md#current-correction-cycle---2026-10-05).
 **All seven acceptance requirements are reopened; zero are fully signed off.**
-CR-01 is active; CR-02 through CR-05 retain partial local evidence; CR-06 and
-CR-07 are blocked on hosted/live/human and owner inputs. The existing A-M
+CR-01 through CR-05 are being implemented and verified; CR-06 and CR-07
+remain blocked on hosted/live/human and owner inputs. The existing A-M
 phase history below remains intact and is not the current correction verdict.
 
-Reopening is evidence-based: missing pinned behaviour anchors still fall back
-to the catalogue, report explanations use catalogue anchors, legacy report
-selection can publish, and practice meaning prompts omit the scenario
-setting. On candidate `8962b09`, 70 local tests pass but two separate
-zero-provider requirement checks fail. Do not call these requirements
-complete because the files or earlier implementation checkpoints exist.
+Historical reopening evidence exposed catalogue fallback, mutable report
+interpretation and read-time publication, and omitted practice scenario
+context despite 70 passing earlier tests. The current correction worktree
+fixes these runtime boundaries and adds executable red/green coverage.
+Latest software milestones: server 940 pass with 27 database skips; frontend
+521 pass after a serialized rerun; separate real DB/HTTP 27/27 and PostgreSQL
+faults 18/18. Browser acceptance: critical 224 passing outcomes with five
+recovered retries; full 875 passing outcomes, 25 existing configuration/
+project skips and five recovered retries. Returning-user/new-assessment/
+report/practice/history passes in all four browser projects; report,
+feedback and history images inspected at 1440/1024/768/390. These are controlled-provider,
+AI-operated checks, not human or live-model verification. Nothing is fully
+signed off; do not close a requirement because its file exists.
 
 No new dashboards, scores, avatars, players, employer screening or report
 architecture are in this cycle. Keep the text/board loop; paid offers,

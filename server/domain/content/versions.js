@@ -5,7 +5,7 @@
 // a separate decision. Published content is immutable: a revision is a new
 // version id, never an edit.
 import { ApiError } from '../http/errors.js'
-import { CORE_TEAMREADY_A } from '../assessments/universalForm.js'
+import { CORE_TEAMREADY_A, CORE_TEAMREADY_A_V1 } from '../assessments/universalForm.js'
 import { DRAFT_CORE_TEAMREADY_A_HANDOVER } from '../assessments/draftSegments.js'
 
 export const CONTENT_STATES = Object.freeze(['DRAFT', 'REVIEW', 'APPROVED_FOR_PILOT', 'APPROVED_FOR_INTENDED_USE', 'RETIRED'])
@@ -41,7 +41,7 @@ export function guardTransition({ from, to, actor, reason, at = new Date() }) {
 // Authored forms this build carries (immutable module content). The live
 // state of a version is the last approvalHistory entry in the registry.
 const AUTHORED = [
-  { formId: CORE_TEAMREADY_A.formId, contentId: CORE_TEAMREADY_A.id, blueprintId: CORE_TEAMREADY_A.blueprintId, version: CORE_TEAMREADY_A.version, title: CORE_TEAMREADY_A.title, kind: 'UNIVERSAL_FORM', approvalHistory: CORE_TEAMREADY_A.approvalHistory, opportunities: CORE_TEAMREADY_A.opportunities.length, stages: CORE_TEAMREADY_A.stages.length, pkg: CORE_TEAMREADY_A },
+  ...[CORE_TEAMREADY_A_V1, CORE_TEAMREADY_A].map((form) => ({ formId: form.formId, contentId: form.id, blueprintId: form.blueprintId, version: form.version, title: form.title, kind: 'UNIVERSAL_FORM', approvalHistory: form.approvalHistory, opportunities: form.opportunities.length, stages: form.stages.length, pkg: form })),
   { formId: `${DRAFT_CORE_TEAMREADY_A_HANDOVER.id}:${DRAFT_CORE_TEAMREADY_A_HANDOVER.version}`, contentId: DRAFT_CORE_TEAMREADY_A_HANDOVER.id, blueprintId: 'CORE-TEAMREADY-A', version: DRAFT_CORE_TEAMREADY_A_HANDOVER.version, title: DRAFT_CORE_TEAMREADY_A_HANDOVER.title, kind: 'SEGMENT', approvalHistory: [{ state: 'DRAFT', at: null, by: null, reason: 'Initial original draft segment.' }], opportunities: DRAFT_CORE_TEAMREADY_A_HANDOVER.opportunities.length, stages: 1, pkg: DRAFT_CORE_TEAMREADY_A_HANDOVER },
 ]
 

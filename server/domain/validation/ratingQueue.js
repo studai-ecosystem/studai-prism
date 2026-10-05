@@ -4,6 +4,7 @@
 // the next item for a rater so every item collects two independent ratings.
 import { createHash } from 'node:crypto'
 import { tokenizeForModel, CANDIDATE_TOKEN } from '../../lib/identityIsolation.js'
+import { methodHash } from '../assessments/frozenMethod.js'
 
 export const RATING_RUBRIC_VERSION = 'evidence-rubric.v1-provisional'
 export const RATINGS_PER_ITEM = 2
@@ -38,6 +39,29 @@ export function ratingItemFrom(unit, { candidateName = null, salt, enqueuedBy })
   const raw = candidateText(unit)
   if (!raw) return { skip: 'NO_CANDIDATE_WORDS' }
   const excerpt = tokenizeForModel(raw, candidateName).replace(EMAIL, '[email]').replace(PHONE, '[number]').slice(0, MAX_EXCERPT)
+  const provenance = unit.provenance_json || {}
+  const rubric = provenance.resolvedRubric
+  if ((provenance.methodHash || rubric) && (!provenance.methodHash || !rubric?.ref || !rubric.anchors
+    || [1, 2, 3, 4, 5].some((level) => !rubric.anchors[level]) || methodHash(rubric.anchors) !== rubric.anchorsHash)) return { skip: 'PINNED_METHOD_UNAVAILABLE' }
+  const clean = (text) => tokenizeForModel(String(text), candidateName).replace(EMAIL, '[email]').replace(PHONE, '[number]').slice(0, MAX_EXCERPT)
+  const context = provenance.evaluationContext
+  const before = context?.workState?.before
+  const after = context?.workState?.after
+  const changes = unit.source_type === 'WORK_ARTIFACT' && before && after ? Object.entries(after).flatMap(([key, value]) => {
+    const [rowId, field] = key.split('.')
+    const row = before.rows?.find((r) => r.rowId === rowId)
+    if (!field || !row) return []
+    const previous = Object.prototype.hasOwnProperty.call(before, key) ? before[key] : row[field]
+    if (previous === undefined || JSON.stringify(previous) === JSON.stringify(value)) return []
+    return [{ rowId, task: clean(row.task), field, before: previous == null ? null : clean(previous), after: value == null ? null : clean(value) }]
+  }) : []
+  const sourceMethod = rubric ? {
+    behaviourId: rubric.behaviourId, methodHash: provenance.methodHash, rubricHash: rubric.contentHash,
+    anchors: Object.fromEntries(Object.entries(rubric.anchors).map(([level, anchor]) => [level, typeof anchor === 'string' ? anchor : anchor.criteria])),
+    facts: (context?.situation?.applicableFacts || []).map((fact) => clean(typeof fact === 'string' ? fact : fact.text)),
+    stimulus: (context?.stimulus?.messages || []).map((message) => ({ speaker: clean(message.speaker || message.actorKind), content: clean(message.content) })),
+    workChanges: changes,
+  } : null
   return {
     item: {
       evidenceRef: refOf('evidence', unit.evidence_id, salt),
@@ -48,7 +72,8 @@ export function ratingItemFrom(unit, { candidateName = null, salt, enqueuedBy })
       excerpt,
       aiLevel: Number.isInteger(unit.rubric_level) ? unit.rubric_level : null,
       aiStatus: unit.evidence_status || null,
-      rubricVersion: RATING_RUBRIC_VERSION,
+      rubricVersion: rubric?.ref || RATING_RUBRIC_VERSION,
+      ...(sourceMethod ? { sourceMethod } : {}),
       enqueuedBy,
     },
   }
@@ -84,6 +109,7 @@ export function blindedView(item, { capabilityName = null } = {}) {
     excerpt: item.excerpt,
     candidateToken: CANDIDATE_TOKEN,
     rubricVersion: item.rubricVersion,
+    ...(item.sourceMethod ? { sourceMethod: item.sourceMethod } : {}),
     scale: [1, 2, 3, 4, 5],
   }
 }

@@ -1,5 +1,40 @@
 # P0 content review and research preparation
 
+## Correction intake - draft content, not approval
+
+The current implementation request supersedes the historical diagnostic-only
+boundary below for original draft corrections, not for human approvals.
+Review the exact corrected candidate, not the older P0/P10 source snapshot.
+
+| Review material | Current candidate | Required independent decision |
+| --- | --- | --- |
+| Universal scenario | `draft-core-teamready-a:0.2.0-draft`; original 0.1 body retained | Content and measurement owners review task quality, elicitation, facts, counterpart branches and supported text/board mode |
+| Assessment method | `v3-slice-0.2`; `evidence_evaluator.v3`; `slice-evaluator.v3` | Review exact archived rubric content/hash, prompt, intended model policy and interpretation rules |
+| Behaviour anchors | Original `draft-teamready-rubric.v0.1` anchors; no invented replacement scale | Confirm behavioural meaning and permitted bounded pilot claims; do not infer comparability |
+| Practice | New DRAFT revisions of M01-M10; historical versions retained | Review every criterion, effective unfamiliar variant, structural versus semantic checks, assistance and counterpart feedback |
+| Blinded review | Recorded behaviour anchors, applicable facts, presented stimulus and work diff, without model ratings | Qualify raters for the actual instrument; review necessary context, identity minimisation and cannot-rate handling |
+
+Counterexample corpus for independent review: concise effective paraphrase,
+vague work, long irrelevant work, punctuation-free clarification, mixed
+inquiry/proposal, two defensible allocations, justified disagreement/refusal,
+help/postponement/reduced scope, changed Sam availability, hidden versus
+revealed facts, seeded versus authored board fields, copied assistance,
+wrong quotation and unavailable context/provider. Existing public software
+fixtures are development material, **not a held-out human evaluation set**.
+The measurement lead must create and seal the held-out split before review.
+
+Software checks establish wiring and failure boundaries only. Live-model,
+qualified content/measurement, manual accessibility, physical-device and
+unassisted comprehension evidence remain NOT RUN. Speech is not a completed
+variant. All content states remain DRAFT until real owners record approval;
+no paid content, new claims or formal longitudinal growth is activated.
+
+Owner slots: Engineering lead (unassigned), Content owner (unassigned),
+Measurement lead (unassigned), Paul/product/finance (decision outstanding),
+Privacy/security owner (unassigned), Accessibility owner (unassigned),
+Operations/support owner (unassigned). A coding agent fills none of these
+independent sign-off slots.
+
 ## P10 handover status - no approval inferred
 
 The controlled-rollout work adds version pinning, approved-content readiness

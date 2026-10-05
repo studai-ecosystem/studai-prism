@@ -141,12 +141,11 @@ test('P0/T25/T26 durable acceptance survives the engine-effect-before-receipt fa
   })
   const args = { user, workspace: { type: 'PERSONAL' }, sessionId: 'synthetic-session', clientEventId: 'synthetic-event', text: 'Synthetic test input' }
   await assert.rejects(service.sendMessage(args), /SYNTHETIC_RECEIPT_WRITE_FAILURE/)
-  // The action was accepted durably before the engine ran, so the retry is a
-  // re-drive of the same accepted action (engine may run again), not a new one.
+  // The applied response survives a lost public receipt.
   const afterFailure = await io.getAction(args.sessionId, args.clientEventId)
-  assert.equal(afterFailure.state, 'ACCEPTED')
+  assert.equal(afterFailure.state, 'APPLIED')
   const receipt = await service.sendMessage(args)
-  assert.equal(receipt.replayed, false)
+  assert.equal(receipt.replayed, true)
   assert.ok(db.clientEvents.has(`${args.sessionId}\u0000${args.clientEventId}`))
   const appliedAction = await io.getAction(args.sessionId, args.clientEventId)
   assert.equal(appliedAction.state, 'APPLIED')
@@ -161,8 +160,8 @@ test('P0/T25/T26 durable acceptance survives the engine-effect-before-receipt fa
   // Same key, changed payload → CONFLICT (never silently applied).
   await assert.rejects(service.sendMessage({ ...args, text: 'Changed synthetic input' }), (err) => err.code === 'CONFLICT')
   const engineEffects = session.exchangeCount
-  assert.ok(engineEffects === 1 || engineEffects === 2, 'at most one re-drive of the accepted action')
-  const status = actions.length === 1 && appliedAction.state === 'APPLIED' && db.clientEvents.size === 1 && engineEffects <= 2 ? 'PASS' : 'FAIL'
+  assert.equal(engineEffects, 1, 'receipt recovery does not repeat an applied engine effect')
+  const status = actions.length === 1 && appliedAction.state === 'APPLIED' && db.clientEvents.size === 1 && engineEffects === 1 ? 'PASS' : 'FAIL'
   assert.equal(status, 'PASS')
   t.diagnostic(JSON.stringify({
     id: 'T25/T26', layer: 'A', invariant: 'one accepted action and one applied result per client event; re-drive idempotent; changed payload conflicts',

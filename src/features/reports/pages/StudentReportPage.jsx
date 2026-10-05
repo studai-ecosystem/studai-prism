@@ -97,7 +97,7 @@ export default function StudentReportPage() {
     if (target && target.id !== active.id) switchTo(target.id)
   }, [target, active.id, switchTo])
   const aligned = !wsParam || Boolean(target && active.id === target.id)
-  const query = useStudentReport(sessionId, { enabled: aligned && !meLoading })
+  const query = useStudentReport(sessionId, { enabled: aligned && !meLoading, version: params.get('version') })
   const [shareOpen, setShareOpen] = useState(false)
   const [pdfError, setPdfError] = useState(null)
 

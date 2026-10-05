@@ -4,7 +4,7 @@ name: CI
 # A claim without a registry entry is a bug with a legal payload.
 on:
   push:
-    branches: [main]
+    branches: [main, ui/prism-brand-transformation]
   pull_request:
     branches: [main]
 
@@ -58,13 +58,26 @@ jobs:
           npm run build
       - name: Frontend unit + component tests (vitest)
         run: npm run test:unit
-      - name: Install critical-path browser
-        run: npx playwright install --with-deps chromium
+      - name: Restore server test dependencies after root postinstall
+        working-directory: server
+        run: npm ci
+      - name: Corrected database and HTTP fault pipeline (disposable, controlled provider)
+        run: |
+          node scripts/run-experience-baseline-tests.mjs database
+          node scripts/run-cr03-runtime-tests.mjs
+      - name: Additive migration and compatible rollback rehearsal
+        run: |
+          npm run rehearse:migrations
+          npm run rehearse:rollback
+      - name: Static architecture safeguards
+        run: npm run audit:static
+      - name: Install supported critical-path browsers
+        run: npx playwright install --with-deps
       - name: Critical browser and accessibility gates
         env:
           # Campus harness server (Journey B) uses the same throwaway CI database.
           PRISM_E2E_DATABASE_URL: postgres://prism:prism-ci-only@localhost:5432/prism_test
-        run: npm run test:e2e:critical -- --project=chromium
+        run: npm run test:e2e:critical
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@v4

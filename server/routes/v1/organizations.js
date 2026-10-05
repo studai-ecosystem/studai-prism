@@ -8,6 +8,7 @@ import { ApiError, ok } from '../../domain/http/errors.js'
 import { INVITABLE_ROLES } from '../../domain/permissions/roles.js'
 import { permissionsForRole } from '../../domain/permissions/matrix.js'
 import { requireFlag } from '../../domain/flags/index.js'
+import { readReportVersion } from '../../domain/http/reportVersion.js'
 
 const ORG_ID = /^[0-9a-f-]{36}$/i
 const CreateInvites = z.object({
@@ -79,7 +80,7 @@ export function createOrganizationsRouter({ requireUser, campus }) {
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/.test(sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
     const org = await campus.repos.organizations.getOrganization(req.params.orgId)
     if (!org || org.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', 'Not found')
-    return ok(res, await campus.reports.forSponsor({ req, actor: req.actor, organizationId: org.id, sessionId }))
+    return ok(res, await campus.reports.forSponsor({ req, actor: req.actor, organizationId: org.id, sessionId, reportVersion: readReportVersion(req.query) }))
   }))
 
   return router

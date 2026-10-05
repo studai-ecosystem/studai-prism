@@ -5,7 +5,7 @@
 // kept, and the objective's hypothesis and budget-allocation steps become
 // checkable criteria. No job-family fallback exists: a mission is found by id
 // or not at all. New missions need governance review (HA-C009).
-import { P6_MISSIONS, handoverRevision, handoverRevisionV3 } from './missionLibrary.p6.js'
+import { P6_MISSIONS, handoverRevision, handoverRevisionV3, runtimeRevision } from './missionLibrary.p6.js'
 
 const MKT_EXPERIMENT_V1 = {
     mission_id: 'MIS-MKT-EXP-01',
@@ -188,12 +188,14 @@ const HANDOVER_V1 = {
 // (M04 metadata revision), handover v3 (M04 honest-checks revision, P6.8),
 // then the P6 originals M01–M03 and M05–M10.
 const HANDOVER_V2 = handoverRevision(HANDOVER_V1)
+const HANDOVER_V3 = handoverRevisionV3(HANDOVER_V2)
 export const MISSION_LIBRARY = Object.freeze([
   MKT_EXPERIMENT_V1,
   HANDOVER_V1,
   HANDOVER_V2,
-  handoverRevisionV3(HANDOVER_V2),
+  HANDOVER_V3,
   ...P6_MISSIONS,
+  ...[HANDOVER_V3, ...P6_MISSIONS].map(runtimeRevision),
 ])
 
 // The ten P6 starter missions (latest version per id, with display codes).

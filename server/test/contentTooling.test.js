@@ -18,7 +18,7 @@ import evidenceGraph from '../lib/evidenceGraph.js'
 
 const ID = CORE_TEAMREADY_A.id
 const V1 = CORE_TEAMREADY_A.version
-const V2 = '0.2.0-draft'
+const V2 = '0.3.0-draft'
 const REASON = 'Reviewed the full package against the blueprint and the confound list.'
 
 function world() {
@@ -211,8 +211,8 @@ test('draft edit: validated body becomes a NEW version; the source version and m
     assert.equal(created.body.state, 'DRAFT')
     assert.equal(created.body.derivedFrom, V1)
     const versions = await w.call('content_admin', 'GET', `/forms/${ID}/versions`)
-    assert.deepEqual(versions.body.versions.map((v) => [v.version, v.state]), [[V1, 'DRAFT'], [V2, 'DRAFT']])
-    assert.equal((await w.call('content_admin', 'GET', `/forms`)).body.forms.filter((f) => f.contentId === ID).length, 2)
+    assert.deepEqual(versions.body.versions.map((v) => [v.version, v.state]), [['0.1.0-draft', 'DRAFT'], [V1, 'DRAFT'], [V2, 'DRAFT']])
+    assert.equal((await w.call('content_admin', 'GET', `/forms`)).body.forms.filter((f) => f.contentId === ID).length, 3)
     // Source version untouched; module content untouched.
     const v1 = await w.call('content_admin', 'GET', `/forms/${ID}/versions/${V1}`)
     assert.equal(v1.body.package.publicFacts[0].text, '24 participants are expected.')

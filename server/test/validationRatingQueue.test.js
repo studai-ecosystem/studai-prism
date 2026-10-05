@@ -14,6 +14,7 @@ import { createValidationRaterRouter } from '../routes/validation.js'
 import { createValidationAdminRouter } from '../routes/admin/validation.js'
 import { createValidationService } from '../domain/validation/service.js'
 import { ROLES } from '../lib/adminRbac.js'
+import { methodHash } from '../domain/assessments/frozenMethod.js'
 
 const NAME = 'Asha Synthetic'
 const unit = (i, over = {}) => ({
@@ -48,6 +49,31 @@ test('queue order: two different raters per item, half-rated items first, never 
   assert.equal(pickNext(items, ratings, 'r2').id, 'b', 'complete the open pair first')
   assert.equal(pickNext(items, ratings, 'r1').id, 'a', 'r1 never rates b twice')
   assert.equal(pickNext(items, [...ratings, { itemId: 'b', raterId: 'r2' }, { itemId: 'a', raterId: 'r3' }, { itemId: 'a', raterId: 'r4' }], 'r5'), null)
+})
+
+test('frozen-method items retain all anchors and action-time work context without exposing the model reading or identity', () => {
+  const anchors = { 1: 'No question.', 2: 'Noticed uncertainty.', 3: 'Asked a relevant question.', 4: 'Explained the consequence.', 5: 'Bounded the next check.' }
+  const provenance = {
+    methodHash: 'synthetic-method-hash',
+    resolvedRubric: { ref: 'synthetic-rubric-A', behaviourId: 'QUESTION_ASSUMPTION', anchors, anchorsHash: methodHash(anchors), contentHash: 'synthetic-rubric-hash' },
+    evaluationContext: {
+      situation: { applicableFacts: ['Asha Synthetic received a request at asha.synthetic@test.local.'] },
+      stimulus: { messages: [{ speaker: 'Synthetic colleague', content: 'Which task will you take?' }] },
+      workState: {
+        before: { rows: [{ rowId: 'R1', task: 'Fixture work', owner: null, status: 'PLANNED' }] },
+        after: { rows: [{ rowId: 'R1', task: 'Fixture work', owner: null, status: 'PLANNED' }], 'R1.owner': 'Sam', 'R1.status': 'PLANNED' },
+      },
+    },
+  }
+  const { item } = ratingItemFrom(unit(10, { source_type: 'WORK_ARTIFACT', provenance_json: provenance }), { candidateName: NAME, salt: 's', enqueuedBy: 'synthetic' })
+  assert.equal(item.rubricVersion, 'synthetic-rubric-A')
+  const view = blindedView({ ...item, id: 'synthetic-item' })
+  assert.deepEqual(view.sourceMethod.anchors, anchors)
+  assert.deepEqual(view.sourceMethod.workChanges, [{ rowId: 'R1', task: 'Fixture work', field: 'owner', before: null, after: 'Sam' }])
+  assert.ok(!JSON.stringify(view).includes('AI description') && !JSON.stringify(view).includes('asha.synthetic@test.local'))
+  assert.ok(!('aiLevel' in view) && !('aiLevel' in view.sourceMethod))
+  provenance.resolvedRubric.anchors[3] = 'Corrupted current rubric.'
+  assert.equal(ratingItemFrom(unit(11, { provenance_json: provenance }), { salt: 's' }).skip, 'PINNED_METHOD_UNAVAILABLE')
 })
 
 test('agreement: no coefficient below the minimum; perfect pairs give 1; claims stay PENDING', () => {

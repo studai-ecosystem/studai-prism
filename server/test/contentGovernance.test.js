@@ -43,7 +43,7 @@ test('registry: forms start DRAFT, transitions are recorded in approval history,
   assert.equal(out.before, 'DRAFT')
   assert.equal(out.state, 'REVIEW')
   assert.equal(reg.stateOf(CORE_TEAMREADY_A.formId), 'REVIEW')
-  assert.deepEqual(reg.listVersions(CORE_TEAMREADY_A.id)[0].approvalHistory.map((h) => h.state), ['DRAFT', 'REVIEW'])
+  assert.deepEqual(reg.listVersions(CORE_TEAMREADY_A.id).find((form) => form.version === CORE_TEAMREADY_A.version).approvalHistory.map((h) => h.state), ['DRAFT', 'REVIEW'])
   assert.throws(() => reg.transition({ formId: CORE_TEAMREADY_A.formId, to: 'REVIEW', actor: reviewer, reason: REASON }), (e) => e.code === 'VALIDATION_FAILED')
   assert.throws(() => reg.transition({ formId: 'nope:1', to: 'REVIEW', actor: reviewer, reason: REASON }), (e) => e.code === 'NOT_FOUND')
   assert.throws(() => reg.listVersions('nope'), (e) => e.code === 'NOT_FOUND')

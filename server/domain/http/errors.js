@@ -45,6 +45,7 @@ export const ERROR_STATUS = Object.freeze({
   // (never a legacy-engine fallback).
   RUN_NOT_ALLOCATABLE: 503,
   RUN_VERSION_UNSUPPORTED: 409,
+  PINNED_METHOD_UNAVAILABLE: 409,
   NOT_IMPLEMENTED: 501,
   INTERNAL: 500,
 })

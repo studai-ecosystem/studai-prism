@@ -51,7 +51,9 @@ export default function StudentReportV2() {
   if (loading) {
     body = <Skeleton label="Loading your report" lines={6} />
   } else if (error) {
-    body = error.status === 404
+    body = error.code === 'LEGACY_VIEW_UNAVAILABLE'
+      ? <ErrorState title="Your original report is preserved" description="This formatted view was not issued. Open the original report without reinterpreting its findings." action={<LinkButton to={`/score?session=${encodeURIComponent(sessionId)}`}>Open original report</LinkButton>} />
+      : error.status === 404
       ? <ErrorState title="Report not found" description="There is no report for this assessment. It may not have been completed yet." action={<LinkButton to="/">Go to home</LinkButton>} />
       : <ErrorState title="This report could not be loaded" description={error.message} requestId={error.requestId} onRetry={reload} />
   } else {

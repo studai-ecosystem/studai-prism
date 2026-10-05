@@ -38,10 +38,10 @@ export function createSessionDirectory({ repos, legacy }) {
         // A new-run completion (P2.7, T35): a DONE evaluation run is a report
         // without any legacy record. Its publication facts come from the
         // stored V3 version, never from the clock.
-        const job = repos?.sessionIo && typeof repos.sessionIo.getJob === 'function' ? await repos.sessionIo.getJob(evaluateJobKey(sessionId)).catch(() => null) : null
+        const job = repos?.sessionIo && typeof repos.sessionIo.getJob === 'function' ? await repos.sessionIo.getJob(evaluateJobKey(sessionId)) : null
         const evaluated = !report && job?.state === 'DONE' ? job : null
-        const published = evaluated && repos?.reportVersions && typeof repos.reportVersions.latest === 'function' ? await repos.reportVersions.latest(sessionId).catch(() => null) : null
-        const issuedAt = report ? toIso(report.issuedAt) : evaluated ? toIso(published?.issuedAt) || toIso(evaluated.updatedAt) : null
+        const published = repos?.reportVersions && typeof repos.reportVersions.latest === 'function' ? await repos.reportVersions.latest(sessionId) : null
+        const issuedAt = toIso(published?.issuedAt) || toIso(report?.issuedAt)
         out.push({
           sessionId,
           integrity: admin?.invalid ? 'INVALIDATED' : admin?.reviewState === 'held' ? 'UNDER_REVIEW' : 'OK',
@@ -50,7 +50,8 @@ export function createSessionDirectory({ repos, legacy }) {
           scenarioId: session?.scenarioId || report?.scenarioId || null,
           startedAt: toIso(session?.startedAt),
           completedAt: report ? toIso(report.issuedAt) || toIso(session?.completedAt) : evaluated ? toIso(evaluated.updatedAt) || toIso(session?.completedAt) : null,
-          hasReport: Boolean(report) || Boolean(evaluated),
+          hasReport: Boolean(report) || Boolean(published),
+          hasPublishedReport: Boolean(published),
           // History projection (P1.2): stored facts only, never derived dates.
           hasSession: Boolean(session),
           sessionCompletedAt: toIso(session?.completedAt),

@@ -3,6 +3,7 @@
 // and dialogue come only from the server's session payload; reports and
 // practice missions never show fabricated scores, levels or readiness.
 import { test, expect } from '@playwright/test'
+import { storeSyntheticInsufficientViews } from '../fixtures/issuedLegacyViews.mjs'
 
 const CONSENT_SCOPES = ['data_processing', 'ai_disclosure', 'ai_scoring_oversight', 'proctoring', 'face_analysis', 'own_work']
 const FABRICATED = /\d+\s*%|±|Score:|Rubric Level|Standard Error|Readiness (Level|Score)|Mobility Readiness|Level \d Achieved/i
@@ -84,6 +85,8 @@ test.describe('Marketing reference simulation — fail closed', () => {
     })
     expect(saved.status).toBe(200)
 
+    // Presentation-only SYNTHETIC issued snapshot; this is not a completed run.
+    await storeSyntheticInsufficientViews(sessionId)
     await page.goto(`/report/${sessionId}/v2`)
     await expect(page.getByRole('heading', { name: 'Not enough evidence yet to describe your capabilities' })).toBeVisible()
     expect(await page.locator('main').innerText()).not.toMatch(FABRICATED)

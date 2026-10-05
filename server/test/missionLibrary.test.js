@@ -102,7 +102,7 @@ test('P6.2: a stored version is immutable (same version, different body is refus
     const lit = await svc.listMissions(user, ws)
     assert.equal(lit.items.length, 11)
     assert.equal(lit.items.filter((m) => m.status === 'DRAFT').length, 10)
-    assert.deepEqual(lit.items.find((m) => m.id === 'MIS-CORE-HANDOVER-01').version, 3, 'the latest draft version is served')
+    assert.deepEqual(lit.items.find((m) => m.id === 'MIS-CORE-HANDOVER-01').version, 4, 'the latest draft version is served')
     const plan = await svc.planFor(user, ws, PRIMARY_CAPABILITY_IDS.map((capabilityId) => ({ capabilityId })))
     assert.deepEqual(plan.recommended.map((m) => m.id), [], 'DRAFT missions are never recommended, even for matching priorities')
     assert.equal(plan.catalogue.length, 11)

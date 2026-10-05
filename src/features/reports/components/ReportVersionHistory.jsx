@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '../../../components/ui/Button.jsx'
 import { Skeleton } from '../../../components/ui/Skeleton.jsx'
 import { Callout } from '../../../components/ui/Notice.jsx'
@@ -13,6 +14,12 @@ import { formatDate } from '../../student/QueryState.jsx'
 export function ReportVersionHistory({ sessionId, currentVersion, moments = [] }) {
   const query = useReportVersions(sessionId)
   const [open, setOpen] = useState(false)
+  const [params] = useSearchParams()
+  const versionLink = (version) => {
+    const next = new URLSearchParams(params)
+    next.set('version', String(version))
+    return { search: `?${next}` }
+  }
   const R = REPORT_COPY
   return (
     <section className="space-y-3" aria-labelledby="report-versions-title" data-testid="report-versions">
@@ -31,10 +38,11 @@ export function ReportVersionHistory({ sessionId, currentVersion, moments = [] }
             <ol className="divide-y divide-prism-border rounded-[var(--prism-radius-md)] border border-prism-border text-sm">
               {query.data.versions.map((v) => (
                 <li key={v.version} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2" data-testid="report-version">
-                  <span className="font-medium text-prism-ink">Version {v.version}{v.version === currentVersion ? ' (shown)' : ''}</span>
+                  <Link to={versionLink(v.version)} className="font-medium text-prism-ink underline focus-visible:ring-2 focus-visible:ring-prism-accent">Version {v.version}{v.version === currentVersion ? ' (shown)' : ''}</Link>
                   <span className="text-prism-ink-muted">
                     {[R.versionReasons[v.reason] || v.reason || null, v.priorVersion ? `replaces version ${v.priorVersion}` : null, formatDate(v.issuedAt || v.createdAt) ? `issued ${formatDate(v.issuedAt || v.createdAt)}` : 'issue date not recorded'].filter(Boolean).join(' · ')}
                   </span>
+                  {v.publicationNote && <p className="basis-full text-prism-ink-muted">{v.publicationNote}</p>}
                 </li>
               ))}
             </ol>

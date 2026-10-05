@@ -14,6 +14,9 @@ import { createCampusContext, EMPTY_LEGACY_SOURCES } from '../domain/campusStore
 import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../domain/sharing/copyVersions.js'
 import { DRAFT_CORE_TEAMREADY_A_HANDOVER, DRAFT_SEGMENT_ID, draftBankScenarios, evaluateJobKey, DRAFT_EVALUATE_JOB_KIND } from '../domain/assessments/draftSegments.js'
 import { createSliceEvaluator } from '../domain/evidence/sliceEvaluator.js'
+import { resolvePinnedMethod } from '../domain/assessments/frozenMethod.js'
+import { evaluationReceiptKey } from '../domain/assessments/sessionIoRepository.js'
+import { evidenceSetHash } from '../domain/reports/v3/service.js'
 import evidenceGraph from '../lib/evidenceGraph.js'
 
 process.env.NODE_ENV = 'test'
@@ -202,7 +205,7 @@ test('T31 provider timeout and malformed output: technical FAILED job, saved wor
   } finally { w.close() }
 })
 
-test('T25 save-acknowledgement loss: a failed receipt write leaves the accepted action recoverable; the client retry applies it exactly once', async () => {
+test('T25 save-acknowledgement loss: an APPLIED action replays its saved response without repeating the effect', async () => {
   const w = await world()
   try {
     const sid = await w.start()
@@ -216,14 +219,23 @@ test('T25 save-acknowledgement loss: a failed receipt write leaves the accepted 
     const action = await io.getAction(sid, 'evt-ack-loss')
     assert.ok(action, 'the action was durably accepted before the engine ran')
     assert.equal(action.payload.text, MSG_CLARIFY, 'the payload is recoverable')
-    assert.notEqual(action.state, 'APPLIED')
-    assert.equal(await io.getClientEvent(sid, 'evt-ack-loss'), null, 'no receipt without an applied result')
+    assert.equal(action.state, 'APPLIED', 'ack loss does not undo the accepted engine effect')
+    assert.ok(action.result.response, 'the exact response survives before the client-event receipt')
+    const savedResponse = structuredClone(action.result.response)
+    const history = structuredClone(w.state.sessions[sid].history)
+    assert.equal(await io.getClientEvent(sid, 'evt-ack-loss'), null, 'the receipt failed after the action was applied')
     const retry = await w.msg(sid, 'evt-ack-loss', MSG_CLARIFY)
-    assert.equal(retry.status, 201, JSON.stringify(retry.body))
+    assert.equal(retry.status, 200, JSON.stringify(retry.body))
+    assert.equal(retry.body.data.replayed, true, 'the effect was already applied before acknowledgement loss')
     assert.equal((await io.getAction(sid, 'evt-ack-loss')).state, 'APPLIED')
+    assert.deepEqual(retry.body.data.messages, savedResponse.messages)
+    assert.equal(retry.body.data.exchanges, savedResponse.exchanges)
+    assert.deepEqual(w.state.sessions[sid].history, history, 'receipt recovery cannot replay an engine effect')
     const replay = await w.msg(sid, 'evt-ack-loss', MSG_CLARIFY)
     assert.equal(replay.status, 200)
     assert.equal(replay.body.data.replayed, true)
+    assert.deepEqual(replay.body.data.messages, savedResponse.messages)
+    assert.deepEqual(w.state.sessions[sid].history, history)
     assert.equal((await io.listActions(sid)).filter((a) => a.clientEventId === 'evt-ack-loss').length, 1, 'one accepted action per client event id')
   } finally { w.close() }
 })
@@ -297,7 +309,8 @@ test('T49 worker crash mid-job: the expired lease is reclaimed with a higher fen
     const sid = await w.start()
     await w.act(sid)
     const io = w.repos.sessionIo
-    await io.enqueueJob({ taskKey: evaluateJobKey(sid), sessionId: sid, kind: DRAFT_EVALUATE_JOB_KIND })
+    await io.requestEvaluation({ taskKey: evaluateJobKey(sid), sessionId: sid, kind: DRAFT_EVALUATE_JOB_KIND, payload: { early: true } })
+    const input = await io.captureEvaluationInput(sid)
     const crashed = await io.claimJob(DRAFT_EVALUATE_JOB_KIND, 1000)
     assert.equal(crashed.attempts, 1)
     const stuck = await w.finish(sid)
@@ -313,6 +326,10 @@ test('T49 worker crash mid-job: the expired lease is reclaimed with a higher fen
     assert.ok(job.fencingToken > crashed.fencingToken)
     await assert.rejects(io.completeJob(crashed.jobId, crashed.fencingToken, 'DONE'), (e) => e.code === 'CONFLICT')
     await assert.rejects(io.failJob(crashed.jobId, crashed.fencingToken), (e) => e.code === 'CONFLICT')
+    await assert.rejects(io.applyEvaluation({
+      jobId: crashed.jobId, fencingToken: crashed.fencingToken, sessionId: sid,
+      expectedInputHash: input.expectedInputHash, units: [], writeUnit: () => assert.fail('a stale lease reached the writer'),
+    }), (e) => e.code === 'CONFLICT')
     assert.equal((await unitsOf(sid)).length, 3, 'exactly one applied result')
     assert.ok((await unitsOf(sid)).every((u) => u.provenance_json.evaluatorAttempt === 2))
   } finally { w.close() }
@@ -371,8 +388,24 @@ test('publication is separate from viewing: later evidence, a catalogue change o
     const v1 = await w.call('GET', `/assessment-sessions/${sid}/report`)
     assert.equal(v1.status, 200)
     const issued = JSON.stringify(v1.body.data.report)
+    const pin = structuredClone((await w.repos.sessionIo.getClientEvent(sid, 'start')).response.runPin)
+    const method = resolvePinnedMethod(pin)
+    assert.equal(method.snapshot.id, DRAFT_SEGMENT_ID, 're-analysis has an intact allocation-time method archive')
+    const getCatalog = w.campus.catalog.getCatalog.bind(w.campus.catalog)
+    w.campus.catalog.getCatalog = async () => {
+      const cat = await getCatalog()
+      return { ...cat, definitions: cat.definitions.map((d) => ({ ...d, title: 'Changed live catalogue title' })) }
+    }
     // Later evidence arrives for the session (e.g. a reviewed addition).
-    const late = await evidenceGraph.recordEvidenceUnit({ session_id: sid, capability_id: 'CAP-L1-COMMUNICATION', source_turn: 99, rubric_level: 5 })
+    const accepted = await unitsOf(sid)
+    const job = await w.repos.sessionIo.getJob(evaluateJobKey(sid))
+    const receipt = await w.repos.sessionIo.getClientEvent(sid, evaluationReceiptKey(job.jobId))
+    assert.equal(receipt.kind, 'EVALUATION_ACCEPTED')
+    assert.deepEqual(receipt.response.evidenceIds.sort(), accepted.map((u) => u.evidence_id).sort())
+    const late = await evidenceGraph.recordEvidenceUnit({
+      ...accepted[0], evidence_id: `late-${crypto.randomUUID()}`, source_turn: 99, rubric_level: 5,
+      observable_behavior: 'Synthetic later observation not accepted by the evaluation worker.',
+    })
     assert.ok(late.evidence_id)
     const again = await w.call('GET', `/assessment-sessions/${sid}/report`)
     assert.equal(again.body.data.version.number, 1)
@@ -402,13 +435,20 @@ test('publication is separate from viewing: later evidence, a catalogue change o
     assert.equal(re.version.priorVersion, 1)
     assert.equal(re.version.reason, 'RE_ANALYSIS')
     assert.ok(re.version.issuedAt && re.version.builderVersion)
+    assert.equal((await w.repos.reportVersions.get(sid, 2)).publicationNote, note, 'the actual reason is durable publication metadata')
+    assert.equal((await w.repos.reportVersions.get(sid, 2)).evidenceSetHash, evidenceSetHash(accepted.filter((u) => !withheld.includes(u.evidence_id))), 're-analysis cites only the accepted batch, never an appended unaccepted observation')
+    const corrected = (await w.repos.reportVersions.get(sid, 2)).report
+    const leakedSections = Object.entries(corrected).filter(([, value]) => JSON.stringify(value).includes(late.evidence_id)).map(([section]) => section)
+    assert.deepEqual(leakedSections, [], 'unaccepted evidence cannot appear in any published report section')
+    assert.deepEqual((await w.repos.sessionIo.getClientEvent(sid, 'start')).response.runPin, pin, 're-analysis never replaces the archived method')
     const v2 = await w.call('GET', `/assessment-sessions/${sid}/report`)
     assert.equal(v2.body.data.version.number, 2)
     assert.notEqual(JSON.stringify(v2.body.data.report), issued)
     // Version 1 is still exactly what was issued.
     assert.equal(JSON.stringify({ ...(await w.repos.reportVersions.get(sid, 1)).report, header: { ...(await w.repos.reportVersions.get(sid, 1)).report.header, candidateName: USER.name } }), issued)
     await assert.rejects(w.campus.reports.publish(sid, { reason: 'RE_ANALYSIS', note, withheldOverride: withheld }), (e) => e.code === 'CONFLICT')
-    assert.ok(w.audits.some((a) => a.type === 'report.v3.version_created' && a.sid === sid && a.payload.version === 2 && a.payload.reason === 'RE_ANALYSIS' && a.payload.priorVersion === 1 && a.payload.note === note))
+    assert.ok(w.audits.some((a) => a.type === 'report.v3.version_created' && a.sid === sid && a.payload.version === 2 && a.payload.reason === 'RE_ANALYSIS' && a.payload.priorVersion === 1 && !Object.hasOwn(a.payload, 'note')))
+    assert.equal(JSON.stringify(w.audits).includes(note), false, 'free-text reasons do not leak into telemetry')
   } finally { w.close() }
 })
 
@@ -471,7 +511,8 @@ test('two workers hold the same logical job in turn: only the current lease can 
     const sid = await w.start()
     await w.act(sid)
     const io = w.repos.sessionIo
-    await io.enqueueJob({ taskKey: evaluateJobKey(sid), sessionId: sid, kind: DRAFT_EVALUATE_JOB_KIND })
+    await io.requestEvaluation({ taskKey: evaluateJobKey(sid), sessionId: sid, kind: DRAFT_EVALUATE_JOB_KIND, payload: { early: true } })
+    const input = await io.captureEvaluationInput(sid)
     const workerA = await io.claimJob(DRAFT_EVALUATE_JOB_KIND, 1000)
     w.tick(1500)
     assert.equal((await w.finish(sid)).status, 200)
@@ -480,6 +521,7 @@ test('two workers hold the same logical job in turn: only the current lease can 
     let writes = 0
     await assert.rejects(io.applyEvaluation({
       jobId: workerA.jobId, fencingToken: workerA.fencingToken, sessionId: sid,
+      expectedInputHash: input.expectedInputHash,
       units: before.map((u) => ({ ...u })), writeUnit: async () => { writes += 1 },
     }), (e) => e.code === 'CONFLICT')
     assert.equal(writes, 0, 'refused before the first write')
@@ -534,7 +576,7 @@ test('erasure during an in-flight job: the reclaimed worker refuses, no units, n
     const sid = await w.start()
     await w.act(sid)
     const io = w.repos.sessionIo
-    await io.enqueueJob({ taskKey: evaluateJobKey(sid), sessionId: sid, kind: DRAFT_EVALUATE_JOB_KIND })
+    await io.requestEvaluation({ taskKey: evaluateJobKey(sid), sessionId: sid, kind: DRAFT_EVALUATE_JOB_KIND, payload: { early: true } })
     await io.claimJob(DRAFT_EVALUATE_JOB_KIND, 1000)
     await io.markErased(sid)
     w.tick(1500)

@@ -1,14 +1,14 @@
 // P6.4 / T40 — the meaning (paraphrase) check. A valid paraphrase satisfies a
 // MEANING criterion through the structured {met, quote, reason} output; a
-// bare keyword list does not; empty or very short work is "not met —
+// bare keyword list does not; empty work is "not met —
 // EMPTY_WORK" without any model call and never produces invented feedback;
 // malformed output leaves the criterion UNCERTAIN; the payload is
 // identity-free. Runs over the deterministic audit harness provider.
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createCompletionService } from '../services/ai/completionService.js'
-import { auditConverse } from '../services/ai/auditConverse.js'
-import { createMissionEvaluator, buildMeaningMessages, MEANING_PROMPT, MIN_MEANING_CHARS } from '../domain/development/evaluator.js'
+import { auditConverse } from './fixtures/missionAuditConverse.js'
+import { createMissionEvaluator, buildMeaningMessages, MEANING_PROMPT, meaningWorkEmpty } from '../domain/development/evaluator.js'
 import { evaluateMissionWork, practiceUnitsFrom } from '../domain/development/evaluate.js'
 import { MISSION_LIBRARY } from '../domain/development/missionLibrary.js'
 import { parseMission } from '../domain/development/missionSchema.js'
@@ -47,12 +47,12 @@ test('T40: a valid paraphrase is accepted with a verbatim quote; keyword stuffin
   assert.equal(by(bad, 'C-NAMES-UNKNOWN').quote, null, 'no quote is invented for an unmet criterion')
 })
 
-test('T40: empty or very short work (including long whitespace) is "not met — EMPTY_WORK" with no model call', async () => {
+test('T40: only empty work (including long whitespace) is "not met — EMPTY_WORK" with no model call', async () => {
   let calls = 0
   const spy = createMissionEvaluator({ complete: async (params, opts) => { calls += 1; return createCompletionService({ converseFn: auditConverse })(params, opts) } })
-  for (const text of ['', '   \n\n   '.repeat(200), 'ok thanks']) {
+  for (const text of ['', '   \n\n   '.repeat(100)]) {
     const ev = await evaluateMissionWork({ mission: M01, work: work(text), evaluator: spy })
-    assert.equal(ev.status, 'EVALUATED', 'short work is decided, not "unavailable"')
+    assert.equal(ev.status, 'EVALUATED', 'empty work is decided, not "unavailable"')
     for (const id of ['C-NAMES-UNKNOWN', 'C-HOLDS']) {
       assert.equal(by(ev, id).result, 'NOT_OBSERVED')
       assert.equal(by(ev, id).reason, 'EMPTY_WORK')
@@ -61,7 +61,8 @@ test('T40: empty or very short work (including long whitespace) is "not met — 
     assert.equal(ev.counts.demonstrated, 0)
   }
   assert.equal(calls, 0, 'the model is never asked about empty work')
-  assert.ok(MIN_MEANING_CHARS >= 10)
+  assert.equal(meaningWorkEmpty(['Headcount please']), false)
+  assert.equal(meaningWorkEmpty(['Print locally']), false)
   // Even with no evaluator configured, empty work is a decision, not an outage.
   const none = await evaluateMissionWork({ mission: M01, work: work(''), evaluator: null })
   assert.equal(by(none, 'C-HOLDS').reason, 'EMPTY_WORK')
@@ -96,7 +97,7 @@ test('T40: malformed or failing evaluator output keeps the attempt reviewable (U
 
 test('T40: the meaning payload is identity-free and carries intent + phrasings, not rule internals', () => {
   const criteria = M01.rubric.criteria.filter((c) => c.check === 'MEANING')
-  const msgs = buildMeaningMessages({ mission: M01, criteria, workTexts: ['Asha Verma here: I need to know how many people are coming.'], candidateName: 'Asha Verma' })
+  const msgs = buildMeaningMessages({ mission: M01, criteria, work: work('Asha Verma here: I need to know how many people are coming.'), candidateName: 'Asha Verma' })
   const system = msgs[0].content
   assert.ok(system.includes('MEANING CRITERIA (JSON)'))
   assert.ok(system.includes('"phrasings"'))

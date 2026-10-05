@@ -10,7 +10,7 @@ import { capabilityInfo } from '../assessments/catalog.js'
 import { CORE_TEAMREADY_A, opportunityById, behaviourById, BEHAVIOUR_IDS } from '../assessments/universalForm.js'
 import { parseMission, applyVariant, MISSION_SCHEMA_VERSION } from './missionSchema.js'
 import { MISSION_LIBRARY, draftContentEnabled } from './missionLibrary.js'
-import { normaliseWork, initialWork, runDeterministicChecks, candidateTextFor } from './validators.js'
+import { normaliseWork, initialWork, runDeterministicChecks, structuredWorkFor } from './validators.js'
 import { evaluateMissionWork, practiceUnitsFrom } from './evaluate.js'
 import { compareAttempts, FEEDBACK_VERSION } from './feedback.js'
 import { resolveRecommendations } from './recommendations.js'
@@ -98,7 +98,7 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
           // a content fault, so it surfaces as an internal error, not a 4xx.
           const start = initialWork(m)
           const passes = [...runDeterministicChecks(m, start).values()].some((r) => r.observed)
-          const quotable = candidateTextFor(m, start, m.artifacts.map((a) => a.artifact_id)).some((t) => String(t).trim())
+          const quotable = structuredWorkFor(m, start).some((a) => a.entries.some((e) => e.editable && e.kind === 'text' && String(e.value || '').trim()))
           if (passes || quotable) throw new Error(`Mission ${m.mission_id} v${m.version}: its starting state is not empty (governance review required).`)
           await store().seedMissionVersion({
             missionId: m.mission_id, targetCapabilityId: m.target_capability_id, version: m.version, status: m.status,
@@ -276,10 +276,12 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
         result: c.result,
         reason: c.reason || null,
         quote: c.result === 'OBSERVED' ? c.quote : null,
+        ...(c.result === 'OBSERVED' && c.quoteSource ? { quoteSource: c.quoteSource } : {}),
         checks: c.rules.map((r) => ({ description: r.description, passed: r.passed })),
         note: c.result === 'OBSERVED' ? 'Shown in this attempt.'
           : c.result === 'COPIED_ASSISTANCE' ? 'This matches the example you were shown, so it is not counted as your own.'
             : c.result === 'NOT_OBSERVED' ? (mission.feedback_policy.show_unobserved ? 'Not shown yet in this attempt.' : null)
+              : c.result === 'NOT_JUDGEABLE' ? 'Could not be judged from this work and context. This is not a missing behaviour or a provider outage, and is not counted either way.'
               : 'Could not be checked reliably this time. It is not counted either way.',
       })),
     }

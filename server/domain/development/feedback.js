@@ -13,7 +13,7 @@
 //   compareAttempts   — criterion ids newly met / no longer met between two
 //                       attempts, only where both attempts could check them.
 //                       Never a percentage, never a growth claim.
-export const FEEDBACK_VERSION = 'mission-feedback.v1'
+export const FEEDBACK_VERSION = 'mission-feedback.v2'
 export const COPY_THRESHOLD = 0.8
 export const COPY_MIN_WORDS = 6
 export const COPIED_NOTE = 'This matches the example you were shown, so it is not counted as your own.'
@@ -31,6 +31,7 @@ export function copiedFrom(learnerTexts, exposed, { threshold = COPY_THRESHOLD, 
   if (!have.size) return null
   for (const e of exposed || []) {
     for (const sentence of splitSentences(e.text)) {
+      if (norm(sentence) && (learnerTexts || []).some((text) => norm(text) === norm(sentence))) return { source: e.source, id: e.id, sentence }
       const ws = words(sentence)
       if (ws.length < minWords) continue
       const bg = bigrams(ws)
@@ -57,7 +58,8 @@ export function buildFocus({ mission, criteria, status, learnerTextFor }) {
   const nextOrder = order(mission.first_attempt_feedback?.next_change_priority)
   const completed = completedOrder.map((id) => byId.get(id)).find((c) => c.result === 'OBSERVED') || null
   const next = nextOrder.map((id) => byId.get(id)).find((c) => c.result === 'NOT_OBSERVED' || c.result === 'COPIED_ASSISTANCE') || null
-  const reviewIncomplete = status !== 'EVALUATED'
+  const notJudgeable = criteria.some((c) => c.result === 'NOT_JUDGEABLE')
+  const reviewIncomplete = status !== 'EVALUATED' || notJudgeable || criteria.some((c) => c.result === 'UNCERTAIN')
   const allMet = !reviewIncomplete && criteria.length > 0 && criteria.every((c) => c.result === 'OBSERVED')
   const ownWords = (c, { minWords = 1, wholeOnly = false } = {}) => {
     const texts = (learnerTextFor ? learnerTextFor(c) : []).map((t) => String(t).trim()).filter(Boolean)
@@ -79,7 +81,7 @@ export function buildFocus({ mission, criteria, status, learnerTextFor }) {
     completed: completed ? {
       criterionId: completed.criterionId,
       description: completed.description,
-      quote: completed.quote || ownWords(completed),
+      quote: completed.quote || null,
       source: completed.check === 'DETERMINISTIC' ? 'AUTOMATIC_CHECK' : completed.check === 'MEANING' ? 'MEANING_CHECK' : 'EVALUATOR',
     } : null,
     nextChange: next ? {
@@ -94,7 +96,9 @@ export function buildFocus({ mission, criteria, status, learnerTextFor }) {
     } : null,
     allMet,
     reviewIncomplete,
-    note: reviewIncomplete
+    note: status === 'EVALUATED' && notJudgeable
+      ? 'Some checks could not be judged from this work and context. They are not counted as missing behaviours or as a provider outage.'
+      : reviewIncomplete
       ? 'The review could not be completed this time. Your work is kept; nothing was guessed, and you can submit it again.'
       : allMet ? 'Every checked behaviour was shown in this attempt. There is nothing to add.' : null,
   }
@@ -106,7 +110,7 @@ export function compareAttempts(previous, current) {
   if (!previous?.criteria || !current?.criteria) return null
   const prev = new Map(previous.criteria.map((c) => [c.criterionId, c.result]))
   const met = (r) => r === 'OBSERVED'
-  const checkable = (r) => r && r !== 'UNCERTAIN'
+  const checkable = (r) => r && r !== 'UNCERTAIN' && r !== 'NOT_JUDGEABLE'
   const newlyMet = []
   const noLongerMet = []
   const notCompared = []

@@ -6,11 +6,12 @@
 // run was measured against.
 import { createHash } from 'node:crypto'
 import { PRIMARY_CAPABILITY_IDS } from './catalog.js'
-import { CORE_TEAMREADY_A, CORE_TEAMREADY_A_ID, CORE_TEAMREADY_A_FORM_ID, UNIVERSAL_RUBRIC_REF } from './universalForm.js'
+import { CORE_TEAMREADY_A, CORE_TEAMREADY_A_V1, CORE_TEAMREADY_A_ID, CORE_TEAMREADY_A_V1_FORM_ID, UNIVERSAL_RUBRIC_REF } from './universalForm.js'
 import { RELEASE_CONFIG_VERSION } from '../release/version.js'
+import { captureMethod, methodHash, FROZEN_METHOD_VERSION, unavailable } from './frozenMethod.js'
 
 export const DRAFT_SEGMENT_ID = 'draft-core-teamready-a-handover'
-export const SLICE_METHOD_VERSION = 'v3-slice-0.1'
+export const SLICE_METHOD_VERSION = FROZEN_METHOD_VERSION
 export const DRAFT_HANDOVER_RUBRIC_REF = 'draft-handover-rubric.v0.1'
 export const DRAFT_EVALUATE_JOB_KIND = 'EVALUATE_RUN'
 export const evaluateJobKey = (sessionId) => `evaluate:${sessionId}`
@@ -26,7 +27,7 @@ export const DRAFT_CORE_TEAMREADY_A_HANDOVER = Object.freeze({
   version: '0.1.0-draft',
   status: 'DRAFT',
   // P4: this segment is the stage-5 subset of the universal form.
-  formRef: { formId: CORE_TEAMREADY_A_FORM_ID, stageId: 'RESOLVE_HANDOVER' },
+  formRef: { formId: CORE_TEAMREADY_A_V1_FORM_ID, stageId: 'RESOLVE_HANDOVER' },
   title: 'Get the team ready: the final handover',
   publicFacts: [
     'Two colleagues have been preparing a short internal workshop for next week.',
@@ -78,22 +79,24 @@ export const snapshotHash = (snapshot) => createHash('sha256').update(canonical(
 // P4: the universal form in the snapshot shape the pin, evaluator and
 // director share. `universal: true` marks a run as Director-driven; the
 // opportunity list carries behaviourIds (plural) and groupId/stageId.
-export const UNIVERSAL_SNAPSHOT = Object.freeze({
+const universalSnapshot = (form) => Object.freeze({
   id: CORE_TEAMREADY_A_ID,
-  version: CORE_TEAMREADY_A.version,
-  status: CORE_TEAMREADY_A.status,
+  version: form.version,
+  status: form.status,
   universal: true,
-  title: CORE_TEAMREADY_A.title,
-  publicFacts: CORE_TEAMREADY_A.publicFacts.map((f) => f.text),
-  participants: CORE_TEAMREADY_A.participants.map((p) => ({ name: p.name, role: p.role, actorKind: p.actorKind })),
-  artifactSchema: { artifactId: CORE_TEAMREADY_A.board.artifactId, type: CORE_TEAMREADY_A.board.type, title: CORE_TEAMREADY_A.board.title, rows: CORE_TEAMREADY_A.board.rows, candidateEditable: CORE_TEAMREADY_A.board.editable },
-  opportunities: CORE_TEAMREADY_A.opportunities.map((o) => ({
+  title: form.title,
+  publicFacts: form.publicFacts.map((f) => f.text),
+  participants: form.participants.map((p) => ({ name: p.name, role: p.role, actorKind: p.actorKind })),
+  artifactSchema: { artifactId: form.board.artifactId, type: form.board.type, title: form.board.title, rows: form.board.rows, candidateEditable: form.board.editable },
+  opportunities: form.opportunities.map((o) => ({
     id: o.id, group: o.groupId, groupId: o.groupId, stageId: o.stageId, capabilityId: o.capabilityId,
     behaviourId: o.behaviourIds[0], behaviourIds: o.behaviourIds, description: o.description, required: o.required, accepts: o.accepts,
   })),
   rubricRef: UNIVERSAL_RUBRIC_REF,
-  form: CORE_TEAMREADY_A,
+  form,
 })
+export const UNIVERSAL_SNAPSHOT = universalSnapshot(CORE_TEAMREADY_A)
+export const UNIVERSAL_SNAPSHOT_V1 = universalSnapshot(CORE_TEAMREADY_A_V1)
 
 export const DRAFT_SEGMENTS = Object.freeze({ [DRAFT_SEGMENT_ID]: DRAFT_CORE_TEAMREADY_A_HANDOVER, [CORE_TEAMREADY_A_ID]: UNIVERSAL_SNAPSHOT })
 export const draftContentEnabled = () => process.env.PRISM_DRAFT_CONTENT === 'true'
@@ -159,11 +162,14 @@ export function answerSegmentQuestion(snapshot, text) {
 
 // What a run on the segment is pinned to. Stored at start; read at evaluation
 // and publication so no later edit can change the measurement conditions.
-export function buildRunPin({ formId, engineVersion = 'legacy-engine', scenarioId = DRAFT_SEGMENT_ID }) {
-  const snapshot = DRAFT_SEGMENTS[scenarioId]
+export function buildRunPin({ formId = null, engineVersion = 'legacy-engine', scenarioId = DRAFT_SEGMENT_ID }) {
+  const snapshot = scenarioId === CORE_TEAMREADY_A_ID && formId === CORE_TEAMREADY_A_V1_FORM_ID
+    ? UNIVERSAL_SNAPSHOT_V1 : DRAFT_SEGMENTS[scenarioId]
   if (!snapshot) throw new Error(`buildRunPin: unknown draft scenario ${scenarioId}`)
+  if (snapshot.universal && formId != null && formId !== snapshot.form.formId) throw unavailable()
   // The universal form is pinned by the hash of the full authored form.
   const pinned = snapshot.universal ? snapshot.form : snapshot
+  const methodSnapshot = captureMethod(snapshot, { formId, engineVersion })
   return {
     scenarioId,
     engineVersion,
@@ -173,5 +179,7 @@ export function buildRunPin({ formId, engineVersion = 'legacy-engine', scenarioI
     rubricRef: snapshot.rubricRef,
     snapshotVersion: snapshot.version,
     snapshotHash: snapshotHash(pinned),
+    methodSnapshot,
+    methodHash: methodHash(methodSnapshot),
   }
 }

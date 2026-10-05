@@ -47,8 +47,8 @@ test('evidence schema: a campus migration drops the VERIFIED_CONSENSUS default a
 })
 
 test('reportV2: an empty session yields no fallback scores, quotes, archetype or precision', async () => {
-  const { buildStudentReportV2 } = await import('../lib/reportV2.js')
-  const report = await buildStudentReportV2(randomUUID(), { history: [] }, {})
+  const { renderStudentReportV2AtPublication } = await import('../lib/reportV2.js')
+  const report = await renderStudentReportV2AtPublication(randomUUID(), { history: [] }, {})
   assert.equal(report.status, 'INSUFFICIENT_EVIDENCE')
   assert.ok(report.section3_layer1TransferableCapabilities.length > 0, 'capabilities are listed, not dropped')
   for (const cap of report.section3_layer1TransferableCapabilities) {

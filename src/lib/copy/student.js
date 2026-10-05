@@ -335,7 +335,7 @@ export const DEVELOPMENT_COPY = {
     observedTitle: 'What was observed',
     nextTitle: 'Next',
     freshChallengeNext: 'Try a fresh challenge for this capability',
-    results: { OBSERVED: 'Shown', NOT_OBSERVED: 'Not shown yet', UNCERTAIN: 'Could not be checked', COPIED_ASSISTANCE: 'Matches an example' },
+    results: { OBSERVED: 'Shown', NOT_OBSERVED: 'Not shown yet', NOT_JUDGEABLE: 'Needs context to review', UNCERTAIN: 'Could not be checked', COPIED_ASSISTANCE: 'Matches an example' },
     unavailable: 'Part of the feedback could not be produced right now. Nothing was guessed: those behaviours are not counted either way.',
     // P6.5 first view, focus feedback, examples and comparison.
     firstView: { target: 'Target behaviour', scene: 'The situation', task: 'What to do', duration: (minutes) => `About ${minutes} minutes, untimed`, allowanceUnlimited: 'No limit on attempts here', facts: 'What you know' },

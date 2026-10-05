@@ -13,7 +13,7 @@
 // addresses a concern; those are MEANING checks (evaluate.js).
 import { ApiError } from '../http/errors.js'
 
-export const VALIDATORS_VERSION = 'mission-validators.v2'
+export const VALIDATORS_VERSION = 'mission-validators.v3'
 
 const str = (v) => (typeof v === 'string' ? v : '')
 
@@ -86,7 +86,15 @@ function valuesAt(artifactWork, path) {
   return [artifactWork[head]]
 }
 
-function runRule(rule, work) {
+function runRule(rule, work, mission) {
+  if (rule.path?.startsWith('rows.')) {
+    const expected = mission.artifacts.find((a) => a.artifact_id === rule.artifact_id)?.initial_state.rows || []
+    const rows = work[rule.artifact_id]?.rows || []
+    const ids = new Set(rows.map((r) => r.id))
+    if (!expected.length || rows.length !== expected.length || ids.size !== rows.length || !expected.every((r) => ids.has(r.id))) {
+      return { passed: false, detail: 'Every mission row is required exactly once' }
+    }
+  }
   const values = valuesAt(work[rule.artifact_id], rule.path)
   switch (rule.type) {
     case 'REQUIRED_FIELD': {
@@ -100,17 +108,28 @@ function runRule(rule, work) {
       return { passed, detail: passed ? 'Matches the expected structure' : 'Does not match the expected structure' }
     }
     case 'ONE_OF': {
-      // Every value names at least one allowed option as a whole word
-      // (case-insensitive). Confirms a valid reference, nothing more.
       const options = (Array.isArray(rule.params.options) ? rule.params.options : []).map((o) => String(o).trim().toLowerCase()).filter(Boolean)
       const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const res = options.map((o) => new RegExp(`(^|[^a-z0-9])${escape(o)}(?![a-z0-9])`, 'i'))
-      const passed = options.length > 0 && values.length > 0 && values.every((v) => res.some((re) => re.test(str(v))))
+      const passed = options.length > 0 && values.length > 0 && values.every((v) => {
+        const text = str(v).trim()
+        if (rule.params.match === 'REFERENCE') {
+          const people = options.filter((o) => !['decide', 'decides', 'escalate', 'escalated'].includes(o))
+          const person = people.map(escape).join('|')
+          const assigned = new RegExp(`^(?:${person})(?:\\s+(?:decides?|to decide|owns?|will (?:own|decide)|takes?).*)?[.!?]?$`, 'i')
+          const requested = new RegExp(`^(?:ask|escalate(?:d)?(?:\\s+to)?|owner[:=]?)\\s*:?\\s*(?:${person})\\b(?:\\s+.*)?$`, 'i')
+          const named = /^(?:[Aa]sk|[Ee]scalate(?:d)?(?: to)?)\s*:?\s*([A-Z][a-z]+(?: [A-Z][a-z]+)*)\s+(?:to decide|decides|will decide)\b/.exec(text)
+          const namedDecider = rule.params.named_decider === true && named && !/\b(?:someone|anyone|whoever|team|lead|manager|boss|person)\b/i.test(named[1])
+          return people.length > 0 && !/\b(?:not|no|nobody|unknown|maybe|unassigned|cannot|can't)\b/i.test(text) && (assigned.test(text) || requested.test(text) || namedDecider)
+        }
+        if (rule.params.match === 'DECISION') return !/^do\s+not\b/i.test(text) && new RegExp(`^(?:${options.map(escape).join('|')})(?=$|\\s|[-:.,;!])`, 'i').test(text)
+        return res.some((re) => re.test(text))
+      })
       return { passed, detail: passed ? 'Names an allowed option' : 'Does not name an allowed option' }
     }
     case 'NUMBER_RANGE': {
       const { min = -Infinity, max = Infinity } = rule.params
-      const passed = values.length > 0 && values.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max)
+      const passed = values.length > 0 && values.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max && (!rule.params.integer || Number.isInteger(v))) && (!rule.params.unique || new Set(values).size === values.length)
       return { passed, detail: passed ? 'Within the allowed range' : 'Outside the allowed range' }
     }
     case 'SUM_EQUALS': {
@@ -129,7 +148,7 @@ export function runDeterministicChecks(mission, work) {
   const results = new Map()
   for (const c of mission.rubric.criteria) results.set(c.criterion_id, { observed: false, rules: [] })
   for (const rule of mission.deterministic_validation_rules) {
-    const r = runRule(rule, work)
+    const r = runRule(rule, work, mission)
     results.get(rule.criterion_id).rules.push({ ruleId: rule.rule_id, passed: r.passed, description: rule.description, detail: r.detail })
   }
   for (const v of results.values()) v.observed = v.rules.length > 0 && v.rules.every((r) => r.passed)
@@ -137,15 +156,28 @@ export function runDeterministicChecks(mission, work) {
 }
 
 // The candidate's own words in the artifacts a criterion reads (for quote checks).
-export function candidateTextFor(mission, work, artifactIds) {
-  const parts = []
-  for (const id of artifactIds) {
-    const a = mission.artifacts.find((x) => x.artifact_id === id)
-    const w = work[id]
-    if (!a || !w) continue
-    if (a.type === 'TEXT_RESPONSE') parts.push(str(w.text))
-    if (a.type === 'FIELD_SHEET') for (const f of a.fields || []) if (f.kind === 'text') parts.push(str(w.fields?.[f.key]))
-    if (a.type === 'TABLE') for (const r of w.rows || []) for (const c of a.columns || []) if (c.kind === 'text' && c.editable) parts.push(str(r[c.key]))
-  }
-  return parts.filter((p) => p.trim())
+export function structuredWorkFor(mission, work) {
+  return mission.artifacts.map((a) => {
+    const w = work[a.artifact_id]
+    const entries = []
+    const add = (path, label, kind, value, editable, initial, rowId = null) => {
+      entries.push({ path, label, kind, editable, source: editable && value !== undefined && value !== null && value !== initial ? 'LEARNER' : 'SCENARIO', value: value ?? null, ...(rowId ? { row_id: rowId } : {}) })
+    }
+    if (a.type === 'TEXT_RESPONSE') add('text', a.title, 'text', w?.text, true, a.initial_state.text)
+    if (a.type === 'FIELD_SHEET') for (const f of a.fields || []) add(`fields.${f.key}`, f.label, f.kind, w?.fields?.[f.key], true, a.initial_state.fields?.[f.key])
+    if (a.type === 'TABLE') for (const seed of a.initial_state.rows || []) {
+      const row = w?.rows?.find((r) => r.id === seed.id)
+      for (const c of a.columns || []) add(`rows.${c.key}`, c.label, c.kind, c.editable ? row?.[c.key] : seed[c.key], c.editable, seed[c.key], seed.id)
+    }
+    return { artifact_id: a.artifact_id, type: a.type, title: a.title, entries }
+  })
+}
+
+export function candidateEntriesFor(mission, work, artifactIds, workPaths = []) {
+  return structuredWorkFor(mission, work).filter((a) => artifactIds.includes(a.artifact_id)).flatMap((a) =>
+    a.entries.filter((e) => e.source === 'LEARNER' && (!workPaths.length || workPaths.some((p) => p.artifact_id === a.artifact_id && p.path === e.path))).map((e) => ({ ...e, artifact_id: a.artifact_id })))
+}
+
+export function candidateTextFor(mission, work, artifactIds, workPaths = []) {
+  return candidateEntriesFor(mission, work, artifactIds, workPaths).filter((e) => e.kind === 'text' && str(e.value).trim()).map((e) => e.value)
 }

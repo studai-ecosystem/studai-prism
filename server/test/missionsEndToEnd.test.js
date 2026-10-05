@@ -25,7 +25,7 @@ import { initialWork, runDeterministicChecks, candidateTextFor } from '../domain
 import { createMissionEvaluator } from '../domain/development/evaluator.js'
 import { copiedFrom, compareAttempts } from '../domain/development/feedback.js'
 import { createCompletionService } from '../services/ai/completionService.js'
-import { auditConverse } from '../services/ai/auditConverse.js'
+import { auditConverse } from './fixtures/missionAuditConverse.js'
 import { FAMILY } from '../domain/assessments/universalForm.js'
 import { MISSION_FIXTURES, FILLER } from './fixtures/p6Missions.js'
 
@@ -170,15 +170,15 @@ for (const mission of MISSIONS) {
       assert.equal(valid.variant, 'BASE')
       assert.deepEqual(valid.provenance.retryOrigin, { kind: 'FIRST', previousAttemptId: null })
       assert.equal(valid.provenance.coachedRevision, false)
-      assert.equal(valid.provenance.feedbackVersion, 'mission-feedback.v1')
-      assert.equal(valid.provenance.evaluatorVersion, 'mission_evaluator.v1')
+      assert.equal(valid.provenance.feedbackVersion, 'mission-feedback.v2')
+      assert.equal(valid.provenance.evaluatorVersion, 'mission_evaluator.v2')
       const r1 = valid.result
       assert.ok(r1.counts.demonstrated >= 1, `${mission.display_code} demonstrates at least one behaviour: ${r1.summary}`)
       assert.ok(r1.focus.completed, 'one completed criterion is acknowledged')
       assert.equal(byId(r1)[r1.focus.completed.criterionId].result, 'OBSERVED')
-      assert.ok(typeof r1.focus.completed.quote === 'string' && r1.focus.completed.quote.length >= 3, 'the acknowledgement quotes the learner')
+      assert.ok(r1.focus.completed.source === 'AUTOMATIC_CHECK' || typeof r1.focus.completed.quote === 'string' && r1.focus.completed.quote.length >= 3, 'interpretive acknowledgements quote the learner; structural checks need not invent a quote')
       const own = workTexts(mission, fx.valid).toLowerCase().replace(/\s+/g, ' ')
-      assert.ok(own.includes(r1.focus.completed.quote.toLowerCase().replace(/…$/, '').replace(/\s+/g, ' ').slice(0, 40)), 'the quote is the learner\'s own change, not an example or template')
+      if (r1.focus.completed.quote) assert.ok(own.includes(r1.focus.completed.quote.toLowerCase().replace(/…$/, '').replace(/\s+/g, ' ').slice(0, 40)), 'the quote is the learner\'s own change, not an example or template')
       const notMet = r1.criteria.filter((c) => c.result === 'NOT_OBSERVED')
       if (notMet.length) {
         assert.ok(r1.focus.nextChange && notMet.some((c) => c.criterionId === r1.focus.nextChange.criterionId), 'the next change is a criterion not yet shown')
@@ -253,7 +253,9 @@ for (const mission of MISSIONS) {
       }
       for (const cid of ex.criterion_ids) {
         const c = byId(r4)[cid]
-        const reads = mission.rubric.criteria.find((x) => x.criterion_id === cid).artifact_ids.includes(target.artifact_id)
+        const definition = mission.rubric.criteria.find((x) => x.criterion_id === cid)
+        const targetPath = target.type === 'TEXT_RESPONSE' ? 'text' : `fields.${fx.copyTarget.field}`
+        const reads = definition.artifact_ids.includes(target.artifact_id) && (!definition.work_paths?.length || definition.work_paths.some((p) => p.artifact_id === target.artifact_id && p.path === targetPath))
         if (reads) assert.notEqual(c.result, 'OBSERVED', `${mission.display_code} ${cid}: not counted as independent`)
       }
       assert.ok(/not counted as your own/.test(r4.summary))
@@ -263,8 +265,8 @@ for (const mission of MISSIONS) {
       const stored = await w.repos.development.getAttempt(copied.id)
       assert.ok(stored.assistance.copyCheck.sources.includes(`EXAMPLE:${ex.example_id}`))
       assert.deepEqual(stored.assistance.copyCheck.flagged, flagged.map((c) => c.criterionId))
-      assert.equal(stored.assistance.feedbackVersion, 'mission-feedback.v1')
-      assert.ok(stored.assistance.promptVersion.meaning === 'mission_meaning.v2' || stored.assistance.promptVersion.evaluator === 'mission_evaluator.v1')
+      assert.equal(stored.assistance.feedbackVersion, 'mission-feedback.v2')
+      assert.ok(stored.assistance.promptVersion.meaning === 'mission_meaning.v3' || stored.assistance.promptVersion.evaluator === 'mission_evaluator.v2')
       // Earlier attempts are untouched by later ones.
       assert.deepEqual((await w.call(who, 'GET', `/mission-attempts/${valid.id}`)).body.data.result.criteria, r1.criteria)
     } finally { w.close() }
@@ -298,7 +300,8 @@ test('P6.3 M09: a missing owner fails the specific criterion as the next change;
     const m10 = 'MIS-CORE-NOT-TO-DO-01'
     const esc10 = await w.run('d', m10, MISSION_FIXTURES[m10].escalation)
     assert.equal(byId(esc10.result)['C-DEFER'].result, 'OBSERVED', 'M10: escalating a task with a reason counts as an explicit decision')
-    assert.match(byId(esc10.result)['C-DEFER'].quote, /escalating to Priya/)
+    const defer = latest(m10).rubric.criteria.find((c) => c.criterion_id === 'C-DEFER')
+    assert.ok(candidateTextFor(latest(m10), MISSION_FIXTURES[m10].escalation, defer.artifact_ids, defer.work_paths).some((t) => t.includes(byId(esc10.result)['C-DEFER'].quote)), 'the deferral or escalation quote comes from its own eligible field')
   } finally { w.close() }
 })
 
@@ -321,11 +324,11 @@ test('P6.4: an unsupported evaluator quote withholds the criterion for review an
     const units = await w.repos.development.listPracticeUnits({ userId: USERS.e.id })
     assert.equal(units.length, 0, 'withheld criteria write no practice evidence')
     assert.ok(!/learner failed|you failed/i.test(JSON.stringify(r)))
-    // Deterministic (structural) checks still stand under the same fault: M08's correct time.
+    // The latest correction criterion is semantic: merely mentioning a time is not a correction.
     process.env.PRISM_AUDIT_AI_FAULT = 'mismatch'
     const b = await w.run('e', 'MIS-CORE-REPAIR-01', MISSION_FIXTURES['MIS-CORE-REPAIR-01'].valid)
     delete process.env.PRISM_AUDIT_AI_FAULT
-    assert.equal(byId(b.result)['C-CORRECT'].result, 'OBSERVED', 'deterministic checks still stand')
+    assert.equal(byId(b.result)['C-CORRECT'].result, 'UNCERTAIN', 'unsupported quotations cannot establish the correct time')
     assert.equal(byId(b.result)['C-OWN'].result, 'UNCERTAIN')
   } finally { delete process.env.PRISM_AUDIT_AI_FAULT; w.close() }
 })
@@ -349,7 +352,7 @@ test('P6.5: a provider failure keeps the attempt readable, marks the review inco
     assert.equal(sub.body.data.result.focus.reviewIncomplete, true)
     assert.match(sub.body.data.result.focus.note, /review could not be completed/i)
     assert.ok(sub.body.data.result.criteria.filter((c) => c.result === 'UNCERTAIN').every((c) => c.reason === 'EVALUATION_UNAVAILABLE'))
-    assert.equal(byId(sub.body.data.result)['C-CORRECT'].result, 'OBSERVED', 'deterministic checks are still reported')
+    assert.equal(byId(sub.body.data.result)['C-CORRECT'].result, 'UNCERTAIN', 'a semantic correction is not guessed from a time token when the provider fails')
     // Readable, work intact, allowance unchanged by the failed review.
     const read = await w.call(who, 'GET', `/mission-attempts/${a.id}`)
     assert.equal(read.status, 200)
@@ -435,11 +438,12 @@ test('P6.6: replay carries only the presented stimulus of THAT moment — no lat
   } finally { w.close() }
 })
 
-test('P6.4 unit: copy detection needs ≥ 80 % of a shown sentence\'s word pairs; comparison lists criterion ids only', () => {
+test('P6.4 unit: fuzzy copying keeps its word-pair floor; exact whole-cell assistance is protected even when concise', () => {
   const shown = [{ source: 'EXAMPLE', id: 'EX-1', text: 'Lea owns the slides and the room booking because Tom is away on Monday.' }]
   assert.ok(copiedFrom(['Lea owns the slides and the room booking because Tom is away on Monday, as agreed.'], shown))
   assert.equal(copiedFrom(['Lea takes the slides plus the room booking since Tom travels on Monday.'], shown), null, 'the same idea in other words is not a copy')
-  assert.equal(copiedFrom(['Tom is away'], [{ source: 'HINT', id: 'H1', text: 'Tom is away.' }]), null, 'short fragments never count')
+  assert.equal(copiedFrom(['Tom is away'], [{ source: 'HINT', id: 'H1', text: 'Tom is away.' }]).id, 'H1', 'exact exposed whole-cell assistance is not independent work')
+  assert.equal(copiedFrom(['Tom is away, so Lea handles Monday work.'], [{ source: 'HINT', id: 'H1', text: 'Tom is away.' }]), null, 'short fragments inside longer work still do not meet the fuzzy-copy floor')
   const cmp = compareAttempts(
     { attemptId: 'p', criteria: [{ criterionId: 'A', result: 'NOT_OBSERVED' }, { criterionId: 'B', result: 'OBSERVED' }, { criterionId: 'C', result: 'UNCERTAIN' }] },
     { criteria: [{ criterionId: 'A', result: 'OBSERVED' }, { criterionId: 'B', result: 'COPIED_ASSISTANCE' }, { criterionId: 'C', result: 'OBSERVED' }] },

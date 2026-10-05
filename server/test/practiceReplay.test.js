@@ -106,7 +106,7 @@ test('P6.6: replay creates a separate PRACTICE attempt that copies only the pres
     assert.equal(r.status, 201, JSON.stringify(r.body))
     const { attempt, missionId } = r.body.data
     assert.equal(missionId, 'MIS-CORE-HANDOVER-01', 'the mission whose exposure tags name this moment')
-    assert.equal(attempt.missionVersion, 3, 'the latest version (P6.8 honest-checks revision)')
+    assert.equal(attempt.missionVersion, 4, 'the latest version (CR04 structured-work revision)')
     assert.equal(attempt.evidenceType, 'PRACTICE')
     assert.deepEqual(attempt.origin, { kind: 'ASSESSMENT_MOMENT', sessionId: SESSION, opportunityId: OPP })
     assert.deepEqual(attempt.assistance, { mode: 'GUIDED', hintsUsed: 0, scaffoldRequested: false })

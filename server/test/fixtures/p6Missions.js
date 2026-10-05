@@ -104,7 +104,7 @@ export const MISSION_FIXTURES = {
     },
     paraphrase: {
       BOARD: { rows: [
-        { id: 'slides', owner: 'Lea', done_when: 'Deck uploaded to the shared folder' },
+        { id: 'slides', owner: 'Lea', done_when: 'Deck uploaded and Tom can open it' },
         { id: 'room', owner: 'Lea', done_when: 'Confirmation from the bookings desk in the inbox' },
         { id: 'projector', owner: 'Tom', done_when: 'Test run done, slide visible on the wall' },
         { id: 'visitors', owner: 'Tom', done_when: 'Named list emailed to Lea' },

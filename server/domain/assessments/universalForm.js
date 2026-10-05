@@ -12,7 +12,8 @@ import { PRIMARY_CAPABILITY_IDS } from './catalog.js'
 import { DRAFT_UNIVERSAL } from './timingPolicy.js'
 
 export const CORE_TEAMREADY_A_ID = 'draft-core-teamready-a'
-export const CORE_TEAMREADY_A_VERSION = '0.1.0-draft'
+export const CORE_TEAMREADY_A_VERSION = '0.2.0-draft'
+export const CORE_TEAMREADY_A_V1_FORM_ID = `${CORE_TEAMREADY_A_ID}:0.1.0-draft`
 export const CORE_TEAMREADY_A_FORM_ID = `${CORE_TEAMREADY_A_ID}:${CORE_TEAMREADY_A_VERSION}`
 export const UNIVERSAL_RUBRIC_REF = 'draft-teamready-rubric.v0.1'
 export const BOARD_ARTIFACT_ID = 'TEAMREADY-BOARD'
@@ -223,11 +224,11 @@ const EXEMPLARS = [
   { kind: 'WORKABLE_ALTERNATIVE_C', behaviourId: 'COMPARE_ALTERNATIVES', text: 'Reduce scope: 24 people, one room, agenda on the whiteboard, no printed pack. Then the only critical task is the room.', note: 'Reduced scope is a defensible alternative.' },
 ]
 
-export const CORE_TEAMREADY_A = deepFreeze({
+export const CORE_TEAMREADY_A_V1 = deepFreeze({
   id: CORE_TEAMREADY_A_ID,
-  formId: CORE_TEAMREADY_A_FORM_ID,
+  formId: CORE_TEAMREADY_A_V1_FORM_ID,
   blueprintId: 'CORE-TEAMREADY-A',
-  version: CORE_TEAMREADY_A_VERSION,
+  version: '0.1.0-draft',
   status: 'DRAFT',
   title: 'Get the team ready',
   briefing: {
@@ -269,6 +270,42 @@ export const CORE_TEAMREADY_A = deepFreeze({
     'The authoring coverage floor (two opportunities per family) is not the governed evidence sufficiency floor.',
   ],
   approvalHistory: [{ state: 'DRAFT', at: null, by: null, reason: 'Initial original draft; not self-approved.' }],
+})
+
+export const CORE_TEAMREADY_A = deepFreeze({
+  ...CORE_TEAMREADY_A_V1,
+  formId: CORE_TEAMREADY_A_FORM_ID,
+  version: CORE_TEAMREADY_A_VERSION,
+  publicFacts: CORE_TEAMREADY_A_V1.publicFacts.map((fact) => fact.id === 'F-PARTICIPANTS' ? { ...fact, triggers: [...fact.triggers, 'attendance'] } : fact),
+  conditionalFacts: CORE_TEAMREADY_A_V1.conditionalFacts.map((fact) => {
+    if (fact.id === 'CF-FACILITATOR-HOURS') return { ...fact, triggers: [...fact.triggers, 'how much time can sam', 'how much time does sam', 'sam contribute', 'sam have', 'how much time can priya', 'priya contribute'] }
+    if (fact.id === 'CF-ROOM-CAPACITY') return { ...fact, triggers: [...fact.triggers, 'room capacity', 'venue capacity', 'seating capacity'] }
+    return fact
+  }),
+  opportunities: CORE_TEAMREADY_A_V1.opportunities.map((o) => {
+    if (o.id === 'OPP-EXEC-BOARD-OWNERS') return {
+      ...o,
+      reactions: {
+        ...o.reactions,
+        OVERLOADED_SAM: {
+          ...o.reactions.OVERLOADED_SAM,
+          content: 'I can give about half a day to preparation on each of the two days. How will the tasks fit, and which should come first?',
+        },
+        FEASIBLE_ALLOCATION: {
+          ...o.reactions.FEASIBLE_ALLOCATION,
+          content: 'That makes the ownership and order explicit. I will work from those responsibilities; tell me if a task needs a different time or owner.',
+        },
+      },
+    }
+    if (o.id === 'OPP-EXEC-BOARD-FINAL') return {
+      ...o,
+      reviewReadiness: {
+        all: ['R1.owner', 'R2.owner', 'R3.owner', 'R1.due', 'R2.due', 'R3.due', 'R1.status', 'R2.status', 'R3.status', 'R1.rationale', 'R2.rationale', 'R3.rationale'],
+      },
+    }
+    return o
+  }),
+  approvalHistory: [{ state: 'DRAFT', at: null, by: null, reason: 'Context/review-readiness correction; requires independent review, not self-approved.' }],
 })
 
 // --- lookups ----------------------------------------------------------------------

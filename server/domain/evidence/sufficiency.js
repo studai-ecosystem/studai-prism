@@ -14,6 +14,7 @@ function median(values) {
 }
 
 function opportunityKey(u) {
+  if (u.provenance_json?.opportunityGroup) return `group:${u.provenance_json.opportunityGroup}`
   if (u.source_turn != null) return `turn:${u.source_turn}`
   if (u.source_artifact_id) return `artifact:${u.source_artifact_id}`
   return `unit:${u.evidence_id}`

@@ -22,6 +22,31 @@ measurement and customer views stay separate:
 Alert payloads are references and aggregate counts only. They must not contain
 answers, transcripts, prompts, report text, e-mail addresses, names or tokens.
 
+## Corrected runtime recovery
+
+- Schema 0054 is required before new allocations. Apply additive migrations
+  only on an authorized target; the local rehearsal uses a disposable cluster.
+- Server startup drains durable EVALUATE_RUN jobs and retries publication.
+  Lease renewal continues during inference; a stale result cannot be accepted.
+  Model calls may repeat; acceptance is idempotent, not exactly-once inference.
+- An accepted-batch receipt binds input hash, method hash and evidence IDs.
+  Reconciliation/publication must not include unaccepted later graph rows.
+- `PINNED_METHOD_UNAVAILABLE` or `EVALUATION_CONTEXT_INCOMPLETE` means review
+  incomplete, not a student weakness. Preserve work and issued snapshots;
+  restore the exact archive/context or escalate. Never substitute a current
+  rubric, rebuild a historical interpretation, or request another purchase.
+- Publication failure keeps accepted work. Retry explicit publication;
+  ordinary owner/sponsor/share/legacy GETs cannot trigger it or inference.
+  Select the requested snapshot version consistently across audiences.
+- Missing historical formatted views lead to the original owned report.
+  An unavailable V3 interpretation is not missing ownership or erased history.
+- Erasure markers fence evidence, reports and late receipts. Do not remove a
+  marker to make a retry succeed. Retained financial records are not evidence.
+- Compatible rollback stops new allocations and drains active work first.
+  Preserve 0054 and accepted receipts in production; do not run schema-down
+  scripts or drop learner evidence as an application rollback shortcut.
+  Disposable down/up rehearsal is not a production restore authorization.
+
 ## Daily pilot triage (when an operator is assigned)
 
 1. Review open alerts by severity (PAGE → TICKET → REVIEW).

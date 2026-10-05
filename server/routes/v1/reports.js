@@ -17,6 +17,7 @@ import { requireFlag } from '../../domain/flags/index.js'
 import { studentScoped } from './studentScope.js'
 import { MAX_SHARE_DAYS, REVIEW_REASON_MAX, REVIEW_REASON_MIN } from '../../domain/reports/v3/service.js'
 import { REVIEW_CATEGORIES } from '../../domain/reports/v3/repository.js'
+import { readReportVersion } from '../../domain/http/reportVersion.js'
 
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -59,7 +60,7 @@ export function createReportsRouter({ requireUser, campus, clock = () => new Dat
 
   router.get('/assessment-sessions/:sessionId/report', ...scoped, available, asyncHandler(async (req, res) => {
     if (!SESSION_ID.test(req.params.sessionId)) throw new ApiError('NOT_FOUND', 'Not found')
-    return ok(res, await campus.reports.forOwner({ user: req.user, workspace: req.workspace, sessionId: req.params.sessionId, requestId: req.requestId }))
+    return ok(res, await campus.reports.forOwner({ user: req.user, workspace: req.workspace, sessionId: req.params.sessionId, requestId: req.requestId, reportVersion: readReportVersion(req.query) }))
   }))
 
   // P5.1: the owner's version history (no report bodies, nothing rebuilt).
@@ -99,7 +100,7 @@ export function createReportsRouter({ requireUser, campus, clock = () => new Dat
     if (!TOKEN.test(req.params.token)) throw new ApiError('NOT_FOUND', 'This link is not valid or has expired.')
     res.setHeader('Referrer-Policy', 'no-referrer')
     res.setHeader('X-Robots-Tag', 'noindex, nofollow')
-    return ok(res, await campus.reports.forShare({ req, token: req.params.token }))
+    return ok(res, await campus.reports.forShare({ req, token: req.params.token, reportVersion: readReportVersion(req.query) }))
   }))
 
   return router

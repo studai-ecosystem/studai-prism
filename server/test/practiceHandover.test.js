@@ -19,7 +19,7 @@ import { createDevelopmentService, normaliseOrigin } from '../domain/development
 import { initialWork, runDeterministicChecks } from '../domain/development/validators.js'
 import { createMissionEvaluator } from '../domain/development/evaluator.js'
 import { createCompletionService } from '../services/ai/completionService.js'
-import { auditConverse } from '../services/ai/auditConverse.js'
+import { auditConverse } from './fixtures/missionAuditConverse.js'
 
 process.env.NODE_ENV = 'test'
 process.env.PRISM_AUDIT_AI = 'true'

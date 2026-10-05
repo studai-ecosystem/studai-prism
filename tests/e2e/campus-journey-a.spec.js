@@ -1,11 +1,11 @@
 // Prism Campus C6.08 — Journey A (direct user → Report V3) and Journey D
 // (insufficient evidence) on the campus harness server (flags on in-process
-// only, K2; mocked AI). Synthetic users only. Proves: the finished player
+// only, K2; controlled audit provider). Synthetic users only. Proves: the finished player
 // links to Report V3; every conclusion the API returns cites evidence or is
 // marked insufficient; an early finish produces an honest insufficient
 // report with no invented level; a summary share link shows the summary only.
 import { test, expect } from '@playwright/test'
-import { CAMPUS_BASE_URL, api, signInSynthetic, expectNoSeriousAxe } from './campusHelpers.js'
+import { CAMPUS_BASE_URL, api, signInSynthetic, expectNoSeriousAxe, continueAssessmentOnSmallScreen } from './campusHelpers.js'
 import { ASSESSMENT_CONSENT_ITEMS } from '../../src/lib/copy/assessmentConsent.js'
 import { seedSponsoredAssignment } from '../fixtures/campusSeed.mjs'
 
@@ -21,12 +21,16 @@ async function startPersonalV3(page, label) {
   for (const item of ASSESSMENT_CONSENT_ITEMS) await page.getByLabel(item.label).check()
   await page.getByRole('button', { name: 'Begin assessment' }).click()
   await expect(page).toHaveURL(new RegExp(`/app/assessment/${dev.body.sessionId}$`))
-  const beginTimed = page.getByRole('dialog').getByRole('button', { name: 'Begin timed assessment' })
-  if (await beginTimed.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)) await beginTimed.click()
+  const contract = await api(page, `/api/v1/assessment-sessions/${dev.body.sessionId}`, { token: student.token })
+  expect(contract.status).toBe(200)
+  expect(contract.body.data.assessment.definitionId).toBe('draft-core-teamready-a')
+  await page.getByRole('dialog').getByRole('button', { name: 'Begin timed assessment' }).click()
+  await expect(page.getByRole('timer')).toBeVisible()
   return { student, sessionId: dev.body.sessionId }
 }
 
 async function answer(page, text) {
+  await continueAssessmentOnSmallScreen(page)
   const participants = page.getByTestId('conversation').locator('[data-role="participant"]')
   const before = await participants.count()
   await page.getByLabel('Your answer').fill(text)
@@ -126,7 +130,7 @@ test.describe('@critical @campus sponsored Report V3 — student and sponsor', (
     const admin = await signInSynthetic(adminPage, CAMPUS_BASE_URL, 'report-owner')
     const student = await signInSynthetic(page, CAMPUS_BASE_URL, 'report-sponsored')
     expect((await api(page, '/api/v1/me/assessments', { token: student.token })).status).toBe(200)
-    const fx = await seedSponsoredAssignment({ databaseUrl: DB, ownerUserId: admin.user.id, studentUserId: student.user.id, seat: true })
+    const fx = await seedSponsoredAssignment({ databaseUrl: DB, ownerUserId: admin.user.id, studentUserId: student.user.id, definitionId: 'draft-core-teamready-a', seat: true })
     const base = `${CAMPUS_BASE_URL}/app/campus/${fx.organizationId}/assignments/${fx.assignmentId}`
     await page.goto(`${base}/briefing`)
     await page.getByLabel(`I understand what ${fx.organizationName} can and cannot see`).check()
@@ -137,6 +141,8 @@ test.describe('@critical @campus sponsored Report V3 — student and sponsor', (
     await page.getByRole('button', { name: 'Begin assessment' }).click()
     await expect(page).toHaveURL(/\/app\/assessment\/[0-9a-f-]{36}\?ws=/)
     const sessionId = new URL(page.url()).pathname.split('/').pop()
+    await page.getByRole('dialog').getByRole('button', { name: 'Begin timed assessment' }).click()
+    await expect(page.getByRole('timer')).toBeVisible()
     await answer(page, 'Synthetic sponsored answer.')
     const finish = page.getByRole('button', { name: 'Finish assessment' })
     const dialog = page.getByRole('dialog')

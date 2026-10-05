@@ -10,7 +10,7 @@ import { StatusChip } from '../../../components/ui/Badge.jsx'
 import { InlineNotice } from '../../../components/ui/Notice.jsx'
 import { DEVELOPMENT_COPY } from '../../../lib/copy/student.js'
 
-const TONE = { OBSERVED: 'positive', NOT_OBSERVED: 'neutral', UNCERTAIN: 'insufficient', COPIED_ASSISTANCE: 'partial' }
+const TONE = { OBSERVED: 'positive', NOT_OBSERVED: 'neutral', NOT_JUDGEABLE: 'insufficient', UNCERTAIN: 'insufficient', COPIED_ASSISTANCE: 'partial' }
 
 function Focus({ focus }) {
   const copy = DEVELOPMENT_COPY.player

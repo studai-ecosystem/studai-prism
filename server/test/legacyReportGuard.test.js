@@ -186,7 +186,7 @@ test('S9: the real app hides the issued report of a V3 session from anonymous ca
     const hidden = await fetch(`${base}/sess-v3-report`)
     assert.equal(hidden.status, 404)
     assert.doesNotMatch(await hidden.text(), /synthetic-a@test\.local/)
-    assert.equal((await fetch(`${base}/sess-personal-report`)).status, 200, 'undisclosed personal report stays public')
+    assert.equal((await fetch(`${base}/sess-personal-report`)).status, 404, 'an original personal report is private too')
   } finally { server.close() }
 })
 

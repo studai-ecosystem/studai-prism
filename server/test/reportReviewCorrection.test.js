@@ -11,7 +11,11 @@ import { createV1Router } from '../routes/v1/index.js'
 import { createReportReviewsAdminRouter } from '../routes/admin/reportReviews.js'
 import { createMemoryCampusRepos } from '../domain/campusStore/index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from '../domain/campusStore/context.js'
-import { PRIMARY_CAPABILITY_IDS } from '../domain/assessments/catalog.js'
+import { PRIMARY_CAPABILITY_IDS, capabilityInfo } from '../domain/assessments/catalog.js'
+import { buildRunPin } from '../domain/assessments/draftSegments.js'
+import { captureMethod, methodHash } from '../domain/assessments/frozenMethod.js'
+import { CORE_TEAMREADY_A_ID, CORE_TEAMREADY_A_FORM_ID } from '../domain/assessments/universalForm.js'
+import { evaluationReceiptKey } from '../domain/assessments/sessionIoRepository.js'
 import { behaviourGaps, resolveRecommendations } from '../domain/development/recommendations.js'
 import { ApiError } from '../domain/http/errors.js'
 
@@ -28,11 +32,15 @@ const LINES = ['First I would check which customers raised the issue.', 'Then I 
 const history = (lines) => [{ role: 'user', content: 'opening instruction' }, ...lines.map((l) => ({ role: 'user', content: `[Candidate]: ${l}` }))]
 
 function unit(sid, id, capabilityId, turn, { rubric = 2, excerpt = null, status = 'PROVISIONAL', behaviourId = null, behaviour = null } = {}) {
+  const anchors = structuredClone(capabilityInfo(capabilityId).anchors)
   return {
     evidence_id: id, session_id: sid, capability_id: capabilityId, evidence_status: status, rubric_level: rubric,
     source_turn: turn, source_artifact_id: null, behavior_anchor_id: `anchor-${turn}`,
     candidate_action_json: { dialogue_excerpt: excerpt },
-    provenance_json: { judge: 'synthetic', rubric_version: 'rubric.v1', ...(behaviourId ? { behaviourId } : {}) },
+    provenance_json: {
+      judge: 'synthetic', rubric_version: 'rubric.v1', ...(behaviourId ? { behaviourId } : {}),
+      resolvedRubric: { ref: 'rubric.v1', anchors, anchorsHash: methodHash(anchors) },
+    },
     judge_agreement_json: { agreement: 0.9 }, observable_behavior: behaviour || `Synthetic observed behaviour ${id}.`, legacy_row: false,
   }
 }
@@ -64,13 +72,13 @@ const ADMINS = {
   reader: { id: 'admin-reader', permissions: new Set(['reports:read']) },
 }
 
-async function world() {
+async function world({ publishStrong = false } = {}) {
   const repos = createMemoryCampusRepos({ clock: () => now })
   const state = {
     sessions: {
       [SID]: { userId: USERS.student.id, scenarioId: 'syn-general-p5', history: history(LINES), startedAt: now.getTime() - 86400000 },
       [SID_STRONG]: { userId: USERS.strong.id, scenarioId: 'syn-general-p5', history: history(LINES), startedAt: now.getTime() - 86400000 },
-      [SID_NEWRUN]: { userId: USERS.newrun.id, scenarioId: 'syn-general-p5', history: history(LINES), startedAt: now.getTime() - 86400000, completedAt: now.getTime() - 3600000 },
+      [SID_NEWRUN]: { userId: USERS.newrun.id, scenarioId: CORE_TEAMREADY_A_ID, history: history(LINES), startedAt: now.getTime() - 86400000, completedAt: now.getTime() - 3600000 },
     },
     reports: {
       [SID]: { userId: USERS.student.id, issuedAt: now.toISOString(), candidateName: 'Synthetic Student' },
@@ -90,6 +98,32 @@ async function world() {
     evidence: { units: async (sid) => (sid === SID ? UNITS : sid === SID_STRONG ? STRONG_UNITS : sid === SID_NEWRUN ? NEWRUN_UNITS : []) },
     audit: (type, sid, payload) => audits.push({ type, sid, payload }),
     sessionOwner: async (sid) => state.sessions[sid]?.userId || null,
+  })
+  // Declare the synthetic allocation rather than recovering an unknown
+  // historical method from today's instructions.
+  const cat = await campus.catalog.getCatalog()
+  const form = cat.forms.find((f) => f.scenarioId === state.sessions[SID].scenarioId)
+  const definition = cat.definitions.find((d) => d.id === form.definitionId)
+  const allocation = {
+    id: state.sessions[SID].scenarioId, version: form.version, rubricRef: 'rubric.v1',
+    opportunities: definition.measures.map((capabilityId) => ({ id: `synthetic-${capabilityId}`, capabilityId, behaviourId: capabilityId })),
+    rubric: { ref: 'rubric.v1', source: 'SYNTHETIC_UNIT_ALLOCATION', anchorsByBehaviour: Object.fromEntries(definition.measures.map((id) => [id, structuredClone(capabilityInfo(id).anchors)])) },
+  }
+  const methodSnapshot = captureMethod(allocation, { formId: form.id, engineVersion: 'synthetic-report-fixture' })
+  const content = { ...allocation }
+  delete content.rubric
+  const runPin = {
+    scenarioId: allocation.id, snapshotVersion: allocation.version, rubricRef: allocation.rubricRef, formId: form.id,
+    snapshotHash: methodHash(content), engineVersion: methodSnapshot.engineVersion, methodVersion: methodSnapshot.methodVersion,
+    methodSnapshot, methodHash: methodHash(methodSnapshot),
+  }
+  for (const sessionId of [SID, SID_STRONG]) await repos.sessionIo.putClientEvent({ sessionId, clientEventId: 'start', kind: 'START', response: { runPin } })
+  // Published-state unit fixtures only. SID_NEWRUN remains unpublished.
+  await campus.reports.publish(SID, { reason: 'INITIAL' })
+  if (publishStrong) await campus.reports.publish(SID_STRONG, { reason: 'INITIAL' })
+  await repos.sessionIo.putClientEvent({
+    sessionId: SID_NEWRUN, clientEventId: 'start', kind: 'START',
+    response: { runPin: buildRunPin({ scenarioId: CORE_TEAMREADY_A_ID, formId: CORE_TEAMREADY_A_FORM_ID }) },
   })
   const requireUser = (req, _res, next) => {
     const user = USERS[req.get('x-test-user')]
@@ -281,11 +315,11 @@ test('P5.7/T36: a reviewer decides once; CORRECT publishes a NEW version without
 })
 
 test('P5.4: capability detail is bound to the latest snapshot — described, bounded-only, under review, stretch, not measured; one state, nothing invented', async () => {
-  const w = await world()
+  const w = await world({ publishStrong: true })
   try {
     const before = await w.call('student', 'GET', `/api/v1/me/capabilities/${CAP_A}`)
     assert.equal(before.status, 200, JSON.stringify(before.body))
-    assert.equal(before.body.data.latestSnapshot.version, null, 'no version exists until the report is published; the pure builder is used')
+    assert.equal(before.body.data.latestSnapshot.version, 1, 'historical-reader setup explicitly published this snapshot')
     assert.equal(before.body.data.state, 'DESCRIBED')
 
     const report = await withDraft(() => w.call('student', 'GET', `/api/v1/assessment-sessions/${SID}/report`))
@@ -344,16 +378,25 @@ test('P5.4: capability detail is bound to the latest snapshot — described, bou
   } finally { w.close() }
 })
 
-test('T35: a new-run completion (DONE evaluation job, no legacy report) is a formal session for capabilities, history and capability detail', async () => {
+test('T35 historical-reader fixture: a DONE evaluation job without a legacy report becomes visible only after explicit publication', async () => {
   const w = await world()
   try {
     // Before the worker finishes: processing, not a report, not a capability.
+    const finish = await w.repos.sessionIo.acceptAction({ sessionId: SID_NEWRUN, clientEventId: 'finish', kind: 'FINISH', payload: { early: true } })
+    await w.repos.sessionIo.applyAction(finish.actionId, { state: 'SCORING' })
     await w.repos.sessionIo.enqueueJob({ taskKey: `evaluate:${SID_NEWRUN}`, sessionId: SID_NEWRUN, kind: 'EVALUATE_RUN' })
     const pending = await w.call('newrun', 'GET', '/api/v1/me/history')
     assert.equal(pending.body.data.items[0].status, 'PROCESSING')
     assert.equal((await w.call('newrun', 'GET', `/api/v1/me/capabilities/${CAP_A}`)).body.data.state, 'NOT_MEASURED')
     const job = await w.repos.sessionIo.claimJob('EVALUATE_RUN', 60000)
+    const input = await w.repos.sessionIo.captureEvaluationInput(SID_NEWRUN)
     await w.repos.sessionIo.completeJob(job.jobId, job.fencingToken, 'DONE')
+    // Synthetic completed-state fixture; integrated journeys must obtain
+    // this receipt atomically from applyEvaluation, never preseed it.
+    await w.repos.sessionIo.putClientEvent({
+      sessionId: SID_NEWRUN, clientEventId: evaluationReceiptKey(job.jobId), kind: 'EVALUATION_ACCEPTED',
+      response: { inputHash: input.expectedInputHash, methodHash: input.runPin.methodHash, evidenceIds: NEWRUN_UNITS.map((u) => u.evidence_id) },
+    })
     // Until the worker publishes, a read says "not ready" and creates nothing.
     const unpublished = await w.call('newrun', 'GET', `/api/v1/assessment-sessions/${SID_NEWRUN}/report`)
     assert.equal(unpublished.status, 409)

@@ -16,10 +16,12 @@
 import { createHash } from 'node:crypto'
 import { renderPrompt } from '../../engine/prompts.js'
 import { sanitizeCandidateText } from '../../lib/promptSecurity.js'
-import { capabilityInfo } from '../assessments/catalog.js'
+import { rubricForSnapshot, resolvePinnedMethod, methodHash, unavailable, EVIDENCE_PROMPT, EVIDENCE_EVALUATOR } from '../assessments/frozenMethod.js'
+import { normalizeEvidenceUnit } from './evidenceUnit.js'
+import { aiProvider, policyFor } from '../../services/ai/modelRouter.js'
 
-export const EVALUATOR_PROMPT = 'evidence_evaluator.v2'
-export const SLICE_EVALUATOR_VERSION = 'slice-evaluator.v2'
+export const EVALUATOR_PROMPT = EVIDENCE_PROMPT
+export const SLICE_EVALUATOR_VERSION = EVIDENCE_EVALUATOR
 const ELIGIBLE_KINDS = new Set(['MESSAGE', 'ARTIFACT'])
 const ABSTAIN_REASONS = new Set(['NOT_ADDRESSED', 'TOO_SPARSE', 'NOT_JUDGEABLE'])
 const MAX_EXCERPT = 600
@@ -78,20 +80,29 @@ export function eligibleActions(actions = []) {
     .sort((a, b) => a.sequence - b.sequence)
 }
 
-export function buildEvaluatorMessages({ snapshot, opportunity, actions }) {
-  const anchors = snapshot.form?.rubric?.anchorsByBehaviour?.[opportunity.behaviourId]
-    || capabilityInfo(opportunity.capabilityId)?.anchors
-  if (!anchors) throw new EvaluatorOutputError(`Pinned anchors are unavailable for ${opportunity.behaviourId}`)
-  const prompt = renderPrompt(EVALUATOR_PROMPT, {
+export function buildEvaluatorMessages({ snapshot, opportunity, actions, method = null }) {
+  const anchors = rubricForSnapshot(snapshot).anchorsByBehaviour[opportunity.behaviourId]
+  if (!anchors) throw unavailable()
+  const vars = {
     OPPORTUNITY_JSON: JSON.stringify({ id: opportunity.id, capabilityId: opportunity.capabilityId, behaviourId: opportunity.behaviourId, description: opportunity.description || '' }),
     ANCHORS_JSON: JSON.stringify(anchors),
     ACTIONS_JSON: JSON.stringify(actions.map((a) => ({
       actionId: a.actionId, kind: a.kind, sequence: a.sequence,
       ...(a.kind === 'ARTIFACT' ? { artifactId: a.payload?.artifactId || null } : {}),
       text: candidateTexts(a).map((t) => sanitizeCandidateText(t, 4000)).join('\n'),
+      workChange: a.kind === 'ARTIFACT' ? {
+        artifactId: a.payload?.artifactId || null, actorKind: 'CANDIDATE',
+        updates: a.payload?.updates || {}, notes: a.payload?.notes || null,
+      } : null,
       context: a.result?.evaluationContext || null,
     }))),
-  })
+  }
+  const prompt = method
+    ? method.prompt.template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, key) => {
+      if (!(key in vars)) throw unavailable()
+      return String(vars[key])
+    }).trim()
+    : renderPrompt(EVALUATOR_PROMPT, vars)
   return [
     { role: 'system', content: prompt },
     { role: 'user', content: `Return the JSON object for opportunity ${opportunity.id}.` },
@@ -138,12 +149,12 @@ export function classifyUnit(raw, { opportunity, actions }) {
 // opportunity, behaviour) always maps to the same evidence id, so applying a
 // retried or duplicated evaluation of the same job can never add a second
 // row for it. The attempt number is deliberately not part of the key.
-export function logicalEvidenceId({ sessionId, snapshotHash, opportunityId, behaviourId }) {
-  const digest = createHash('sha256').update([sessionId, snapshotHash || '', opportunityId, behaviourId || ''].join('\u0000')).digest('hex')
+export function logicalEvidenceId({ sessionId, snapshotHash, pinnedMethodHash = '', inputRevision = '', opportunityId, behaviourId }) {
+  const digest = createHash('sha256').update([sessionId, snapshotHash || '', pinnedMethodHash, inputRevision, opportunityId, behaviourId || ''].join('\u0000')).digest('hex')
   return `ev-${digest.slice(0, 48)}`
 }
 
-function toEvidenceInput(decision, { sessionId, formId, pin, attempt, provenanceBase }) {
+function toEvidenceInput(decision, { sessionId, formId, pin, attempt, provenanceBase, method, inputRevision }) {
   const action = decision.action
   const sourceType = action ? (action.kind === 'ARTIFACT' ? 'WORK_ARTIFACT' : 'DIALOGUE_TURN') : null
   const provenance = {
@@ -154,6 +165,16 @@ function toEvidenceInput(decision, { sessionId, formId, pin, attempt, provenance
     rubric_version: pin.rubricRef,
     methodVersion: pin.methodVersion,
     snapshotHash: pin.snapshotHash,
+    methodHash: pin.methodHash,
+    inputRevision,
+    resolvedRubric: {
+      ref: pin.rubricRef, contentHash: method.rubricHash, behaviourId: decision.behaviourId,
+      anchors: rubricForSnapshot(method.snapshot).anchorsByBehaviour[decision.behaviourId],
+      anchorsHash: methodHash(rubricForSnapshot(method.snapshot).anchorsByBehaviour[decision.behaviourId]),
+    },
+    interpretation: method.interpretation,
+    capabilityDefinition: method.capabilityDefinitions?.[decision.capabilityId] || null,
+    modelPolicy: method.modelPolicy,
     opportunityId: decision.opportunityId,
     opportunityGroup: decision.opportunityGroup || null,
     behaviourId: decision.behaviourId,
@@ -174,7 +195,7 @@ function toEvidenceInput(decision, { sessionId, formId, pin, attempt, provenance
     ...(decision.excerpt ? { dialogue_excerpt: decision.excerpt } : {}),
   } : null
   return {
-    evidence_id: logicalEvidenceId({ sessionId, snapshotHash: pin.snapshotHash, opportunityId: decision.opportunityId, behaviourId: decision.behaviourId }),
+    evidence_id: logicalEvidenceId({ sessionId, snapshotHash: pin.snapshotHash, pinnedMethodHash: pin.methodHash, inputRevision, opportunityId: decision.opportunityId, behaviourId: decision.behaviourId }),
     session_id: sessionId,
     assessment_form_id: formId,
     capability_id: decision.capabilityId,
@@ -186,7 +207,7 @@ function toEvidenceInput(decision, { sessionId, formId, pin, attempt, provenance
     candidate_action: candidateAction,
     observable_behavior: decision.outcome === 'RATED' ? decision.observedBehavior || null : null,
     rubric_level: decision.outcome === 'RATED' ? decision.level : null,
-    rubric_label: decision.outcome === 'RATED' ? capabilityInfo(decision.capabilityId)?.anchors?.[decision.level]?.label || null : null,
+    rubric_label: decision.outcome === 'RATED' ? rubricForSnapshot(method.snapshot).anchorsByBehaviour[decision.behaviourId][decision.level]?.label || null : null,
     human_review_status: decision.outcome === 'REVIEW' ? 'REQUIRED' : 'NOT_REQUIRED',
     provenance,
   }
@@ -212,22 +233,19 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
   // Compute-then-apply: `apply: false` returns the validated, proposed units
   // without writing anything; the caller applies them inside its own guarded
   // transaction (sessionIoRepository.applyEvaluation) via persistUnit().
-  async function finish(inputs, attempt, apply) {
-    if (!apply) return { units: inputs, attempt, applied: false }
-    const stored = []
-    for (const input of inputs) stored.push(await recordUnit(input))
-    return { units: stored, attempt, applied: true }
+  async function finish(inputs, attempt) {
+    return { units: inputs.map((input) => normalizeEvidenceUnit(input).unit), attempt, applied: false }
   }
 
-  async function ask(messages, sessionId) {
-    const call = complete({ messages, temperature: 0, max_completion_tokens: 900, response_format: { type: 'json_object' } }, { task: 'evidence_evaluator', retries: 1, sessionId })
+  async function ask(messages, sessionId, method) {
+    const call = complete({ messages, model: method.modelPolicy.modelId, temperature: method.modelPolicy.temperature, max_completion_tokens: method.modelPolicy.maxCompletionTokens, response_format: { type: 'json_object' } }, { task: 'evidence_evaluator', retries: method.modelPolicy.retries, sessionId })
     const timeout = new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'TIMEOUT' })), timeoutMs).unref?.())
     const out = await Promise.race([call, timeout])
     return parseUnits(out?.choices?.[0]?.message?.content ?? out?.content ?? out)
   }
   // One sample: ask, require exactly one unit for the target, classify.
-  async function sample(target, actions, snapshot, sessionId) {
-    const units = await ask(buildEvaluatorMessages({ snapshot, opportunity: target, actions }), sessionId)
+  async function sample(target, actions, snapshot, sessionId, method) {
+    const units = await ask(buildEvaluatorMessages({ snapshot, opportunity: target, actions, method }), sessionId, method)
     const found = units.filter((u) => u && u.opportunityId === target.id)
     if (found.length !== 1) throw new EvaluatorOutputError(`Evaluator returned ${found.length} units for ${target.id}`)
     return classifyUnit(found[0], { opportunity: target, actions })
@@ -235,10 +253,10 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
   // T33: a rated unit carrying an ambiguity / contrary-evidence marker gets
   // exactly one more sample (MAX_JUDGE_SAMPLES); the two are reconciled by
   // policy, never averaged. Unflagged units stay single-judge PROVISIONAL.
-  async function judge(target, actions, snapshot, sessionId) {
-    const first = await sample(target, actions, snapshot, sessionId)
+  async function judge(target, actions, snapshot, sessionId, method) {
+    const first = await sample(target, actions, snapshot, sessionId, method)
     if (first.outcome !== 'RATED' || !hasAmbiguityMarker(first) || MAX_JUDGE_SAMPLES < 2) return first
-    const second = await sample(target, actions, snapshot, sessionId)
+    const second = await sample(target, actions, snapshot, sessionId, method)
     return reconcileSamples(first, second)
   }
 
@@ -254,8 +272,26 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
      * for the caller's fenced apply step.
      * @returns { units, attempt, applied }
      */
-    async evaluateRun({ sessionId, actions, snapshot, pin, formId = null, attempt = 1, opportunities = null, apply = true }) {
+    async evaluateRun({ sessionId, actions, snapshot, pin, formId = null, attempt = 1, opportunities = null, inputRevision = '' }) {
+      const method = resolvePinnedMethod(pin, snapshot)
+      let activePolicy
+      try { activePolicy = policyFor('evidence_evaluator', method.modelPolicy.modelId) } catch { throw unavailable() }
+      if (aiProvider() !== method.modelPolicy.provider || activePolicy.region !== method.modelPolicy.region
+        || activePolicy.timeoutMs !== method.modelPolicy.timeoutMs || activePolicy.allowFallback !== method.modelPolicy.allowFallback) throw unavailable()
+      snapshot = method.snapshot
       const eligible = eligibleActions(actions)
+      for (const action of eligible) {
+        const context = action.result?.evaluationContext
+        if (!context || !Array.isArray(context.situation?.applicableFacts) || !context.workState
+          || !Array.isArray(context.stimulus?.messages) || !context.stimulus.messages.length
+          || context.stimulus.messages.some((message) => typeof message.content !== 'string' || !message.content.trim())
+          || (context.situation.scenarioId && context.situation.scenarioId !== snapshot.id)
+          || (context.method?.methodHash && context.method.methodHash !== pin.methodHash)) {
+          const error = new EvaluatorOutputError('The recorded action context is unavailable or mismatched.')
+          error.code = 'EVALUATION_CONTEXT_INCOMPLETE'
+          throw error
+        }
+      }
       const inputs = []
       const provenanceBase = { evaluatorPrompt: EVALUATOR_PROMPT, snapshotId: snapshot.id, snapshotVersion: snapshot.version }
       // P4.8 ledger-driven path: only opportunities the learner actually
@@ -267,7 +303,7 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
         for (const row of opportunities) {
           if (!['ACTION_RECEIVED', 'EVALUATION_PENDING'].includes(row.state)) continue
           const def = defs.get(row.opportunityId.replace(/:CLARIFY$/, ''))
-          if (!def) continue
+          if (!def) throw unavailable()
           const mine = eligible.filter((a) => (row.actionIds || []).includes(a.actionId))
           for (const action of mine) {
             const context = action.result?.evaluationContext
@@ -283,24 +319,24 @@ export function createSliceEvaluator({ complete, recordUnit, timeoutMs = 30_000 
             if (mine.length === 0) {
               decision = { opportunityId: target.id, capabilityId: target.capabilityId, behaviourId, outcome: 'ABSTAIN', reason: 'NOT_ADDRESSED', action: null, excerpt: null, level: null }
             } else {
-              decision = await judge(target, mine, snapshot, sessionId)
+              decision = await judge(target, mine, snapshot, sessionId, method)
             }
-            inputs.push(toEvidenceInput({ ...decision, opportunityGroup: target.group, behaviourIds: def.behaviourIds || [behaviourId] }, { sessionId, formId, pin, attempt, provenanceBase }))
+            inputs.push(toEvidenceInput({ ...decision, opportunityGroup: target.group, behaviourIds: def.behaviourIds || [behaviourId] }, { sessionId, formId, pin, attempt, provenanceBase, method, inputRevision }))
           }
         }
-        return finish(inputs, attempt, apply)
+        return finish(inputs, attempt)
       }
       for (const opportunity of snapshot.opportunities || []) {
         let decision
         if (eligible.length === 0) {
           decision = { opportunityId: opportunity.id, capabilityId: opportunity.capabilityId, behaviourId: opportunity.behaviourId, outcome: 'ABSTAIN', reason: 'NOT_ADDRESSED', action: null, excerpt: null, level: null }
         } else {
-          decision = await judge(opportunity, eligible, snapshot, sessionId)
+          decision = await judge(opportunity, eligible, snapshot, sessionId, method)
         }
-        inputs.push(toEvidenceInput({ ...decision, opportunityGroup: opportunity.group || null }, { sessionId, formId, pin, attempt, provenanceBase }))
+        inputs.push(toEvidenceInput({ ...decision, opportunityGroup: opportunity.group || null }, { sessionId, formId, pin, attempt, provenanceBase, method, inputRevision }))
       }
       // All evaluator calls succeeded: the whole set is applied or none of it.
-      return finish(inputs, attempt, apply)
+      return finish(inputs, attempt)
     },
   }
 }

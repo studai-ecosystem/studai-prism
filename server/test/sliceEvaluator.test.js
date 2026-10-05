@@ -112,9 +112,9 @@ async function world() {
   const recorded = []
   const sliceEvaluator = createSliceEvaluator({
     complete,
-    recordUnit: async (unit) => {
+    recordUnit: async (unit, tx) => {
       if (fault.mode === 'evidence-write') throw new Error('evidence store unavailable')
-      const stored = await evidenceGraph.recordEvidenceUnit(unit)
+      const stored = await evidenceGraph.recordEvidenceUnit(unit, tx)
       recorded.push(stored)
       return stored
     },

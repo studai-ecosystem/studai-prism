@@ -97,6 +97,23 @@ describe('Development page (V2)', () => {
 })
 
 describe('Mission player', () => {
+  it('renders unjudgeable work neutrally without calling it absent behaviour or mastery', async () => {
+    const unjudgeable = {
+      ...result, verified: false, summary: 'The situation needs more context for this check.',
+      counts: { demonstrated: 0, uncertain: 0, total: 1 },
+      focus: { completed: null, nextChange: null, allMet: false, reviewIncomplete: true, note: null },
+      criteria: [{ ...result.criteria[0], result: 'NOT_JUDGEABLE', checks: [], quote: null, note: 'Attendance is not known in this situation.' }],
+    }
+    renderStudent('/app/development/missions/:missionId', <MissionPlayerPage />, {
+      [`/api/v1/missions/${MID}`]: { data: { ...mission, openAttemptId: ATT } },
+      '/api/v1/mission-attempts/': { data: attempt({ status: 'EVALUATED', result: unjudgeable, submittedAt: '2026-10-10T09:00:00Z' }) },
+    })
+    expect(await screen.findByText('Needs context to review')).toBeInTheDocument()
+    expect(screen.getByText('The review could not be completed. Your work is kept and nothing was guessed.')).toBeInTheDocument()
+    expect(screen.queryByText('Not shown yet')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Every checked behaviour was shown/)).not.toBeInTheDocument()
+  })
+
   it('is labelled as practice before anything starts, and completion is calm: observed, reflect, next, reassessment', async () => {
     const other = { ...card, id: 'MIS-OTHER', title: 'Write a clear update for a stakeholder' }
     const open = { id: 'r1', name: 'December reassessment', windowStart: '2026-12-01T08:00:00.000Z', windowEnd: '2026-12-15T18:00:00.000Z', status: 'SCHEDULED', assignmentId: 'a-2', rosterStatus: 'ASSIGNED', endedAt: null, comparability: 'APPROVED' }

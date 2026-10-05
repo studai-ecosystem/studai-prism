@@ -26,6 +26,23 @@ function mock(routes) {
 afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); localStorage.clear() })
 
 describe('Evidence rating page', () => {
+  it('shows the frozen behaviour anchors and contextual work change, not a current catalogue substitute', async () => {
+    sessionStorage.setItem('prismRaterToken', 'syn-token')
+    mock({ 'GET /api/validation/rater/next': { item: {
+      ...item, rubricVersion: 'synthetic-rubric-A',
+      sourceMethod: {
+        behaviourId: 'ASSIGN_RESPONSIBILITY', methodHash: 'synthetic-method', rubricHash: 'synthetic-rubric-hash',
+        anchors: { 1: 'No owner.', 2: 'Owner without capacity.', 3: 'Owner with capacity.', 4: 'Reasoned owner.', 5: 'Reasoned owner with fallback.' },
+        facts: ['The colleague is available for half a day.'], stimulus: [{ speaker: 'Colleague', content: 'Who takes the materials?' }],
+        workChanges: [{ rowId: 'R2', task: 'Materials', field: 'owner', before: null, after: 'Sam' }],
+      },
+    } } })
+    renderApp(<EvidenceRatingPage />, { route: '/rater/evidence' })
+    expect(await screen.findByText('Owner with capacity.')).toBeInTheDocument()
+    expect(screen.getByText('The colleague is available for half a day.')).toBeInTheDocument()
+    expect(screen.getByText('Materials (R2), owner: Not set to Sam.')).toBeInTheDocument()
+  })
+
   it('asks for the rater token first', () => {
     renderApp(<EvidenceRatingPage />, { route: '/rater/evidence' })
     expect(screen.getByRole('link', { name: 'rater workbench' })).toHaveAttribute('href', '/rater')

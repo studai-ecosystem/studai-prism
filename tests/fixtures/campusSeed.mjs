@@ -52,6 +52,12 @@ export async function seedSponsoredAssignment({ databaseUrl, ownerUserId, studen
   await repos.memberships.upsertMembership({ organizationId: org.id, userId: studentUserId, role: 'STUDENT', status: 'ACTIVE' })
   const day = 86400000
   let form = { definitionId, formPolicy: 'SERVER_SELECTED', formId: null }
+  if (definitionId === 'draft-core-teamready-a') {
+    const pinned = (await repos.assessments.listForms(definitionId))
+      .find((candidate) => candidate.id === 'draft-core-teamready-a:0.2.0-draft')
+    if (!pinned) throw new Error('the isolated catalog has no current universal draft form')
+    form = { definitionId, formPolicy: 'FIXED_FORM', formId: pinned.id }
+  }
   if (workMaterials) {
     // Governed-bank definitions are the fixed-form ones (every form carries
     // its job family); the spec asserts the session really has materials.
@@ -90,6 +96,22 @@ export async function listConsumptions({ databaseUrl, entitlementId }) {
 export async function listConsentRecords({ databaseUrl, userId }) {
   const repos = await reposFor(databaseUrl)
   return repos.sharing.listConsents(userId)
+}
+
+// Read-only inspection of a real browser run, never a seeded final result.
+export async function readAcceptedRun({ databaseUrl, sessionId }) {
+  const repos = await reposFor(databaseUrl)
+  const { evaluateJobKey } = await import('../../server/domain/assessments/draftSegments.js')
+  const { evaluationReceiptKey } = await import('../../server/domain/assessments/sessionIoRepository.js')
+  const [start, actions, opportunities, job, version] = await Promise.all([
+    repos.sessionIo.getClientEvent(sessionId, 'start'),
+    repos.sessionIo.listActions(sessionId),
+    repos.sessionIo.listOpportunities(sessionId),
+    repos.sessionIo.getJob(evaluateJobKey(sessionId)),
+    repos.reportVersions.latest(sessionId),
+  ])
+  const accepted = job ? await repos.sessionIo.getClientEvent(sessionId, evaluationReceiptKey(job.jobId)) : null
+  return { start, actions, opportunities, job, version, accepted }
 }
 
 // Journey C: invitation emails are not delivered in the harness, so the test

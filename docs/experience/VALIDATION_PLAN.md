@@ -10,6 +10,15 @@ as executed studies; suggested counts remain proposals.
 
 Carries forward the human-action register (`docs/campus/CAMPUS_HUMAN_ACTIONS.md`, HA-C items) and the existing blinded double-rating queue (`/api/admin/validation`, dark behind `PRISM_V3_RATING_QUEUE`). This file adds the study designs, rater programme and pre-registered thresholds; it does not replace the register.
 
+Corrected-candidate boundary: rate the archived method for form
+`0.2.0-draft`, method `v3-slice-0.2` and prompt/evaluator v3, with the exact
+rubric/content hash recorded in the run. The queue now supplies frozen
+behaviour anchors and necessary action-time context. It does not qualify
+raters, approve content or execute this study. Old issued outputs are not
+silently rescored. M01-M10 corrected revisions remain DRAFT; published
+software fixtures cannot be relabelled held-out responses. Separate
+text/board pilot review from the still-unreviewed spoken variant.
+
 ## 1. Measurement-lead review (precondition for everything below)
 
 A qualified measurement lead reviews and signs, in writing: intended use of the pilot form; the constructs and their behaviour anchors; task alignment (does the handover slice elicit the behaviours it claims to); timing and accessibility (timing policy, modes, accommodations); confounds (prior exposure, language, device, AI-participant variance). Open items block Studies B–F. Output: a signed review note stored in the research store with the form version, rubric reference and method version from the run manifest (`scripts/live-model-smoke.mjs`).

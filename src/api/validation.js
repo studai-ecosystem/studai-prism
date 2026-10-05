@@ -6,6 +6,11 @@ import { request } from './client.js'
 const Item = z.object({
   itemId: z.string(), capabilityId: z.string(), capabilityName: z.string().nullable(), sourceType: z.string(),
   excerpt: z.string(), candidateToken: z.string(), rubricVersion: z.string(), scale: z.array(z.number()),
+  sourceMethod: z.object({
+    behaviourId: z.string(), methodHash: z.string(), rubricHash: z.string(), anchors: z.record(z.string()),
+    facts: z.array(z.string()), stimulus: z.array(z.object({ speaker: z.string(), content: z.string() })),
+    workChanges: z.array(z.object({ rowId: z.string(), task: z.string(), field: z.string(), before: z.string().nullable(), after: z.string().nullable() })).optional().default([]),
+  }).optional(),
 }).nullable()
 
 const opts = (token, extra = {}) => ({ legacy: true, auth: false, workspace: false, on401: 'none', headers: { 'x-rater-token': token }, ...extra })

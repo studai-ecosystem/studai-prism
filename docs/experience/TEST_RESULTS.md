@@ -1,5 +1,49 @@
 # P0 - Verification results
 
+## Corrected runtime candidate - local software evidence
+
+Branch `ui/prism-brand-transformation`, starting HEAD `12bc65e`. Results below
+cover the current correction worktree, not the historical P0/P10 candidate.
+GitHub publication is now user-authorized; AWS deployment is requested but
+blocked by an expired AWS login, target/release review and hosted gates.
+No production deployment or feature activation has occurred.
+
+| Command / check | Verified result |
+| --- | --- |
+| Production client build | PASS; existing large-chunk advisory retained |
+| Full frontend Vitest suite | 521 pass, 0 fail, 0 skip; serialized rerun after resource-contended timeouts |
+| Full server suite | 941 pass, 0 fail, 27 default database skips |
+| Real disposable PostgreSQL + buildApp HTTP loop | 27 pass, 0 fail, 0 skip; accepted work/evaluation/publication/practice and fault recovery, no final-result preload |
+| Dedicated PostgreSQL acceptance/erasure/publication faults | 18 pass, 0 fail, 0 skip; includes JSON legacy store + PostgreSQL campus personal Finish regression |
+| Accepted-receipt interruption/memory boundary suite | 25 pass, 0 fail, 0 skip; final receipt failure rolls back evidence and leaves retry eligible |
+| First required rubric/context checkpoints | Missing pinned anchors: initial 2 failures, subsequently green; omitted practice context: initial 2 failures, subsequently green |
+| Critical browser corpus | 224 passing outcomes (219 first-pass, 5 recovered retries), 0 final fail, 0 skip |
+| Full browser corpus | 875 passing outcomes (870 first-pass, 5 recovered retries), 0 final fail, 25 existing configuration/project skips |
+| Connected returning-user loop | Passed first attempt in Chromium, Firefox, WebKit and mobile Chromium; original history -> new universal run -> actual worker/publication -> report-linked practice -> preserved history |
+| Migration / compatible rollback rehearsal | 54 up; 15 experience down/up; interrupted transaction recovery and idempotency PASS, head 0054; no production database or schema rollback |
+| Calibration | 64 pass, 0 fail |
+| Static audit, handover consistency and diff whitespace | PASS; six independent sign-offs remain OPEN |
+
+Screenshots actually inspected at 1440, 1024, 768 and 390 for report,
+practice feedback and owned history:
+`audit-results/ui/cr05/{report,practice-feedback,history}-<width>.png`.
+Browser results: `audit-results/cr05-critical-complete.json` and
+`audit-results/cr05-browser-all-complete.json`. Evidence is local and uses
+explicit controlled-provider adapters, not live semantic validation.
+
+The 25 full-corpus skips are preserved: four preparation journeys need their
+separate configured mode, and 21 visual/motion/keyboard matrix cases are
+Chromium-scoped. They are not passed checks on other physical devices.
+Earlier failed browser/timeout runs were repaired and rerun, not hidden.
+The personal Finish fault was reproduced under the actual mixed JSON/PG
+audit configuration before its allocation guard was repaired.
+
+Hosted CI: NOT RUN yet on the published candidate. Live intended-provider
+calls, real users, qualified held-out measurement review, manual assistive
+technology, physical devices, live payments and production deployment:
+NOT RUN. Draft content remains unapproved, formal growth and paid offers
+remain gated, and applicable release scope remains NO_GO.
+
 ## Staged release decision verification - 2026-10-05
 
 Engineering checks for the scope diagnostic and paid-offer guard:

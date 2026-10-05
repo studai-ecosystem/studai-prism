@@ -14,7 +14,7 @@ export function createValidationRepoMemory(db) {
     async upsertItem(input) {
       const existing = [...db.ratingItems.values()].find((i) => i.evidenceRef === input.evidenceRef)
       if (existing) return { item: clone(existing), created: false }
-      const row = { id: db.id(), ...input, createdAt: now() }
+      const row = { id: db.id(), sourceMethod: null, ...input, createdAt: now() }
       db.ratingItems.set(row.id, row)
       return { item: clone(row), created: true }
     },
@@ -42,15 +42,15 @@ export function createValidationRepoPg({ query }) {
   const item = (r) => r && ({
     id: r.id, evidenceRef: r.evidence_ref, sessionRef: r.session_ref, capabilityId: r.capability_id, sourceType: r.source_type,
     behaviorAnchorId: r.behavior_anchor_id, excerpt: r.excerpt, aiLevel: r.ai_level, aiStatus: r.ai_status, rubricVersion: r.rubric_version,
-    enqueuedBy: r.enqueued_by, createdAt: iso(r.created_at),
+    enqueuedBy: r.enqueued_by, createdAt: iso(r.created_at), sourceMethod: r.source_method_json || null,
   })
   const rating = (r) => r && ({ id: r.id, itemId: r.item_id, raterId: r.rater_id, level: r.level, cannotRate: r.cannot_rate, createdAt: iso(r.created_at) })
   return {
     async upsertItem(input) {
       const { rows: [r] } = await query(
-        `INSERT INTO evidence_rating_items (evidence_ref, session_ref, capability_id, source_type, behavior_anchor_id, excerpt, ai_level, ai_status, rubric_version, enqueued_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (evidence_ref) DO NOTHING RETURNING *`,
-        [input.evidenceRef, input.sessionRef, input.capabilityId, input.sourceType, input.behaviorAnchorId, input.excerpt, input.aiLevel, input.aiStatus, input.rubricVersion, input.enqueuedBy],
+        `INSERT INTO evidence_rating_items (evidence_ref, session_ref, capability_id, source_type, behavior_anchor_id, excerpt, ai_level, ai_status, rubric_version, enqueued_by, source_method_json)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (evidence_ref) DO NOTHING RETURNING *`,
+        [input.evidenceRef, input.sessionRef, input.capabilityId, input.sourceType, input.behaviorAnchorId, input.excerpt, input.aiLevel, input.aiStatus, input.rubricVersion, input.enqueuedBy, input.sourceMethod ? JSON.stringify(input.sourceMethod) : null],
       )
       if (r) return { item: item(r), created: true }
       const { rows: [e] } = await query('SELECT * FROM evidence_rating_items WHERE evidence_ref = $1', [input.evidenceRef])

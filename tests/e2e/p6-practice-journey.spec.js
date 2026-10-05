@@ -18,7 +18,7 @@ import { MISSION_FIXTURES } from '../../server/test/fixtures/p6Missions.js'
 
 const M09 = 'MIS-CORE-USABLE-HANDOVER-01'
 const FX = MISSION_FIXTURES[M09]
-const WIDTHS = [1440, 390]
+const WIDTHS = [1440, 1024, 768, 390]
 const SHOTS = join('audit-results', 'ui', 'p6')
 const ROW_LABEL = { slides: 'Prepare the demo slides', room: 'Book the demo room', projector: 'Test the projector', visitors: 'Confirm the visitor list' }
 
@@ -31,6 +31,7 @@ async function shoot(page, testInfo, name) {
   const original = page.viewportSize()
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
+    await page.evaluate(() => window.scrollTo(0, 0))
     await page.waitForTimeout(250)
     await expectNoHorizontalOverflow(page)
     await page.screenshot({ path: join(SHOTS, `${name}-${width}.png`), fullPage: true })

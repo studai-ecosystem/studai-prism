@@ -15,7 +15,7 @@ import { createAssessmentSessionService, REQUIRED_CONSENT_SCOPES } from '../doma
 import { DRAFT_SEGMENT_ID } from '../domain/assessments/draftSegments.js'
 process.env.PRISM_DRAFT_CONTENT = 'true'
 
-const ALL_READY = { player: true, durableWriter: true, migrationsApplied: ['0040_candidate_actions_jobs', '0049_preview_attempts'], evaluator: true, publication: true, contentState: 'APPROVED_FOR_INTENDED_USE', worker: true }
+const ALL_READY = { player: true, durableWriter: true, migrationsApplied: ['0040_candidate_actions_jobs', '0049_preview_attempts', '0054_report_publication_note'], evaluator: true, publication: true, contentState: 'APPROVED_FOR_INTENDED_USE', worker: true }
 const ALL_FLAGS = Object.fromEntries(['PRISM_APP_SHELL_V3', 'PRISM_ASSESSMENT_WORKSPACE_V3', 'PRISM_STUDENT_REPORT_V3', 'PRISM_EVIDENCE_FAIL_CLOSED', 'PRISM_DEVELOPMENT_V2'].map((k) => [k, 'true']))
 
 test('P10.2: RELEASE_CONFIG v2 is frozen, covers every stage and ordered dependency bundle, only names registered flags and never requires growth', () => {
@@ -96,8 +96,8 @@ function startWorld({ allocatable }) {
   const io = createSessionIoRepoMemory(db)
   const calls = { reserve: 0, engineStart: 0, createEntitlement: 0, draftSession: 0 }
   const gate = createReleaseGate({ env: {}, stage: 'LOCAL_CI', probes: allocatable
-    ? { player: () => true, durableWriter: () => true, migrationsApplied: () => ['0040_x'], evaluator: () => true, publication: () => true, contentState: () => 'DRAFT' }
-    : { player: () => true, durableWriter: () => true, migrationsApplied: () => ['0040_x'], evaluator: () => false, publication: () => true, contentState: () => 'DRAFT' } })
+    ? { player: () => true, durableWriter: () => true, migrationsApplied: () => ['0054_report_publication_note'], evaluator: () => true, publication: () => true, contentState: () => 'DRAFT' }
+    : { player: () => true, durableWriter: () => true, migrationsApplied: () => ['0054_report_publication_note'], evaluator: () => false, publication: () => true, contentState: () => 'DRAFT' } })
   let session = null
   const svc = createAssessmentSessionService({
     repos: { kind: 'memory', sessionIo: io, assessments: { updateStudent: async () => {} } },

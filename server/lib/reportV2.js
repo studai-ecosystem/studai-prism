@@ -54,7 +54,7 @@ function capabilityCard(cap, decision, units, turns) {
   }
 }
 
-export async function buildStudentReportV2(sessionId, session, baseReport = {}) {
+export async function renderStudentReportV2AtPublication(sessionId, session, baseReport = {}) {
   const scenario = session?.scenarioId ? getScenarioByAssessmentId(session.scenarioId) : null
   const blueprintId = scenario?.blueprintId || null
   const blueprint = blueprintId ? await occupationalGraph.getJobFamilyBlueprint(blueprintId) : null
@@ -156,8 +156,7 @@ export async function buildStudentReportV2(sessionId, session, baseReport = {}) 
   }
 }
 
-export async function buildEmployeeReportV2(sessionId, session, baseReport = {}) {
-  const studentReport = await buildStudentReportV2(sessionId, session, baseReport)
+async function renderEmployeeReportV2AtPublication(sessionId, session, baseReport, studentReport) {
   const blueprintId = studentReport.section5_appliedWorkDemonstration.jobFamilyId
   const blueprint = blueprintId ? await occupationalGraph.getJobFamilyBlueprint(blueprintId) : null
   const neighborhood = blueprintId ? await occupationalGraph.findRoleNeighborhood(blueprintId) : []
@@ -182,6 +181,7 @@ export async function buildEmployeeReportV2(sessionId, session, baseReport = {})
           level: card?.level || null,
           evidenceIds: card?.evidenceIds || [],
         }
+
       }),
     },
     internalMobilityPathways: (Array.isArray(neighborhood) ? neighborhood : []).map((edge) => ({
@@ -190,4 +190,24 @@ export async function buildEmployeeReportV2(sessionId, session, baseReport = {})
       bridgeCompetency: edge.bridge_competency || null,
     })),
   }
+}
+
+function issuedView(baseReport, key) {
+  const view = baseReport?.issuedViews?.[key]
+  if (!view) throw Object.assign(new Error('This formatted view was not issued. Your original report is preserved.'), { code: 'LEGACY_VIEW_UNAVAILABLE' })
+  return structuredClone(view)
+}
+
+export async function buildStudentReportV2(_sessionId, _session, baseReport = {}) {
+  return issuedView(baseReport, 'studentV2')
+}
+
+export async function buildEmployeeReportV2(_sessionId, _session, baseReport = {}) {
+  return issuedView(baseReport, 'employeeV2')
+}
+
+export async function captureIssuedLegacyViews(sessionId, session, baseReport) {
+  const studentV2 = await renderStudentReportV2AtPublication(sessionId, session, baseReport)
+  const employeeV2 = await renderEmployeeReportV2AtPublication(sessionId, session, baseReport, studentV2)
+  return { studentV2, employeeV2 }
 }

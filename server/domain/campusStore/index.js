@@ -41,7 +41,7 @@ export function createMemoryCampusRepos(options = {}) {
     db,
     // P10.2 readiness probe: the memory store carries every repo the current
     // schema needs, so it reports the required floor as applied.
-    listAppliedMigrations: async () => ['0040_candidate_actions_jobs', '0043_run_timing', '0044_opportunity_ledger'],
+    listAppliedMigrations: async () => ['0040_candidate_actions_jobs', '0043_run_timing', '0044_opportunity_ledger', '0054_report_publication_note'],
     organizations: createOrganizationsRepoMemory(db),
     memberships: createMembershipsRepoMemory(db),
     workspaces: createWorkspacesRepoMemory(db),

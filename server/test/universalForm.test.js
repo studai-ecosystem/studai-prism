@@ -3,7 +3,7 @@
 // ids and the 20 proposed behaviour ids.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { CORE_TEAMREADY_A, BEHAVIOUR_IDS, FAMILY, familiesCovered, worldStateFor, validateBoardPatch, CORE_TEAMREADY_A_FORM_ID } from '../domain/assessments/universalForm.js'
+import { CORE_TEAMREADY_A, CORE_TEAMREADY_A_V1, CORE_TEAMREADY_A_V1_FORM_ID, BEHAVIOUR_IDS, FAMILY, familiesCovered, worldStateFor, validateBoardPatch, CORE_TEAMREADY_A_FORM_ID } from '../domain/assessments/universalForm.js'
 import { PRIMARY_CAPABILITY_IDS } from '../domain/assessments/catalog.js'
 import { DRAFT_UNIVERSAL } from '../domain/assessments/timingPolicy.js'
 import { DRAFT_CORE_TEAMREADY_A_HANDOVER, UNIVERSAL_SNAPSHOT, buildRunPin, snapshotHash, draftBankScenarios } from '../domain/assessments/draftSegments.js'
@@ -20,7 +20,9 @@ const EXPECTED_BEHAVIOURS = [
 test('P4.1: the form is an original DRAFT package with every authoring section present', () => {
   const f = CORE_TEAMREADY_A
   assert.equal(f.status, 'DRAFT')
-  assert.equal(f.version, '0.1.0-draft')
+  assert.equal(f.version, '0.2.0-draft')
+  assert.equal(CORE_TEAMREADY_A_V1.version, '0.1.0-draft')
+  assert.notEqual(CORE_TEAMREADY_A_V1_FORM_ID, CORE_TEAMREADY_A_FORM_ID)
   assert.equal(f.blueprintId, 'CORE-TEAMREADY-A')
   assert.deepEqual(f.approvalHistory.map((h) => h.state), ['DRAFT'])
   assert.equal(f.licensing.source, 'ORIGINAL')
@@ -98,7 +100,7 @@ test('P4.1: content is deep-frozen; a run pin hashes the whole form and the segm
   assert.ok(Object.isFrozen(CORE_TEAMREADY_A.board.rows[0]))
   assert.throws(() => { 'use strict'; CORE_TEAMREADY_A.opportunities[0].stimulus.template = 'x' })
   assert.throws(() => { 'use strict'; CORE_TEAMREADY_A.publicFacts.push({}) })
-  assert.equal(DRAFT_CORE_TEAMREADY_A_HANDOVER.formRef.formId, CORE_TEAMREADY_A_FORM_ID)
+  assert.equal(DRAFT_CORE_TEAMREADY_A_HANDOVER.formRef.formId, CORE_TEAMREADY_A_V1_FORM_ID)
   assert.equal(DRAFT_CORE_TEAMREADY_A_HANDOVER.formRef.stageId, 'RESOLVE_HANDOVER')
   const pin = buildRunPin({ formId: CORE_TEAMREADY_A_FORM_ID, scenarioId: CORE_TEAMREADY_A.id })
   assert.equal(pin.snapshotHash, snapshotHash(CORE_TEAMREADY_A))

@@ -18,7 +18,7 @@ function Frame({ children }) {
     <main id="main" className="mx-auto max-w-3xl space-y-6 px-4 py-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold text-prism-ink">Rate evidence</h1>
-        <p className="text-sm text-prism-ink-muted">Judge only what the candidate wrote, against the rubric from your training. You will not see the AI&apos;s judgement or other raters&apos; ratings.</p>
+        <p className="text-sm text-prism-ink-muted">Judge only the candidate&apos;s work. Use the recorded behaviour rubric when shown; older items retain their training rubric. You will not see the AI&apos;s judgement or other raters&apos; ratings.</p>
       </header>
       {children}
     </main>
@@ -45,6 +45,21 @@ function Rating({ token, item }) {
     <Panel title={<span ref={headingRef} tabIndex={-1}>{item.capabilityName || item.capabilityId}</span>} description={`${SOURCE[item.sourceType] || 'Evidence'} · rubric ${item.rubricVersion}`}>
       <blockquote className="whitespace-pre-wrap rounded-[var(--prism-radius-md)] border-l-4 border-prism-border-strong bg-prism-subtle p-4 text-sm text-prism-ink" data-testid="evidence-excerpt">{item.excerpt}</blockquote>
       <p className="mt-2 text-xs text-prism-ink-subtle">{item.candidateToken} stands for the candidate.</p>
+      {item.sourceMethod && (
+        <section className="mt-4 space-y-3" aria-label="Recorded assessment method">
+          <h2 className="text-sm font-semibold text-prism-ink">Recorded behaviour: {item.sourceMethod.behaviourId}</h2>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-prism-ink-muted">{item.sourceMethod.facts.map((fact, index) => <li key={index}>{fact}</li>)}</ul>
+          {item.sourceMethod.stimulus.map((message, index) => <p key={index} className="text-sm text-prism-ink-muted">{message.speaker}: {message.content}</p>)}
+          {item.sourceMethod.workChanges.map((change) => (
+            <p key={`${change.rowId}.${change.field}`} className="text-sm text-prism-ink-muted">
+              {change.task} ({change.rowId}), {change.field}: {change.before ?? 'Not set'} to {change.after ?? 'Not set'}.
+            </p>
+          ))}
+          <ol className="list-decimal space-y-2 pl-5 text-sm text-prism-ink">
+            {item.scale.map((level) => <li key={level}>{item.sourceMethod.anchors[level]}</li>)}
+          </ol>
+        </section>
+      )}
       <form className="mt-4 space-y-3" onSubmit={submit} noValidate>
         <fieldset aria-describedby={error ? 'rating-error' : undefined}>
           <legend className="mb-2 text-sm font-medium text-prism-ink">Rubric level</legend>

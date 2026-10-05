@@ -134,7 +134,7 @@ const ReviewRequest = z.object({ id: z.string(), sessionId: z.string(), version:
 
 const VersionHistory = z.object({
   sessionId: z.string(),
-  versions: z.array(z.object({ version: z.number().int(), builderVersion: z.string(), createdAt: z.string().nullable(), issuedAt: z.string().nullable(), reason: z.string().nullable(), priorVersion: z.number().int().nullable() })),
+  versions: z.array(z.object({ version: z.number().int(), builderVersion: z.string(), createdAt: z.string().nullable(), issuedAt: z.string().nullable(), reason: z.string().nullable(), priorVersion: z.number().int().nullable(), publicationNote: z.string().nullable().optional() })),
   reviews: z.array(ReviewRequest),
 })
 
@@ -154,23 +154,25 @@ export async function requestReportReview(sessionId, body) {
   return data
 }
 
-export async function fetchStudentReport(sessionId) {
-  const { data } = await request(`/api/v1/assessment-sessions/${encodeURIComponent(sessionId)}/report`, {
+const versionQuery = (version) => version == null ? '' : `?version=${encodeURIComponent(version)}`
+
+export async function fetchStudentReport(sessionId, { version = null } = {}) {
+  const { data } = await request(`/api/v1/assessment-sessions/${encodeURIComponent(sessionId)}/report${versionQuery(version)}`, {
     schema: ReportResponse, on401: 'redirect', defaultErrorMessage: 'Your report could not be loaded.',
   })
   return data
 }
 
 // A sponsored (or student-shared) report read by an authorized staff member.
-export async function fetchSponsorReport(organizationId, sessionId) {
-  const { data } = await request(`/api/v1/organizations/${encodeURIComponent(organizationId)}/sessions/${encodeURIComponent(sessionId)}/report`, {
+export async function fetchSponsorReport(organizationId, sessionId, { version = null } = {}) {
+  const { data } = await request(`/api/v1/organizations/${encodeURIComponent(organizationId)}/sessions/${encodeURIComponent(sessionId)}/report${versionQuery(version)}`, {
     schema: ReportResponse, defaultErrorMessage: 'This report could not be loaded.',
   })
   return data
 }
 
-export async function fetchSharedReport(token) {
-  const { data } = await request(`/api/v1/shared/${encodeURIComponent(token)}`, {
+export async function fetchSharedReport(token, { version = null } = {}) {
+  const { data } = await request(`/api/v1/shared/${encodeURIComponent(token)}${versionQuery(version)}`, {
     workspace: false, auth: false, schema: ReportResponse, defaultErrorMessage: 'This report could not be loaded.',
   })
   return data

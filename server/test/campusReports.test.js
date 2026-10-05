@@ -14,6 +14,7 @@ import { createCampusContext, EMPTY_LEGACY_SOURCES } from '../domain/campusStore
 import { buildStudentReportV3 } from '../domain/reports/v3/build.js'
 import { assertReportSafe, forbiddenPaths } from '../domain/reports/v3/schema.js'
 import { PRIMARY_CAPABILITY_IDS, capabilityInfo } from '../domain/assessments/catalog.js'
+import { captureMethod, methodHash } from '../domain/assessments/frozenMethod.js'
 import { hashToken } from '../domain/memberships/inviteService.js'
 import { ApiError } from '../domain/http/errors.js'
 
@@ -38,10 +39,15 @@ const history = (lines) => [{ role: 'user', content: 'opening instruction' }, ..
 const LINES = ['First I would check which customers raised the issue.', 'Then I would compare the numbers before deciding.', 'I would agree next steps with the team lead.']
 
 function unit(sessionId, id, capabilityId, turn, { rubric = 2, excerpt = null, status = 'PROVISIONAL' } = {}) {
+  const anchors = structuredClone(capabilityInfo(capabilityId).anchors)
   return {
     evidence_id: id, session_id: sessionId, capability_id: capabilityId, evidence_status: status, rubric_level: rubric,
     source_turn: turn, source_artifact_id: null, behavior_anchor_id: `anchor-${turn}`,
-    candidate_action_json: { dialogue_excerpt: excerpt }, provenance_json: { judge: 'synthetic', rubric_version: 'rubric.v1' },
+    candidate_action_json: { dialogue_excerpt: excerpt },
+    provenance_json: {
+      judge: 'synthetic', rubric_version: 'rubric.v1',
+      resolvedRubric: { ref: 'rubric.v1', anchors, anchorsHash: methodHash(anchors) },
+    },
     judge_agreement_json: { agreement: 0.9 }, observable_behavior: `Synthetic observed behaviour ${id}.`, legacy_row: false,
   }
 }
@@ -95,6 +101,29 @@ async function world() {
     shareTokenFactory: () => `synthetic-share-token-${String(++tokens).padStart(4, '0')}-abcdefghij`,
     sessionOwner: async (sid) => state.sessions[sid]?.userId || null,
   })
+  // These unit worlds declare their synthetic allocation explicitly; they
+  // do not recover missing instructions from a historical assessment.
+  const cat = await campus.catalog.getCatalog()
+  for (const sid of Object.keys(state.reports)) {
+    const scenarioId = state.sessions[sid].scenarioId
+    const form = cat.forms.find((f) => f.scenarioId === scenarioId)
+    const definition = cat.definitions.find((d) => d.id === form.definitionId)
+    const allocation = {
+      id: scenarioId, version: form.version, rubricRef: 'rubric.v1',
+      opportunities: definition.measures.map((capabilityId) => ({ id: `synthetic-${capabilityId}`, capabilityId, behaviourId: capabilityId })),
+      rubric: { ref: 'rubric.v1', source: 'SYNTHETIC_UNIT_ALLOCATION', anchorsByBehaviour: Object.fromEntries(definition.measures.map((id) => [id, structuredClone(capabilityInfo(id).anchors)])) },
+    }
+    const methodSnapshot = captureMethod(allocation, { formId: form.id, engineVersion: 'synthetic-report-fixture' })
+    const content = { ...allocation }
+    delete content.rubric
+    const runPin = {
+      scenarioId, snapshotVersion: allocation.version, rubricRef: allocation.rubricRef, formId: form.id,
+      snapshotHash: methodHash(content), engineVersion: methodSnapshot.engineVersion, methodVersion: methodSnapshot.methodVersion,
+      methodSnapshot, methodHash: methodHash(methodSnapshot),
+    }
+    await repos.sessionIo.putClientEvent({ sessionId: sid, clientEventId: 'start', kind: 'START', response: { runPin } })
+    await campus.reports.publish(sid, { reason: 'INITIAL' })
+  }
   const requireUser = (req, _res, next) => {
     const user = USERS[req.get('x-test-user')]
     if (!user) return next(new ApiError('UNAUTHENTICATED', 'Sign in to continue.'))
@@ -184,7 +213,7 @@ test('C6.02: the owner reads the report in the session\'s workspace; versions ar
     assert.equal(r.body.data.report.header.candidateName, 'Synthetic Student')
     const again = await w.call('student', 'GET', '/assessment-sessions/sess-personal-r1/report')
     assert.equal(again.body.data.version.number, 1, 'the same content is not stored twice')
-    assert.equal(w.repos.db.reportVersions.length, 1)
+    assert.equal(w.repos.db.reportVersions.filter((v) => v.sessionId === 'sess-personal-r1').length, 1)
     assert.ok(w.audits.some((a) => a.type === 'report.v3.viewed' && a.sid === 'sess-personal-r1' && a.payload.audience === 'OWNER'))
     assert.equal((await w.call('other', 'GET', '/assessment-sessions/sess-personal-r1/report')).status, 404)
     assert.equal((await w.call('student', 'GET', '/assessment-sessions/sess-personal-r1/report', null, { 'X-Prism-Workspace': w.campusWs.id })).status, 404, 'personal report not in the campus workspace')
@@ -336,6 +365,13 @@ test('C6.01: the level description matches the decided level, not whichever unit
   }).summary.capabilities[0]
   assert.equal(even.level.band, 'DEVELOPING')
   assert.equal(even.levelDescriptor, anchors[3].criteria)
+  const withoutSource = units.map((u) => {
+    const copy = structuredClone(u)
+    delete copy.provenance_json.resolvedRubric
+    return copy
+  })
+  const unrecorded = buildStudentReportV3({ sessionId: sid, definition: { id: 'd', title: 'T', measures: [CAP_A] }, units: withoutSource, turns: LINES })
+  assert.equal(unrecorded.summary.capabilities[0].levelDescriptor, null, 'current catalogue anchors never replace an unrecorded source rubric')
 })
 
 test('C6.03: a held report cannot be shared, and an existing link reveals nothing about the hold', async () => {

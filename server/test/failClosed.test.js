@@ -11,7 +11,8 @@ import express from 'express'
 delete process.env.DATABASE_URL
 
 const { PRE_APPROVED_SCENARIOS } = await import('../lib/scenarioBank.js')
-const { createSession } = await import('../lib/store.js')
+const { createSession, getSession, saveReport } = await import('../lib/store.js')
+const { captureIssuedLegacyViews } = await import('../lib/reportV2.js')
 const { default: evidenceGraph } = await import('../lib/evidenceGraph.js')
 const { default: assessmentRouter } = await import('../routes/assessment.js')
 const { default: jobFamiliesRouter } = await import('../routes/jobFamilies.js')
@@ -69,6 +70,10 @@ async function incompleteSession() {
     provenance: { source: 'JUDGE_PANEL' }, rubric_level: 4, judge_agreement: { agreement: 0.9 },
   })
   await evidenceGraph.recordEvidenceUnit({ session_id: sessionId, capability_id: 'CAP-L1-COMMUNICATION', source_turn: 1, rubric_level: 5 })
+  // Labelled sparse-report fixture: publication is explicit, never a GET.
+  const original = { issuedAt: new Date().toISOString() }
+  original.issuedViews = await captureIssuedLegacyViews(sessionId, await getSession(sessionId), original)
+  await saveReport(sessionId, original)
   return sessionId
 }
 

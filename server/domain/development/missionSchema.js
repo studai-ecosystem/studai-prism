@@ -4,7 +4,7 @@
 // it has a way to observe.
 import { z } from 'zod'
 
-export const MISSION_SCHEMA_VERSION = 'mission-schema.v2'
+export const MISSION_SCHEMA_VERSION = 'mission-schema.v3'
 
 const Id = z.string().regex(/^[A-Z0-9][A-Z0-9_-]{1,63}$/)
 const Text = (max) => z.string().trim().min(1).max(max)
@@ -51,6 +51,10 @@ const Criterion = z.object({
   evaluator_guidance: Text(600).optional(),
   meaning: Meaning.optional(),
   artifact_ids: z.array(Id).min(1).max(4),
+  work_paths: z.array(z.object({
+    artifact_id: Id,
+    path: z.string().regex(/^(text|fields\.[a-z][a-z0-9_]*|rows\.[a-z][a-z0-9_]*)$/),
+  }).strict()).min(1).max(12).optional(),
 }).strict()
 
 // P6.2 reviewer package. Examples are teaching support shown only after a
@@ -81,7 +85,7 @@ const Transfer = z.object({
   exposure_tags: z.array(Id).max(8),
   artifact_initial_state: z.record(z.record(z.unknown())).optional(),
   rule_overrides: z.array(z.object({ rule_id: Id, params: z.record(z.unknown()), description: Text(300).optional() }).strict()).max(20).optional(),
-  meaning_overrides: z.array(z.object({ criterion_id: Id, intent: Text(400), synonyms: z.array(Text(80)).min(1).max(12), evaluator_guidance: Text(600).optional() }).strict()).max(8).optional(),
+  meaning_overrides: z.array(z.object({ criterion_id: Id, intent: Text(400), synonyms: z.array(Text(80)).min(1).max(12), evaluator_guidance: Text(600).optional(), description: Text(300).optional() }).strict()).max(8).optional(),
   // P6.8: the transfer scene's own counterpart (a different person reacts).
   counterpart: z.lazy(() => Counterpart).optional(),
 }).strict()
@@ -154,6 +158,15 @@ export const MissionContentSchema = z.object({
   const criteria = new Map(m.rubric.criteria.map((c) => [c.criterion_id, c]))
   const behaviors = new Set(m.target_behavior_ids)
   for (const c of m.rubric.criteria) {
+    for (const p of c.work_paths || []) {
+      const a = m.artifacts.find((x) => x.artifact_id === p.artifact_id)
+      const valid = a && c.artifact_ids.includes(p.artifact_id) && (
+        a.type === 'TEXT_RESPONSE' && p.path === 'text' ||
+        a.type === 'FIELD_SHEET' && (a.fields || []).some((f) => p.path === `fields.${f.key}`) ||
+        a.type === 'TABLE' && (a.columns || []).some((col) => col.editable && p.path === `rows.${col.key}`)
+      )
+      if (!valid) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} reads unknown or read-only work path ${p.artifact_id}.${p.path}` })
+    }
     if (!behaviors.has(c.behavior_id)) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} targets an unlisted behaviour` })
     for (const a of c.artifact_ids) if (!artifacts.has(a)) ctx.addIssue({ code: 'custom', message: `criterion ${c.criterion_id} reads unknown artifact ${a}` })
     const rules = m.deterministic_validation_rules.filter((r) => r.criterion_id === c.criterion_id)
@@ -192,6 +205,7 @@ export const MissionContentSchema = z.object({
   for (const r of m.transfer?.counterpart?.reactions || []) if (!criteria.has(r.criterion_id)) ctx.addIssue({ code: 'custom', message: `transfer counterpart reaction references unknown criterion ${r.criterion_id}` })
   for (const r of m.deterministic_validation_rules) {
     if (r.type === 'ONE_OF' && !(Array.isArray(r.params.options) && r.params.options.length > 0)) ctx.addIssue({ code: 'custom', message: `rule ${r.rule_id} needs options` })
+    if (r.type === 'ONE_OF' && r.params.match !== undefined && !['REFERENCE', 'DECISION'].includes(r.params.match)) ctx.addIssue({ code: 'custom', message: `rule ${r.rule_id} has an unknown reference match mode` })
     // P6.8: a bare punctuation pattern (e.g. "?") is formatting, not behaviour.
     if (r.type === 'TEXT_PATTERN' && /^\\?[?!.,;:]$|^\\\?$/.test(String(r.params.pattern || ''))) ctx.addIssue({ code: 'custom', message: `rule ${r.rule_id} matches punctuation only` })
   }
@@ -224,7 +238,7 @@ export function applyVariant(mission, variant = 'BASE') {
     rubric: {
       criteria: mission.rubric.criteria.map((c) => {
         const o = meaningOverride.get(c.criterion_id)
-        return o ? { ...c, meaning: { intent: o.intent, synonyms: o.synonyms }, evaluator_guidance: o.evaluator_guidance || c.evaluator_guidance } : c
+        return o ? { ...c, meaning: { intent: o.intent, synonyms: o.synonyms }, evaluator_guidance: o.evaluator_guidance || c.evaluator_guidance, description: o.description || c.description } : c
       }),
     },
     ...(t.counterpart ? { counterpart: t.counterpart } : {}),

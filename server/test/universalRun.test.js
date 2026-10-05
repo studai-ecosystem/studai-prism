@@ -16,6 +16,7 @@ import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../domain/sharing/cop
 import { draftBankScenarios, evaluateJobKey, snapshotHash } from '../domain/assessments/draftSegments.js'
 import { CORE_TEAMREADY_A, CORE_TEAMREADY_A_FORM_ID, BOARD_ARTIFACT_ID } from '../domain/assessments/universalForm.js'
 import { createSliceEvaluator, independentOpportunityCount } from '../domain/evidence/sliceEvaluator.js'
+import { EVIDENCE_PROMPT, EVIDENCE_EVALUATOR } from '../domain/assessments/frozenMethod.js'
 import { DRAFT_UNIVERSAL } from '../domain/assessments/timingPolicy.js'
 import evidenceGraph from '../lib/evidenceGraph.js'
 
@@ -41,7 +42,7 @@ const ANSWERS = {
   'OPP-REASON-OPTIONS': 'One session for all 24 reaches everyone at once; two smaller sessions support people better but double the setup. With two days I would run one session and keep materials minimal.',
   'OPP-COMM-PLAN-EXPLAIN': 'Plan: Sam sets up the room Day 1 morning, I confirm the list today, Priya prepares the materials Day 2. Sam, I need the seat count from you first.',
   'OPP-COLLAB-PUSHBACK': 'I hear that the room matters most and I agree it comes first. I still think a one-page agenda is worth it; can we do that instead of a full pack?',
-  'OPP-ADAPT-REPLAN': 'What is Sam availability now? Sam is out Day 1 afternoon, so room setup moves to Day 1 morning and I take the materials myself. Priya, can you cover the list if I run short?',
+  'OPP-ADAPT-REPLAN': 'Sam is out Day 1 afternoon, so room setup moves to Day 1 morning and I take the materials myself. Priya covers the list if I run short.',
   'OPP-REASON-CHECK-RECOMMENDATION': 'No. The brief says 24 participants, not 40, and the venue only has one screen, so I would not rely on a projector. I am unsure the screen works with a laptop; Sam can check.',
   'OPP-COLLAB-HANDOVER-DISAGREEMENT': 'Both readings make sense. Priya, your worksheet idea is good but we do not have the time; let us agree Sam does the one-page agenda and we revisit the pack next time.',
   'OPP-ADAPT-FEEDBACK': 'You are right, I had the materials due after setup starts. Moving it to Day 2 morning; printing then happens on the day, which the venue allows.',
@@ -49,7 +50,7 @@ const ANSWERS = {
 }
 const BOARD_PATCHES = {
   'OPP-EXEC-BOARD-OWNERS': { 'R2.rationale': 'Materials wait for the confirmed list so we print the right number.', 'R2.owner': 'Priya', 'R3.owner': 'You', 'R3.due': 'Day 1 morning', 'R2.dependency': 'R3' },
-  'OPP-EXEC-BOARD-FINAL': { 'R1.rationale': 'Done when the room is laid out for 24 and the screen is tested.', 'R1.status': 'IN_PROGRESS', 'R2.due': 'Day 2 morning', 'R2.status': 'PLANNED', 'R3.status': 'DONE' },
+  'OPP-EXEC-BOARD-FINAL': { 'R1.rationale': 'Done when the room is laid out for 24 and the screen is tested.', 'R3.rationale': 'Done when all 24 participants have the confirmed time, room and invitation.', 'R1.status': 'IN_PROGRESS', 'R2.due': 'Day 2 morning', 'R2.status': 'PLANNED', 'R3.status': 'DONE' },
 }
 
 function fakeEngine(state) {
@@ -103,7 +104,7 @@ async function world() {
   const evaluatorCalls = []
   const sliceEvaluator = createSliceEvaluator({
     complete: async (params, options) => { evaluatorCalls.push(params); return createCompletion(params, options) },
-    recordUnit: (unit) => evidenceGraph.recordEvidenceUnit(unit),
+    recordUnit: (unit, tx) => evidenceGraph.recordEvidenceUnit(unit, tx),
   })
   const campus = createCampusContext({
     repos, clock: () => NOW, legacy, engine, sliceEvaluator,
@@ -154,6 +155,7 @@ async function world() {
       const version = (await repos.sessionIo.latestArtifactVersion(sid, BOARD_ARTIFACT_ID))?.version || 0
       const r = await call('PATCH', `/assessment-sessions/${sid}/artifacts/${BOARD_ARTIFACT_ID}`, { updates: BOARD_PATCHES[id], clientEventId: `art-run-${String(seq).padStart(4, '0')}` }, { 'If-Match': String(version) })
       assert.equal(r.status, 200, JSON.stringify(r.body))
+      assert.equal(r.body.data.reviewReadiness.ready, true, `the authored ${id} fixture must be complete: ${JSON.stringify(r.body.data.reviewReadiness)}`)
       return r.body.data
     }
     const text = ANSWERS[id]
@@ -215,8 +217,8 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     assert.equal(act1.result.evaluationContext.stimulus.messages[0].content, row.stimulus.messages[0].content)
     assert.deepEqual(act1.result.evaluationContext.informationAccess.revealedFactIds, [], 'the answer revealed after this action is not backdated')
     assert.equal(act1.result.evaluationContext.situation.applicableFacts.some((f) => f.id === 'CF-PRINTING'), false)
-    assert.equal(act1.result.evaluationContext.method.promptVersion, 'evidence_evaluator.v2')
-    assert.equal(act1.result.evaluationContext.method.evaluatorVersion, 'slice-evaluator.v2')
+    assert.equal(act1.result.evaluationContext.method.promptVersion, EVIDENCE_PROMPT)
+    assert.equal(act1.result.evaluationContext.method.evaluatorVersion, EVIDENCE_EVALUATOR)
     ledger = await w.repos.sessionIo.listOpportunities(sid)
     assert.equal(ledger.find((r) => r.opportunityId === 'OPP-REASON-FACTS-ASSUMPTIONS').state, 'ACTION_RECEIVED')
     assert.deepEqual(ledger.find((r) => r.opportunityId === 'OPP-REASON-FACTS-ASSUMPTIONS').actionIds, [act1.actionId])
@@ -231,9 +233,14 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
       presentedOrder.push(row.opportunityId)
       if (row.stimulus.worldChangeId) sawWorldChange = { id: row.opportunityId, messages: row.stimulus.messages }
       if (row.opportunityId === 'OPP-COMM-HANDOVER-AUDIENCE') break
+      if (row.opportunityId === 'OPP-ADAPT-REPLAN') {
+        const inquiry = await w.call('POST', `/assessment-sessions/${sid}/messages`, { clientEventId: 'evt-availability-inquiry', text: 'What is Sam availability now?' })
+        assert.equal(inquiry.status, 201, JSON.stringify(inquiry.body))
+        availabilityAnswer = inquiry.body.data.messages.find((m) => m.factAnswer)
+        assert.equal((await w.presentedRow(sid)).opportunityId, row.opportunityId, 'asking for a fact does not complete the replan decision')
+      }
       const out = await w.answer(sid, row)
       assert.equal(out.replayed, false)
-      if (row.opportunityId === 'OPP-ADAPT-REPLAN') availabilityAnswer = out.messages.find((m) => m.factAnswer)
     }
     assert.equal(presentedOrder.at(-1), 'OPP-COMM-HANDOVER-AUDIENCE')
     assert.equal(new Set(presentedOrder).size, presentedOrder.length, 'no opportunity presented twice')
@@ -255,11 +262,11 @@ test('P4 T22/T23/T24/T27/T28: start → begin → six Director-driven stages →
     c = await w.call('GET', `/assessment-sessions/${sid}`)
     assert.equal(c.body.data.stages.at(-1).state, 'CURRENT')
     assert.equal(c.body.data.stages[0].state, 'DONE')
-    assert.equal(c.body.data.progress.exchanges, 8, 'eight text answers and two board patches')
+    assert.equal(c.body.data.progress.exchanges, 9, 'eight text decisions, one separate information request and two board patches')
     const shown = c.body.data.messages
     assert.ok(shown.some((m) => m.aiGenerated && /AI-generated recommendation/.test(m.content)), 'the AI recommendation is labelled as such')
     assert.ok(!shown.some((m) => /Engine opening|rate this level/.test(m.content)), 'T24: engine text is never shown')
-    assert.equal(shown.filter((m) => m.isUser).length, 8)
+    assert.equal(shown.filter((m) => m.isUser).length, 9)
     // T34: a structured board action outside the schema is rejected without completing fields.
     const bad = await w.call('PATCH', `/assessment-sessions/${sid}/artifacts/${BOARD_ARTIFACT_ID}`, { updates: { 'R2.task': 'Order catering', 'R2.owner': 'The CEO' }, clientEventId: 'art-bad-0001' }, { 'If-Match': '2' })
     assert.equal(bad.status, 422, JSON.stringify(bad.body))
@@ -459,12 +466,14 @@ test('board autosaves stay drafts until complete, and stakeholder reactions dist
     assert.equal((await w.presentedRow(sid)).opportunityId, 'OPP-EXEC-BOARD-OWNERS')
 
     const overloaded = await w.call('PATCH', `/assessment-sessions/${sid}/artifacts/${BOARD_ARTIFACT_ID}`, {
-      updates: { 'R3.owner': 'Sam', 'R2.due': 'Day 2 morning' },
+      updates: { ...BOARD_PATCHES['OPP-EXEC-BOARD-OWNERS'], 'R2.owner': 'Sam', 'R3.owner': 'Sam', 'R2.due': 'Day 2 morning' },
       clientEventId: 'art-overloaded-0001',
     }, { 'If-Match': '1' })
     assert.equal(overloaded.status, 200, JSON.stringify(overloaded.body))
     assert.equal(overloaded.body.data.reviewReadiness.ready, false)
-    assert.ok(overloaded.body.data.messages.some((message) => /morning available/i.test(message.content)))
+    assert.ok(overloaded.body.data.messages.some((message) => message.speaker === 'Sam'
+      && message.stakeholderReaction === true && /half a day/i.test(message.content)
+      && !/room setup.*assigned to me/i.test(message.content) && message.revealedFactIds.includes('CF-FACILITATOR-HOURS')), JSON.stringify(overloaded.body.data.messages))
     assert.equal((await w.presentedRow(sid)).opportunityId, 'OPP-EXEC-BOARD-OWNERS')
 
     const feasible = await w.call('PATCH', `/assessment-sessions/${sid}/artifacts/${BOARD_ARTIFACT_ID}`, {
@@ -473,7 +482,9 @@ test('board autosaves stay drafts until complete, and stakeholder reactions dist
     }, { 'If-Match': '2' })
     assert.equal(feasible.status, 200, JSON.stringify(feasible.body))
     assert.equal(feasible.body.data.reviewReadiness.state, 'READY_FOR_REVIEW')
-    assert.ok(feasible.body.data.messages.some((message) => /allocation works/i.test(message.content)))
+    assert.ok(feasible.body.data.messages.some((message) => message.speaker === 'Priya'
+      && message.stakeholderReaction === true && message.continue === false
+      && /ownership and order explicit/i.test(message.content) && /responsibilities/i.test(message.content)), JSON.stringify(feasible.body.data.messages))
     assert.equal((await w.presentedRow(sid)).opportunityId, 'OPP-COMM-PLAN-EXPLAIN')
   } finally { w.close() }
 })

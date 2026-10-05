@@ -9,7 +9,8 @@ import express from 'express'
 import { createV1Router } from '../routes/v1/index.js'
 import { createMemoryCampusRepos } from '../domain/campusStore/index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from '../domain/campusStore/context.js'
-import { PRIMARY_CAPABILITY_IDS } from '../domain/assessments/catalog.js'
+import { PRIMARY_CAPABILITY_IDS, capabilityInfo } from '../domain/assessments/catalog.js'
+import { captureMethod, methodHash } from '../domain/assessments/frozenMethod.js'
 import { ApiError } from '../domain/http/errors.js'
 
 process.env.PRISM_CAMPUS_ENABLED = 'true'
@@ -64,6 +65,25 @@ async function world() {
     shareTokenFactory: () => `synthetic-audience-token-${String(++tokens).padStart(4, '0')}-abcdefghij`,
     sessionOwner: async (sid) => state.sessions[sid]?.userId || null,
   })
+  const cat = await campus.catalog.getCatalog()
+  const form = cat.forms.find((f) => f.scenarioId === state.sessions[SID].scenarioId)
+  const definition = cat.definitions.find((d) => d.id === form.definitionId)
+  const allocation = {
+    id: state.sessions[SID].scenarioId, version: form.version, rubricRef: 'rubric.v1',
+    opportunities: definition.measures.map((capabilityId) => ({ id: `synthetic-${capabilityId}`, capabilityId, behaviourId: capabilityId })),
+    rubric: { ref: 'rubric.v1', source: 'SYNTHETIC_UNIT_ALLOCATION', anchorsByBehaviour: Object.fromEntries(definition.measures.map((id) => [id, structuredClone(capabilityInfo(id).anchors)])) },
+  }
+  const methodSnapshot = captureMethod(allocation, { formId: form.id, engineVersion: 'synthetic-report-fixture' })
+  const content = { ...allocation }
+  delete content.rubric
+  const runPin = {
+    scenarioId: allocation.id, snapshotVersion: allocation.version, rubricRef: allocation.rubricRef, formId: form.id,
+    snapshotHash: methodHash(content), engineVersion: methodSnapshot.engineVersion, methodVersion: methodSnapshot.methodVersion,
+    methodSnapshot, methodHash: methodHash(methodSnapshot),
+  }
+  // This unit fixture allocates its own synthetic method before publication.
+  await repos.sessionIo.putClientEvent({ sessionId: SID, clientEventId: 'start', kind: 'START', response: { runPin } })
+  await campus.reports.publish(SID, { reason: 'INITIAL' })
   const requireUser = (req, _res, next) => {
     const user = USERS[req.get('x-test-user')]
     if (!user) return next(new ApiError('UNAUTHENTICATED', 'Sign in to continue.'))

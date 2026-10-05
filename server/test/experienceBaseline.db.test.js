@@ -51,7 +51,7 @@ test('P0 integrated diagnostic and real learner-path baseline on a self-owned da
     const result = await inspectDatabase(guarded)
     assert.equal(denied, true)
     assert.equal(result.status, 'AVAILABLE')
-    assert.equal(result.migrations.appliedKnown, 53)
+    assert.equal(result.migrations.appliedKnown, 54)
     assert.deepEqual(await client.query('SELECT COUNT(*) AS n FROM public.v1_users').then((r) => r.rows), before.rows)
     evidence.checks.push({ id: 'CH-41', status: 'PASS', readOnlyWriteRejected: true, migrationsApplied: result.migrations.appliedKnown })
   })
@@ -123,14 +123,16 @@ test('P0 integrated diagnostic and real learner-path baseline on a self-owned da
   const strict = await query("SELECT COUNT(*)::int AS n FROM behavioral_evidence_units WHERE session_id=$1 AND NOT legacy_row AND rubric_level IS NOT NULL", [sid])
   const historyAfter = await query("SELECT COALESCE(data ? 'history',false) AS present FROM v1_sessions WHERE session_id=$1", [sid])
   const result = await request('GET', `/api/v1/assessment-sessions/${sid}/report`, token)
-  assert.equal(result.status, 200)
+  assert.equal(result.status, 409, 'an original legacy report is not silently materialized as a new V3 interpretation')
+  assert.equal(result.payload.error.code, 'REPORT_NOT_READY')
   const versions = await query('SELECT COUNT(*)::int AS n FROM student_report_versions WHERE session_id=$1', [sid])
   const checks = [
     { id: 'T27', status: strict.rows[0].n ? 'OBSERVED_REQUIRES_REVIEW' : 'FAIL', judgedStrictUnits: strict.rows[0].n },
     { id: 'T32', status: historyAfter.rows[0].present ? 'SOURCE_PRESENT' : 'FAIL', sourceHistoryPresentAfterCompletion: historyAfter.rows[0].present },
-    { id: 'T36', status: 'DIAGNOSTIC_SIDE_EFFECT', reportReadAppendedVersion: versions.rows[0].n > 0 },
+    { id: 'T36', status: 'PASS', reportReadAppendedVersion: versions.rows[0].n > 0 },
   ]
   evidence.checks.push(...checks)
+  assert.equal(versions.rows[0].n, 0, 'the legacy V3 read cannot mint findings')
   for (const check of checks) t.diagnostic(JSON.stringify(check))
   const assignments = await request('GET', '/api/v1/me/assessments', token)
   assert.equal(assignments.status, 200)
@@ -190,7 +192,7 @@ test('P0 integrated diagnostic and real learner-path baseline on a self-owned da
     const { eraseCampusSessionData, isErased } = await import('../lib/campusErasure.js')
     const counts = await eraseCampusSessionData(sid)
     assert.ok(counts.assessment_client_events >= 3)
-    assert.ok(counts.student_report_versions >= 1)
+    assert.equal(counts.student_report_versions, 0, 'the unsupported legacy run did not mint V3 findings')
     assert.equal(counts.erasure_marker, 1)
     for (const table of ['assessment_client_events', 'assessment_artifact_versions', 'student_report_versions', 'behavioral_evidence_units', 'assessment_candidate_actions', 'assessment_jobs']) {
       const left = await query(`SELECT COUNT(*)::int AS n FROM ${table} WHERE session_id=$1`, [sid])

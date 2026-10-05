@@ -577,7 +577,7 @@ test('P2.9 Layer B: action → strict evidence → stable V3 report → separate
       for (const table of ['behavioral_evidence_units', 'assessment_candidate_actions', 'assessment_jobs', 'student_report_versions']) {
         assert.equal((await query(`SELECT COUNT(*)::int AS n FROM ${table} WHERE session_id=$1`, [s])).rows[0].n, 0)
       }
-      assert.equal((await request('GET', `/api/v1/assessment-sessions/${s}/report`, token)).status, 409)
+      assert.equal((await request('GET', `/api/v1/assessment-sessions/${s}/report`, token)).status, 404)
       const retry = await finish(s)
       assert.ok([404, 409].includes(retry.status), 'retry is refused for erased work')
       assert.equal((await units(s)).length, 0)

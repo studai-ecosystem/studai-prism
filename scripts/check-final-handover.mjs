@@ -14,7 +14,7 @@ if (handover.verdict !== 'NO_GO') failures.push('verdict must remain NO_GO')
 for (const key of ['productionActivated', 'deployed', 'manualApprovalClaimed', 'layerCClaimed']) {
   if (handover[key] !== false) failures.push(`${key} must be false`)
 }
-if (handover.migrationCount !== 53 || handover.migrationHead !== '0053_intent_display_and_research') failures.push('migration head/count')
+if (handover.migrationCount !== 54 || handover.migrationHead !== '0054_report_publication_note') failures.push('migration head/count')
 if (handover.checklist.map((row) => row.id).join(',') !== expectedChecklist.join(',')) failures.push('checklist ids')
 for (const row of handover.checklist) {
   if (!allowed.has(row.status)) failures.push(`${row.id} invalid status`)

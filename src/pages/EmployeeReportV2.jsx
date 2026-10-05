@@ -28,7 +28,9 @@ export default function EmployeeReportV2() {
   if (loading) {
     body = <Skeleton label="Loading the workplace view" lines={6} />
   } else if (error) {
-    body = error.status === 404
+    body = error.code === 'LEGACY_VIEW_UNAVAILABLE'
+      ? <ErrorState title="Your original report is preserved" description="This workplace view was not issued. The original findings remain available without reinterpretation." action={<LinkButton to={`/score?session=${encodeURIComponent(sessionId)}`}>Open original report</LinkButton>} />
+      : error.status === 404
       ? <ErrorState title="Report not found" description="There is no report for this assessment." action={<LinkButton to="/">Go to home</LinkButton>} />
       : <ErrorState title="This report could not be loaded" description={error.message} requestId={error.requestId} onRetry={load} />
   } else {

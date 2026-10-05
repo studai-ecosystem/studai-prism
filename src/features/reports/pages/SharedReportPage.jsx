@@ -3,7 +3,7 @@
 // allowed (summary or full). The token stays in the URL only; it is never
 // logged by the server and never stored by the browser.
 import { useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Skeleton } from '../../../components/ui/Skeleton.jsx'
 import { DocumentTitle } from '../../../components/ui/DocumentTitle.jsx'
 import { ErrorState } from '../../../components/states/index.js'
@@ -15,7 +15,8 @@ import { REPORT_COPY } from '../../../lib/copy/report.js'
 
 export default function SharedReportPage() {
   const { token } = useParams()
-  const query = useSharedReport(token)
+  const [params] = useSearchParams()
+  const query = useSharedReport(token, { version: params.get('version') })
   // The token is in this page's URL: never send it onward as a referrer.
   useEffect(() => {
     const meta = document.createElement('meta')

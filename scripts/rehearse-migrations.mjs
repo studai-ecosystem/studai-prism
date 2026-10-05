@@ -51,7 +51,7 @@ try {
   const { steps } = parseArgs(process.argv.slice(2))
   const ups = await sortedUps()
   report.migrationCount = ups.length
-  if (ups.length !== 53) throw new Error('REHEARSAL_EXPECTED_53_MIGRATIONS')
+  if (ups.length !== 54) throw new Error('REHEARSAL_EXPECTED_54_MIGRATIONS')
   const fresh = ups.filter((n) => /^00[4-9]\d_/.test(n))
   const down = await readdir(MIGRATIONS)
   report.newMigrations = fresh

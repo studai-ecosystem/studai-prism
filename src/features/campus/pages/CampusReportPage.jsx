@@ -1,6 +1,6 @@
 // A sponsored (or student-shared) report, read by authorized staff. The
 // server authorizes and records every read; the view is read-only.
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { ReportView } from '../../reports/components/ReportView.jsx'
 import { CampusPage, crumbs } from '../components/CampusPage.jsx'
 import { useCampusOrg, useSponsorReport } from '../hooks.js'
@@ -9,8 +9,9 @@ import { ErrorState } from '../../../components/states/index.js'
 
 export default function CampusReportPage() {
   const { sessionId } = useParams()
+  const [params] = useSearchParams()
   const { orgId, workspace } = useCampusOrg()
-  const query = useSponsorReport(sessionId)
+  const query = useSponsorReport(sessionId, { version: params.get('version') })
   const pendingCode = query.error?.code
   const notReady = pendingCode === 'REPORT_NOT_READY' || pendingCode === 'REPORT_UNDER_REVIEW'
   const d = query.data

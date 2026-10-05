@@ -72,7 +72,7 @@ export function createStudentHistory({ directory, catalog, legacy, practice = { 
     const definition = cat.definitions.find((d) => d.id === definitionId) || null
     const bank = Boolean(definitionId) && definitionId !== CORE_DEFINITION_ID
     const sourceType = s.hasSession ? 'FORMAL_SESSION' : 'LEGACY_REPORT'
-    const reportFormat = s.hasReport ? (s.hasSession && reportV3() ? 'V3' : 'LEGACY_V2') : null
+    const reportFormat = s.hasReport ? (s.hasPublishedReport && reportV3() ? 'V3' : 'LEGACY_V2') : null
     const resumeTo = workspaceV3()
       ? playerPath(s.sessionId, sponsored ? workspace.id : null)
       : (sponsored ? null : paths.resume(s.sessionId, bank))
@@ -84,7 +84,7 @@ export function createStudentHistory({ directory, catalog, legacy, practice = { 
       recoveryState = 'HELD'
     } else if (s.hasReport) {
       status = sourceType === 'LEGACY_REPORT' ? 'LEGACY' : 'COMPLETED'
-      action = { kind: 'VIEW_REPORT', to: reportPath(paths, s.sessionId, bank, sponsored ? workspace.organizationId : null) }
+      action = { kind: 'VIEW_REPORT', to: reportPath(paths, s.sessionId, bank, sponsored ? workspace.organizationId : null, s.hasPublishedReport) }
     } else if (s.sessionCompletedAt) {
       const age = at.getTime() - new Date(s.sessionCompletedAt).getTime()
       if (age > PROCESSING_GRACE_MS) {

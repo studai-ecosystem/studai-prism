@@ -13,6 +13,7 @@ import { createCampusContext, EMPTY_LEGACY_SOURCES } from '../domain/campusStore
 import { buildStudentReportV3, MAX_MOMENTS } from '../domain/reports/v3/build.js'
 import { assertReportSafe, forbiddenPaths } from '../domain/reports/v3/schema.js'
 import { PRIMARY_CAPABILITY_IDS, CAPABILITY_DISPLAY_LABELS, capabilityInfo } from '../domain/assessments/catalog.js'
+import { captureMethod, methodHash } from '../domain/assessments/frozenMethod.js'
 import { ApiError } from '../domain/http/errors.js'
 
 process.env.PRISM_CAMPUS_ENABLED = 'true'
@@ -26,11 +27,15 @@ const LINES = ['First I would check which customers raised the issue.', 'Then I 
 const history = (lines) => [{ role: 'user', content: 'opening instruction' }, ...lines.map((l) => ({ role: 'user', content: `[Candidate]: ${l}` }))]
 
 function unit(id, capabilityId, turn, { rubric = 2, excerpt = null, status = 'PROVISIONAL', opportunityId = null, behaviour = null } = {}) {
+  const anchors = structuredClone(capabilityInfo(capabilityId).anchors)
   return {
     evidence_id: id, session_id: SID, capability_id: capabilityId, evidence_status: status, rubric_level: rubric,
     source_turn: turn, source_artifact_id: null, behavior_anchor_id: `anchor-${turn}`,
     candidate_action_json: { dialogue_excerpt: excerpt },
-    provenance_json: { judge: 'synthetic', rubric_version: 'rubric.v1', ...(opportunityId ? { opportunityId } : {}) },
+    provenance_json: {
+      judge: 'synthetic', rubric_version: 'rubric.v1', ...(opportunityId ? { opportunityId } : {}),
+      resolvedRubric: { ref: 'rubric.v1', anchors, anchorsHash: methodHash(anchors) },
+    },
     judge_agreement_json: { agreement: 0.9 }, observable_behavior: behaviour || `Synthetic observed behaviour ${id}.`, legacy_row: false,
   }
 }
@@ -130,6 +135,25 @@ async function world() {
     audit: (type, sid, payload) => audits.push({ type, sid, payload }),
     sessionOwner: async (sid) => state.sessions[sid]?.userId || null,
   })
+  const cat = await campus.catalog.getCatalog()
+  const form = cat.forms.find((f) => f.scenarioId === state.sessions[SID].scenarioId)
+  const definition = cat.definitions.find((d) => d.id === form.definitionId)
+  const allocation = {
+    id: state.sessions[SID].scenarioId, version: form.version, rubricRef: 'rubric.v1',
+    opportunities: definition.measures.map((capabilityId) => ({ id: `synthetic-${capabilityId}`, capabilityId, behaviourId: capabilityId })),
+    rubric: { ref: 'rubric.v1', source: 'SYNTHETIC_UNIT_ALLOCATION', anchorsByBehaviour: Object.fromEntries(definition.measures.map((id) => [id, structuredClone(capabilityInfo(id).anchors)])) },
+  }
+  const methodSnapshot = captureMethod(allocation, { formId: form.id, engineVersion: 'synthetic-report-fixture' })
+  const content = { ...allocation }
+  delete content.rubric
+  const runPin = {
+    scenarioId: allocation.id, snapshotVersion: allocation.version, rubricRef: allocation.rubricRef, formId: form.id,
+    snapshotHash: methodHash(content), engineVersion: methodSnapshot.engineVersion, methodVersion: methodSnapshot.methodVersion,
+    methodSnapshot, methodHash: methodHash(methodSnapshot),
+  }
+  // A declared synthetic allocation, not a reconstructed historical method.
+  await repos.sessionIo.putClientEvent({ sessionId: SID, clientEventId: 'start', kind: 'START', response: { runPin } })
+  await campus.reports.publish(SID, { reason: 'INITIAL' })
   const requireUser = (req, _res, next) => {
     const user = USERS[req.get('x-test-user')]
     if (!user) return next(new ApiError('UNAUTHENTICATED', 'Sign in to continue.'))
@@ -152,7 +176,7 @@ async function world() {
 test('P5.1/P5.7/T36: the owner lists immutable versions and asks for a review; the request is a row, not a rewrite, and promises no outcome', async () => {
   const w = await world()
   try {
-    assert.equal((await w.call('student', 'GET', `/assessment-sessions/${SID}/report/versions`)).body.data.versions.length, 0, 'nothing is published by listing')
+    assert.equal((await w.call('student', 'GET', `/assessment-sessions/${SID}/report/versions`)).body.data.versions.length, 1, 'listing only returns the setup publication')
     const report = await w.call('student', 'GET', `/assessment-sessions/${SID}/report`)
     assert.equal(report.status, 200)
     assert.ok(report.body.data.report.moments.length >= 2)

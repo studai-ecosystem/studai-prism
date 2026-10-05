@@ -175,7 +175,7 @@ test('stakeholder reactions are grounded in the actual proposal and board state'
     worldState: world,
   })
   assert.equal(overloaded.continue, true)
-  assert.match(overloaded.content, /morning available/i)
+  assert.match(overloaded.content, /half a day/i)
   const feasible = stakeholderReaction({
     form, opportunity: owners, interpretation,
     action: { kind: 'ARTIFACT', payload: { text: '' } },
@@ -219,6 +219,26 @@ test('feedback stimulus does not allege an error when the current board is consi
     form,
     opportunity: feedback,
     workState: { 'R1.due': 'Day 1 morning', 'R2.due': 'Day 2 morning', 'R3.due': 'Day 1 morning' },
+  })
+
+  test('unrelated words stay unclear; a refusal and a grounded alternative never assert a false Sam overload', () => {
+    const owners = opportunityById(form, 'OPP-EXEC-BOARD-OWNERS')
+    assert.equal(interpretLearnerMessage({ text: 'Purple galaxies spinning endlessly', opportunity: owners }).kind, LEARNER_INTENT.UNCLEAR)
+    assert.equal(interpretLearnerMessage({ text: 'Priya: materials; Sam: room; me: list', opportunity: owners }).kind, LEARNER_INTENT.PROPOSAL)
+    const refusal = interpretLearnerMessage({ text: 'I will not give Sam both tasks', opportunity: owners })
+    const reaction = stakeholderReaction({
+      form, opportunity: owners, interpretation: refusal,
+      action: { kind: 'MESSAGE', payload: { text: 'I will not give Sam both tasks' } },
+      boardState: { 'R2.owner': 'Sam', 'R3.owner': 'Sam' }, worldState: world,
+    })
+    assert.ok(!reaction || !reaction.continue)
+    const planned = stakeholderReaction({
+      form, opportunity: owners, interpretation: { kind: LEARNER_INTENT.WORK_ACTION },
+      action: { kind: 'ARTIFACT' }, worldState: world,
+      boardState: { 'R2.owner': 'Sam', 'R3.owner': 'Sam', 'R1.rationale': 'Preparation split across the two mornings.', 'R2.rationale': 'After setup on the first morning.', 'R3.rationale': 'Use the second morning.' },
+    })
+    assert.equal(planned.continue, false, 'provided reasoning is not declared infeasible from a task count alone')
+    assert.doesNotMatch(planned.content, /feasible|fits|capacity|room setup.*assigned/i)
   })
   assert.notEqual(stimulus, feedback.stimulus)
   assert.doesNotMatch(stimulus.template, /error|doesn't line up|does not line up/i)

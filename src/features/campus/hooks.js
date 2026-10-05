@@ -55,7 +55,7 @@ export const useCompletion = (id) => { const { orgId } = useCampusOrg(); return 
 export const useMembers = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['members'], () => api.members(orgId)) }
 export const useAuditLog = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['audit'], () => api.audit(orgId, { limit: 50 })) }
 export const useOnboarding = (options = {}) => { const { orgId } = useCampusOrg(); return useCampusQuery(['onboarding'], () => api.onboarding(orgId), options) }
-export const useSponsorReport = (sessionId) => { const { orgId } = useCampusOrg(); return useCampusQuery(['report', sessionId], () => fetchSponsorReport(orgId, sessionId)) }
+export const useSponsorReport = (sessionId, { version = null } = {}) => { const { orgId } = useCampusOrg(); return useCampusQuery(['report', sessionId, version], () => fetchSponsorReport(orgId, sessionId, { version })) }
 
 export function useCreateCohort() {
   const { orgId } = useCampusOrg()

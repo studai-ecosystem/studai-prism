@@ -96,6 +96,10 @@ test.describe('@critical @campus @a11y Keyboard-only journeys', () => {
     }
     await press(page, page.getByRole('button', { name: 'Begin assessment' }))
     await expect(page).toHaveURL(new RegExp(`/app/assessment/${dev.body.sessionId}$`))
+    await press(page, page.getByRole('dialog').getByRole('button', { name: 'Begin timed assessment' }))
+    await expect(page.getByRole('timer')).toBeVisible()
+    const continuation = page.getByRole('button', { name: 'Continue on this device' })
+    if (await continuation.isVisible()) await press(page, continuation)
 
     const feed = page.getByTestId('conversation')
     const participants = feed.locator('[data-role="participant"]')

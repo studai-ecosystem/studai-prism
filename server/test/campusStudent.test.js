@@ -11,7 +11,12 @@ import express from 'express'
 import { createV1Router } from '../routes/v1/index.js'
 import { createMemoryCampusRepos } from '../domain/campusStore/index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from '../domain/campusStore/context.js'
-import { buildCatalog, definitionForScenario, CORE_DEFINITION_ID } from '../domain/assessments/catalog.js'
+import { buildCatalog, definitionForScenario, CORE_DEFINITION_ID, PRIMARY_CAPABILITY_IDS, capabilityInfo } from '../domain/assessments/catalog.js'
+import { buildStudentReportV3, reportContentHash, REPORT_V3_BUILDER_VERSION } from '../domain/reports/v3/build.js'
+import { assertReportSafe } from '../domain/reports/v3/schema.js'
+import { candidateTurnsFrom } from '../domain/reports/claims.js'
+import { methodHash } from '../domain/assessments/frozenMethod.js'
+import { rulesFor, SUFFICIENCY_RULES_VERSION } from '../domain/evidence/sufficiencyRules.js'
 import { personalAssignmentId } from '../domain/assessments/assignmentService.js'
 import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../domain/sharing/copyVersions.js'
 import { sanitizeProps } from '../domain/telemetry/events.js'
@@ -21,6 +26,7 @@ import { ApiError } from '../domain/http/errors.js'
 process.env.PRISM_CAMPUS_ENABLED = 'true'
 process.env.PRISM_APP_SHELL_V3 = 'true'
 process.env.PRISM_ROLE_EXPLORATION_V2 = 'true'
+process.env.PRISM_STUDENT_REPORT_V3 = 'true'
 
 const NOW = new Date('2026-10-01T10:00:00Z')
 const day = 86400000
@@ -46,16 +52,34 @@ const SCENARIOS = {
 }
 
 const QUOTE = 'I would first separate the complaint data from the channel numbers'
-function unit(id, cap, turn, level, status = 'PROVISIONAL', excerpt = null) {
+const SYNTHETIC_ALLOCATION = {
+  fixture: 'campus-student-published-snapshot',
+  scenarioId: 'syn-general-a', scenarioVersion: '1.0.0',
+  formId: 'prism-workplace-core:syn-general-a:1.0.0',
+  methodVersion: 'synthetic-campus-student-allocation.v1',
+  rubric: Object.fromEntries(PRIMARY_CAPABILITY_IDS.map((id) => [id, structuredClone(capabilityInfo(id).anchors)])),
+  interpretation: { rulesVersion: SUFFICIENCY_RULES_VERSION, rules: Object.fromEntries(PRIMARY_CAPABILITY_IDS.map((id) => [id, structuredClone(rulesFor(id))])) },
+}
+function unit(sessionId, id, cap, turn, level, status = 'PROVISIONAL', excerpt = null) {
+  const allocation = sessionId === 'sess-done' ? SYNTHETIC_ALLOCATION : null
+  const anchors = allocation ? structuredClone(allocation.rubric[cap]) : null
   return {
-    evidence_id: id, session_id: 'x', capability_id: cap, evidence_status: status, rubric_level: level,
+    evidence_id: id, session_id: sessionId, capability_id: cap, evidence_status: status, rubric_level: level,
     source_turn: turn, source_artifact_id: null, behavior_anchor_id: `${cap}-A${turn}`,
-    candidate_action_json: { dialogue_excerpt: excerpt }, provenance_json: { judge: 'synthetic' },
+    candidate_action_json: { dialogue_excerpt: excerpt },
+    provenance_json: {
+      judge: 'synthetic',
+      ...(allocation ? {
+        methodVersion: allocation.methodVersion, methodHash: methodHash(allocation),
+        interpretation: structuredClone(allocation.interpretation),
+        resolvedRubric: { ref: 'synthetic-campus-student-rubric.v1', contentHash: methodHash(allocation.rubric), anchors, anchorsHash: methodHash(anchors) },
+      } : {}),
+    },
     judge_agreement_json: { agreement: 0.9 }, observable_behavior: `Synthetic behaviour ${id}`, legacy_row: false,
   }
 }
 
-async function world({ storeUp = true } = {}) {
+async function world({ storeUp = true, publishedSnapshots = true } = {}) {
   const repos = createMemoryCampusRepos({ clock: () => NOW })
   const org = await repos.organizations.createOrganization({ name: 'Synthetic University', slug: 'syn-u', organizationType: 'UNIVERSITY', status: 'ACTIVE' })
   await repos.memberships.upsertMembership({ organizationId: org.id, userId: USERS.student.id, role: 'STUDENT', status: 'ACTIVE' })
@@ -81,12 +105,12 @@ async function world({ storeUp = true } = {}) {
     },
     units: {
       'sess-done': [
-        unit('u1', 'CAP-L1-REASONING', 1, 2, 'PROVISIONAL', QUOTE),
-        unit('u2', 'CAP-L1-REASONING', 2, 3),
-        unit('u3', 'CAP-L1-REASONING', 3, 3),
-        unit('u4', 'CAP-L1-COMMUNICATION', 1, 4, 'PROVISIONAL', 'words the candidate never said'),
+        unit('sess-done', 'u1', 'CAP-L1-REASONING', 1, 2, 'PROVISIONAL', QUOTE),
+        unit('sess-done', 'u2', 'CAP-L1-REASONING', 2, 3),
+        unit('sess-done', 'u3', 'CAP-L1-REASONING', 3, 3),
+        unit('sess-done', 'u4', 'CAP-L1-COMMUNICATION', 1, 4, 'PROVISIONAL', 'words the candidate never said'),
       ],
-      'sess-live': [unit('live1', 'CAP-L1-REASONING', 1, 5), unit('live2', 'CAP-L1-REASONING', 2, 5), unit('live3', 'CAP-L1-REASONING', 3, 5)],
+      'sess-live': [unit('sess-live', 'live1', 'CAP-L1-REASONING', 1, 5), unit('sess-live', 'live2', 'CAP-L1-REASONING', 2, 5), unit('sess-live', 'live3', 'CAP-L1-REASONING', 3, 5)],
     },
     admin: {},
   }
@@ -126,6 +150,25 @@ async function world({ storeUp = true } = {}) {
     },
     hashActor: (id) => (id ? `hash-of-${id.length}` : null),
   })
+  // Published-state unit fixtures, not an assessment journey or a legacy
+  // migration: the synthetic allocation and its source rules are explicit.
+  if (publishedSnapshots) {
+    const cat = buildCatalog(SCENARIOS)
+    for (const sid of ['sess-done', 'sess-sponsored']) {
+      const session = legacyState.sessions[sid]
+      const definition = cat.definitions.find((d) => d.id === definitionForScenario(cat, session.scenarioId))
+      const report = assertReportSafe(buildStudentReportV3({
+        sessionId: sid, definition, formId: SYNTHETIC_ALLOCATION.formId,
+        units: legacyState.units[sid] || [], turns: candidateTurnsFrom(session.history),
+        header: { assessmentTitle: definition.title, completedAt: legacyState.reports[sid].issuedAt, scope: sid === 'sess-sponsored' ? 'SPONSORED' : 'PERSONAL', sponsorName: sid === 'sess-sponsored' ? org.name : null },
+      }))
+      await repos.sessionIo.putClientEvent({ sessionId: sid, clientEventId: 'start', kind: 'START', response: { fixtureAllocationArchive: structuredClone(SYNTHETIC_ALLOCATION) } })
+      await repos.reportVersions.append({
+        sessionId: sid, version: 1, contentHash: reportContentHash(report), builderVersion: REPORT_V3_BUILDER_VERSION,
+        report, issuedAt: legacyState.reports[sid].issuedAt, reason: 'INITIAL',
+      })
+    }
+  }
   const requireUser = (req, _res, next) => {
     const user = USERS[req.get('x-test-user')]
     if (!user) return next(new ApiError('UNAUTHENTICATED', 'Sign in to continue.'))
@@ -149,7 +192,7 @@ async function world({ storeUp = true } = {}) {
   const workspaces = (await campus.workspaceService.listWorkspaces(USERS.student))
   const campusWs = workspaces.find((w) => w.type === 'CAMPUS_STUDENT')
   const adminWs = (await campus.workspaceService.listWorkspaces(USERS.admin)).find((w) => w.type === 'CAMPUS_ADMIN')
-  return { repos, org, campus, call, legacyState, snapshot, roleCalls, audits, state, campusWs, adminWs, close: () => server.close() }
+  return { repos, org, campus, call, legacy, legacyState, snapshot, roleCalls, audits, state, campusWs, adminWs, close: () => server.close() }
 }
 
 async function sponsoredAssignment(w, { windowStart = iso(-day), windowEnd = iso(7 * day), status = 'ACTIVE', userId = USERS.student.id } = {}) {
@@ -243,18 +286,63 @@ test('C4.03: evidence explorer filters, verifies quotes and rejects bad filters'
   try {
     const r = await w.call('student', 'GET', '/me/evidence')
     assert.equal(r.status, 200)
-    assert.equal(r.body.data.total, 4, 'completed-session units only')
+    assert.equal(r.body.data.total, 3, 'only evidence cited by the published snapshot is exposed')
     assert.ok(r.body.data.items.every((i) => i.kind === 'FORMAL' && i.scope === 'PERSONAL'))
-    const u4 = r.body.data.items.find((i) => i.id === 'u4')
-    assert.equal(u4.candidateAction.quote, null, 'a non-verbatim excerpt is never shown as a quote')
+    assert.deepEqual(r.body.data.items.map((i) => i.id).sort(), ['u1', 'u2', 'u3'])
+    assert.equal(r.body.data.items.some((i) => i.id === 'u4'), false, 'the unverified observation was not part of the published evidence')
+    assert.equal(JSON.stringify(r.body).includes('words the candidate never said'), false, 'a non-verbatim excerpt is never exposed')
     const f = await w.call('student', 'GET', '/me/evidence?capability=CAP-L1-COMMUNICATION')
-    assert.deepEqual(f.body.data.items.map((i) => i.id), ['u4'])
+    assert.deepEqual(f.body.data.items, [], 'an insufficient capability never invents a published evidence unit')
     const practice = await w.call('student', 'GET', '/me/evidence?kind=PRACTICE')
     assert.deepEqual(practice.body.data.items, [])
     const sponsored = await w.call('student', 'GET', '/me/evidence?scope=SPONSORED')
     assert.deepEqual(sponsored.body.data.items, [], 'personal workspace never returns sponsored evidence')
     assert.equal((await w.call('student', 'GET', '/me/evidence?kind=GUESS')).status, 422)
     assert.equal((await w.call('student', 'GET', '/me/evidence?injected=1')).status, 422)
+  } finally { w.close() }
+})
+
+test('C4.03 published-state fixture: later live evidence cannot change findings or leak across workspaces/accounts', async () => {
+  const w = await world()
+  try {
+    const capabilities = (await w.call('student', 'GET', '/me/capabilities')).body.data
+    const evidence = (await w.call('student', 'GET', '/me/evidence')).body.data
+    const stored = structuredClone(w.repos.db.reportVersions)
+    for (const turn of [4, 5, 6]) w.legacyState.units['sess-done'].push(unit('sess-done', `late-${turn}`, 'CAP-L1-REASONING', turn, 5))
+    assert.deepEqual((await w.call('student', 'GET', '/me/capabilities')).body.data, capabilities)
+    assert.deepEqual((await w.call('student', 'GET', '/me/evidence')).body.data, evidence)
+    assert.equal((await w.call('other', 'GET', '/me/capabilities')).body.data.assessedCount, 0)
+    assert.equal((await w.call('other', 'GET', '/me/evidence')).body.data.total, 0)
+    assert.equal((await w.call('student', 'GET', '/me/evidence', null, { 'X-Prism-Workspace': w.campusWs.id })).body.data.total, 0)
+    assert.deepEqual(w.repos.db.reportVersions, stored, 'read projections never publish another version')
+  } finally { w.close() }
+})
+
+test('C4.03 legacy-only fixture: unsupported old runs retain original history without V3 materialization or findings', async () => {
+  const w = await world({ publishedSnapshots: false })
+  try {
+    await w.repos.sessionIo.putClientEvent({
+      sessionId: 'sess-done', clientEventId: 'start', kind: 'START',
+      response: { runPin: { scenarioId: 'syn-general-a', methodVersion: 'unsupported-historical-method', snapshotVersion: 'unsupported-old-allocation' } },
+    })
+    const original = await w.legacy.getReport('sess-done')
+    const history = await w.call('student', 'GET', '/me/history')
+    const historical = history.body.data.items.find((item) => item.sourceType === 'FORMAL_SESSION' && item.sourceId === 'sess-done')
+    assert.equal(historical.status, 'COMPLETED')
+    const assignments = await w.call('student', 'GET', '/me/assessments')
+    const completed = assignments.body.data.completed.find((a) => a.sessionId === 'sess-done')
+    assert.equal(completed.cta.kind, 'VIEW_REPORT')
+    const caps = await w.call('student', 'GET', '/me/capabilities')
+    assert.equal(caps.body.data.assessedCount, 0)
+    assert.ok(caps.body.data.items.every((c) => c.level === null))
+    assert.equal((await w.call('student', 'GET', '/me/evidence')).body.data.total, 0)
+    assert.deepEqual((await w.call('student', 'POST', '/me/role-exploration', { interests: null })).body.data.demonstrated, [])
+    await assert.rejects(w.campus.reports.publish('sess-done'), { code: 'PINNED_METHOD_UNAVAILABLE' })
+    assert.deepEqual(await w.legacy.getReport('sess-done'), original)
+    assert.equal(w.repos.db.reportVersions.length, 0, 'unsupported old references are never replaced with current instructions')
+    assert.equal(historical.permittedAction.to, w.legacy.paths.report('sess-done', false), 'no-snapshot history must open the original stored report, not an unavailable V3 projection')
+    assert.equal(completed.cta.to, w.legacy.paths.report('sess-done', false), 'the existing original reader stays reachable')
+    assert.notEqual(historical.reportFormat, 'V3')
   } finally { w.close() }
 })
 

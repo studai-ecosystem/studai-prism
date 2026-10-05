@@ -10,6 +10,8 @@ import { SUFFICIENCY_RULES_VERSION } from '../../evidence/sufficiencyRules.js'
 import { LEVEL_LABELS_STATUS } from '../../evidence/levels.js'
 import { buildClaim, validateClaims, verifiedQuote } from '../claims.js'
 import { CATALOG_VERSION, PRIMARY_CAPABILITY_IDS, capabilityInfo } from '../../assessments/catalog.js'
+import { anchorFromEvidence, methodHash, unavailable } from '../../assessments/frozenMethod.js'
+import { rulesFor } from '../../evidence/sufficiencyRules.js'
 
 export const REPORT_V3_BUILDER_VERSION = 'student-report.v3.1'
 export const DISCLOSURE_LEVELS = Object.freeze(['SUMMARY', 'FULL'])
@@ -41,7 +43,7 @@ function sentence(text) {
 
 // Why a capability has no description, in plain words (never a number).
 function absenceText(decision, title) {
-  if (decision?.status === 'HUMAN_REVIEW_REQUIRED') return 'A person is reviewing the evidence for this before it is described.'
+  if (decision?.status === 'HUMAN_REVIEW_REQUIRED') return 'This evidence needs review before it can be described.'
   if (!decision || decision.reasons?.includes('NO_EVIDENCE')) return `No evidence for this was recorded in ${title}, so it is not described.`
   return `There was not enough evidence in ${title} to describe this.`
 }
@@ -77,14 +79,25 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
   const withheld = new Set((withheldEvidenceIds || []).filter((id) => typeof id === 'string'))
   const ownUnits = units.filter((u) => u.session_id === sessionId && !withheld.has(u.evidence_id))
   const withheldHere = [...withheld].filter((id) => units.some((u) => u.session_id === sessionId && u.evidence_id === id)).sort()
-  const decisions = evaluateProfile(ownUnits, { capabilityIds })
+  const decisions = evaluateProfile(ownUnits, {
+    capabilityIds,
+    rulesForCapability: (id) => {
+      const pinned = ownUnits.filter((u) => u.capability_id === id && u.provenance_json?.methodHash)
+      if (!pinned.length) return rulesFor(id)
+      const sources = pinned.map((u) => u.provenance_json?.interpretation?.rules?.[id])
+      if (sources.some((s) => !s) || new Set(sources.map(methodHash)).size !== 1) throw unavailable()
+      return sources[0]
+    },
+  })
   const index = new Map(ownUnits.filter((u) => ADMISSIBLE.has(u.evidence_status)).map((u) => [u.evidence_id, u]))
 
   // 1. Draft every claim, then let the registry gate decide what is shown.
   const drafts = []
   const perCapability = []
   for (const capId of capabilityIds) {
-    const cap = capabilityInfo(capId)
+    const display = capabilityInfo(capId)
+    const frozenDefinition = ownUnits.find((u) => u.capability_id === capId && u.provenance_json?.capabilityDefinition)?.provenance_json.capabilityDefinition
+    const cap = display && frozenDefinition ? { ...display, description: frozenDefinition.description, layer: frozenDefinition.layer } : display
     if (!cap) continue
     const decision = decisions[capId] || null
     const admissible = Boolean(decision && ADMISSIBLE.has(decision.status) && decision.level)
@@ -139,7 +152,10 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
     // The rubric description of the DECIDED level (median of the evidence),
     // never of whichever unit happens to sort first.
     const decidedRubric = shown ? Math.round(Number(decision.level.rubricMedian)) : null
-    const anchor = shown && Number.isFinite(decidedRubric) ? cap.anchors?.[decidedRubric] : null
+    const descriptions = shown && Number.isFinite(decidedRubric)
+      ? [...new Set(decision.unitIds.map((id) => anchorFromEvidence(index.get(id), decidedRubric)?.criteria).filter(Boolean))]
+      : []
+    const anchor = descriptions.length === 1 ? { criteria: descriptions[0] } : null
     return {
       id: cap.id,
       name: cap.name,
@@ -161,7 +177,7 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
   for (const { cap, decision, observations } of perCapability) {
     for (const { claim, unit } of observations) {
       if (!ok.has(claim.claim_id)) continue
-      const anchor = Number.isFinite(unit.rubric_level) ? cap.anchors?.[Math.round(unit.rubric_level)] : null
+      const anchor = Number.isFinite(unit.rubric_level) ? anchorFromEvidence(unit, Math.round(unit.rubric_level)) : null
       evidence.push({
         id: unit.evidence_id,
         kind: 'FORMAL',
@@ -198,7 +214,7 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
         claim: development.text,
         evidenceIds: development.evidence_ids,
         currentLevel: { band: decision.level.band, label: decision.level.label },
-        behaviorToImprove: cap.anchors?.[next]?.criteria || null,
+        behaviorToImprove: decision.unitIds.map((id) => anchorFromEvidence(index.get(id), next)?.criteria).find(Boolean) || null,
         whyItMatters: cap.description || null,
         recommendedMission: null,
         practiceTime: null,
@@ -217,7 +233,7 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
     for (const u of candidates.slice(0, 1)) {
       const quote = verifiedQuote(u, turns)
       if (!quote) continue
-      const anchor = cap.anchors?.[Math.round(u.rubric_level)]
+      const anchor = anchorFromEvidence(u, Math.round(u.rubric_level))
       const next = Math.max(3, Math.min(5, u.rubric_level + 1))
       boundedObservations.push({
         id: u.evidence_id,
@@ -226,7 +242,7 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
         quote,
         source: { turn: Number.isInteger(u.source_turn) ? u.source_turn : null, artifactId: u.source_artifact_id || null, opportunityId: u.provenance_json?.opportunityId || null },
         rubricAnchor: anchor?.criteria ? { criteria: anchor.criteria } : null,
-        nextBehavior: cap.anchors?.[next]?.criteria || null,
+        nextBehavior: u.rubric_level < 5 ? anchorFromEvidence(u, next)?.criteria || null : null,
         limitation: `One moment was observed in ${title}. That is not enough to describe ${cap.name} as a whole; sufficiency reasons: ${(decision?.reasons || ['NO_EVIDENCE']).join(', ')}.`,
         provenance: provenanceOf(u),
       })
@@ -242,7 +258,8 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
   const oppIndex = new Map((opportunities || []).filter((o) => o && o.sessionId === sessionId).map((o) => [o.opportunityId, o]))
   const contextFor = (u) => {
     const oppId = u.provenance_json?.opportunityId || null
-    return opportunityContext(oppId ? oppIndex.get(oppId) : null)
+    return opportunityContext({ stimulus: u.provenance_json?.evaluationContext?.stimulus })
+      || opportunityContext(oppId ? oppIndex.get(oppId) : null)
       || `${header.scenarioTitle || title}${Number.isInteger(u.source_turn) ? `, exchange ${u.source_turn}` : ''}`
   }
   const momentFrom = (cap, u, quote, { evidenceStatus, basis, next }) => ({
@@ -253,7 +270,7 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
     quote,
     context: contextFor(u),
     source: { turn: Number.isInteger(u.source_turn) ? u.source_turn : null, artifactId: u.source_artifact_id || null, opportunityId: u.provenance_json?.opportunityId || null },
-    rubricAnchor: Number.isFinite(u.rubric_level) && cap.anchors?.[Math.round(u.rubric_level)]?.criteria ? { criteria: cap.anchors[Math.round(u.rubric_level)].criteria } : null,
+    rubricAnchor: Number.isFinite(u.rubric_level) && anchorFromEvidence(u, Math.round(u.rubric_level))?.criteria ? { criteria: anchorFromEvidence(u, Math.round(u.rubric_level)).criteria } : null,
     nextBehavior: next,
     evidenceStatus,
     provenance: provenanceOf(u),
@@ -265,7 +282,7 @@ export function buildStudentReportV3({ sessionId, definition = null, formId = nu
     verified.forEach(({ claim, unit }, i) => {
       const next = Math.max(3, Math.min(5, Math.floor(Number(e.decision.level.rubricMedian) || 0) + 1))
       rounds[i] ||= []
-      rounds[i].push(momentFrom(e.cap, unit, claim.quote, { evidenceStatus: unit.evidence_status, basis: 'DESCRIBED', next: e.cap.anchors?.[next]?.criteria || null }))
+      rounds[i].push(momentFrom(e.cap, unit, claim.quote, { evidenceStatus: unit.evidence_status, basis: 'DESCRIBED', next: unit.rubric_level < 5 ? anchorFromEvidence(unit, next)?.criteria || null : null }))
     })
   }
   const moments = rounds.flat()
