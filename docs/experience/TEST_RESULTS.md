@@ -1,5 +1,33 @@
 # P0 - Verification results
 
+## Staged release decision verification - 2026-10-05
+
+Engineering checks for the scope diagnostic and paid-offer guard:
+
+| Check | Result |
+| --- | --- |
+| Focused release/commerce/comparability tests | 48 pass, zero failures |
+| Server suite | 882 pass, 26 DB-only skips, zero failures |
+| Disposable PostgreSQL/HTTP baseline | 27 pass, zero failures/skips |
+| Production build | PASS; existing chunk-size advisory |
+| Migration rehearsal | 53 up; second up zero; 14 down/up; interrupted migration rolled back; restored head 0053 |
+| Local rollback-plan rehearsal | PASS; no production or schema drop |
+| Chromium commercial journey | 1 pass; checkout create-order refused with 409 |
+| Checkout/preview client tests | 30 pass, zero failures |
+| Static audit / handover check | PASS; six independent sign-offs still OPEN and release verdict still NO_GO |
+| Developmental-scope diagnostic | Expected NO_GO for selected core components; preparation/payment/Campus/growth DEFERRED; activationAuthorized false |
+
+Paid checkout now additionally requires configured finance-reviewed tax
+presentation and complete APPROVED recovery/review/refund policy. The actual
+policy remains PROPOSED; no payment or approval was performed. A limited
+developmental scope does not require price or comparability approval for
+features excluded from it, but cannot waive its own applicable owner
+sign-offs. Tests explicitly reject enabling out-of-scope growth, Explore or
+Campus analytics just to repair navigation.
+
+All results are local engineering evidence. Deployment, live-model, human
+usefulness, privacy, commercial and operational approvals remain open.
+
 ## Current three-level verification follow-up - 2026-10-04
 
 **Software verified; live-model and human evidence not executed. Pilot verdict

@@ -35,11 +35,15 @@ export * from './softBudget.js'
 
 // The offer as the running build can actually deliver it: the mission library
 // and the content registry decide whether the promised content is reviewed.
-export function liveOfferAvailability(code, { priceApproved } = {}) {
+export function liveOfferAvailability(code, { priceApproved, taxTreatment } = {}) {
   const latest = new Map()
   for (const m of MISSION_LIBRARY) latest.set(m.mission_id || m.id, m)
   const formStates = contentRegistry.listForms().filter((f) => f.kind === 'UNIVERSAL_FORM').map((f) => f.state)
-  return offerAvailability(code, { missions: [...latest.values()], formStates, ...(priceApproved === undefined ? {} : { priceApproved }) })
+  return offerAvailability(code, {
+    missions: [...latest.values()], formStates,
+    ...(priceApproved === undefined ? {} : { priceApproved }),
+    ...(taxTreatment === undefined ? {} : { taxTreatment }),
+  })
 }
 
 export function liveOfferView(code, options = {}) {

@@ -33,6 +33,10 @@ const NOW = new Date('2026-10-01T10:00:00Z')
 const DAY = 86400000
 const user = { id: 'user-gap-1', email: 'g@test.local' }
 const GOOD = 'Nia, can you take the room booking by Friday? Dev, please hand the invitations list to Nia before you leave tomorrow. What else do we still need to know?'
+const APPROVED_TERMS_FIXTURE = {
+  taxTreatment: 'Synthetic finance-reviewed tax presentation',
+  policy: { status: 'APPROVED', recovery: 'Synthetic approved failed-service reissue terms', review: 'Synthetic approved review terms', refund: 'Synthetic approved refund terms' },
+}
 
 function world() {
   let now = NOW
@@ -77,14 +81,14 @@ async function appWorld({ env = {} } = {}) {
 test('P8.6: the sprint is NOT purchasable while fewer than four missions are reviewed, the form is draft or the price is unapproved; every blocker is named', () => {
   const none = offerAvailability('PERSONAL_DEVELOPMENT_SPRINT', { missions: [], formStates: ['DRAFT'], priceApproved: false })
   assert.equal(none.purchasable, false)
-  assert.deepEqual(none.blockers.map((b) => b.code), ['PRICE_NOT_APPROVED', 'CONTENT_NOT_REVIEWED', 'FORM_NOT_REVIEWED'])
+  assert.deepEqual(none.blockers.map((b) => b.code), ['PRICE_NOT_APPROVED', 'CONTENT_NOT_REVIEWED', 'FORM_NOT_REVIEWED', 'TAX_PRESENTATION_NOT_CONFIGURED', 'RECOVERY_POLICY_NOT_APPROVED'])
   assert.equal(none.priceStatus, 'PROPOSED')
   assert.equal(none.reviewedMissions, 0)
   assert.equal(none.requiredMissions, 4)
-  const threeReviewed = offerAvailability('PERSONAL_DEVELOPMENT_SPRINT', { missions: [{ status: 'PUBLISHED' }, { status: 'APPROVED_FOR_PILOT' }, { status: 'PUBLISHED' }, { status: 'DRAFT' }], formStates: ['APPROVED_FOR_PILOT'], priceApproved: true })
+  const threeReviewed = offerAvailability('PERSONAL_DEVELOPMENT_SPRINT', { ...APPROVED_TERMS_FIXTURE, missions: [{ status: 'PUBLISHED' }, { status: 'APPROVED_FOR_PILOT' }, { status: 'PUBLISHED' }, { status: 'DRAFT' }], formStates: ['APPROVED_FOR_PILOT'], priceApproved: true })
   assert.deepEqual(threeReviewed.blockers.map((b) => b.code), ['CONTENT_NOT_REVIEWED'])
   assert.match(threeReviewed.blockers[0].message, /3 of the 4/)
-  const ready = offerAvailability('PERSONAL_DEVELOPMENT_SPRINT', { missions: Array(4).fill({ status: 'PUBLISHED' }), formStates: ['APPROVED_FOR_PILOT'], priceApproved: true })
+  const ready = offerAvailability('PERSONAL_DEVELOPMENT_SPRINT', { ...APPROVED_TERMS_FIXTURE, missions: Array(4).fill({ status: 'PUBLISHED' }), formStates: ['APPROVED_FOR_PILOT'], priceApproved: true })
   assert.equal(ready.purchasable, true)
   assert.deepEqual(ready.blockers, [])
   assert.equal(ready.priceStatus, 'APPROVED')
@@ -93,6 +97,24 @@ test('P8.6: the sprint is NOT purchasable while fewer than four missions are rev
   assert.equal(pro.purchasable, false)
   assert.equal(pro.blockers[0].code, 'NOT_FOR_SALE')
   assert.equal(offerAvailability('FREE_FIRST_EXPERIENCE').purchasable, false)
+})
+
+test('paid offers remain unavailable with reviewed content and price until tax presentation and recovery terms are ready', () => {
+  const contentReady = { missions: Array(4).fill({ status: 'PUBLISHED' }), formStates: ['APPROVED_FOR_PILOT'], priceApproved: true, taxTreatment: null }
+  const pending = offerAvailability('PERSONAL_DEVELOPMENT_SPRINT', contentReady)
+  assert.equal(pending.purchasable, false)
+  assert.deepEqual(pending.blockers.map((b) => b.code), ['TAX_PRESENTATION_NOT_CONFIGURED', 'RECOVERY_POLICY_NOT_APPROVED'])
+  const onlyTax = offerAvailability('PERSONAL_DEVELOPMENT_SPRINT', { ...contentReady, taxTreatment: APPROVED_TERMS_FIXTURE.taxTreatment })
+  assert.deepEqual(onlyTax.blockers.map((b) => b.code), ['RECOVERY_POLICY_NOT_APPROVED'])
+  for (const policy of [
+    { ...APPROVED_TERMS_FIXTURE.policy, status: 'PROPOSED' },
+    { ...APPROVED_TERMS_FIXTURE.policy, refund: 'pending approval' },
+    { ...APPROVED_TERMS_FIXTURE.policy, recovery: '' },
+  ]) {
+    assert.equal(offerAvailability('PERSONAL_DEVELOPMENT_SPRINT', { ...contentReady, ...APPROVED_TERMS_FIXTURE, policy }).purchasable, false)
+  }
+  const configured = liveOfferAvailability('PERSONAL_DEVELOPMENT_SPRINT', { priceApproved: true, taxTreatment: APPROVED_TERMS_FIXTURE.taxTreatment, policy: APPROVED_TERMS_FIXTURE.policy })
+  assert.ok(configured.blockers.some((b) => b.code === 'RECOVERY_POLICY_NOT_APPROVED'), 'live wiring ignores a caller policy override; actual server policy is still proposed')
 })
 
 test('P8.6: in THIS build the live offer is honestly unpurchasable (draft missions), the tax label says finance has not approved, test mode is explicit', () => {

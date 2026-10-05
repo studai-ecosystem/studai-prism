@@ -321,3 +321,14 @@ Release verdict: NO_GO
 - [ ] Manual accessibility and physical-device checks: NOT RUN. Automated axe/keyboard/viewport tests do not substitute.
 
 The prior browser pass establishes software interaction only; it does not establish that an unassisted human can explain the finding, moment and next practice. That remains a real-user acceptance question.
+
+## Staged release decisions - 2026-10-05
+
+Status: SCOPE_AND_GUARDS_IMPLEMENTED; OWNER_APPROVALS_OPEN
+
+- [x] Personal navigation has its own read-only scope decision; no requirement to activate evaluation, practice, paid offers, Campus, Explore or growth to repair it.
+- [x] Proposed unpaid developmental scope: Home/history, text/board assessment/evidence/report, reviewed practice. Preparation/payment/Campus/formal growth are DEFERRED. Applicable content, measurement, privacy, product/support and operational sign-offs remain required; no human gate self-approved.
+- [x] Paid offer gating now includes configured tax presentation and APPROVED recovery/review/refund terms. Current policy is PROPOSED, so sale remains unavailable. Existing prices, limits, grants and entitlements are unchanged.
+- [x] Formal growth retains its existing approved-comparability guard and is outside the developmental scope. The diagnostic rejects out-of-scope enabled flags; it never switches flags.
+- [x] Validation: focused 48 pass; server 882 pass/26 DB skips; real DB/HTTP 27 pass; build PASS; migration/rollback rehearsals PASS; Chromium commercial journey 1 pass.
+- [ ] Owner decisions and actual deployment authorization remain OPEN. Current scoped diagnostic is NO_GO; this implementation is not pilot sign-off.

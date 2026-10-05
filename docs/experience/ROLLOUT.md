@@ -1,5 +1,83 @@
 # P0 diagnostic recovery and operator handoff
 
+## Staged release decisions - 2026-10-05
+
+**Scope defined, not activated; applicable owner sign-offs remain OPEN.** A
+limited personal developmental pilot is not the whole platform launch. The
+read-only diagnostic now separates component decisions:
+
+```text
+node scripts/check-experience-baseline.mjs --stage EXTERNAL_PILOT --scope DEVELOPMENTAL_PILOT
+```
+
+Available scopes: `PERSONAL_NAVIGATION`, `DEVELOPMENTAL_PILOT`, `PAID_PILOT`,
+`FULL_RELEASE`. The output's `scopeDecision.components` distinguishes NO_GO
+for missing evidence in a selected component from DEFERRED for an excluded
+component. `activationAuthorized` is always false: this diagnostic never
+sets flags, signs a gate, deploys or replaces the existing allocation gate.
+The legacy `release.allocatable` value remains new-assessment readiness,
+not permission to activate basic navigation.
+
+| Component | Limited developmental scope | Decision/evidence still required |
+| --- | --- | --- |
+| Personal Home/history | Included; currently NO_GO | Engineering review of the candidate and scoped history; privacy/access and operational sign-offs |
+| Text/board assessment, evidence and report | Included; currently NO_GO | Reviewed exact scenario/rubric/method, permitted bounded pilot claims, live-model evidence, working staging candidate and service recovery/support |
+| Reviewed practice | Included; currently NO_GO | Review of the actual missions and feedback method; approve only the content/limits the pilot promises |
+| Paid packages | DEFERRED | Exact package/limits, approved price and configured finance-reviewed tax presentation, approved failed-service recovery/review/refund terms |
+| Private preparation | DEFERRED | Its own content, model, privacy, retention and operational approval; not a navigation dependency |
+| Campus | DEFERRED | Its own disclosure, access, data handling and erasure approvals |
+| Formal longitudinal growth | DEFERRED; keep disabled | Approved form comparability and measurement review; no growth claim from practice/replay |
+| Explore / Campus analytics | Outside the selected pilot scope | Do not enable them to repair personal navigation |
+
+Proposed claim boundary for owner review: bounded observations in this work
+simulation and specific next practice. No employment prediction, hiring
+fitness, independent mastery from assisted work, measured practice improvement
+or formal longitudinal growth is approved here. A developmental scope still
+needs defensible interpretation; narrowing the claim does not waive content,
+measurement, privacy or live-model checks.
+
+### Owner decisions are not closed by software or this record
+
+| Owner | Evidence now available | Decision still OPEN |
+| --- | --- | --- |
+| Engineering lead | Current source/test candidate; 48 focused gate/commerce/growth tests, 882 passing server tests, 27 disposable DB/HTTP tests, production build, migration and local rollback rehearsals | Review corrected implementation and reproducibility; approve and verify an actual deployment target/candidate |
+| Content + measurement owners | Versioned form/rubric/missions and fail-closed interpretation paths | Independently review exact content and held-out responses; specify permitted developmental pilot claims; do not infer formal comparability |
+| Paul / product / finance | Existing package and limits remain proposed; no price or quota was invented | Approve the actual unpaid pilot boundaries/support commitments; separately approve any paid package, amount, tax presentation and failed-service policy |
+| Privacy/security + operations | Scoped reads, erasure and access tests; support/monitoring/rollback tooling | Approve data handling/retention/access, named support responsibility, target monitoring, authorized live spend and staged activation/rollback |
+
+The scoped evaluator requires APPROVED for applicable owner/gate decisions;
+NOT_APPLICABLE cannot waive a selected component's review. Deferring payment
+does not require a price approval for the unpaid pilot. Deferring growth does
+not require comparability for bounded developmental findings. Approved
+technical recovery for an unpaid pilot is a separate scope decision from
+paid-service refunds.
+
+### Enforced paid boundary
+
+Server checkout previously gated content and price but could omit policy and
+tax readiness. `offerAvailability()` now also blocks on
+`TAX_PRESENTATION_NOT_CONFIGURED` and `RECOVERY_POLICY_NOT_APPROVED`.
+The actual configured policy remains PROPOSED, so the paid offer stays closed
+even if the price flag is set. Recovery, review and refund terms must be
+complete and marked APPROVED in reviewed server configuration; a checkout
+request cannot provide that policy. No approval flag was switched here, no
+price/tax rate was approved, no entitlement changed and no refund issued.
+
+### Reproducible engineering checks for this change
+
+- Focused release/commerce/comparability suite: 48 pass.
+- Server suite: 882 pass, 26 DB-only skips, zero failures.
+- Isolated database/HTTP suite: 27 pass, zero skips or failures.
+- Build: PASS; existing large-chunk advisory only.
+- Migration rehearsal: 53 up, second up applies zero; 14 reversible down/up
+  steps; interrupted migration rolls back; head restored to 0053.
+- Local rollback rehearsal: PASS; no production target or schema drop.
+- Chromium commercial journey: 1 pass; actual create-order returns 409.
+- Checkout/preview client unit tests: 30 pass; static audit PASS.
+
+These are local engineering results, not owner sign-offs or a deployed pilot.
+Live-model and human studies remain unrun as recorded in TEST_RESULTS.md.
+
 ## P9 independent go/no-go gates - 2026-10-03
 
 Overall verdict: **NO-GO**. These six gates are independent and remain **OPEN**

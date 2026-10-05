@@ -3,6 +3,7 @@
 // a NOT_READY or UNVERIFIED required check, or a missing flag yields NO_GO.
 // A pending approval is never a passing test.
 import { RELEASE_CONFIG, stageConfig } from './config.js'
+import { ApiError } from '../http/errors.js'
 
 export const HUMAN_GATES = Object.freeze([
   'HA-C001', 'HA-C002', 'HA-C003', 'HA-C004', 'HA-C005', 'HA-C006', 'HA-C007',
@@ -99,5 +100,100 @@ export function goNoGo({ readiness, humanGates = {}, independentSignoffs = {}, r
     independentSignoffs: signoffs,
     releaseProhibitions: prohibitions,
     areas,
+  }
+}
+
+// Scope decisions are read-only operator diagnostics, not flag activation or
+// replacements for the stage readiness/allocation gate. Deferred components
+// do not block a smaller scope; their applicable approvals are not waived.
+export const RELEASE_SCOPES = Object.freeze({
+  PERSONAL_NAVIGATION: Object.freeze(['PERSONAL_HOME_HISTORY']),
+  DEVELOPMENTAL_PILOT: Object.freeze(['PERSONAL_HOME_HISTORY', 'PLAYER_EVIDENCE_REPORT', 'REVIEWED_PRACTICE']),
+  PAID_PILOT: Object.freeze(['PERSONAL_HOME_HISTORY', 'PLAYER_EVIDENCE_REPORT', 'REVIEWED_PRACTICE', 'APPROVED_PAID_PACKAGES']),
+  FULL_RELEASE: RELEASE_CONFIG.activationOrder,
+})
+
+const COMMON_SAFETY = RELEASE_PROHIBITIONS.slice(0, 4)
+const COMPONENT_REQUIREMENTS = {
+  PERSONAL_HOME_HISTORY: {
+    flags: ['PRISM_APP_SHELL_V3'], checks: ['SCOPED_HISTORY'],
+    owners: ['ENGINEERING', 'SECURITY_PRIVACY', 'OPERATIONS'], gates: ['HA-C001', 'HA-C005', 'HA-C007', 'HA-C012', 'HA-C013'],
+  },
+  PLAYER_EVIDENCE_REPORT: {
+    flags: ['PRISM_ASSESSMENT_WORKSPACE_V3', 'PRISM_STUDENT_REPORT_V3', 'PRISM_EVIDENCE_FAIL_CLOSED'],
+    checks: ['COMPATIBLE_PLAYER', 'DURABLE_WRITER', 'EVALUATOR', 'PUBLICATION', 'APPROVED_CONTENT', 'WORKER_REACHABILITY'],
+    owners: ['ENGINEERING', 'CONTENT', 'MEASUREMENT', 'SECURITY_PRIVACY', 'PRODUCT_FINANCE', 'OPERATIONS'],
+    gates: ['HA-C002', 'HA-C003'], prohibitions: ['NO_APPROVED_RECOVERY_POLICY'],
+  },
+  REVIEWED_PRACTICE: {
+    flags: ['PRISM_DEVELOPMENT_V2'], checks: ['APPROVED_PRACTICE_CONTENT'],
+    owners: ['ENGINEERING', 'CONTENT', 'MEASUREMENT', 'PRODUCT_FINANCE', 'OPERATIONS'],
+    gates: ['HA-C009'], prohibitions: ['ADVERTISED_PRACTICE_UNAVAILABLE'],
+  },
+  PRIVATE_PREPARATION: {
+    flags: ['PRISM_PREPARATION_V1'], checks: ['PRIVACY_ERASURE_APPROVAL', 'APPROVED_PREPARATION_CONTENT'],
+    owners: ['ENGINEERING', 'CONTENT', 'SECURITY_PRIVACY', 'OPERATIONS'], gates: ['HA-C005'],
+  },
+  APPROVED_PAID_PACKAGES: {
+    flags: [], checks: ['PAID_OFFER_READY'],
+    owners: ['ENGINEERING', 'CONTENT', 'MEASUREMENT', 'SECURITY_PRIVACY', 'PRODUCT_FINANCE', 'OPERATIONS'],
+    gates: ['HA-C006'], prohibitions: ['NO_APPROVED_RECOVERY_POLICY'],
+  },
+  CAMPUS: {
+    flags: ['PRISM_CAMPUS_ENABLED'], checks: ['CAMPUS_PRIVACY_ERASURE_APPROVAL'],
+    owners: ['ENGINEERING', 'CONTENT', 'MEASUREMENT', 'SECURITY_PRIVACY', 'OPERATIONS'],
+    gates: ['HA-C005', 'HA-C010'],
+  },
+  GROWTH: {
+    flags: ['PRISM_GROWTH_ENABLED'], checks: ['APPROVED_FORM_COMPARABILITY'],
+    owners: ['ENGINEERING', 'MEASUREMENT', 'SECURITY_PRIVACY', 'OPERATIONS'], gates: ['HA-C004', 'HA-C008'],
+  },
+}
+
+export function scopedReleaseDecisions({
+  scope = 'DEVELOPMENTAL_PILOT', env = {}, readiness = null, componentChecks = {},
+  humanGates = {}, independentSignoffs = {}, releaseProhibitions = {},
+} = {}) {
+  if (!Object.hasOwn(RELEASE_SCOPES, scope)) throw new ApiError('VALIDATION_FAILED', 'Unknown release scope.')
+  const selected = new Set(RELEASE_SCOPES[scope])
+  const activeDeferredFlags = Object.entries(COMPONENT_REQUIREMENTS)
+    .filter(([id]) => !selected.has(id))
+    .flatMap(([, requirements]) => requirements.flags)
+    .filter((flag) => env[flag] === 'true')
+  if (env.PRISM_ROLE_EXPLORATION_V2 === 'true') activeDeferredFlags.push('PRISM_ROLE_EXPLORATION_V2')
+  if (!selected.has('CAMPUS') && env.PRISM_CAMPUS_ANALYTICS === 'true') activeDeferredFlags.push('PRISM_CAMPUS_ANALYTICS')
+  const reasons = activeDeferredFlags.map((flag) => `OUT_OF_SCOPE_FLAG_ON:${flag}`)
+  const components = RELEASE_CONFIG.activationOrder.map((id) => {
+    const requirements = COMPONENT_REQUIREMENTS[id]
+    if (!selected.has(id)) return { id, status: 'DEFERRED', reasons: [], ownerRoles: [...requirements.owners] }
+    const blockers = []
+    for (const flag of requirements.flags) if (env[flag] !== 'true') blockers.push(`FLAG_OFF:${flag}`)
+    for (const check of requirements.checks) {
+      let state = readiness?.checks?.[check]?.state
+        || (componentChecks[check] === true ? 'READY' : componentChecks[check] === false ? 'NOT_READY' : 'UNVERIFIED')
+      if (check === 'APPROVED_CONTENT' && state === 'READY') {
+        const contentState = readiness?.checks?.[check]?.detail?.contentState
+        if (!['APPROVED_FOR_PILOT', 'APPROVED_FOR_INTENDED_USE'].includes(contentState)) state = contentState ? 'NOT_READY' : 'UNVERIFIED'
+      }
+      if (state !== 'READY') blockers.push(`${state}:${check}`)
+    }
+    for (const owner of requirements.owners) {
+      if (independentSignoffs[owner] !== 'APPROVED') blockers.push(`INDEPENDENT_SIGNOFF_OPEN:${owner}`)
+    }
+    for (const gate of requirements.gates) {
+      if (humanGates[gate] !== 'APPROVED') blockers.push(`HUMAN_GATE_OPEN:${gate}`)
+    }
+    for (const prohibition of [...COMMON_SAFETY, ...(requirements.prohibitions || [])]) {
+      if (releaseProhibitions[prohibition] !== 'CLEAR') blockers.push(`RELEASE_PROHIBITION_${releaseProhibitions[prohibition] === 'PRESENT' ? 'PRESENT' : 'UNVERIFIED'}:${prohibition}`)
+    }
+    reasons.push(...blockers)
+    return { id, status: blockers.length ? 'NO_GO' : 'GO', reasons: blockers, ownerRoles: [...requirements.owners] }
+  })
+  return {
+    scope, verdict: reasons.length ? 'NO_GO' : 'GO', reasons: [...new Set(reasons)], components,
+    activationAuthorized: false,
+    scopeBoundary: scope === 'DEVELOPMENTAL_PILOT' || scope === 'PERSONAL_NAVIGATION'
+      ? 'No paid offers, formal longitudinal growth, employment prediction, Campus or preparation activation in this scope.'
+      : 'Every selected feature retains its own content, claims, privacy and operational approvals.',
   }
 }

@@ -10,6 +10,21 @@ operations, measurement or Layer C approval.
 
 The machine-readable authority is `docs/experience/P10_HANDOVER.json`.
 
+### Staged decisions follow-up - 2026-10-05
+
+The proposed unpaid `DEVELOPMENTAL_PILOT` scope selects personal Home/history,
+the text/board assessment/evidence/report chain and reviewed practice.
+Preparation, paid offers, Campus and formal growth are DEFERRED, not
+prerequisites for that scope. Navigation has its own narrower scope.
+Applicable owner approvals remain OPEN; the actual diagnostic is NO_GO.
+See [ROLLOUT.md](./ROLLOUT.md#staged-release-decisions---2026-10-05).
+
+The scoped diagnostic cannot activate features or authorize a deployment.
+Checkout now independently blocks unapproved recovery terms and missing tax
+presentation, in addition to reviewed content and price. Growth retains its
+existing comparability guard. No human sign-off, commercial policy, amount,
+tax rate or production flag was changed.
+
 ### Current verification follow-up - 2026-10-04
 
 Fresh isolated PostgreSQL/HTTP verification passed 27 tests, including

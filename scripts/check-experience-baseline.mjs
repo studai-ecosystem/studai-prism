@@ -3,6 +3,7 @@ import { readdir } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { checkStudentFlowFlags } from './check-student-flow-flags.mjs'
 import { readiness, stageConfig, summarize } from '../server/domain/release/config.js'
+import { RELEASE_SCOPES, scopedReleaseDecisions } from '../server/domain/release/goNoGo.js'
 
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const { z } = require('zod')
@@ -150,7 +151,7 @@ export async function inspectDatabase(client) {
 // P10.2: safe effective release readiness. Only facts this read-only
 // diagnostic can observe become READY/NOT_READY; everything else (worker,
 // evaluator, publication, content approval) stays UNVERIFIED here.
-function releaseReadiness(env, database, stage) {
+function releaseReadiness(env, database, stage, scope) {
   const migrations = database?.status === 'AVAILABLE' && database.migrations
     ? database.migrations.pending === 0 && database.migrations.unknown === 0 : null
   const result = readiness({
@@ -163,20 +164,21 @@ function releaseReadiness(env, database, stage) {
   })
   return {
     ...summarize(result),
+    scopeDecision: scopedReleaseDecisions({ scope, env, readiness: result }),
     buildCompatibility: 'OPERATOR_PROVENANCE_REQUIRED',
     schemaCompatibility: database?.status === 'AVAILABLE' ? 'COMPATIBLE'
       : database?.status === 'INCOMPATIBLE' ? 'INCOMPATIBLE' : 'UNVERIFIED',
   }
 }
 
-export function baselineReport(env, database = null, { stage = env.PRISM_RELEASE_STAGE || 'LOCAL_CI' } = {}) {
+export function baselineReport(env, database = null, { stage = env.PRISM_RELEASE_STAGE || 'LOCAL_CI', scope = 'DEVELOPMENTAL_PILOT' } = {}) {
   const config = configuration(env)
   const parsed = database === null ? { status: 'UNVERIFIED' } : Database.parse(database)
   return {
     kind: 'P0_DIAGNOSTIC_NOT_RELEASE_APPROVAL',
     configuration: config,
     database: parsed,
-    release: releaseReadiness(env, parsed, stage),
+    release: releaseReadiness(env, parsed, stage, scope),
     build: 'OPERATOR_PROVENANCE_REQUIRED',
     worker: 'UNVERIFIED_NO_DURABLE_WORKER_PROBE',
     contentApproval: 'HUMAN_REVIEW_REQUIRED',
@@ -193,14 +195,17 @@ export async function runDiagnostic({ args = [], env = process.env, clientFactor
   let output
   let failed = false
   let stage = env.PRISM_RELEASE_STAGE || 'LOCAL_CI'
+  let scope = 'DEVELOPMENTAL_PILOT'
   try {
-    // Accepted: `--database` (once) and `--stage <LOCAL|STAGING|...>` (once).
+    // Accepted: --database, --stage and --scope (each once).
     // Anything else — in particular identifiers or connection strings — is refused.
     let wantDatabase = false
     let sawStage = false
+    let sawScope = false
     for (let i = 0; i < args.length; i += 1) {
       if (args[i] === '--database' && !wantDatabase) { wantDatabase = true; continue }
       if (args[i] === '--stage' && !sawStage && stageConfig(args[i + 1] || '')) { stage = stageConfig(args[i + 1]).stage; sawStage = true; i += 1; continue }
+      if (args[i] === '--scope' && !sawScope && Object.hasOwn(RELEASE_SCOPES, args[i + 1] || '')) { scope = args[i + 1]; sawScope = true; i += 1; continue }
       throw new Error('DIAGNOSTIC_INVALID_ARGUMENTS')
     }
     if (wantDatabase) {
@@ -211,19 +216,19 @@ export async function runDiagnostic({ args = [], env = process.env, clientFactor
       })
       client = factory(env.PRISM_DIAGNOSTIC_DATABASE_URL)
       await client.connect()
-      output = baselineReport(env, await inspectDatabase(client), { stage })
-    } else output = baselineReport(env, null, { stage })
+      output = baselineReport(env, await inspectDatabase(client), { stage, scope })
+    } else output = baselineReport(env, null, { stage, scope })
   } catch (error) {
     failed = true
     const allowed = ['DIAGNOSTIC_INVALID_ARGUMENTS', 'DIAGNOSTIC_DATABASE_NOT_CONFIGURED']
-    output = { ...baselineReport(env, null, { stage }), database: {
+    output = { ...baselineReport(env, null, { stage, scope }), database: {
       status: 'ERROR', code: allowed.includes(error.message) ? error.message : 'DIAGNOSTIC_READ_FAILED',
     } }
   } finally {
     if (client) {
       try { await client.end() } catch {
         failed = true
-        output = { ...baselineReport(env, null, { stage }), database: { status: 'ERROR', code: 'DIAGNOSTIC_CONNECTION_CLOSE_FAILED' } }
+        output = { ...baselineReport(env, null, { stage, scope }), database: { status: 'ERROR', code: 'DIAGNOSTIC_CONNECTION_CLOSE_FAILED' } }
       }
     }
   }

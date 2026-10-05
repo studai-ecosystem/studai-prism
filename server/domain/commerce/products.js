@@ -78,13 +78,17 @@ export const PRICE_APPROVAL_FLAG = 'PRISM_OFFER_PRICE_APPROVED'
 export const TAX_PENDING_LABEL = 'Tax: as configured by finance \u2014 not yet approved'
 
 // P8.6 — a bundle is purchasable only when everything it promises exists in
-// reviewed form AND finance has approved the price. Each failed gate is a
+// reviewed form AND finance has approved the price, configured the tax
+// presentation, and approved the failed-service recovery terms. Each failed gate is a
 // named blocker the checkout shows instead of taking payment for a package
 // whose only next step would be "not yet available".
 //   missions: [{ status }]            the mission library (latest versions)
 //   formStates: ['DRAFT', ...]        states of the universal forms the formal baseline uses
-//   priceApproved: boolean            PRISM_OFFER_PRICE_APPROVED === 'true'
-export function offerAvailability(code, { missions = [], formStates = [], priceApproved = process.env[PRICE_APPROVAL_FLAG] === 'true' } = {}) {
+// `policy` is reviewed server configuration, never a checkout request input.
+export function offerAvailability(code, {
+  missions = [], formStates = [], priceApproved = process.env[PRICE_APPROVAL_FLAG] === 'true',
+  taxTreatment = process.env.PRISM_TAX_TREATMENT || null, policy = productFor(code)?.policy,
+} = {}) {
   const p = productFor(code)
   if (!p) return null
   if (!p.purchasable) {
@@ -97,6 +101,10 @@ export function offerAvailability(code, { missions = [], formStates = [], priceA
   if (!priceApproved) blockers.push({ code: 'PRICE_NOT_APPROVED', message: 'The price is a test hypothesis pending finance approval.' })
   if (reviewed < required) blockers.push({ code: 'CONTENT_NOT_REVIEWED', message: `Only ${reviewed} of the ${required} included missions have reviewed content; the rest are draft.` })
   if (!formReviewed) blockers.push({ code: 'FORM_NOT_REVIEWED', message: 'The formal assessment form is not yet approved for use.' })
+  if (typeof taxTreatment !== 'string' || !taxTreatment.trim()) blockers.push({ code: 'TAX_PRESENTATION_NOT_CONFIGURED', message: 'Finance must confirm the tax presentation before purchase.' })
+  const approvedPolicy = policy?.status === 'APPROVED'
+    && ['recovery', 'review', 'refund'].every((key) => typeof policy[key] === 'string' && policy[key].trim() && !/\b(pending|proposed)\b/i.test(policy[key]))
+  if (!approvedPolicy) blockers.push({ code: 'RECOVERY_POLICY_NOT_APPROVED', message: 'Failed-service recovery, review and refund terms must be approved before purchase.' })
   return { purchasable: blockers.length === 0, priceStatus: priceApproved ? 'APPROVED' : 'PROPOSED', blockers, reviewedMissions: reviewed, requiredMissions: required, formReviewed }
 }
 
@@ -107,7 +115,7 @@ export function offerAvailability(code, { missions = [], formStates = [], priceA
 export function offerView(code, { taxTreatment = process.env.PRISM_TAX_TREATMENT || null, availability = null } = {}) {
   const p = productFor(code)
   if (!p) return null
-  const avail = availability || offerAvailability(code)
+  const avail = availability || offerAvailability(code, { taxTreatment })
   const tax = p.purchasable && typeof taxTreatment === 'string' && taxTreatment.trim() ? taxTreatment.trim().slice(0, 200) : null
   return {
     code: p.code,

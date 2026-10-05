@@ -5,7 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { RELEASE_CONFIG, RELEASE_STAGES, READINESS_CHECKS, readiness, assertAllocatable, createReleaseGate, summarize, stageConfig } from '../domain/release/config.js'
-import { goNoGo, HUMAN_GATES, INDEPENDENT_SIGNOFF_GATES, RELEASE_PROHIBITIONS, defaultHumanGates, defaultIndependentSignoffs } from '../domain/release/goNoGo.js'
+import { goNoGo, scopedReleaseDecisions, RELEASE_SCOPES, HUMAN_GATES, INDEPENDENT_SIGNOFF_GATES, RELEASE_PROHIBITIONS, defaultHumanGates, defaultIndependentSignoffs } from '../domain/release/goNoGo.js'
 import { ALERTS, ALERT_IDS, alertsByTriage } from '../domain/release/alerts.js'
 import { ERROR_STATUS } from '../domain/http/errors.js'
 import { FLAG_CATALOGUE } from '../lib/flagRegistry.js'
@@ -183,6 +183,91 @@ test('P10.2: check-experience-baseline reports release readiness per stage witho
     assert.equal(await runDiagnostic({ args, env: {}, write: (l) => bad.push(l) }), 1)
     assert.equal(JSON.parse(bad[0]).database.code, 'DIAGNOSTIC_INVALID_ARGUMENTS')
     assert.doesNotMatch(bad[0], /private/)
+  }
+})
+
+test('developmental pilot decisions defer paid, preparation, Campus and growth without waiving applicable owner approvals', () => {
+  const approved = Object.fromEntries(HUMAN_GATES.map((id) => [id, 'APPROVED']))
+  const signed = Object.fromEntries(INDEPENDENT_SIGNOFF_GATES.map((id) => [id, 'APPROVED']))
+  const clear = Object.fromEntries(RELEASE_PROHIBITIONS.map((id) => [id, 'CLEAR']))
+  const coreFlags = { ...ALL_FLAGS, PRISM_CAMPUS_ENABLED: 'false', PRISM_PREPARATION_V1: 'false', PRISM_GROWTH_ENABLED: 'false' }
+  const pilot = {
+    env: coreFlags,
+    readiness: readiness({ env: coreFlags, stage: 'EXTERNAL_PILOT', checks: { ...ALL_READY, contentState: 'APPROVED_FOR_PILOT' } }),
+    componentChecks: { SCOPED_HISTORY: true, APPROVED_PRACTICE_CONTENT: true },
+    humanGates: { ...approved, 'HA-C004': 'OPEN', 'HA-C006': 'OPEN', 'HA-C008': 'OPEN', 'HA-C010': 'OPEN', 'HA-C011': 'OPEN' },
+    independentSignoffs: signed, releaseProhibitions: clear,
+  }
+  const decision = scopedReleaseDecisions(pilot)
+  assert.equal(decision.verdict, 'GO', 'no price, comparability or Campus approval is required for an unpaid personal developmental scope')
+  assert.equal(decision.activationAuthorized, false, 'a diagnostic result does not authorize deployment or flag activation')
+  assert.deepEqual(decision.components.filter((c) => c.status === 'DEFERRED').map((c) => c.id), ['PRIVATE_PREPARATION', 'APPROVED_PAID_PACKAGES', 'CAMPUS', 'GROWTH'])
+  assert.match(decision.scopeBoundary, /No paid offers, formal longitudinal growth, employment prediction/)
+  for (const owner of INDEPENDENT_SIGNOFF_GATES) {
+    const open = scopedReleaseDecisions({ ...pilot, independentSignoffs: { ...signed, [owner]: 'OPEN' } })
+    assert.equal(open.verdict, 'NO_GO', `${owner} must actually approve this limited scope`)
+  }
+  const notApplicable = scopedReleaseDecisions({ ...pilot, humanGates: { ...pilot.humanGates, 'HA-C003': 'NOT_APPLICABLE' } })
+  assert.equal(notApplicable.verdict, 'NO_GO', 'scope deferral does not excuse required scenario approval')
+  const noPractice = scopedReleaseDecisions({ ...pilot, componentChecks: { SCOPED_HISTORY: true, APPROVED_PRACTICE_CONTENT: false } })
+  assert.ok(noPractice.reasons.includes('NOT_READY:APPROVED_PRACTICE_CONTENT'))
+  const leakedGrowth = scopedReleaseDecisions({ ...pilot, env: { ...coreFlags, PRISM_GROWTH_ENABLED: 'true' } })
+  assert.ok(leakedGrowth.reasons.includes('OUT_OF_SCOPE_FLAG_ON:PRISM_GROWTH_ENABLED'))
+  const leakedExtras = scopedReleaseDecisions({ ...pilot, env: { ...coreFlags, PRISM_ROLE_EXPLORATION_V2: 'true', PRISM_CAMPUS_ANALYTICS: 'true' } })
+  assert.ok(leakedExtras.reasons.includes('OUT_OF_SCOPE_FLAG_ON:PRISM_ROLE_EXPLORATION_V2'))
+  assert.ok(leakedExtras.reasons.includes('OUT_OF_SCOPE_FLAG_ON:PRISM_CAMPUS_ANALYTICS'))
+  const draft = scopedReleaseDecisions({ ...pilot, readiness: readiness({ env: coreFlags, stage: 'LOCAL_CI', checks: { ...ALL_READY, contentState: 'DRAFT' } }) })
+  assert.ok(draft.reasons.includes('NOT_READY:APPROVED_CONTENT'), 'LOCAL_CI draft acceptance cannot be promoted to a developmental pilot')
+  const unrecordedContent = scopedReleaseDecisions({ ...pilot, readiness: null, componentChecks: { ...pilot.componentChecks, APPROVED_CONTENT: true } })
+  assert.ok(unrecordedContent.reasons.includes('UNVERIFIED:APPROVED_CONTENT'), 'a boolean alone cannot prove pilot-approved content state')
+  decision.components[0].ownerRoles.length = 0
+  assert.ok(scopedReleaseDecisions({ ...pilot, independentSignoffs: { ...signed, ENGINEERING: 'OPEN' } }).reasons.includes('INDEPENDENT_SIGNOFF_OPEN:ENGINEERING'), 'editing a diagnostic does not edit gate requirements')
+  const paid = scopedReleaseDecisions({ ...pilot, scope: 'PAID_PILOT' })
+  assert.equal(paid.verdict, 'NO_GO')
+  assert.ok(paid.reasons.includes('HUMAN_GATE_OPEN:HA-C006'))
+  assert.ok(paid.reasons.includes('UNVERIFIED:PAID_OFFER_READY'))
+  const growth = scopedReleaseDecisions({
+    ...pilot, scope: 'FULL_RELEASE',
+    env: { ...coreFlags, PRISM_GROWTH_ENABLED: 'true' },
+    componentChecks: { ...pilot.componentChecks, APPROVED_FORM_COMPARABILITY: false },
+  }).components.find((c) => c.id === 'GROWTH')
+  assert.equal(growth.status, 'NO_GO')
+  assert.ok(growth.reasons.includes('NOT_READY:APPROVED_FORM_COMPARABILITY'))
+  assert.ok(growth.reasons.includes('HUMAN_GATE_OPEN:HA-C004'))
+  assert.equal(scopedReleaseDecisions().verdict, 'NO_GO')
+})
+
+test('basic personal navigation does not depend on evaluator, practice, paid, Campus or growth activation', () => {
+  const result = scopedReleaseDecisions({
+    scope: 'PERSONAL_NAVIGATION', env: { PRISM_APP_SHELL_V3: 'true' },
+    componentChecks: { SCOPED_HISTORY: true },
+    humanGates: Object.fromEntries(['HA-C001', 'HA-C005', 'HA-C007', 'HA-C012', 'HA-C013'].map((id) => [id, 'APPROVED'])),
+    independentSignoffs: { ENGINEERING: 'APPROVED', SECURITY_PRIVACY: 'APPROVED', OPERATIONS: 'APPROVED' },
+    releaseProhibitions: Object.fromEntries(RELEASE_PROHIBITIONS.slice(0, 4).map((id) => [id, 'CLEAR'])),
+  })
+  assert.equal(result.verdict, 'GO')
+  assert.equal(result.components.filter((c) => c.status === 'GO').length, 1)
+  assert.ok(result.components.slice(1).every((c) => c.status === 'DEFERRED'))
+  assert.equal(result.activationAuthorized, false)
+  assert.deepEqual(Object.keys(RELEASE_SCOPES), ['PERSONAL_NAVIGATION', 'DEVELOPMENTAL_PILOT', 'PAID_PILOT', 'FULL_RELEASE'])
+})
+
+test('read-only scope diagnostic emits per-component decisions and refuses unknown or repeated scopes', async () => {
+  const { runDiagnostic } = await import('../../scripts/check-experience-baseline.mjs')
+  const lines = []
+  const env = { PRISM_APP_SHELL_V3: 'true', JWT_SECRET: 'must-not-leak' }
+  const before = { ...env }
+  await runDiagnostic({ args: ['--scope', 'PERSONAL_NAVIGATION'], env, write: (line) => lines.push(line) })
+  const out = JSON.parse(lines[0])
+  assert.equal(out.release.scopeDecision.scope, 'PERSONAL_NAVIGATION')
+  assert.equal(out.release.scopeDecision.verdict, 'NO_GO', 'schema presence is not an independent owner sign-off')
+  assert.ok(out.release.scopeDecision.components.slice(1).every((c) => c.status === 'DEFERRED'))
+  assert.deepEqual(env, before, 'diagnostics never enable flags')
+  assert.doesNotMatch(lines[0], /must-not-leak/)
+  for (const args of [['--scope', 'bogus'], ['--scope'], ['--scope', 'FULL_RELEASE', '--scope', 'PERSONAL_NAVIGATION']]) {
+    const errors = []
+    assert.equal(await runDiagnostic({ args, env: {}, write: (line) => errors.push(line) }), 1)
+    assert.equal(JSON.parse(errors[0]).database.code, 'DIAGNOSTIC_INVALID_ARGUMENTS')
   }
 })
 
