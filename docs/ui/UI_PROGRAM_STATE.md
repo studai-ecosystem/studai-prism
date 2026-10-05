@@ -8,8 +8,30 @@ run_mode: off
 active_phase: none
 target_phase: M
 branch: ui/prism-brand-transformation
-last_updated: 2026-10-02
+last_updated: 2026-10-05
 UI-STATE:END -->
+
+## Current correction requirements - CR-01 through CR-07
+
+The current authoritative ordered checklist is
+[Experience programme: current correction cycle](../experience/IMPLEMENTATION_STATE.md#current-correction-cycle---2026-10-05).
+**All seven acceptance requirements are reopened; zero are fully signed off.**
+CR-01 is active; CR-02 through CR-05 retain partial local evidence; CR-06 and
+CR-07 are blocked on hosted/live/human and owner inputs. The existing A-M
+phase history below remains intact and is not the current correction verdict.
+
+Reopening is evidence-based: missing pinned behaviour anchors still fall back
+to the catalogue, report explanations use catalogue anchors, legacy report
+selection can publish, and practice meaning prompts omit the scenario
+setting. On candidate `8962b09`, 70 local tests pass but two separate
+zero-provider requirement checks fail. Do not call these requirements
+complete because the files or earlier implementation checkpoints exist.
+
+No new dashboards, scores, avatars, players, employer screening or report
+architecture are in this cycle. Keep the text/board loop; paid offers,
+formal growth and unrelated activation retain their own gates. Human
+comprehension, manual accessibility, physical devices, hosted/live-model
+testing and applicable owner approvals remain unverified/open.
 
 ## Baseline
 

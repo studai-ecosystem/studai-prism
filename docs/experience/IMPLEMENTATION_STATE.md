@@ -1,5 +1,85 @@
 # Experience programme - source traceability and execution checkpoints
 
+## Current correction cycle - 2026-10-05
+
+State: **REOPENED - 0 of 7 exit conditions signed off.** Current source
+candidate: `8962b09667ec15bb4f3cef226e0084ec72f99803`. Release remains **NO_GO**.
+This is the current requirements tracker; historical P0-P10 and UI A-M
+implementation checkpoints below remain preserved, not restarted or promoted
+into acceptance. Existing files and positive fixture tests do not close an
+item.
+
+Immediate target: **meaningful situation -> real learner action -> correct
+evidence -> understandable finding -> useful practice -> preserved history**.
+Work in CR-01 through CR-07 order. CR-01 is the active technical requirement;
+later work may prepare independent evidence but cannot be signed off while
+its prerequisites remain open.
+
+| Order / requirement | Current status | Prerequisite | Available evidence / reason reopened | Exit condition |
+| --- | --- | --- | --- | --- |
+| CR-01 - Frozen rubric and contextual evaluation | **IN_PROGRESS; reproduced failure** | None | On this candidate, deleting the pinned behaviour anchors still permits evaluator prompt construction via catalogue fallback. Evidence labels and Report V3 anchor explanations still read catalogue anchors. Action-time context storage tests exist; they do not establish a single frozen method end to end. | Rubric A assessment still evaluates and explains with A after catalogue B; evidence identifies anchors actually used; missing pinned versions produce recoverable incomplete review; no later/hidden fact changes an earlier interpretation. |
+| CR-02 - Responsive interaction and clarification | **REOPENED; local partial evidence** | CR-01 | Controlled-adapter tests cover inquiry vs decision, draft saves and grounded reactions. The recent browser pass was AI-operated, not unassisted human evidence. | Different defensible decisions produce coherent responses; clarification does not replace a required decision/work action; short clear requests, disagreement, refusal, help and reduced scope remain valid. Verify with the real provider and unassisted users. |
+| CR-03 - Safe evidence application and explicit publication | **REOPENED; local partial evidence** | CR-01, CR-02 | PostgreSQL/HTTP faults pass for lease loss/expiry, second-insert rollback, erasure during computation, finish races and publication recovery. A remaining legacy read path calls `materialiseLegacy()` -> `publish()`, contrary to the unconditional stable-read requirement. Audit erasure/write/publication boundaries as well as the already-tested compute window. | Interrupted/retried/duplicate work applies one accepted batch; deletion prevents late writes; accepted eligible actions reconcile before publication; every ordinary report GET reads an issued snapshot without new findings, including legacy, owner, sponsor and summary views. |
+| CR-04 - Mission semantic quality | **REOPENED; local partial evidence** | CR-01 through CR-03 | Ten-mission structural/semantic classification and copy/feedback tests exist. Reproduced: M02 meaning prompts contain the objective but omit the actual scenario setting. Text is pooled across criteria; structured board/field context needs rechecking. Live-model and qualified mission review have not run. | Every promised mission interprets behaviour against its actual situation and relevant work; concise paraphrases pass and nonsense/contradictions fail; examples are assisted; counterpart feedback is relevant; one evidenced observation and useful next change; practice/replay remain separate from formal results. |
+| CR-05 - Running-product UX and accessibility | **REOPENED; automated/local evidence only** | CR-01 through CR-04 | Local browser journeys, layout/keyboard/axe and viewport checks exist. Manual assistive technology, physical devices and target-user comprehension are NOT RUN. | On supported physical devices, unassisted users find history, complete the text/board assessment, understand their finding and source moment, start useful practice and recover their history. Complete manual accessibility checks; no hidden-URL dependence, misleading data or speech-completion claim. |
+| CR-06 - Hosted tests and authorized live-model staging | **BLOCKED; not executed** | CR-01 through CR-05 | No authorized hosted target, approved spend or exact package approval references supplied. Live gate exit 3; current smoke script is a manifest, not an executor. Local results are not hosted/live results. | Authorized hosted and real intended-provider runs are tied to the corrected commit and model/prompt/package fingerprints; actual latency/cost/rejections/recovery and inspected evidence/reports cover the required response cases. No preloaded final evidence/report shortcut. |
+| CR-07 - Scoped approvals and controlled pilot | **BLOCKED; owner decisions open** | CR-01 through CR-06 | Read-only scoped decisions and paid-policy/tax gates are implemented; applicable independent owners remain OPEN. See [staged decisions](./ROLLOUT.md#staged-release-decisions---2026-10-05). | Engineering, content/measurement, Paul/product/finance, privacy/security and operations approve the actual bounded offer, behaviour, claims, support, data permissions and deployment/rollback. Run only that controlled scope; no approval inferred from a document or file. |
+
+### Reopened checklist and next actions
+
+- [ ] **CR-01:** resolve and retain the actual frozen rubric/anchors throughout
+  evaluator, evidence and explanations; add the catalogue-A/B and missing
+  rubric regressions before claiming this repaired.
+- [ ] **CR-02:** recheck bounded decisions and inquiry handling after CR-01;
+  retain existing local regression evidence but obtain real-provider/human
+  interaction evidence.
+- [ ] **CR-03:** remove read-time publication from the remaining historical
+  path without inventing historical findings; cover the full erasure/apply/
+  publication race boundary.
+- [ ] **CR-04:** provide actual scenario and criterion-specific structured
+  work to practice interpretation; review all ten missions with qualified
+  reviewers and actual-model cases, not the keyword-based test provider.
+- [ ] **CR-05:** complete manual accessibility, physical-device and
+  unassisted target-student/professional sessions. The AI cannot self-certify
+  that a person understands the finding, moment and next action.
+- [ ] **CR-06:** obtain operator-owned staging/model authorization, budget,
+  consent/data class and package approvals; execute hosted/live checks against
+  the corrected commit. Do not silently use a paid provider or deploy.
+- [ ] **CR-07:** obtain the scoped owner decisions and authorize the limited
+  pilot only after preceding exits. Keep paid offers closed while content,
+  tax and recovery terms are unready; keep formal growth disabled until
+  comparability approval.
+
+### Evidence checked in this update
+
+- Current-candidate local tests: **70 passed, zero failures/skips**, covering
+  slice evaluator, universal run, fault injection, mission meaning,
+  evaluator meaning, mission end-to-end and release tests. These use synthetic
+  inputs/controlled model adapters, not live-provider interpretation.
+- Separate zero-provider prompt checks **failed the required invariants**:
+  `PINNED_ANCHOR_MISSING_MUST_FAIL_CLOSED` accepted missing pinned anchors;
+  `PRACTICE_CONTEXT_IN_MODEL_INSTRUCTIONS` omitted M02's scenario setting.
+  A green test count is therefore not satisfaction of CR-01 or CR-04.
+- Source inspection: [sliceEvaluator.js](../../server/domain/evidence/sliceEvaluator.js)
+  uses catalogue fallback and catalogue labels;
+  [Report V3 build](../../server/domain/reports/v3/build.js) uses catalogue
+  anchor explanations; [report service](../../server/domain/reports/v3/service.js)
+  materialises a legacy publication during selection;
+  [practice evaluator](../../server/domain/development/evaluator.js) supplies
+  objective/criteria/text but not the scenario setting.
+- Live gate remains BLOCKED. No live model, human review, target-user study,
+  production deployment or owner sign-off was performed in this update.
+
+### Scope lock
+
+Do not add employer screening, new capability scores, additional dashboards,
+elaborate avatars, assessment players or another report architecture.
+Retain the existing canonical loop and historical readers. This cycle is a
+correction/verification pass, not a programme restart or feature expansion.
+Voice remains outside the text-and-board pilot. Employment prediction and
+formal longitudinal growth are not required claims for a developmental pilot;
+narrower claims do not waive the pilot's own review obligations.
+
 ## P10 final code-safe closure checkpoint - 2026-10-03
 
 State: **`CODE_IMPLEMENTED_WITH_VERIFICATION_BLOCKERS`** from

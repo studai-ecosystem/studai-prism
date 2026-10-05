@@ -10,6 +10,17 @@ operations, measurement or Layer C approval.
 
 The machine-readable authority is `docs/experience/P10_HANDOVER.json`.
 
+### Reopened correction requirements - 2026-10-05
+
+The seven current exits are explicitly reopened in
+[IMPLEMENTATION_STATE.md](./IMPLEMENTATION_STATE.md#current-correction-cycle---2026-10-05);
+historical code-safe closure is not current acceptance. Invariant checks on
+`8962b09` exposed missing pinned-anchor fallback and missing practice scenario
+context despite 70 passing local tests. Legacy read-time publication and
+catalogue report explanations also remain in scope. Do not infer completion
+of the dependable loop from earlier commit summaries. No phase programme was
+restarted, expanded or newly approved.
+
 ### Staged decisions follow-up - 2026-10-05
 
 The proposed unpaid `DEVELOPMENTAL_PILOT` scope selects personal Home/history,
