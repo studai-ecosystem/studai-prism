@@ -8,7 +8,7 @@ run_mode: off
 active_phase: none
 target_phase: M
 branch: ui/prism-brand-transformation
-last_updated: 2026-10-05
+last_updated: 2026-10-06
 UI-STATE:END -->
 
 ## Current correction requirements - CR-01 through CR-07
@@ -16,15 +16,16 @@ UI-STATE:END -->
 The current authoritative ordered checklist is
 [Experience programme: current correction cycle](../experience/IMPLEMENTATION_STATE.md#current-correction-cycle---2026-10-05).
 **All seven acceptance requirements are reopened; zero are fully signed off.**
-CR-01 through CR-05 are being implemented and verified; CR-06 and CR-07
-remain blocked on hosted/live/human and owner inputs. The existing A-M
+CR-01 through CR-05 software implementation and automated verification are
+published; hosted CI passes on code SHA `7be1774`. Deployment/live/human
+checks and CR-07 owner decisions remain blocked/open. The existing A-M
 phase history below remains intact and is not the current correction verdict.
 
 Historical reopening evidence exposed catalogue fallback, mutable report
 interpretation and read-time publication, and omitted practice scenario
-context despite 70 passing earlier tests. The current correction worktree
+context despite 70 passing earlier tests. The published correction candidate
 fixes these runtime boundaries and adds executable red/green coverage.
-Latest software milestones: server 940 pass with 27 database skips; frontend
+Latest software milestones: server 941 pass with 27 database skips; frontend
 521 pass after a serialized rerun; separate real DB/HTTP 27/27 and PostgreSQL
 faults 18/18. Browser acceptance: critical 224 passing outcomes with five
 recovered retries; full 875 passing outcomes, 25 existing configuration/
@@ -34,10 +35,16 @@ feedback and history images inspected at 1440/1024/768/390. These are controlled
 AI-operated checks, not human or live-model verification. Nothing is fully
 signed off; do not close a requirement because its file exists.
 
+GitHub CI [run 37361436184](https://github.com/studai-ecosystem/studai-prism/actions/runs/37361436184)
+passed at `7be1774d3a3ba0b4935f80a80ae79dbfc5a606a1`.
+AWS image [run 37365615065](https://github.com/studai-ecosystem/studai-prism/actions/runs/37365615065)
+failed on denied OIDC role access; local production SSO remains expired.
+No production rollout, migration, main promotion or pilot activation occurred.
+
 No new dashboards, scores, avatars, players, employer screening or report
 architecture are in this cycle. Keep the text/board loop; paid offers,
 formal growth and unrelated activation retain their own gates. Human
-comprehension, manual accessibility, physical devices, hosted/live-model
+comprehension, manual accessibility, physical devices, deployed-product/live-model
 testing and applicable owner approvals remain unverified/open.
 
 ## Baseline

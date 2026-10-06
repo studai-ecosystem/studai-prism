@@ -2,15 +2,17 @@
 
 ## Current correction cycle - 2026-10-05
 
-State: **IMPLEMENTING AND VERIFYING - 0 of 7 exit conditions signed off.**
-Starting HEAD: `12bc65e`; current candidate is its uncommitted correction
-worktree on `ui/prism-brand-transformation`. Release remains **NO_GO**.
+State: **SOFTWARE VERIFIED AND PUBLISHED - 0 of 7 exit conditions signed off.**
+Starting HEAD: `12bc65e`; verified code candidate:
+`7be1774d3a3ba0b4935f80a80ae79dbfc5a606a1` on
+`ui/prism-brand-transformation`, published to GitHub. Status reconciled
+2026-10-06. Release remains **NO_GO**.
 This is the current requirements tracker; historical P0-P10 and UI A-M
 implementation checkpoints below remain preserved, not restarted or promoted
 into acceptance. Existing files and positive fixture tests do not close an
 item.
 
-### Runtime checkpoint (in progress, not release acceptance)
+### Runtime checkpoint (software verified, not release acceptance)
 
 - CR-01: START now archives the complete actual form, behaviour rubric,
   prompt text, evaluator/model policy, timing and interpretation rules.
@@ -49,7 +51,7 @@ item.
 - Latest real database/HTTP loop: **27/27 pass, zero skips**, through actual
   routes, model fixtures, accepted actions, evaluation/application,
   publication, practice, faults and erasure; no final report/evidence preload.
-  Dedicated PostgreSQL fencing checkpoint: **17/17 pass**. These are
+  Dedicated PostgreSQL fencing checkpoint: **18/18 pass**. These are
   controlled-provider software checks, not live-model interpretation.
 - Build, frontend, static and calibration milestones passed. Final full
   suites, migration re-rehearsal after the last schema change, rollback,
@@ -61,10 +63,21 @@ item.
   Report/practice/history screenshots were inspected at 1440/1024/768/390.
   Latest server checkpoint: 941 pass, zero failures, 27 default DB skips;
   frontend 521 pass; actual mixed-store PG fault corpus 18/18.
-- Hosted CI, authorized live-model calls, qualified content/measurement
-  sign-off, real users, manual assistive technology, physical-device checks,
-  live payments and production activation: **NOT RUN**. Paid offers and
-  formal growth remain gated; no owner approval is inferred from these tests.
+- Hosted CI: **PASS** on the exact verified code candidate,
+  [run 37361436184](https://github.com/studai-ecosystem/studai-prism/actions/runs/37361436184).
+  Earlier hosted attempts failed on clean-install peer dependencies and
+  obsolete legacy/migration fixtures; both were corrected in subsequent
+  commits, not suppressed. The expanded disposable database runner passes
+  **20/20** (migration chain, legacy audit and fencing).
+- AWS image build: **FAILED before image publication**,
+  [run 37365615065](https://github.com/studai-ecosystem/studai-prism/actions/runs/37365615065),
+  because `sts:AssumeRoleWithWebIdentity` was denied. The local `prod-admin`
+  SSO session remains expired/invalid, rechecked 2026-10-06. No production
+  migration, rollout, main promotion or feature activation occurred.
+- Authorized live-model calls, qualified content/measurement sign-off, real
+  users, manual assistive technology, physical-device checks and live
+  payments: **NOT RUN**. Paid offers and formal growth remain gated; no
+  owner approval is inferred from software tests.
 
 The reopened table and historical evidence below explain why corrections
 were required. Its original failure descriptions are superseded by this
@@ -72,64 +85,79 @@ runtime checkpoint, **not** by a claim that external exit conditions passed.
 
 Immediate target: **meaningful situation -> real learner action -> correct
 evidence -> understandable finding -> useful practice -> preserved history**.
-Work in CR-01 through CR-07 order. CR-01 is the active technical requirement;
-later work may prepare independent evidence but cannot be signed off while
-its prerequisites remain open.
+Runtime implementation and software checks have followed CR-01 through
+CR-07 order. The remaining work is authorized staging, independent review
+and scoped release decisions; later exits cannot waive earlier prerequisites.
 
 | Order / requirement | Current status | Prerequisite | Available evidence / reason reopened | Exit condition |
 | --- | --- | --- | --- | --- |
-| CR-01 - Frozen rubric and contextual evaluation | **IN_PROGRESS; reproduced failure** | None | On this candidate, deleting the pinned behaviour anchors still permits evaluator prompt construction via catalogue fallback. Evidence labels and Report V3 anchor explanations still read catalogue anchors. Action-time context storage tests exist; they do not establish a single frozen method end to end. | Rubric A assessment still evaluates and explains with A after catalogue B; evidence identifies anchors actually used; missing pinned versions produce recoverable incomplete review; no later/hidden fact changes an earlier interpretation. |
-| CR-02 - Responsive interaction and clarification | **REOPENED; local partial evidence** | CR-01 | Controlled-adapter tests cover inquiry vs decision, draft saves and grounded reactions. The recent browser pass was AI-operated, not unassisted human evidence. | Different defensible decisions produce coherent responses; clarification does not replace a required decision/work action; short clear requests, disagreement, refusal, help and reduced scope remain valid. Verify with the real provider and unassisted users. |
-| CR-03 - Safe evidence application and explicit publication | **REOPENED; local partial evidence** | CR-01, CR-02 | PostgreSQL/HTTP faults pass for lease loss/expiry, second-insert rollback, erasure during computation, finish races and publication recovery. A remaining legacy read path calls `materialiseLegacy()` -> `publish()`, contrary to the unconditional stable-read requirement. Audit erasure/write/publication boundaries as well as the already-tested compute window. | Interrupted/retried/duplicate work applies one accepted batch; deletion prevents late writes; accepted eligible actions reconcile before publication; every ordinary report GET reads an issued snapshot without new findings, including legacy, owner, sponsor and summary views. |
-| CR-04 - Mission semantic quality | **REOPENED; local partial evidence** | CR-01 through CR-03 | Ten-mission structural/semantic classification and copy/feedback tests exist. Reproduced: M02 meaning prompts contain the objective but omit the actual scenario setting. Text is pooled across criteria; structured board/field context needs rechecking. Live-model and qualified mission review have not run. | Every promised mission interprets behaviour against its actual situation and relevant work; concise paraphrases pass and nonsense/contradictions fail; examples are assisted; counterpart feedback is relevant; one evidenced observation and useful next change; practice/replay remain separate from formal results. |
-| CR-05 - Running-product UX and accessibility | **REOPENED; automated/local evidence only** | CR-01 through CR-04 | Local browser journeys, layout/keyboard/axe and viewport checks exist. Manual assistive technology, physical devices and target-user comprehension are NOT RUN. | On supported physical devices, unassisted users find history, complete the text/board assessment, understand their finding and source moment, start useful practice and recover their history. Complete manual accessibility checks; no hidden-URL dependence, misleading data or speech-completion claim. |
-| CR-06 - Hosted tests and authorized live-model staging | **BLOCKED; not executed** | CR-01 through CR-05 | No authorized hosted target, approved spend or exact package approval references supplied. Live gate exit 3; current smoke script is a manifest, not an executor. Local results are not hosted/live results. | Authorized hosted and real intended-provider runs are tied to the corrected commit and model/prompt/package fingerprints; actual latency/cost/rejections/recovery and inspected evidence/reports cover the required response cases. No preloaded final evidence/report shortcut. |
+| CR-01 - Frozen rubric and contextual evaluation | **SOFTWARE VERIFIED; independent interpretation review OPEN** | None | Immutable START method archive, exact frozen anchors/prompt/model policy and action-time context are wired through evaluator, evidence and Report V3. Missing-anchor regressions failed before the repair and pass afterward. Hosted CI passes on the published candidate. | Rubric A assessment still evaluates and explains with A after catalogue B; evidence identifies anchors actually used; missing pinned versions produce recoverable incomplete review; no later/hidden fact changes an earlier interpretation. |
+| CR-02 - Responsive interaction and clarification | **SOFTWARE VERIFIED; live/human interaction OPEN** | CR-01 | Controlled-adapter and real-route/browser checks cover inquiry vs decision, cumulative board readiness, grounded branches, neutral clarification and durable response recovery. They are not unassisted human or actual-model evidence. | Different defensible decisions produce coherent responses; clarification does not replace a required decision/work action; short clear requests, disagreement, refusal, help and reduced scope remain valid. Verify with the real provider and unassisted users. |
+| CR-03 - Safe evidence application and explicit publication | **SOFTWARE VERIFIED; engineering sign-off OPEN** | CR-01, CR-02 | Real PostgreSQL/HTTP and 18 dedicated fault checks cover lease loss/expiry, batch rollback, erasure, finish races and publication recovery. Accepted membership fences all rendered evidence. V3, legacy V2 and employee GETs now read issued snapshots; unsupported historical formatted views preserve access to the original report without rebuilding. | Interrupted/retried/duplicate work applies one accepted batch; deletion prevents late writes; accepted eligible actions reconcile before publication; every ordinary report GET reads an issued snapshot without new findings, including legacy, owner, sponsor and summary views. |
+| CR-04 - Mission semantic quality | **SOFTWARE VERIFIED; content/live review OPEN** | CR-01 through CR-03 | All ten corrected DRAFT revisions carry effective scenario and criterion-specific structured work; original bodies/attempts remain preserved. Missing-context red/green checks, assistance attribution, counterpart feedback and neutral NOT_JUDGEABLE checks pass. Actual-model and qualified mission review have not run. | Every promised mission interprets behaviour against its actual situation and relevant work; concise paraphrases pass and nonsense/contradictions fail; examples are assisted; counterpart feedback is relevant; one evidenced observation and useful next change; practice/replay remain separate from formal results. |
+| CR-05 - Running-product UX and accessibility | **AUTOMATED SOFTWARE VERIFIED; manual/human OPEN** | CR-01 through CR-04 | Critical browsers: 224 passing outcomes; full corpus: 875 passing outcomes, 25 existing skips, five recovered retries. The actual returning-user loop passes all four browser projects. Screenshots inspected at four widths. Manual assistive technology, physical devices and target-user comprehension are NOT RUN. | On supported physical devices, unassisted users find history, complete the text/board assessment, understand their finding and source moment, start useful practice and recover their history. Complete manual accessibility checks; no hidden-URL dependence, misleading data or speech-completion claim. |
+| CR-06 - Hosted tests and authorized live-model staging | **HOSTED CI PASS; deployment/live staging BLOCKED** | CR-01 through CR-05 | Hosted CI passes at `7be1774`; AWS image workflow is denied OIDC role access and local production SSO is expired. No intended-provider budget/package approval references supplied. Current smoke script is a manifest, not proof of execution; zero live calls. | Authorized hosted and real intended-provider runs are tied to the corrected commit and model/prompt/package fingerprints; actual latency/cost/rejections/recovery and inspected evidence/reports cover the required response cases. No preloaded final evidence/report shortcut. |
 | CR-07 - Scoped approvals and controlled pilot | **BLOCKED; owner decisions open** | CR-01 through CR-06 | Read-only scoped decisions and paid-policy/tax gates are implemented; applicable independent owners remain OPEN. See [staged decisions](./ROLLOUT.md#staged-release-decisions---2026-10-05). | Engineering, content/measurement, Paul/product/finance, privacy/security and operations approve the actual bounded offer, behaviour, claims, support, data permissions and deployment/rollback. Run only that controlled scope; no approval inferred from a document or file. |
 
 ### Reopened checklist and next actions
 
-- [ ] **CR-01:** resolve and retain the actual frozen rubric/anchors throughout
-  evaluator, evidence and explanations; add the catalogue-A/B and missing
-  rubric regressions before claiming this repaired.
-- [ ] **CR-02:** recheck bounded decisions and inquiry handling after CR-01;
-  retain existing local regression evidence but obtain real-provider/human
-  interaction evidence.
-- [ ] **CR-03:** remove read-time publication from the remaining historical
-  path without inventing historical findings; cover the full erasure/apply/
-  publication race boundary.
-- [ ] **CR-04:** provide actual scenario and criterion-specific structured
-  work to practice interpretation; review all ten missions with qualified
-  reviewers and actual-model cases, not the keyword-based test provider.
+- [x] **CR-01 software:** archive and resolve the actual frozen method through
+  evaluator, evidence and explanations - evidence: `frozenMethod.js`,
+  `sliceEvaluator.js`, Report V3; tests: missing-anchor red/green and pinned
+  method/context regressions, hosted CI at `7be1774`.
+- [x] **CR-02 software:** bounded inquiry/decision handling, board readiness
+  and durable response recovery - evidence: `sessionService.js`,
+  `universalForm.js`, `factBoundary.js`; tests: controlled-provider route
+  regressions and connected browser journey.
+- [x] **CR-03 software:** fenced accepted batch and immutable issued reads,
+  including legacy - evidence: `sessionIoRepository.js`, Report V3,
+  `reportV2.js`; tests: real DB/HTTP 27/27, PG faults 18/18 and hosted expanded
+  migration/audit/fencing runner 20/20.
+- [x] **CR-04 software:** effective scenario and criterion-specific work,
+  preserved versions and neutral cannot-judge feedback - evidence:
+  development evaluators/library and `MissionFeedback.jsx`; tests:
+  missing-context red/green, mission and frontend suites.
+- [x] **CR-05 software:** actual returning-user loop and automated
+  responsive/accessibility acceptance - evidence: `cr05-returning-loop.spec.js`,
+  `audit-results/cr05-{critical,browser-all}-complete.json` and inspected
+  `audit-results/ui/cr05/` screenshots; tests: four browser projects.
+- [ ] **CR-01/02/04 independent acceptance:** review frozen interpretation,
+  all ten missions and relevant interaction cases with qualified reviewers
+  and the authorized intended provider, not the controlled test adapter.
 - [ ] **CR-05:** complete manual accessibility, physical-device and
   unassisted target-student/professional sessions. The AI cannot self-certify
   that a person understands the finding, moment and next action.
-- [ ] **CR-06:** obtain operator-owned staging/model authorization, budget,
-  consent/data class and package approvals; execute hosted/live checks against
-  the corrected commit. Do not silently use a paid provider or deploy.
+- [x] **CR-06 hosted software:** publish and pass CI on the exact corrected
+  commit - evidence: GitHub branch `ui/prism-brand-transformation` at
+  `7be1774`, Actions run `37361436184`; tests: hosted CI SUCCESS.
+- [ ] **CR-06 deployment/live:** restore authorized AWS access and reviewed
+  promotion through the supported private-EKS runbook; obtain staging/model
+  authorization, budget, consent/data class and package approvals, then
+  execute live checks against that exact candidate. Do not widen IAM trust,
+  use the prohibited ECS path or infer spending approval from deployment.
 - [ ] **CR-07:** obtain the scoped owner decisions and authorize the limited
   pilot only after preceding exits. Keep paid offers closed while content,
   tax and recovery terms are unready; keep formal growth disabled until
   comparability approval.
 
-### Evidence checked in this update
+### Historical reopening evidence (before the runtime correction)
 
-- Current-candidate local tests: **70 passed, zero failures/skips**, covering
+- Pre-correction local tests: **70 passed, zero failures/skips**, covering
   slice evaluator, universal run, fault injection, mission meaning,
   evaluator meaning, mission end-to-end and release tests. These use synthetic
   inputs/controlled model adapters, not live-provider interpretation.
 - Separate zero-provider prompt checks **failed the required invariants**:
   `PINNED_ANCHOR_MISSING_MUST_FAIL_CLOSED` accepted missing pinned anchors;
   `PRACTICE_CONTEXT_IN_MODEL_INSTRUCTIONS` omitted M02's scenario setting.
-  A green test count is therefore not satisfaction of CR-01 or CR-04.
-- Source inspection: [sliceEvaluator.js](../../server/domain/evidence/sliceEvaluator.js)
-  uses catalogue fallback and catalogue labels;
-  [Report V3 build](../../server/domain/reports/v3/build.js) uses catalogue
-  anchor explanations; [report service](../../server/domain/reports/v3/service.js)
-  materialises a legacy publication during selection;
-  [practice evaluator](../../server/domain/development/evaluator.js) supplies
-  objective/criteria/text but not the scenario setting.
+  The later runtime checkpoint records their repairs and passing reruns.
+- Pre-correction source inspection found catalogue fallback/labels in
+  [sliceEvaluator.js](../../server/domain/evidence/sliceEvaluator.js), catalogue
+  explanations in [Report V3 build](../../server/domain/reports/v3/build.js),
+  read-time legacy publication in [report service](../../server/domain/reports/v3/service.js),
+  and omitted setting in [practice evaluator](../../server/domain/development/evaluator.js).
+  These are retained failure evidence, not descriptions of the current code.
 - Live gate remains BLOCKED. No live model, human review, target-user study,
-  production deployment or owner sign-off was performed in this update.
+  production deployment or owner sign-off has since been performed.
 
 ### Scope lock
 

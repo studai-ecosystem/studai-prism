@@ -24,8 +24,19 @@ answers, transcripts, prompts, report text, e-mail addresses, names or tokens.
 
 ## Corrected runtime recovery
 
+- Deployment checkpoint (2026-10-06): published code `7be1774` passes hosted
+  CI, but AWS image workflow `37365615065` failed on denied OIDC role access
+  and operator `prod-admin` SSO is expired. No corrected production rollout
+  or schema migration has occurred. Follow
+  [the supported deployment runbook](../DEPLOYMENT_RUNBOOK_v1.md), not ECS.
+  Restore authorized access and reviewed promotion; do not widen role trust
+  or infer pilot/model-spending approval. Review exact candidate migrations,
+  rollback image and single-writer preflight before any production change.
 - Schema 0054 is required before new allocations. Apply additive migrations
   only on an authorized target; the local rehearsal uses a disposable cluster.
+  Verify the migration runner contains the candidate's 0054 files and works
+  with the runtime image/secret; the already-running image cannot be assumed
+  to contain a new migration or npm. Do not start a second JSON/EFS writer.
 - Server startup drains durable EVALUATE_RUN jobs and retries publication.
   Lease renewal continues during inference; a stale result cannot be accepted.
   Model calls may repeat; acceptance is idempotent, not exactly-once inference.

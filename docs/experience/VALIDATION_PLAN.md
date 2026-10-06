@@ -18,6 +18,9 @@ raters, approve content or execute this study. Old issued outputs are not
 silently rescored. M01-M10 corrected revisions remain DRAFT; published
 software fixtures cannot be relabelled held-out responses. Separate
 text/board pilot review from the still-unreviewed spoken variant.
+Use published code SHA `7be1774d3a3ba0b4935f80a80ae79dbfc5a606a1` as the
+software-verified review baseline, and record any later candidate separately.
+Hosted CI passed; no intended-provider run or independent study was executed.
 
 ## 1. Measurement-lead review (precondition for everything below)
 

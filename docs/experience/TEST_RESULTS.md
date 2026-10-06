@@ -1,12 +1,14 @@
 # P0 - Verification results
 
-## Corrected runtime candidate - local software evidence
+## Corrected runtime candidate - local and hosted software evidence
 
 Branch `ui/prism-brand-transformation`, starting HEAD `12bc65e`. Results below
-cover the current correction worktree, not the historical P0/P10 candidate.
-GitHub publication is now user-authorized; AWS deployment is requested but
-blocked by an expired AWS login, target/release review and hosted gates.
-No production deployment or feature activation has occurred.
+cover the corrected code candidate, not the historical P0/P10 candidate.
+Published and CI-verified code SHA:
+`7be1774d3a3ba0b4935f80a80ae79dbfc5a606a1`. GitHub publication is complete;
+AWS deployment remains blocked by expired production SSO, denied image-build
+OIDC role access and reviewed main promotion. Status rechecked 2026-10-06.
+No production migration, deployment or feature activation has occurred.
 
 | Command / check | Verified result |
 | --- | --- |
@@ -15,6 +17,7 @@ No production deployment or feature activation has occurred.
 | Full server suite | 941 pass, 0 fail, 27 default database skips |
 | Real disposable PostgreSQL + buildApp HTTP loop | 27 pass, 0 fail, 0 skip; accepted work/evaluation/publication/practice and fault recovery, no final-result preload |
 | Dedicated PostgreSQL acceptance/erasure/publication faults | 18 pass, 0 fail, 0 skip; includes JSON legacy store + PostgreSQL campus personal Finish regression |
+| Expanded hosted disposable DB runner | 20 pass, 0 fail, 0 skip: migration chain 1, legacy sufficiency/access audit 1, fencing corpus 18 |
 | Accepted-receipt interruption/memory boundary suite | 25 pass, 0 fail, 0 skip; final receipt failure rolls back evidence and leaves retry eligible |
 | First required rubric/context checkpoints | Missing pinned anchors: initial 2 failures, subsequently green; omitted practice context: initial 2 failures, subsequently green |
 | Critical browser corpus | 224 passing outcomes (219 first-pass, 5 recovered retries), 0 final fail, 0 skip |
@@ -38,11 +41,38 @@ Earlier failed browser/timeout runs were repaired and rerun, not hidden.
 The personal Finish fault was reproduced under the actual mixed JSON/PG
 audit configuration before its allocation guard was repaired.
 
-Hosted CI: NOT RUN yet on the published candidate. Live intended-provider
-calls, real users, qualified held-out measurement review, manual assistive
-technology, physical devices, live payments and production deployment:
-NOT RUN. Draft content remains unapproved, formal growth and paid offers
-remain gated, and applicable release scope remains NO_GO.
+### GitHub and AWS execution record
+
+| Exact source | Run | Actual result |
+| --- | --- | --- |
+| `6c218ec27dbb4f682ac0a5a1e1c2e5164e03b63d` | [CI 37292450077](https://github.com/studai-ecosystem/studai-prism/actions/runs/37292450077) | FAILED: server clean install exposed missing optional telemetry peer lock entries |
+| `41c3886620eed6fce744002280ddd600c0efd7d3` | [CI 37308409497](https://github.com/studai-ecosystem/studai-prism/actions/runs/37308409497) | FAILED: DB gate exposed obsolete dynamic legacy-view fixture and hard-coded 50-migration rollback limit; server/calibration passed |
+| `7be1774d3a3ba0b4935f80a80ae79dbfc5a606a1` | [CI 37361436184](https://github.com/studai-ecosystem/studai-prism/actions/runs/37361436184) | SUCCESS: corrected fixtures and actual applied-migration count; exact published code candidate |
+| `7be1774d3a3ba0b4935f80a80ae79dbfc5a606a1` | [AWS image 37365615065](https://github.com/studai-ecosystem/studai-prism/actions/runs/37365615065) | FAILED: `Not authorized to perform sts:AssumeRoleWithWebIdentity`; no new image or rollout |
+
+Local and remote branch matched the verified SHA with a clean tracked
+worktree before this documentation-only reconciliation. Unrelated untracked
+data, brand files and the separate audit document were left untouched.
+Production `prod-admin` STS check on 2026-10-06 failed because its SSO session
+is expired/invalid. User unavailable for interactive reauthentication; no
+IAM trust changes, main merge, ECS bypass or production writes attempted.
+
+Documentation reconciliation checks (2026-10-06): change ledger, route
+inventory, programme validation and final handover PASS; six independent
+sign-offs remain OPEN. `git diff --check` passes. The composite
+`npm run validate:p10` stops at
+`P10_INTEGRATED_RESOURCE_NOT_PASSED:PREPARATION_ATTEMPT`: the latest saved
+full-browser artifact contains four skipped preparation cases, as already
+disclosed above. This is not a fresh preparation pass or a regression caused
+by these documentation edits. No check was weakened or result fabricated;
+re-run the separately configured preparation mode before claiming that
+composite route gate passes on the current local artifact.
+
+Hosted CI is software evidence, not a hosted product deployment or live-model
+study. Live intended-provider calls, real users, qualified held-out measurement
+review, manual assistive technology, physical devices, live payments and
+production deployment: NOT RUN. Draft content remains unapproved, formal
+growth and paid offers remain gated, and applicable release scope remains NO_GO.
 
 ## Staged release decision verification - 2026-10-05
 

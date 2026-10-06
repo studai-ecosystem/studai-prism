@@ -5,6 +5,10 @@
 The current implementation request supersedes the historical diagnostic-only
 boundary below for original draft corrections, not for human approvals.
 Review the exact corrected candidate, not the older P0/P10 source snapshot.
+Published, software-CI-verified candidate:
+`7be1774d3a3ba0b4935f80a80ae79dbfc5a606a1` on
+`ui/prism-brand-transformation`. Neither publication nor CI grants content
+approval; the independent decisions below remain open.
 
 | Review material | Current candidate | Required independent decision |
 | --- | --- | --- |
