@@ -1,0 +1,53 @@
+# gitleaks configuration — PROD-READY Phase 1 (SECURITY_REVIEW S5, CI half).
+#
+# Starts from gitleaks' default rule set and allowlists ONLY known, reviewed
+# false positives. Every entry says why. Do not add broad path allowlists for
+# source or test directories: a real secret pasted into a test is still a leak.
+# Note: a global [[allowlists]] entry with `paths` skips the whole file for
+# every rule (its `condition` does not apply to paths), so value-specific
+# exceptions are scoped to the rule that raises them, under [[rules]].
+# Decision record: docs/production/PROD_READY_STATE.md (Phase 1 P-rows).
+
+title = "studai-prism gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Vendored Tesseract OCR runtime (minified wasm glue, wasm binaries, worker, language data) and local build output: high-entropy minified/base64 content, not credentials (SECURITY_REVIEW 2026-09-26 secrets row)"
+paths = [
+  '''^public/ocr/tesseract-core[^/]*\.wasm(\.js)?$''',
+  '''^public/ocr/worker\.min\.js$''',
+  '''^public/ocr/tessdata/[^/]+\.traineddata(\.gz)?$''',
+  '''^dist/''',
+]
+
+[[allowlists]]
+description = "Documented PUBLIC Razorpay key id (a publishable identifier served by /api/payment/config, not the key secret), quoted in the 2026-08-04 incident record; rotation tracked as HA-001/HA-002"
+regexTarget = "match"
+regexes = ['''rzp_live_TItHtKm7Qs0CPQ''']
+
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Placeholder values in example env files"
+  condition = "AND"
+  paths = ['''(^|/)\.env\.example$''']
+  regexes = ['''^REPLACE_WITH[A-Za-z0-9_\-]*$''']
+
+  [[rules.allowlists]]
+  description = "Feature-flag catalogue keys (flag NAMES, not values) in the flag registry"
+  condition = "AND"
+  paths = ['''^server/lib/flagRegistry\.js$''']
+  regexes = ['''^PRISM_[A-Z0-9_]+$''']
+
+  [[rules.allowlists]]
+  description = "Throwaway fixtures inside server tests (JWT test secrets, a fixed TOTP fixture, idempotency keys); never valid outside the test process"
+  condition = "AND"
+  paths = ['''^server/test/[^/]+\.test\.js$''']
+  regexes = [
+    '''^test-secret-for-[a-z0-9\-]+$''',
+    '''^ABCDEF234567$''',
+    '''^cr0[0-9]-[a-z0-9\-]+$''',
+  ]

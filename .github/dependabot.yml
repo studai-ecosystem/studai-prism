@@ -1,0 +1,54 @@
+# PROD-READY Phase 1 (SECURITY_REVIEW S5, CI half): dependency update PRs.
+# Security updates are raised regardless of the schedule; version updates are
+# weekly and grouped so they arrive as reviewable batches. Every PR still has
+# to pass ci.yml (tests, npm audit gate, secret scan) and CodeQL.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      client-dev-tooling:
+        dependency-type: development
+      client-runtime-minor:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    # Note: a bump of @aws-sdk/client-bedrock-runtime fails CI's judge
+    # fingerprint check until server/scoring/judge-fingerprint.json is updated
+    # in the same PR. That is intended (the judge SDK changes deliberately);
+    # it is not ignored here so security updates still arrive.
+    groups:
+      server-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: cargo
+    directory: /desktop/src-tauri
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: pip
+    directory: /calibration
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

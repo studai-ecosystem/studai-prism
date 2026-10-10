@@ -27,7 +27,6 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.103.2",
-    "concurrently": "^8.2.2",
     "date-fns": "^4.4.0",
     "face-api.js": "^0.22.2",
     "framer-motion": "^11.3.0",
@@ -54,6 +53,7 @@
     "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
     "jsdom": "^25.0.1",
     "postcss": "^8.4.44",
@@ -62,7 +62,6 @@
     "vitest": "^2.1.9"
   },
   "overrides": {
-    "dompurify": "3.4.14",
     "node-fetch": "2.7.0"
   },
   "engines": {

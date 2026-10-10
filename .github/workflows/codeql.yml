@@ -1,0 +1,43 @@
+name: CodeQL
+
+# PROD-READY Phase 1 (SECURITY_REVIEW S5, CI half): static analysis of the
+# JavaScript client (src/) and server (server/). DAST against a running
+# environment is out of scope here and stays with HA-C012.
+on:
+  push:
+    branches: [main, ui/prism-brand-transformation]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '23 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - public/ocr
+              - dist
+              - node_modules
+              - server/node_modules
+              - desktop/shell-dist
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
