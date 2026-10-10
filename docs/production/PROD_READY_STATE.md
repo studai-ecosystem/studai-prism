@@ -514,7 +514,7 @@ Two migrations were added (0061, 0062). Two flags were registered OFF (`PRISM_PI
 ## Phase 9 — Employer development-use workspace (dark)
 Status: COMPLETE (dark; nothing deployed, no flag flipped, no human action closed)
 Branch: `prod/p09-employer-lnd` (from `prod/p08-sales-readiness` @ `e38cfdd`)
-Commit: see the follow-up commit recording this hash
+Commit: `e85782b` (code, tests, docs) + follow-up commit recording this hash
 Gates: see table
 
 Phase 9 builds a minimal employer development-use (L&D) mode on the campus machinery, dark behind the new flag `PRISM_EMPLOYER_LND` (registered OFF):
