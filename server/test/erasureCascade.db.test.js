@@ -1,5 +1,5 @@
 // PROD-READY Phase 2 (SECURITY_REVIEW S8): the account erasure cascade on a
-// real PostgreSQL (migrations 0001–0056; 0058 accommodation requests added in PROD-READY Phase 4). One subtest per table of the S8 risk
+// real PostgreSQL (migrations 0001–0056; 0058 accommodation requests added in PROD-READY Phase 4; 0059 background jobs in Phase 5). One subtest per table of the S8 risk
 // row (and the other personal tables the registry erases), another student's
 // rows untouched, a rerun after a mid-way failure completes from the ledger,
 // the one-transaction guarantee of the account step, the narrowly scoped
@@ -95,6 +95,14 @@ async function seedPerson(p, s) {
   p.membership = (await one(`INSERT INTO organization_memberships (organization_id, user_id, role, status, invited_by) VALUES ($1, $2, 'STUDENT', 'ACTIVE', $3) RETURNING id`, [s.org, p.uid, STAFF])).id
   await query(`INSERT INTO workspaces (type, owner_user_id, organization_id, name, status) VALUES ('CAMPUS_STUDENT', $1, $2, 'W', 'ACTIVE')`, [p.uid, s.org])
   await query(`INSERT INTO organization_invites (organization_id, email, role, token_hash, status, invited_by, expires_at, accepted_by) VALUES ($1, $2, 'STUDENT', $3, 'ACCEPTED', $4, now() + interval '1 day', $5)`, [s.org, p.email, hex64(), STAFF, p.uid])
+  // PROD-READY Phase 5 (0059): the person's queued jobs — an invite email for
+  // a pending invite to their address (refs only: the invite id) and an
+  // assignment reminder keyed to their account.
+  const pendingInvite = (await one(`INSERT INTO organization_invites (organization_id, email, role, token_hash, status, invited_by, expires_at) VALUES ($1, $2, 'STUDENT', $3, 'PENDING', $4, now() + interval '1 day') RETURNING id`, [s.org, p.email, hex64(), STAFF])).id
+  p.jobIds = [
+    (await one(`INSERT INTO jobs (kind, payload, dedupe_key) VALUES ('campus.invite_email', jsonb_build_object('inviteId', $1::text), $1::text) RETURNING id`, [pendingInvite])).id,
+    (await one(`INSERT INTO jobs (kind, payload, subject_user_id, dedupe_key, status, attempts, last_error, finished_at) VALUES ('campus.assignment_reminder', jsonb_build_object('assignmentId', $2::text, 'userId', $1::text), $1, $2 || ':' || $1, 'DEAD', 5, 'EAUTH: login failed', now()) RETURNING id`, [p.uid, s.assignment])).id,
+  ]
   const ent = (await one(`INSERT INTO entitlements (user_id, source_type, product_code, quantity, valid_from, status) VALUES ($1, 'PERSONAL_PURCHASE', 'P', 2, now(), 'ACTIVE') RETURNING id`, [p.uid])).id
   p.spareEntitlement = (await one(`INSERT INTO entitlements (user_id, source_type, product_code, quantity, valid_from, status) VALUES ($1, 'PROMO', 'P', 1, now(), 'ACTIVE') RETURNING id`, [p.uid])).id
   p.entitlement = ent
@@ -256,6 +264,7 @@ test('S8: the account erasure cascade on PostgreSQL', { skip }, async (t) => {
     'v1_sessions / v1_reports / v1_payments': ['SELECT (SELECT count(*) FROM v1_sessions WHERE session_id = ANY($1)) + (SELECT count(*) FROM v1_reports WHERE session_id = ANY($1)) + (SELECT count(*) FROM v1_payments WHERE session_id = ANY($1))::int AS n', [[a.sid, a.sid2]]],
     'evidence_rating_items (unrated)': ['SELECT count(*)::int AS n FROM evidence_rating_items WHERE id = $1', [a.unratedItem]],
     assessment_accommodation_requests: ['SELECT count(*)::int AS n FROM assessment_accommodation_requests WHERE user_id = $1 OR session_id = $2', [a.uid, a.sid]],
+    jobs: ['SELECT count(*)::int AS n FROM jobs WHERE id = ANY($1::uuid[]) OR subject_user_id = $2', [a.jobIds, a.uid]],
   }
   for (const [table, [sql, params]] of Object.entries(gone)) {
     await t.test(`${table}: the person's rows are deleted`, async () => assert.equal(await n(sql, params), 0))

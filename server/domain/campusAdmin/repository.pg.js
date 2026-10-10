@@ -219,6 +219,17 @@ export function createCampusAdminRepoPg({ query, getPool }) {
       const { rows } = await query("SELECT * FROM assessment_assignments WHERE organization_id = $1 AND sponsor_type = 'INSTITUTION' ORDER BY created_at, id", [organizationId])
       return rows.map(assignment)
     },
+    // PROD-READY Phase 5 scans (reminders, seat release): institution
+    // assignments in the given statuses whose window ends in (after, before].
+    async listInstitutionAssignmentsEndingBetween({ after, before, statuses }) {
+      const { rows } = await query(
+        `SELECT * FROM assessment_assignments
+          WHERE sponsor_type = 'INSTITUTION' AND status = ANY($3::text[]) AND window_end > $1::timestamptz AND window_end <= $2::timestamptz
+          ORDER BY window_end, id`,
+        [after, before, statuses],
+      )
+      return rows.map(assignment)
+    },
     async listAssignmentStudents(assignmentId) {
       const { rows } = await query('SELECT * FROM assessment_assignment_students WHERE assignment_id = $1 ORDER BY created_at, user_id', [assignmentId])
       return rows.map(student)

@@ -195,6 +195,26 @@ test('campus assignment email: delivered with escaped title and due date', async
   assert.ok(body.includes('Sun, 01 Nov 2026 10:00:00 GMT'))
 })
 
+test('campus assignment reminder email (PROD-READY Phase 5): escaped title, due date, no student name', async () => {
+  const before = messages.length
+  await mailer.sendCampusAssignmentReminderEmail({
+    to: 'student@example.edu',
+    organizationName: 'Riverside <b>College</b>',
+    assessmentTitle: 'Team <script>x</script> brief',
+    dueAt: '2026-11-01T10:00:00.000Z',
+    url: 'https://prism.test/campus/assignments',
+  })
+  assert.equal(messages.length, before + 1)
+  const msg = lastMessage()
+  assert.match(headerValue(msg.raw, 'Subject'), /Reminder/, 'subject names a reminder (MIME-encoded when it carries quotes)')
+  const body = decodeQp(msg.raw)
+  assert.ok(body.includes('Team &lt;script&gt;x&lt;/script&gt; brief'))
+  assert.ok(body.includes('Riverside &lt;b&gt;College&lt;/b&gt;'))
+  assert.ok(!body.includes('<script>x</script></strong>'))
+  assert.ok(body.includes('Sun, 01 Nov 2026 10:00:00 GMT'))
+  assert.ok(body.includes('If you have already finished, you can ignore this message.'))
+})
+
 test('an SMTP rejection surfaces as an error to the caller', async () => {
   // No usable recipient: nodemailer refuses the envelope and the mailer
   // propagates the failure (callers log it and fall back; nothing is swallowed).

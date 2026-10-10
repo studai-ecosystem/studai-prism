@@ -85,6 +85,8 @@ export function createCampusContext({
   shareTokenFactory,
   users = EMPTY_USER_DIRECTORY,
   sendAssignmentEmail,
+  // PROD-READY Phase 5 (K80): reminder emails sent by the job runner.
+  sendReminderEmail,
   appUrl = '',
   missionEvaluator = null,
   // P2.4 bounded evidence evaluator for draft-segment runs (sliceEvaluator.js).
@@ -139,6 +141,10 @@ export function createCampusContext({
   })
   admin = createCampusAdminService({
     repos: storeView, users, invites, catalog, clock, audit: auditWriter, appUrl, ledger, ...(sendAssignmentEmail ? { sendAssignmentEmail } : {}),
+    ...(sendReminderEmail ? { sendReminderEmail } : {}),
+    // PROD-READY Phase 5: CSV-import invite emails go through the job queue
+    // only while PRISM_JOB_WORKER is on; off = today's synchronous sends.
+    queueImportInvites: () => isEnabled('PRISM_JOB_WORKER') && Boolean(liveRepos()?.jobs),
     onRosterSync: (organizationId, cohortId, userId, tx = null) => development.syncCohortMember(organizationId, cohortId, userId, tx),
   })
   const growth = createGrowthService({ repos: storeView, catalog, clock, audit: auditWriter, entryFor: createSessionEntryLoader({ catalog, evidence, legacy, reportReviews: { listForSession: (id) => (storeView.reportReviews ? storeView.reportReviews.listForSession(id) : []) } }) })

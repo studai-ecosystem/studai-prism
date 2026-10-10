@@ -14,9 +14,10 @@
 // Same discipline as lib/retentionEnforcement.js: dry-run is the default and
 // mutates nothing; a real run needs a dry-run receipt for the entity within
 // 24 hours and is refused under an entity legal hold; every run leaves a
-// retention_runs receipt. Nothing schedules this yet: Phase 5 moves it onto
-// the job runner, dark behind PRISM_RETENTION_ENFORCEMENT until HA-003. The
-// operator script is server/db/purgeImportRows.js.
+// retention_runs receipt. PROD-READY Phase 5 schedules it on the job runner
+// (job `retention.import_rows`: a dry run, then the real run) only while
+// PRISM_RETENTION_ENFORCEMENT is on (HA-003). The operator script is
+// server/db/purgeImportRows.js.
 import { randomUUID } from 'node:crypto'
 import { isDbConfigured as defaultDbConfigured, query as defaultQuery } from '../../db/pool.js'
 import {

@@ -57,6 +57,20 @@ export function createMembershipsRepoPg({ query }) {
       )
       return invite(rows[0]) || null
     },
+    // PROD-READY Phase 5: a queued CSV-import invite is read by id when its
+    // email job runs, then gets the token that the email carries.
+    async getInviteById(id) {
+      const { rows } = await query(
+        `SELECT i.*, o.name AS organization_name, o.status AS organization_status
+         FROM organization_invites i JOIN organizations o ON o.id = i.organization_id WHERE i.id = $1`,
+        [id],
+      )
+      return invite(rows[0]) || null
+    },
+    async setPendingInviteTokenHash(id, tokenHash) {
+      const { rowCount } = await query("UPDATE organization_invites SET token_hash = $2 WHERE id = $1 AND status = 'PENDING'", [id, tokenHash])
+      return rowCount === 1
+    },
     // Row lock for a multi-write acceptance (PROD-READY Phase 3): inside a
     // repository transaction a concurrent acceptance waits here until the
     // first commits, then reads its final status.

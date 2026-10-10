@@ -71,6 +71,18 @@ async function start() {
   })
   server.once('close', () => { void worker.stop() })
 
+  // PROD-READY Phase 5: background job runner (PRISM_JOB_WORKER, default
+  // OFF). Same container, one worker per replica; claims with FOR UPDATE SKIP
+  // LOCKED, so several replicas are safe. Off = nothing is queued and CSV
+  // import invites are sent inside the request exactly as before.
+  const { startJobWorker } = await import('./domain/jobs/index.js')
+  let jobWorker = null
+  try {
+    jobWorker = startJobWorker({ campus, logger })
+  } catch (err) {
+    logger.captureException(err, { msg: 'job_worker_start_failed' })
+  }
+
   // Behind a load balancer: keep-alive must OUTLIVE the LB idle timeout (ALB
   // default 60s) or the LB reuses a socket the app just closed → intermittent
   // 502s. Long scoring requests must not be cut by Node's own header/request
@@ -95,8 +107,10 @@ async function start() {
   const shutdown = createGracefulShutdown({
     server,
     getIo: () => proctorIo,
-    onDrain: () => { app.locals.draining = true },
-    cleanups: [() => worker.stop(), () => closePool()],
+    // Draining stops the job worker claiming at once; the cleanup waits for
+    // running jobs (bounded) and gives unfinished leases back.
+    onDrain: () => { app.locals.draining = true; jobWorker?.beginDrain() },
+    cleanups: [() => worker.stop(), () => jobWorker?.stop({ drainMs: 3000 }), () => closePool()],
     logger,
     timeoutMs: shutdownTimeoutMs(),
   })
@@ -135,8 +149,11 @@ async function start() {
   // Charter §16 (PRISM_RETENTION_ENFORCEMENT, default OFF): the scheduled
   // retention-enforcement job. Dark = nothing auto-deletes; dry-runs and
   // deliberate audited runs remain available through the privacy plane.
+  // PROD-READY Phase 5: while the job worker runs, the same daily pass is the
+  // queued job `retention.enforce` (still only under PRISM_RETENTION_ENFORCEMENT).
   import('./lib/retentionEnforcement.js')
     .then(({ startRetentionScheduler }) => {
+      if (jobWorker) return
       if (startRetentionScheduler()) logger.info('retention_scheduler_active')
     })
     .catch((err) => logger.captureException(err, { msg: 'retention_scheduler_failed' }))

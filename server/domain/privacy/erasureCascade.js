@@ -79,6 +79,16 @@ export const USER_STATEMENTS = Object.freeze([
   ['organization_memberships', async (run, c) => ({ rowCount: rowCount(await run('DELETE FROM organization_memberships WHERE user_id = $1', [c.uid]))
     + rowCount(await run('UPDATE organization_memberships SET invited_by = $2 WHERE invited_by = $1', [c.uid, c.pseudo])) })],
   ['workspaces', (run, c) => run('DELETE FROM workspaces WHERE owner_user_id = $1', [c.uid])],
+  // PROD-READY Phase 5 (0059): the person's background jobs (reminders keyed
+  // to the account, invite emails keyed to an invite sent to the address) —
+  // removed in every state, before the invites themselves are deleted. A job
+  // a worker is running at that moment loses its row and cannot record a result.
+  ['jobs', (run, c) => run(
+    `DELETE FROM jobs WHERE subject_user_id = $1
+        OR (kind = 'campus.invite_email' AND payload->>'inviteId' IN (
+              SELECT id::text FROM organization_invites WHERE accepted_by = $1 OR ($2::text IS NOT NULL AND lower(email) = $2)))`,
+    [c.uid, c.email],
+  )],
   ['organization_invites', async (run, c) => ({ rowCount: rowCount(await run(
     'DELETE FROM organization_invites WHERE accepted_by = $1 OR ($2::text IS NOT NULL AND lower(email) = $2)', [c.uid, c.email],
   )) + rowCount(await run('UPDATE organization_invites SET invited_by = $2 WHERE invited_by = $1', [c.uid, c.pseudo])) })],
@@ -304,6 +314,8 @@ export function eraseUserFromMemoryDb(db, c) {
   counts.intervention_memberships = dropMap(db.interventionMembers, (m) => m.userId === uid)
   counts.organization_memberships = dropMap(db.memberships, (m) => m.userId === uid) + patchMap(db.memberships, (m) => m.invitedBy === uid, () => ({ invitedBy: pseudo }))
   counts.workspaces = dropMap(db.workspaces, (w) => w.ownerUserId === uid)
+  const inviteIds = new Set([...(db.invites?.values() || [])].filter((i) => i.acceptedBy === uid || (email && String(i.email).toLowerCase() === email)).map((i) => i.id))
+  counts.jobs = dropMap(db.jobs, (j) => j.subjectUserId === uid || (j.kind === 'campus.invite_email' && inviteIds.has(j.payload?.inviteId)))
   counts.organization_invites = dropMap(db.invites, (i) => i.acceptedBy === uid || (email && String(i.email).toLowerCase() === email))
     + patchMap(db.invites, (i) => i.invitedBy === uid, () => ({ invitedBy: pseudo }))
   counts.assessment_assignment_targets = dropFrom(db.assignmentTargets, (t) => t.targetType === 'USER' && t.targetId === uid)

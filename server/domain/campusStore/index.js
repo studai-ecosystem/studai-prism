@@ -34,6 +34,7 @@ import { createPreparationRepoMemory, createPreparationRepoPg } from '../prepara
 import { createMemorySessionLocks, createPgSessionLocks } from '../assessments/sessionLocks.js'
 import { createCommerceRepoMemory, createCommerceRepoPg } from '../commerce/repository.js'
 import { createAccommodationRequestsRepoMemory, createAccommodationRequestsRepoPg } from '../support/accommodationRepository.js'
+import { createJobsRepoMemory, createJobsRepoPg } from '../jobs/repository.js'
 import { withTransaction, transactionDeps, inTransaction } from './pgUtil.js'
 
 // Memory "transaction" (no-database development and tests only): one at a
@@ -114,6 +115,8 @@ export function createMemoryCampusRepos(options = {}) {
     commerce: createCommerceRepoMemory(db),
     // PROD-READY Phase 4 (0058): pre-start accommodation requests.
     accommodationRequests: createAccommodationRequestsRepoMemory(db),
+    // PROD-READY Phase 5 (0059): background job queue.
+    jobs: createJobsRepoMemory(db),
   }
   return self
 }
@@ -162,6 +165,7 @@ export function createPgCampusRepos({ query, getPool, getLockPool }) {
     preparation: createPreparationRepoPg(deps),
     commerce: createCommerceRepoPg(deps),
     accommodationRequests: createAccommodationRequestsRepoPg(deps),
+    jobs: createJobsRepoPg(deps),
   }
   return self
 }

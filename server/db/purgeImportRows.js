@@ -8,7 +8,8 @@
 //       entity student_import_rows_raw, default IMPORT_ROW_RAW_RETENTION_DAYS,
 //       PROVISIONAL pending HA-003). Refused without a dry-run receipt in the
 //       last 24 hours or under an entity legal hold.
-// Nothing schedules this (Phase 5 job runner, dark behind PRISM_RETENTION_ENFORCEMENT).
+// Scheduled only by the Phase 5 job runner (job retention.import_rows), and only
+// while PRISM_RETENTION_ENFORCEMENT is on.
 import { fileURLToPath } from 'url'
 import { isDbConfigured, closePool } from './pool.js'
 import { purgeImportRowRaw } from '../domain/privacy/importRowRetention.js'

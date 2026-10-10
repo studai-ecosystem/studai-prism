@@ -81,7 +81,13 @@ export function createInviteService({
   }
 
   return {
-    async createInvites({ actor, orgId, role, emails, cohortId = null, departmentId = null }) {
+    // delivery 'SEND' (default): each email is sent inside the request, as
+    // before. 'QUEUE' (CSV import while PRISM_JOB_WORKER is on, PROD-READY
+    // Phase 5): every invite and its email job are written in one
+    // transaction; the invite holds an unusable placeholder token until the
+    // job issues the real link (deliverQueuedInvite) — the job payload is the
+    // invite id only, never the address or the token.
+    async createInvites({ actor, orgId, role, emails, cohortId = null, departmentId = null, delivery = 'SEND' }) {
       const org = await repos.organizations.getOrganization(orgId)
       if (!org || org.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', 'Not found')
       const cohort = cohortId ? await repos.organizations.getCohort(cohortId) : null
@@ -94,6 +100,19 @@ export function createInviteService({
       const unique = [...new Set(emails.map((e) => String(e).trim().toLowerCase()))]
       const expiresAt = new Date(clock().getTime() + INVITE_TTL_DAYS * 86400000).toISOString()
       const results = []
+      if (delivery === 'QUEUE') {
+        await inTransaction(async (tx) => {
+          for (const email of unique) {
+            const invite = await tx.memberships.createInvite({
+              organizationId: orgId, email, role, cohortId, departmentId: cohort?.departmentId ?? departmentId, tokenHash: hashToken(randomBytes(32).toString('base64url')), invitedBy: actor.userId, expiresAt,
+            })
+            await tx.jobs.enqueue({ kind: 'campus.invite_email', payload: { inviteId: invite.id }, dedupeKey: invite.id })
+            results.push({ id: invite.id, email, role, expiresAt, delivery: 'QUEUED' })
+          }
+        })
+        audit('campus.membership.changed', null, { action: 'INVITED', organizationId: orgId, role, count: results.length, actorUserId: actor.userId, delivery: 'QUEUED' })
+        return results
+      }
       for (const email of unique) {
         const token = tokenFactory()
         const invite = await repos.memberships.createInvite({
@@ -109,6 +128,24 @@ export function createInviteService({
       }
       audit('campus.membership.changed', null, { action: 'INVITED', organizationId: orgId, role, count: results.length, actorUserId: actor.userId })
       return results
+    },
+
+    // Job handler for 'campus.invite_email' (idempotent): an invite that is
+    // no longer PENDING, has expired or whose organization is not active is
+    // skipped; otherwise a fresh link token replaces the stored hash and the
+    // email is sent. A transport failure throws (the job retries with
+    // backoff); a retry issues a new token, so only the latest email's link
+    // works. Mail not configured → NOT_SENT, like the synchronous path.
+    async deliverQueuedInvite(inviteId) {
+      const invite = await repos.memberships.getInviteById(inviteId)
+      if (!invite) return { outcome: 'GONE' }
+      if (invite.status !== 'PENDING') return { outcome: 'NOT_PENDING' }
+      if (invite.organizationStatus !== 'ACTIVE') return { outcome: 'ORGANIZATION_INACTIVE' }
+      if (new Date(invite.expiresAt) <= clock()) return { outcome: 'EXPIRED' }
+      const token = tokenFactory()
+      if (!(await repos.memberships.setPendingInviteTokenHash(invite.id, hashToken(token)))) return { outcome: 'NOT_PENDING' }
+      const sent = await sendInviteEmail({ to: invite.email, organizationName: invite.organizationName, inviteUrl: inviteUrlFor(token) })
+      return { outcome: sent ? 'SENT' : 'NOT_SENT' }
     },
 
     async getInvite(token) {

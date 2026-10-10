@@ -58,3 +58,96 @@ does not show:
 
 A human should repeat the probe against staging Postgres with a realistic cohort
 before the analytics flag is flipped (ROLLOUT_PLAN step 6).
+
+## Addendum 2026-10-10 — PROD-READY Phase 5: background job runner (operator runbook)
+
+Nothing above is changed. This addendum describes the new background worker, its
+flag and how an operator watches it. Decisions: PROD_READY_STATE.md P52–P60.
+
+### What it is
+
+- A PostgreSQL-backed job queue: table `jobs` (migration `0059_job_queue`, with a
+  `.down.sql`). No Redis or other service (P52). Code: `server/domain/jobs/`
+  (`kinds.js` payload schemas, `repository.js` memory + PostgreSQL stores,
+  `runner.js`, `scheduler.js`, `handlers.js`, `index.js`).
+- One worker per API replica, inside the same container, started from
+  `server/index.js` **only when `PRISM_JOB_WORKER=true`** (registered OFF; a human
+  flips it). Off = nothing is queued or scheduled, and CSV-import invite emails are
+  sent inside the request exactly as before.
+- Claims use `FOR UPDATE SKIP LOCKED` with a lease (`locked_by`, a fresh
+  `lease_token` per claim, `locked_until`). Several replicas never run the same job;
+  a crashed replica's lease expires and another replica recovers the job. Results
+  from an expired lease are fenced out.
+- Failures retry with exponential backoff and jitter (30 s base, doubling, capped
+  at 6 h; attempt *n* waits between half and all of `30 s × 2^(n−1)`). After
+  `max_attempts` (per kind, 3–6) the job is **DEAD** (a dead letter) until an
+  operator acts. A handler can also declare a failure permanent (DEAD at once).
+- Recurring work is enqueued by every replica's scheduler tick (once a minute)
+  with a dedupe key per time bucket, so only one job per bucket exists however many
+  replicas tick:
+
+| Kind | Every | What it does |
+| --- | --- | --- |
+| `campus.reminders_scan` | 15 min | Enqueues `campus.assignment_reminder` for each unfinished student of a live assignment whose reminder policy is on and whose window ends within `daysBeforeDue` (default 2). One per student per window (dedupe). |
+| `campus.seat_release_scan` | 15 min | Enqueues `campus.seat_release` for live assignments whose window ended more than 24 h ago (grace) and less than 30 days ago. |
+| `jobs.prune` | daily | Deletes SUCCEEDED / CANCELLED rows older than 30 days. DEAD rows are kept. |
+| `retention.enforce`, `retention.import_rows`, `retention.accommodation_requests` | daily | **Scheduled only while `PRISM_RETENTION_ENFORCEMENT=true`** (still OFF until HA-003). Each runs a dry run (receipt) and then the real run; a legal hold on the entity is a clean skip. While the worker runs, the old in-process retention timer is not started. |
+
+Event-driven kinds: `campus.invite_email` (one per CSV-import invite while the
+worker flag is on), `campus.assignment_reminder`, `campus.seat_release`.
+
+### Settings (environment, all optional)
+
+| Variable | Default | Range |
+| --- | --- | --- |
+| `PRISM_JOB_WORKER` | off | `true` to run the worker on this replica |
+| `PRISM_JOB_CONCURRENCY` | 2 | 1–16 jobs at a time per replica |
+| `PRISM_JOB_POLL_MS` | 2000 | 250–60000 ms between idle polls |
+| `PRISM_JOB_LEASE_MS` | 120000 | 10 s – 1 h; renewed every third of the lease while a job runs |
+
+Before flipping `PRISM_JOB_WORKER`: migration 0059 applied, SMTP (`isMailEnabled`)
+and `PUBLIC_APP_URL` verified in that environment (without them invite and reminder
+jobs succeed with outcome `NOT_SENT`, as the synchronous path does today), and the
+flag set on every replica (a replica without it still queues nothing and does not
+claim).
+
+### Load
+
+Each idle replica runs one indexed `UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP
+LOCKED LIMIT n)` and one lease-recovery `UPDATE` per poll (default every 2 s), and
+one `INSERT … ON CONFLICT DO NOTHING` per recurring kind per minute. A CSV import of
+2,000 rows writes 2,000 invite rows and 2,000 job rows in one transaction per cohort
+instead of sending 2,000 emails inside the request; the emails then go out at
+`PRISM_JOB_CONCURRENCY` per replica. Not load-tested at cohort scale in this phase
+(Phase 6 owns the load test).
+
+### Watching it (operator runbook)
+
+1. **Admin console** → System → *Job queue* (visible only while the flag is on;
+   `system:read`). It shows counts per status and lists **DEAD** jobs first, with
+   the kind, attempts and the sanitised last error (an error code and a message
+   with addresses, links and long numbers removed; payloads hold ids only and
+   account ids are masked).
+2. API: `GET /api/admin/job-queue?status=DEAD` (`system:read`), `GET
+   /api/admin/job-queue/:id`.
+3. Logs (JSON): `job_dead_lettered` (error level) — alert on any; also
+   `job_attempt_failed`, `job_lease_lost`, `job_leases_released_on_shutdown`,
+   `job_runner_pass_failed`, `job_schedule_failed`, `job_worker_started`.
+4. SQL (read-only):
+   `SELECT kind, status, count(*) FROM jobs GROUP BY 1, 2 ORDER BY 1, 2;`
+   `SELECT id, kind, attempts, last_error, updated_at FROM jobs WHERE status = 'DEAD' ORDER BY updated_at DESC LIMIT 50;`
+   `SELECT count(*) FROM jobs WHERE status IN ('PENDING','FAILED') AND run_at < now() - interval '15 minutes';` (a growing backlog means no replica is claiming).
+5. **Acting on a dead letter** (`jobs:manage`, audited in `admin_audit_events` as
+   `job_retried` / `job_cancelled` with the written reason): fix the cause first
+   (for example SMTP credentials), then *Retry* (attempts reset, runs at once). Use
+   *Cancel* when the work should not happen any more. Handlers are idempotent: a
+   retried invite email re-checks that the invite is still pending and issues a
+   fresh link (only the newest email's link works); a reminder re-checks that the
+   student has not finished and the window is open; a seat release only releases a
+   seat that is still RESERVED.
+6. **Shutdown**: on SIGTERM the worker stops claiming at once, waits up to 3 s
+   after the HTTP drain for running jobs, and gives unfinished leases back
+   (status PENDING, the attempt not counted) so another replica continues.
+7. **Delivery semantics**: at-least-once. If a replica dies after an email was sent
+   but before the job is marked done, the retry sends it once more; the dedupe key
+   still prevents the job being scheduled twice.

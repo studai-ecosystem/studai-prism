@@ -8,7 +8,7 @@ import * as v1Store from '../../lib/store.js'
 import { assuranceForSession } from '../../lib/identityAssurance.js'
 import { legacySupportSources } from '../support/legacySources.js'
 import { buildCatalog, formForSession } from '../assessments/catalog.js'
-import { isMailEnabled, sendOrgInviteEmail, sendCampusAssignmentEmail } from '../../lib/mailer.js'
+import { isMailEnabled, sendOrgInviteEmail, sendCampusAssignmentEmail, sendCampusAssignmentReminderEmail } from '../../lib/mailer.js'
 import { findUserById, findUserByEmail } from '../../lib/db.js'
 import evidenceGraph from '../../lib/evidenceGraph.js'
 import roleAffinityEngine from '../../lib/roleAffinityEngine.js'
@@ -77,6 +77,8 @@ export function createDefaultCampusContext({ complete = completeViaGateway } = {
     sendInviteEmail: async (msg) => (isMailEnabled() && base ? sendOrgInviteEmail(msg) : false),
     inviteUrlFor: (token) => `${base}/app/campus-invite/${encodeURIComponent(token)}`,
     sendAssignmentEmail: async (msg) => (isMailEnabled() && base ? sendCampusAssignmentEmail(msg) : false),
+    // Job runner (PROD-READY Phase 5): a transport failure throws so the job retries.
+    sendReminderEmail: async (msg) => (isMailEnabled() && base ? sendCampusAssignmentReminderEmail(msg) : false),
     appUrl: base,
     // Only the fields admin views need; never password hashes or profile data.
     users: {

@@ -323,6 +323,18 @@ export const PERSONAL_DATA_REGISTRY = Object.freeze({
     decision_note: D('Staff decision note about the learner request'), decided_by: D(ROW_GONE),
   }, 'Pre-start accommodation requests on V3 assignments; linked to the session at start'),
 
+  // ── 0059 background job queue (PROD-READY Phase 5) ──
+  // Payloads are references only (kinds.js validates them with .strict()
+  // schemas: ids and a time bucket, never an address or free text);
+  // last_error is sanitised (no addresses, links or numbers); dedupe_key
+  // repeats ids already in the payload.
+  jobs: user({
+    subject_user_id: D('Account a job concerns (assignment reminders); the account step deletes the jobs of the person in every state'),
+    payload: D('Ids only (an invite id, an assignment id and the account id of the reminder); deleted with the row — invite-email jobs are found through the invites sent to the address of the person'),
+    result: D(ROW_GONE),
+    locked_by: R('Worker id (host:pid:random) of the replica holding the lease; not a person'),
+  }, 'Background jobs; finished rows are pruned after 30 days by the jobs.prune job'),
+
   // ── 0056 erasure ledger (this phase) ──
   privacy_erasure_runs: none({
     subject_ref: R('Keyed one-way hash of the account id (no personal data); lets an operator prove completion'),

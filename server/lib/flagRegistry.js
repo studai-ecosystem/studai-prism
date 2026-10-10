@@ -64,6 +64,11 @@ export const FLAG_CATALOGUE = [
   // identity-check routes for V3 sessions (the legacy routes are closed for
   // them, K104), their admin accommodation plane and UI entry points. Default OFF.
   { key: 'PRISM_V3_SUPPORT_ROUTES', risk: 'medium', owner: 'product', description: 'V3 support routes: one free human review per assessment (§11), accommodation requests before the start (§13), Level 1 identity self-declaration (§9; Level 3 not offered).', dataGate: 'PRISM_APP_SHELL_V3 live + migration 0058 + staff assigned to the review and accommodation queues (reports:review, accommodations:manage) + draft copy reviewed by counsel (HA-005) + operator flip (HA-C001)' },
+  // PROD-READY Phase 5: PostgreSQL-backed background job runner (no Redis) —
+  // CSV-import invite emails, assignment reminders, seat release after a
+  // window passes, scheduled retention passes (those still need
+  // PRISM_RETENTION_ENFORCEMENT) and the admin job-queue view. Default OFF.
+  { key: 'PRISM_JOB_WORKER', risk: 'medium', owner: 'engineering', description: 'Background job worker in the API container (one per replica, FOR UPDATE SKIP LOCKED): queued CSV-import invite emails, assignment reminder emails per reminder policy, release of RESERVED seats after an assignment window passes, recurring scans, and the /api/admin/job-queue dead-letter view. Off = CSV invites are sent inside the request as before and nothing is scheduled.', dataGate: 'DATABASE_URL + migration 0059 + SMTP and PUBLIC_APP_URL verified in the environment + an operator watching dead letters (runbook: PERFORMANCE_REVIEW addendum 2026-10-10) + operator flip' },
   // Campus Phase 12 validation tooling (not a product surface). Default OFF.
   { key: 'PRISM_V3_RATING_QUEUE', risk: 'medium', owner: 'psychometrics', description: 'Blinded human double-rating queue for V3 evidence units (/api/validation, /api/admin/validation, /rater/evidence).', dataGate: 'DATABASE_URL + 0039 + qualified raters + rating protocol approved by the psychometrics lead (HA-C008)' },
 ]

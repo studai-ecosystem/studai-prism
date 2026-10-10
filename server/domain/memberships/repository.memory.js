@@ -26,6 +26,18 @@ export function createMembershipsRepoMemory(db) {
       const row = [...db.invites.values()].find((i) => i.tokenHash === tokenHash)
       return row ? withOrg(row) : null
     },
+    // PROD-READY Phase 5: a queued CSV-import invite is read by id when its
+    // email job runs, then gets the token that the email carries.
+    async getInviteById(id) {
+      const row = db.invites.get(id)
+      return row ? withOrg(row) : null
+    },
+    async setPendingInviteTokenHash(id, tokenHash) {
+      const row = db.invites.get(id)
+      if (!row || row.status !== 'PENDING') return false
+      row.tokenHash = tokenHash
+      return true
+    },
     async lockInvite(id) {
       const row = db.invites.get(id)
       return row ? { id: row.id, status: row.status, acceptedBy: row.acceptedBy ?? null } : null

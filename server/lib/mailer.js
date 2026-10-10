@@ -179,3 +179,35 @@ export async function sendCampusAssignmentEmail({ to, organizationName, assessme
   })
   return true
 }
+
+// PROD-READY Phase 5 (K80): reminder for a sponsored assessment that is due
+// soon and not finished yet, sent by the job runner per the assignment's
+// reminder policy (once per student per window). Same escaping and no
+// student name, like the assignment email.
+export async function sendCampusAssignmentReminderEmail({ to, organizationName, assessmentTitle, dueAt = null, url }) {
+  const transport = await getTransport()
+  if (!transport) throw new Error('mail_not_configured')
+  const fromAddress = process.env.MAIL_FROM || process.env.SMTP_USER
+  const fromName = process.env.MAIL_FROM_NAME || 'StudAI Prism'
+  const org = String(organizationName || 'Your institution').replace(/[\r\n]+/g, ' ').slice(0, 120)
+  const title = String(assessmentTitle || 'A Prism assessment').replace(/[\r\n]+/g, ' ').slice(0, 160)
+  const due = dueAt ? ` It is due by ${new Date(dueAt).toUTCString()}.` : ''
+  await transport.sendMail({
+    from: `"${fromName}" <${fromAddress}>`,
+    to,
+    subject: `Reminder: "${title}" from ${org}`,
+    text:
+      `This is a reminder that ${org} assigned you "${title}" and it is not finished yet.${due}\n\n` +
+      `Open your campus workspace to read the briefing, including what ${org} can and cannot see:\n\n${url}\n\n` +
+      `If you have already finished, you can ignore this message.\n\n— StudAI Prism`,
+    html:
+      `<div style="font-family:Arial,Helvetica,sans-serif;color:#1A1A2E;line-height:1.6">` +
+      `<p>This is a reminder that <strong>${escapeHtml(org)}</strong> assigned you <strong>${escapeHtml(title)}</strong> and it is not finished yet.${escapeHtml(due)}</p>` +
+      `<p>Open your campus workspace to read the briefing, including what they can and cannot see:</p>` +
+      `<p><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></p>` +
+      `<p>If you have already finished, you can ignore this message.</p>` +
+      `<p style="color:#7A7F8C;font-size:13px;margin-top:16px">— StudAI Prism</p>` +
+      `</div>`,
+  })
+  return true
+}

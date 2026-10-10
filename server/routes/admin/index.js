@@ -54,6 +54,7 @@ import validationRouter from './validation.js'
 import qualityRouter from './quality.js'
 import reportReviewsRouter from './reportReviews.js'
 import accommodationRequestsRouter from './accommodationRequests.js'
+import jobQueueRouter from './jobQueue.js'
 
 const router = Router()
 
@@ -148,5 +149,7 @@ router.use('/quality', qualityRouter)
 router.use('/report-reviews', reportReviewsRouter)
 // PROD-READY Phase 4 — V3 pre-start accommodation requests (dark behind PRISM_V3_SUPPORT_ROUTES).
 router.use('/accommodation-requests', accommodationRequestsRouter)
+// PROD-READY Phase 5 — background job queue: counts, dead letters, audited retry/cancel (dark behind PRISM_JOB_WORKER).
+router.use('/job-queue', jobQueueRouter)
 
 export default router

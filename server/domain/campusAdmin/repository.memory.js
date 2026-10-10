@@ -152,6 +152,17 @@ export function createCampusAdminRepoMemory(db) {
     async listOrgAssignments(organizationId) {
       return [...db.assignments.values()].filter((a) => a.organizationId === organizationId && a.sponsorType === 'INSTITUTION').map(clone)
     },
+    // PROD-READY Phase 5 scans (reminders, seat release): institution
+    // assignments in the given statuses whose window ends in (after, before].
+    async listInstitutionAssignmentsEndingBetween({ after, before, statuses }) {
+      const a0 = new Date(after).getTime()
+      const b0 = new Date(before).getTime()
+      return [...db.assignments.values()]
+        .filter((a) => a.sponsorType === 'INSTITUTION' && statuses.includes(a.status) && a.windowEnd
+          && new Date(a.windowEnd).getTime() > a0 && new Date(a.windowEnd).getTime() <= b0)
+        .sort((x, y) => String(x.windowEnd).localeCompare(String(y.windowEnd)) || String(x.id).localeCompare(String(y.id)))
+        .map(clone)
+    },
     async listAssignmentStudents(assignmentId) {
       return [...db.assignmentStudents.values()].filter((s) => s.assignmentId === assignmentId).map(clone)
     },

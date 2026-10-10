@@ -38,6 +38,7 @@ export const RETENTION_DEFAULTS = [
   { entity: 'payment_records', retentionDays: 2920, basis: `${PROVISIONAL_BASIS} Statutory retention, provisionally configured around 8 years — NOT legally approved until counsel signs off.` },
   { entity: 'revoked_credential_tombstone', retentionDays: null, basis: 'Content-free tombstone retained indefinitely for verification integrity.' },
   { entity: 'student_import_rows_raw', retentionDays: 30, basis: `${PROVISIONAL_BASIS} Raw CSV cells of student imports (emails, names, roll numbers): cleared 30 days after the import is committed or cancelled (PROD-READY Phase 2, SECURITY_REVIEW S8).` },
+  { entity: 'accommodation_requests_unstarted', retentionDays: 30, basis: `${PROVISIONAL_BASIS} Pre-start accommodation requests whose assessment never started (needs text may reference disability): deleted 30 days after the assignment window ended or the assignment was closed (PROD-READY Phase 5).` },
 ]
 
 // Governed constant (PROVISIONAL pending HA-003): days after an import job is
@@ -45,9 +46,18 @@ export const RETENTION_DEFAULTS = [
 // row above seeds the same value; an operator decision or contract override
 // changes the effective period (longest wins, effectiveRetentionDays).
 // Purge: server/domain/privacy/importRowRetention.js (deliberate operator run
-// today; scheduling is PROD-READY Phase 5, dark behind PRISM_RETENTION_ENFORCEMENT).
+// today; PROD-READY Phase 5 schedules it on the job runner, dark behind
+// PRISM_RETENTION_ENFORCEMENT).
 export const IMPORT_ROW_RAW_ENTITY = 'student_import_rows_raw'
 export const IMPORT_ROW_RAW_RETENTION_DAYS = 30
+
+// Governed constant (PROVISIONAL pending HA-003): days after an assignment
+// window ends (or the assignment is closed/cancelled) before a pre-start
+// accommodation request that was never linked to a started session is
+// deleted. Purge: server/domain/privacy/accommodationRequestRetention.js,
+// scheduled by the job runner only while PRISM_RETENTION_ENFORCEMENT is on.
+export const ACCOMMODATION_REQUEST_UNSTARTED_ENTITY = 'accommodation_requests_unstarted'
+export const ACCOMMODATION_REQUEST_UNSTARTED_RETENTION_DAYS = 30
 
 // Idempotent seed of the charter categories into data_retention_rules,
 // labelled provisional. Existing operator-decided rows are never overwritten.
@@ -175,6 +185,9 @@ export async function runRetention(entity, { dryRun = true, ranBy = null } = {})
 // ── Scheduler (charter §16 "scheduled enforcement jobs") ─────────────────────
 // Starts ONLY under PRISM_RETENTION_ENFORCEMENT (default OFF). One pass per
 // interval over the enforceable entities, in enforce mode, receipts + logs.
+// PROD-READY Phase 5: while the job worker runs (PRISM_JOB_WORKER), the same
+// pass is the queued job `retention.enforce` (once per day across replicas)
+// and server/index.js does not start this in-process timer.
 let _timer = null
 export function startRetentionScheduler({ intervalMs = 24 * 60 * 60 * 1000 } = {}) {
   if (!isRetentionEnforcementEnabled() || _timer) return false

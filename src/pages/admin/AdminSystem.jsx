@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminFetch } from '../../lib/adminApi.js'
 import { PageHeader, ErrorNotice, Toolbar, Pill, when, mono } from './ui.jsx'
+import AdminJobQueue from './AdminJobQueue.jsx'
 
 // ── /admin/system — integration health, models, job monitor (Phase 5) ────────
 // Read-only panels. Booleans and latencies only — secrets never leave the env.
@@ -94,6 +95,9 @@ export default function AdminSystem() {
           <p className="mt-2 font-mono text-[10px] text-[var(--prism-ink-muted)]">{models.note}</p>
         </section>
       )}
+
+      {/* PROD-READY Phase 5: renders nothing while PRISM_JOB_WORKER is off. */}
+      <AdminJobQueue />
 
       {jobs && (
         <section className="mt-4 mb-10 rounded-[10px] border border-[var(--prism-border)] bg-[var(--prism-surface)] p-4">

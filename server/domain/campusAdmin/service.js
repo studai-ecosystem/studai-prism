@@ -30,6 +30,25 @@ export function assertContentAssignable(formId, registry = contentRegistry) {
 }
 const COMPLETION_THRESHOLDS = [50, 100]
 
+// PROD-READY Phase 5 job runner (K69/K79/K80).
+// A window that passed releases the seats of starts that never finished once
+// this grace period is over, so a run that was in progress at the deadline is
+// never cut off by the release (the student view already shows EXPIRED).
+export const SEAT_RELEASE_GRACE_HOURS = 24
+// Scans look back this far for windows that passed (older ones were handled).
+export const SEAT_RELEASE_LOOKBACK_DAYS = 30
+// Reminder policy (stored on the assignment since C7.08): `daysBeforeDue`
+// clamped to 1..14; default 2 (the value the launch form stores).
+export const REMINDER_MAX_DAYS_BEFORE_DUE = 14
+const REMINDER_SKIP_STATUSES = new Set(['COMPLETED', 'WITHDRAWN', 'EXPIRED'])
+const SYSTEM_ACTOR = 'system:job-runner'
+const HOUR_MS = 60 * 60 * 1000
+const DAY_MS = 24 * HOUR_MS
+export function reminderDaysBeforeDue(policy) {
+  const n = Number(policy?.daysBeforeDue)
+  return Number.isInteger(n) ? Math.min(REMINDER_MAX_DAYS_BEFORE_DUE, Math.max(1, n)) : 2
+}
+
 // The exact disclosure a student reads before a sponsored assessment
 // (mirrors the student briefing copy; version-stamped).
 export function consentPreviewFor(organizationName) {
@@ -45,6 +64,10 @@ export function consentPreviewFor(organizationName) {
 export function createCampusAdminService({
   repos, users, invites, catalog, clock = () => new Date(), audit = () => {},
   sendAssignmentEmail = async () => false, appUrl = '', ledger = null,
+  // PROD-READY Phase 5: CSV-import invites go through the job queue while
+  // this returns true (PRISM_JOB_WORKER on and a store with a jobs table).
+  queueImportInvites = () => false,
+  sendReminderEmail = async () => false,
   // P8.7 content approval registry (tests inject one with a known state).
   contentRegistry: registry = contentRegistry,
   // Called whenever a student is (re)attached to a cohort (Phase 8 interventions).
@@ -176,6 +199,26 @@ export function createCampusAdminService({
     return store().createNotification({ userId, organizationId, kind, payload })
   }
 
+  // Seats reserved by starts that never finished go back to the pool
+  // (K69 follow-up, K79): the ledger only releases an OPEN reservation, so a
+  // CONSUMED seat is never touched and a second pass releases nothing.
+  async function releaseUnfinishedSeats(assignmentId) {
+    let released = 0
+    if (!ledger || !repos.sessionIo) return released
+    for (const s of await store().listAssignmentStudents(assignmentId)) {
+      if (s.status === 'COMPLETED' || !s.sessionId) continue
+      const start = await repos.sessionIo.getClientEvent(s.sessionId, 'start').catch(() => null)
+      const entitlementId = start?.response?.entitlementId
+      if (!entitlementId) continue
+      const out = await ledger.release({ entitlementId, user: { id: s.userId }, sessionId: s.sessionId }).catch((err) => {
+        if (err?.code === 'CONFLICT') return null
+        throw err
+      })
+      if (out && !out.replayed) released += 1
+    }
+    return released
+  }
+
   async function runCommit(req, actor, organizationId, decision, job, commitKey) {
     const rows = await store().listImportRows(job.id)
     const outcomes = {}
@@ -211,7 +254,7 @@ export function createCampusAdminService({
     for (const [cohortId, list] of byCohort) {
       const emails = list.map((r) => r.normalized.email)
       try {
-        await invites.createInvites({ actor, orgId: organizationId, role: 'STUDENT', emails, cohortId })
+        await invites.createInvites({ actor, orgId: organizationId, role: 'STUDENT', emails, cohortId, delivery: queueImportInvites() ? 'QUEUE' : 'SEND' })
         for (const r of list) outcomes[r.rowNumber] = 'INVITED'
         // A re-imported student keeps one working link: the new one.
         for (const old of before.filter((i) => emails.includes(i.email) && !revoked.includes(i.id))) {
@@ -680,22 +723,7 @@ export function createCampusAdminService({
       }
       if (!['CLOSED', 'CANCELLED'].includes(status)) throw new ApiError('VALIDATION_FAILED', 'Choose close or cancel.')
       const row = await store().setAssignmentStatus(a.id, status)
-      // Seats reserved by starts that never finished go back to the pool
-      // (K69 follow-up): the ledger only releases an OPEN reservation.
-      let released = 0
-      if (ledger && repos.sessionIo) {
-        for (const s of await store().listAssignmentStudents(a.id)) {
-          if (s.status === 'COMPLETED' || !s.sessionId) continue
-          const start = await repos.sessionIo.getClientEvent(s.sessionId, 'start').catch(() => null)
-          const entitlementId = start?.response?.entitlementId
-          if (!entitlementId) continue
-          const out = await ledger.release({ entitlementId, user: { id: s.userId }, sessionId: s.sessionId }).catch((err) => {
-            if (err?.code === 'CONFLICT') return null
-            throw err
-          })
-          if (out && !out.replayed) released += 1
-        }
-      }
+      const released = await releaseUnfinishedSeats(a.id)
       await orgAudit(req, organizationId, `assignment.${status.toLowerCase()}`, 'ASSIGNMENT', a.id, { seatsReleased: released })
       return row
     },
@@ -710,6 +738,81 @@ export function createCampusAdminService({
       if (!reached.length) return
       const already = (await store().listNotifications(a.createdBy, { limit: 200 })).filter((n) => n.kind === 'COMPLETION_THRESHOLD' && n.payload?.assignmentId === a.id).map((n) => n.payload.threshold)
       for (const t of reached.filter((x) => !already.includes(x))) await notify({ userId: a.createdBy, organizationId, kind: 'COMPLETION_THRESHOLD', payload: { assignmentId: a.id, threshold: t } })
+    },
+
+    // ── Background jobs (PROD-READY Phase 5; called by the job handlers) ──
+    // Reminder scan (K80): for each live institution assignment whose policy
+    // enables reminders and whose window ends within `daysBeforeDue`, one
+    // reminder job per student who has not finished. The dedupe key
+    // (assignment, student, window end) sends a reminder once per recipient
+    // per window; moving the window end allows one more.
+    async scanReminders({ enqueue }) {
+      const now = clock()
+      const due = await store().listInstitutionAssignmentsEndingBetween({
+        after: now.toISOString(), before: new Date(now.getTime() + REMINDER_MAX_DAYS_BEFORE_DUE * DAY_MS).toISOString(), statuses: ['ACTIVE', 'SCHEDULED'],
+      })
+      let assignments = 0
+      let enqueued = 0
+      for (const a of due) {
+        if (!a.reminderPolicy?.enabled) continue
+        if (a.windowStart && new Date(a.windowStart) > now) continue
+        if (new Date(a.windowEnd).getTime() - reminderDaysBeforeDue(a.reminderPolicy) * DAY_MS > now.getTime()) continue
+        assignments += 1
+        for (const s of await store().listAssignmentStudents(a.id)) {
+          if (REMINDER_SKIP_STATUSES.has(s.status)) continue
+          const out = await enqueue({ kind: 'campus.assignment_reminder', payload: { assignmentId: a.id, userId: s.userId }, dedupeKey: `${a.id}:${s.userId}:${a.windowEnd}` })
+          if (out.created) enqueued += 1
+        }
+      }
+      return { assignments, enqueued }
+    },
+    // One reminder (idempotent re-checks): still live, window still open,
+    // the student is still an active member and has not finished.
+    async sendAssignmentReminder({ assignmentId, userId }) {
+      const now = clock()
+      const a = await repos.assessments.getAssignment(assignmentId)
+      if (!a || a.sponsorType !== 'INSTITUTION') return { outcome: 'GONE' }
+      if (!['ACTIVE', 'SCHEDULED'].includes(a.status)) return { outcome: 'NOT_LIVE' }
+      if (!a.windowEnd || new Date(a.windowEnd) <= now) return { outcome: 'WINDOW_PASSED' }
+      const s = (await store().listAssignmentStudents(a.id)).find((x) => x.userId === userId)
+      if (!s || REMINDER_SKIP_STATUSES.has(s.status)) return { outcome: 'NOT_DUE' }
+      const member = (await store().listOrgMemberships(a.organizationId)).some((m) => m.userId === userId && m.role === 'STUDENT' && m.status === 'ACTIVE')
+      if (!member) return { outcome: 'NOT_MEMBER' }
+      const org = await repos.organizations.getOrganization(a.organizationId)
+      if (!org || org.status !== 'ACTIVE') return { outcome: 'ORGANIZATION_INACTIVE' }
+      const card = await userCard(userId)
+      if (!card.email || !appUrl) return { outcome: 'NOT_SENT' }
+      const title = (await catalog.getCatalog()).definitions.find((d) => d.id === a.definitionId)?.title || null
+      const sent = await sendReminderEmail({ to: card.email, organizationName: org.name, assessmentTitle: title, dueAt: a.windowEnd, url: `${appUrl}/app/campus/${a.organizationId}/assignments` })
+      return { outcome: sent ? 'SENT' : 'NOT_SENT' }
+    },
+    // Seat-release scan (K69/K79): one release job per live institution
+    // assignment whose window ended more than the grace period ago.
+    async scanSeatReleases({ enqueue }) {
+      const now = clock().getTime()
+      const ended = await store().listInstitutionAssignmentsEndingBetween({
+        after: new Date(now - SEAT_RELEASE_LOOKBACK_DAYS * DAY_MS).toISOString(), before: new Date(now - SEAT_RELEASE_GRACE_HOURS * HOUR_MS).toISOString(), statuses: ['ACTIVE', 'SCHEDULED'],
+      })
+      let enqueued = 0
+      for (const a of ended) {
+        const out = await enqueue({ kind: 'campus.seat_release', payload: { assignmentId: a.id }, dedupeKey: `${a.id}:${a.windowEnd}` })
+        if (out.created) enqueued += 1
+      }
+      return { assignments: ended.length, enqueued }
+    },
+    // Releases RESERVED seats of unfinished starts once the window passed
+    // (+ grace); never touches a CONSUMED seat; billing is unaffected. The
+    // assignment status is not changed (closing stays an admin action).
+    async releaseWindowSeats({ assignmentId }) {
+      const a = await repos.assessments.getAssignment(assignmentId)
+      if (!a || a.sponsorType !== 'INSTITUTION') return { outcome: 'GONE', released: 0 }
+      if (!['ACTIVE', 'SCHEDULED'].includes(a.status)) return { outcome: 'NOT_LIVE', released: 0 }
+      if (!a.windowEnd || new Date(a.windowEnd).getTime() + SEAT_RELEASE_GRACE_HOURS * HOUR_MS > clock().getTime()) return { outcome: 'NOT_DUE', released: 0 }
+      const released = await releaseUnfinishedSeats(a.id)
+      if (released) {
+        await store().appendOrgAudit({ organizationId: a.organizationId, actorUserId: SYSTEM_ACTOR, action: 'assignment.seats_released', targetType: 'ASSIGNMENT', targetId: a.id, details: { seatsReleased: released, reason: 'WINDOW_PASSED' }, requestId: null })
+      }
+      return { outcome: 'RELEASED', released }
     },
 
     // ── Team (§29) ────────────────────────────────────────────────────────

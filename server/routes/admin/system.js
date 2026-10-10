@@ -9,10 +9,10 @@
 //                                 recent exports (real observable work)
 //   POST /jobs/:id/cancel jobs:manage  cancel a QUEUED system job
 //
-// Honesty note: there is no queue runtime in this codebase (fire-and-forget
-// promises + externally-run Python jobs). The monitor shows REAL records; the
-// system_jobs table is the substrate for a future queue — no fake retry
-// buttons for work nothing can re-run.
+// Honesty note: the monitor shows REAL records only. system_jobs has no
+// writer; the PostgreSQL job queue added in PROD-READY Phase 5 (table `jobs`,
+// dark behind PRISM_JOB_WORKER) has its own view with audited retry/cancel of
+// dead letters at /api/admin/job-queue (routes/admin/jobQueue.js).
 
 import { Router } from 'express'
 import logger from '../../lib/logger.js'
@@ -178,7 +178,12 @@ router.get('/jobs', requirePermission('system:read'), async (req, res) => {
       systemJobs,
       calibrationRuns,
       recentExports: exports_,
-      runtime: 'No queue runtime exists — calibration jobs are operator-run Python; system_jobs is the substrate for future queued work.',
+      // PROD-READY Phase 5: the PostgreSQL job queue (table `jobs`) has its
+      // own view, /api/admin/job-queue, live only while PRISM_JOB_WORKER is on.
+      runtime: process.env.PRISM_JOB_WORKER === 'true'
+        ? 'Background job worker is on: invites, reminders, seat release and scheduled passes run on the PostgreSQL job queue (see Job queue). Calibration jobs are operator-run Python.'
+        : 'Background job worker is off (PRISM_JOB_WORKER) — CSV-import invites are sent inside the request and nothing is scheduled. Calibration jobs are operator-run Python; system_jobs has no writer.',
+      jobQueue: process.env.PRISM_JOB_WORKER === 'true',
     })
   } catch (err) {
     logger.captureException(err, { msg: 'admin_jobs_failed', requestId: req.requestId })
