@@ -145,7 +145,7 @@ Tooling note: the shared `withpg.mjs` helper runs the command with `spawnSync`, 
 ## Phase 3 — Multi-instance and data-integrity readiness (S6)
 Status: COMPLETE
 Branch: `prod/p03-multi-instance` (from `prod/p02-erasure-cascade` @ `52ae461`)
-Commit: recorded by the follow-up commit (code, tests, docs in the Phase 3 commit)
+Commit: `f4cf8e3` (code, tests, docs) + follow-up commit recording this hash
 Gates: see table
 
 V3 session operations are serialised across instances by PostgreSQL advisory locks and artifact saves reserve their version row before the engine (P32, P33); the multi-writes named by the charter are repository transactions (P34, P35); migration 0057 adds the equivalence/snapshot guards, a two-ratings-per-item backstop and the persisted session form id (P36, P37); the JSON→PG rehearsal ran at realistic size and found and fixed a quadratic reconciliation (P38); the erasure pseudonym key fails closed in production (P39). Integrity fixes of existing behaviour ship on: no new route, no new flag, no flag flipped, nothing deployed, the cutover NOT executed. The frozen legacy router and every committed migration are untouched.
