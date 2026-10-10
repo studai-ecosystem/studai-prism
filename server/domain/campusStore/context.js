@@ -129,11 +129,11 @@ export function createCampusContext({
   let admin = null
   const invites = createInviteService({
     repos, sendInviteEmail, inviteUrlFor, clock, ...(tokenFactory ? { tokenFactory } : {}), ...(audit ? { audit } : {}),
-    onCohortJoined: ({ organizationId, cohortId, userId }) => admin.syncRoster(organizationId, cohortId, userId),
+    onCohortJoined: ({ organizationId, cohortId, userId, repos: tx = null }) => admin.syncRoster(organizationId, cohortId, userId, tx),
   })
   admin = createCampusAdminService({
     repos: storeView, users, invites, catalog, clock, audit: auditWriter, appUrl, ledger, ...(sendAssignmentEmail ? { sendAssignmentEmail } : {}),
-    onRosterSync: (organizationId, cohortId, userId) => development.syncCohortMember(organizationId, cohortId, userId),
+    onRosterSync: (organizationId, cohortId, userId, tx = null) => development.syncCohortMember(organizationId, cohortId, userId, tx),
   })
   const growth = createGrowthService({ repos: storeView, catalog, clock, audit: auditWriter, entryFor: createSessionEntryLoader({ catalog, evidence, legacy, reportReviews: { listForSession: (id) => (storeView.reportReviews ? storeView.reportReviews.listForSession(id) : []) } }) })
   // P7: private preparation and SELF_REPORT check-ins (PERSONAL only). Its

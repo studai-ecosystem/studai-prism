@@ -9,6 +9,7 @@ const ALLOWED_TARGETS = new Set([
   'db/migrateStore.js',
   'db/purgeImportRows.js',
   'db/erasureLedger.js',
+  'db/pinSessionForms.js',
   'db/seedAdmin.js',
   'db/seedItems.js',
 ])

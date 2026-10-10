@@ -25,6 +25,7 @@ import { dirname, join } from 'path'
 import { promises as fs } from 'fs'
 import { query } from './pool.js'
 import { canonicalStringify, sha256hex } from '../lib/credentials.js'
+import { pinJsonFiles, unpinJsonFiles } from '../lib/jsonStoreSnapshot.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.DATA_DIR || join(__dirname, '..', 'data')
@@ -145,17 +146,20 @@ async function copySessions(sessions, apply) {
     copied += 1
     if (!apply) continue
     const { sessionId, scenarioId = null, userId = null, userEmail = null,
-      startedAt = null, completedAt = null, updatedAt = null, ...rest } = rec
+      startedAt = null, completedAt = null, updatedAt = null, assessmentFormId = null, ...rest } = rec
+    // PROD-READY Phase 3 (0057): a recorded form id moves to its column and
+    // an id already in PostgreSQL is never replaced.
     await query(
-      `INSERT INTO v1_sessions (session_id, scenario_id, user_id, user_email, data, started_at, completed_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      `INSERT INTO v1_sessions (session_id, scenario_id, user_id, user_email, data, started_at, completed_at, updated_at, assessment_form_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT (session_id) DO UPDATE SET
          scenario_id = EXCLUDED.scenario_id, user_id = EXCLUDED.user_id,
          user_email = EXCLUDED.user_email, data = EXCLUDED.data,
          started_at = EXCLUDED.started_at, completed_at = EXCLUDED.completed_at,
-         updated_at = EXCLUDED.updated_at`,
+         updated_at = EXCLUDED.updated_at,
+         assessment_form_id = COALESCE(v1_sessions.assessment_form_id, EXCLUDED.assessment_form_id)`,
       [sessionId, scenarioId, userId, userEmail, JSON.stringify(rest),
-        startedAt, completedAt, updatedAt],
+        startedAt, completedAt, updatedAt, assessmentFormId],
     )
   }
   return copied
@@ -326,11 +330,23 @@ function normalize(rec, defaults, absentWhenNull = []) {
 
 const USER_DEFAULTS = { name: '', college: '', year: '', candidateId: null, accountState: 'active', tokenVersion: 0, ageDeclaration: null }
 const SESSION_DEFAULTS = { startedAt: null, completedAt: null, updatedAt: null }
-const SESSION_ABSENT_WHEN_NULL = ['scenarioId', 'userId', 'userEmail']
+const SESSION_ABSENT_WHEN_NULL = ['scenarioId', 'userId', 'userEmail', 'assessmentFormId']
 const PAYMENT_DEFAULTS = { userId: null, userEmail: null }
 const DEVICE_DEFAULTS = { sessionId: '', status: 'pending', phoneUserAgent: '' }
+const REDEMPTION_DEFAULTS = { orderId: null, sessionId: null, userId: null }
 
 export async function reconcileStores() {
+  // PROD-READY Phase 3: the JSON files are pinned read-only for the whole
+  // reconciliation (one parse each instead of one per record; writes refused).
+  await pinJsonFiles([STORE_FILE, USERS_FILE])
+  try {
+    return await reconcilePinned()
+  } finally {
+    unpinJsonFiles()
+  }
+}
+
+async function reconcilePinned() {
   const [jsonStore, pgStore, dbJson, dbPg] = await Promise.all([
     import('../lib/storeJson.js'), import('../lib/storePg.js'),
     import('../lib/dbJson.js'), import('../lib/dbPg.js'),
@@ -369,6 +385,10 @@ export async function reconcileStores() {
   await compareKeyed('verifications', Object.keys(snap.verifications), jsonStore.getVerification, pgStore.getVerification)
   await compareKeyed('deviceLinks', Object.keys(snap.deviceLinks), jsonStore.getDeviceLink, pgStore.getDeviceLink, DEVICE_DEFAULTS)
   await compareKeyed('accommodations', Object.keys(snap.accommodations), jsonStore.getAccommodation, pgStore.getAccommodation)
+  // PROD-READY Phase 3: the single-use payment ledger (0055) is reconciled
+  // too (it was copied but not compared). Keyed on the JSON ledger; rows PG
+  // backfilled from older paid entitlements have no JSON twin by design.
+  await compareKeyed('paymentRedemptions', Object.keys(snap.paymentRedemptions), jsonStore.getPaymentRedemption, pgStore.getPaymentRedemption, REDEMPTION_DEFAULTS)
 
   // Append-only buckets compared as whole per-session arrays.
   const eventSessions = [...new Set(snap.events.map((e) => e.sessionId))]

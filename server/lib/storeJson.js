@@ -5,6 +5,8 @@
 // storePg.js; store.js dispatches between them.
 
 import { fileURLToPath } from 'url'
+import { withRecordedForm } from './sessionFormResolver.js'
+import { pinnedJson, assertNotPinned } from './jsonStoreSnapshot.js'
 import { dirname, join } from 'path'
 import { promises as fs } from 'fs'
 
@@ -49,6 +51,11 @@ async function atomicRename(src, dest, retries = 5) {
 // JSON store safe for scale-out (2+ instances still race read-modify-write).
 // Multi-instance deployments must run PRISM_PG_STORE=true.
 function writeDB(db) {
+  try {
+    assertNotPinned(DB_FILE)
+  } catch (err) {
+    return Promise.reject(err)
+  }
   writeChain = writeChain.then(async () => {
     const tmp = `${DB_FILE}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`
     await fs.writeFile(tmp, JSON.stringify(db, null, 2))
@@ -58,9 +65,10 @@ function writeDB(db) {
 }
 
 async function readDB() {
-  await ensureFile()
+  const pin = pinnedJson(DB_FILE)
+  if (!pin) await ensureFile()
   try {
-    const parsed = JSON.parse(await fs.readFile(DB_FILE, 'utf-8'))
+    const parsed = pin ? pin.parsed || {} : JSON.parse(await fs.readFile(DB_FILE, 'utf-8'))
     return {
       sessions: parsed.sessions || {},
       payments: parsed.payments || {},
@@ -152,6 +160,7 @@ export async function listEntitlementsByUser(userId) {
 }
 
 export async function createSession(sessionId, data) {
+  data = await withRecordedForm(data)
   const db = await readDB()
   db.sessions[sessionId] = {
     sessionId,

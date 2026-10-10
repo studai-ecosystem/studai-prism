@@ -7,6 +7,7 @@
 // null defaults, field names) so callers and the frontend see no difference.
 
 import { query, getPool } from '../db/pool.js'
+import { withRecordedForm } from './sessionFormResolver.js'
 
 // ── Payments ────────────────────────────────────────────────────────────────
 export async function createEntitlement({ sessionId, paymentId, orderId, amount, mode, userId, userEmail }) {
@@ -126,6 +127,8 @@ function rowToSession(row) {
     userId: row.user_id ?? undefined,
     userEmail: row.user_email ?? undefined,
     ...(row.data || {}),
+    // PROD-READY Phase 3 (0057): the form the session was taken on.
+    ...(row.assessment_form_id ? { assessmentFormId: row.assessment_form_id } : {}),
     startedAt: row.started_at != null ? Number(row.started_at) : null,
     completedAt: row.completed_at != null ? Number(row.completed_at) : null,
     updatedAt: row.updated_at != null ? Number(row.updated_at) : null,
@@ -134,21 +137,26 @@ function rowToSession(row) {
 
 export async function createSession(sessionId, data = {}) {
   const now = Date.now()
-  const { scenarioId = null, userId = null, userEmail = null, ...rest } = data
-  await query(
-    `INSERT INTO v1_sessions (session_id, scenario_id, user_id, user_email, data, started_at, completed_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,NULL,$7)
+  data = await withRecordedForm(data)
+  const { scenarioId = null, userId = null, userEmail = null, assessmentFormId = null, ...rest } = data
+  // The persisted form id is never replaced once recorded (0057).
+  const r = await query(
+    `INSERT INTO v1_sessions (session_id, scenario_id, user_id, user_email, data, started_at, completed_at, updated_at, assessment_form_id)
+     VALUES ($1,$2,$3,$4,$5,$6,NULL,$7,$8)
      ON CONFLICT (session_id) DO UPDATE SET
        scenario_id = EXCLUDED.scenario_id, user_id = EXCLUDED.user_id,
        user_email = EXCLUDED.user_email, data = EXCLUDED.data,
-       started_at = EXCLUDED.started_at, completed_at = NULL, updated_at = EXCLUDED.updated_at`,
-    [sessionId, scenarioId, userId, userEmail, JSON.stringify(rest), now, now],
+       started_at = EXCLUDED.started_at, completed_at = NULL, updated_at = EXCLUDED.updated_at,
+       assessment_form_id = COALESCE(v1_sessions.assessment_form_id, EXCLUDED.assessment_form_id)
+     RETURNING assessment_form_id`,
+    [sessionId, scenarioId, userId, userEmail, JSON.stringify(rest), now, now, assessmentFormId],
   )
+  const storedFormId = r?.rows?.[0]?.assessment_form_id ?? null
   // A started session consumes its entitlement.
   await query('UPDATE v1_payments SET consumed = true WHERE session_id = $1', [sessionId])
   return rowToSession({
     session_id: sessionId, scenario_id: scenarioId, user_id: userId, user_email: userEmail,
-    data: rest, started_at: now, completed_at: null, updated_at: now,
+    data: rest, started_at: now, completed_at: null, updated_at: now, assessment_form_id: storedFormId,
   })
 }
 
@@ -184,12 +192,15 @@ export async function updateSession(sessionId, patch = {}) {  const existing = a
   if (!existing) return null
   const merged = { ...existing, ...patch, updatedAt: Date.now() }
   const { sessionId: _s, scenarioId = null, userId = null, userEmail = null,
-    startedAt = null, completedAt = null, updatedAt, ...rest } = merged
+    startedAt = null, completedAt = null, updatedAt, assessmentFormId = null, ...rest } = merged
+  // assessment_form_id is set once (COALESCE): an update never remaps it.
   await query(
     `UPDATE v1_sessions SET scenario_id=$2, user_id=$3, user_email=$4, data=$5,
-       started_at=$6, completed_at=$7, updated_at=$8 WHERE session_id=$1`,
-    [sessionId, scenarioId, userId, userEmail, JSON.stringify(rest), startedAt, completedAt, updatedAt],
+       started_at=$6, completed_at=$7, updated_at=$8,
+       assessment_form_id = COALESCE(assessment_form_id, $9) WHERE session_id=$1`,
+    [sessionId, scenarioId, userId, userEmail, JSON.stringify(rest), startedAt, completedAt, updatedAt, assessmentFormId],
   )
+  if (existing.assessmentFormId) merged.assessmentFormId = existing.assessmentFormId
   return merged
 }
 

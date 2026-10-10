@@ -49,8 +49,27 @@ async function seedShared() {
   for (const f of ['P2-FORM-A', 'P2-FORM-B']) {
     await query(`INSERT INTO assessment_forms (id, definition_id, version, scenario_id, capability_ids, status, frozen_at) VALUES ($1, 'P2-DEF', '1', $1, ARRAY['C1'], 'FROZEN', now()) ON CONFLICT DO NOTHING`, [f])
   }
-  await query(`INSERT INTO assessment_form_equivalence (form_a_id, form_b_id, status, evidence_ref, decided_by, decided_at)
+  // PROD-READY Phase 3 (P-row): migration 0057 refuses an APPROVED pair
+  // without its APPROVED decision row, so the fixture writes both in one
+  // transaction (the pair and its decision are unchanged otherwise).
+  {
+    const c = await getPool().connect()
+    try {
+      await c.query('BEGIN')
+      const { rowCount } = await c.query(`INSERT INTO assessment_form_equivalence (form_a_id, form_b_id, status, evidence_ref, decided_by, decided_at)
                VALUES ('P2-FORM-A', 'P2-FORM-B', 'APPROVED', 'doc-1', $1, now()) ON CONFLICT DO NOTHING`, [STAFF])
+      if (rowCount) {
+        await c.query(`INSERT INTO assessment_form_equivalence_decisions (form_a_id, form_b_id, status, evidence_ref, reason, decided_by, approval_id)
+                 VALUES ('P2-FORM-A', 'P2-FORM-B', 'APPROVED', 'doc-1', 'Synthetic fixture decision', $1, 'p2-approval')`, [STAFF])
+      }
+      await c.query('COMMIT')
+    } catch (err) {
+      await c.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      c.release()
+    }
+  }
   const assignment = `p2-asg-${randomUUID()}`
   await query(`INSERT INTO assessment_assignments (id, definition_id, form_policy, sponsor_type, organization_id, integrity_policy, accommodations_policy, reminder_policy, created_by, status)
                VALUES ($1, 'P2-DEF', 'SERVER_SELECTED', 'INSTITUTION', $2, 'STANDARD', '{}', '{}', $3, 'ACTIVE')`, [assignment, org, STAFF])

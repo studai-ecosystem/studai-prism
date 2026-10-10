@@ -21,6 +21,7 @@ import { createHash, createHmac } from 'node:crypto'
 import { isDbConfigured, query, getPool } from '../db/pool.js'
 import { withTransaction } from '../domain/campusStore/pgUtil.js'
 import { lockPublication } from '../domain/assessments/publicationFence.js'
+import { DEVELOPMENT_PSEUDONYM_KEY, assertErasureConfigured } from './erasureKey.js'
 
 // Text written over learner words that must stay in an append-only row.
 export const ERASED_TEXT = 'erased: removed on request'
@@ -58,7 +59,14 @@ export const sessionRef = (sessionId) => createHash('sha256')
 
 // Stable pseudonym for a person (audit actors, ledger owners). Keyed so the
 // mapping cannot be recomputed without the server key.
-const pseudonymKey = () => process.env.PRISM_ERASURE_PSEUDONYM_KEY || 'prism-erasure-v1'
+//
+// PROD-READY Phase 3: production fails closed without a real key
+// (lib/erasureKey.js).
+export { DEVELOPMENT_PSEUDONYM_KEY, MIN_PSEUDONYM_KEY_LENGTH, erasureKeyStatus, erasureNotConfiguredError, assertErasureConfigured } from './erasureKey.js'
+const pseudonymKey = () => {
+  assertErasureConfigured()
+  return process.env.PRISM_ERASURE_PSEUDONYM_KEY || DEVELOPMENT_PSEUDONYM_KEY
+}
 export const pseudonymFor = (userId) => `erased:${createHmac('sha256', pseudonymKey()).update(`actor:${userId}`).digest('hex').slice(0, 24)}`
 export const subjectRef = (userId) => createHmac('sha256', pseudonymKey()).update(`subject:${userId}`).digest('hex')
 // Pseudonym for an erased session id where an append-only audit row names it

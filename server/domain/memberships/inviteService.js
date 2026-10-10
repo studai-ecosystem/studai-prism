@@ -57,6 +57,10 @@ export function createInviteService({
     }
   }
 
+  // Multi-write unit: the store's transaction when it has one (both campus
+  // stores do), otherwise the plain repositories (test doubles).
+  const inTransaction = (fn) => (typeof repos.transaction === 'function' ? repos.transaction(fn) : fn(repos))
+
   async function loadInvite(token) {
     if (typeof token !== 'string' || token.length < 20 || token.length > 200) return null
     return repos.memberships.findInviteByTokenHash(hashToken(token))
@@ -136,34 +140,51 @@ export function createInviteService({
       if (existing && ['SUSPENDED', 'REMOVED'].includes(existing.status)) {
         throw new ApiError('FORBIDDEN', 'Your membership with this institution is not active. Contact your institution.')
       }
-      // Consent first: an ACTIVE sponsor membership never exists without the
-      // disclosure the student acknowledged (recorded once per copy version).
-      // Membership/workspace/cohort writes are upserts and the invite is
-      // marked ACCEPTED last, so a retry completes a partial acceptance.
-      const prior = (await repos.sharing.listConsents(user.id)).some((c) =>
-        c.organizationId === invite.organizationId && c.consentType === 'CAMPUS_SPONSORSHIP_DISCLOSURE'
-        && c.copyVersion === CAMPUS_DISCLOSURE_COPY_VERSION && !c.withdrawnAt)
-      if (!prior) {
-        await repos.sharing.recordConsent({
-          userId: user.id, organizationId: invite.organizationId, consentType: 'CAMPUS_SPONSORSHIP_DISCLOSURE',
-          copyVersion: CAMPUS_DISCLOSURE_COPY_VERSION, grantedAt: clock().toISOString(),
+      // PROD-READY Phase 3 (S6 family): consent, membership, workspace,
+      // cohort membership (and the roster sync it triggers) and the invite
+      // status are written in ONE repository transaction, so a failure leaves
+      // no partial acceptance. The invite row is re-read under the
+      // transaction and must still be PENDING, so two concurrent acceptances
+      // cannot both run the writes.
+      const workspace = await inTransaction(async (tx) => {
+        const current = typeof tx.memberships.lockInvite === 'function' ? await tx.memberships.lockInvite(invite.id) : invite
+        if (!current) throw new ApiError('NOT_FOUND', 'This invitation is not valid.')
+        if (current.status !== 'PENDING') {
+          if (current.status === 'ACCEPTED' && current.acceptedBy === user.id) return null
+          throw new ApiError('CONFLICT', 'This invitation has already been used.')
+        }
+        // Consent first: an ACTIVE sponsor membership never exists without
+        // the disclosure the student acknowledged (once per copy version).
+        const prior = (await tx.sharing.listConsents(user.id)).some((c) =>
+          c.organizationId === invite.organizationId && c.consentType === 'CAMPUS_SPONSORSHIP_DISCLOSURE'
+          && c.copyVersion === CAMPUS_DISCLOSURE_COPY_VERSION && !c.withdrawnAt)
+        if (!prior) {
+          await tx.sharing.recordConsent({
+            userId: user.id, organizationId: invite.organizationId, consentType: 'CAMPUS_SPONSORSHIP_DISCLOSURE',
+            copyVersion: CAMPUS_DISCLOSURE_COPY_VERSION, grantedAt: clock().toISOString(),
+          })
+        }
+        // A staff invite adds its cohort to any cohorts already assigned.
+        const priorCohorts = Array.isArray(existing?.scope?.cohortIds) ? existing.scope.cohortIds : []
+        const scope = invite.role !== 'STUDENT' && invite.cohortId
+          ? { ...(existing?.scope || {}), cohortIds: [...new Set([...priorCohorts, invite.cohortId])] }
+          : {}
+        await tx.memberships.upsertMembership({
+          organizationId: invite.organizationId, userId: user.id, role: invite.role, status: 'ACTIVE',
+          departmentId: invite.departmentId, scope, invitedBy: invite.invitedBy,
         })
-      }
-      // A staff invite adds its cohort to any cohorts already assigned.
-      const priorCohorts = Array.isArray(existing?.scope?.cohortIds) ? existing.scope.cohortIds : []
-      const scope = invite.role !== 'STUDENT' && invite.cohortId
-        ? { ...(existing?.scope || {}), cohortIds: [...new Set([...priorCohorts, invite.cohortId])] }
-        : {}
-      await repos.memberships.upsertMembership({
-        organizationId: invite.organizationId, userId: user.id, role: invite.role, status: 'ACTIVE',
-        departmentId: invite.departmentId, scope, invitedBy: invite.invitedBy,
+        const ws = await tx.workspaces.upsertWorkspace({ type, ownerUserId: user.id, organizationId: invite.organizationId, name: invite.organizationName })
+        if (invite.role === 'STUDENT' && invite.cohortId) {
+          await tx.organizations.addCohortMember({ cohortId: invite.cohortId, userId: user.id, addedBy: invite.invitedBy })
+          await onCohortJoined({ organizationId: invite.organizationId, cohortId: invite.cohortId, userId: user.id, repos: tx })
+        }
+        await tx.memberships.updateInvite(invite.id, { status: 'ACCEPTED', acceptedBy: user.id, acceptedAt: clock().toISOString() })
+        return ws
       })
-      const workspace = await repos.workspaces.upsertWorkspace({ type, ownerUserId: user.id, organizationId: invite.organizationId, name: invite.organizationName })
-      if (invite.role === 'STUDENT' && invite.cohortId) {
-        await repos.organizations.addCohortMember({ cohortId: invite.cohortId, userId: user.id, addedBy: invite.invitedBy })
-        await onCohortJoined({ organizationId: invite.organizationId, cohortId: invite.cohortId, userId: user.id })
+      if (!workspace) {
+        const ws = await repos.workspaces.upsertWorkspace({ type, ownerUserId: user.id, organizationId: invite.organizationId, name: invite.organizationName })
+        return { workspaceId: ws.id, workspaceType: type, organizationId: invite.organizationId, role: invite.role, alreadyAccepted: true }
       }
-      await repos.memberships.updateInvite(invite.id, { status: 'ACCEPTED', acceptedBy: user.id, acceptedAt: clock().toISOString() })
       audit('campus.membership.changed', null, { action: 'ACCEPTED', organizationId: invite.organizationId, role: invite.role, userId: user.id })
       return { workspaceId: workspace.id, workspaceType: type, organizationId: invite.organizationId, role: invite.role, alreadyAccepted: false }
     },

@@ -48,6 +48,14 @@ test('0036: equivalence fails closed, decision history + snapshots immutable, cy
   await assert.rejects(pool.query("UPDATE assessment_form_equivalence_decisions SET reason = 'changed afterwards' WHERE id = $1", [d.id]))
   await assert.rejects(pool.query('DELETE FROM assessment_form_equivalence_decisions WHERE id = $1', [d.id]))
 
+  // PROD-READY Phase 3 (0057, P-row): a snapshot on the still-PENDING pair is
+  // refused; the pair is approved (its APPROVED decision row exists above)
+  // before the snapshot assertions below, which are unchanged.
+  await assert.rejects(pool.query(
+    "INSERT INTO capability_growth_snapshots (user_id, capability_id, baseline_session_id, reassessment_session_id, form_a_id, form_b_id, from_band, to_band, direction, rules_version) VALUES ('u-db', 'CAP-L1-REASONING', 's0', 's0b', $1, $2, 'EARLY', 'DEVELOPING', 'HIGHER', 'r1')",
+    [fa, fb],
+  ), /APPROVED form pair/)
+  await pool.query("UPDATE assessment_form_equivalence SET status = 'APPROVED', evidence_ref = 'run-1', decided_by = 'adm', decided_at = now() WHERE form_a_id = $1 AND form_b_id = $2", [fa, fb])
   const { rows: [s] } = await pool.query(
     "INSERT INTO capability_growth_snapshots (user_id, capability_id, baseline_session_id, reassessment_session_id, form_a_id, form_b_id, from_band, to_band, direction, rules_version) VALUES ('u-db', 'CAP-L1-REASONING', 's1', 's2', $1, $2, 'EARLY', 'DEVELOPING', 'HIGHER', 'r1') RETURNING id",
     [fa, fb],

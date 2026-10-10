@@ -49,6 +49,11 @@ export function createValidationService({
       const ratings = (await store().listRatings()).filter((r) => r.itemId === item.id)
       if (ratings.some((r) => r.raterId === raterId)) throw new ApiError('CONFLICT', 'You have already rated this item.')
       if (ratings.length >= RATINGS_PER_ITEM) throw new ApiError('CONFLICT', 'This item already has its ratings.')
+      // The pre-check above answers the common case; the store re-checks
+      // under a row lock so a race cannot add a third rating (K101).
+      if (typeof store().appendRatingWithinLimit === 'function') {
+        return store().appendRatingWithinLimit({ itemId: item.id, raterId, level: cannotRate ? null : level, cannotRate, limit: RATINGS_PER_ITEM })
+      }
       return store().appendRating({ itemId: item.id, raterId, level: cannotRate ? null : level, cannotRate })
     },
 

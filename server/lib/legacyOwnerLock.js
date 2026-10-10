@@ -26,6 +26,7 @@
 //    audio uploads are accepted.
 import { authenticate as defaultAuthenticate } from '../domain/auth/requireUser.js'
 import logger from './logger.js'
+import { erasureKeyStatus } from './erasureKey.js'
 
 // { exists, owner } for a legacy session id: the owner recorded on the live
 // session, the entitlement (payment / invite / dev session) or the issued report.
@@ -58,6 +59,9 @@ export function createLegacyErasureGuard({ authenticate = defaultAuthenticate, l
       if (!user) return notFound(res)
       const { owner } = await lookup(sessionIdOf(req))
       if (!owner || owner !== String(user.id)) return notFound(res)
+      // PROD-READY Phase 3: production without the erasure pseudonym key
+      // refuses before the router erases anything (503, retryable).
+      if (!erasureKeyStatus().ok) return res.status(503).json({ error: 'Erasure is temporarily unavailable. Nothing was deleted; please try again later.', code: 'ERASURE_NOT_CONFIGURED' })
       return next()
     } catch (err) {
       return failed(req, res, 'legacy_erasure_guard_failed', err)

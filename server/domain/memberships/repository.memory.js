@@ -26,6 +26,10 @@ export function createMembershipsRepoMemory(db) {
       const row = [...db.invites.values()].find((i) => i.tokenHash === tokenHash)
       return row ? withOrg(row) : null
     },
+    async lockInvite(id) {
+      const row = db.invites.get(id)
+      return row ? { id: row.id, status: row.status, acceptedBy: row.acceptedBy ?? null } : null
+    },
     async updateInvite(id, { status, acceptedBy = null, acceptedAt = null }) {
       const row = db.invites.get(id)
       if (!row) return null

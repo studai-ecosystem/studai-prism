@@ -3,7 +3,7 @@
 // append-only and unique per (item, rater).
 import { ApiError } from '../http/errors.js'
 import { clone } from '../campusStore/memoryDb.js'
-import { iso } from '../campusStore/pgUtil.js'
+import { iso, withTransaction } from '../campusStore/pgUtil.js'
 
 export function createValidationRepoMemory(db) {
   db.ratingItems ||= new Map()
@@ -35,10 +35,19 @@ export function createValidationRepoMemory(db) {
     async listRatings() {
       return db.unitRatings.map(clone)
     },
+    // PROD-READY Phase 3 (K101): the "N ratings per item" check and the
+    // insert as one step (synchronous here, so no interleaving).
+    async appendRatingWithinLimit({ itemId, raterId, level, cannotRate, limit }) {
+      if (!db.ratingItems.has(itemId)) throw new ApiError('NOT_FOUND', 'Not found')
+      const existing = db.unitRatings.filter((r) => r.itemId === itemId)
+      if (existing.some((r) => r.raterId === raterId)) throw new ApiError('CONFLICT', 'You have already rated this item.')
+      if (existing.length >= limit) throw new ApiError('CONFLICT', 'This item already has its ratings.')
+      return this.appendRating({ itemId, raterId, level, cannotRate })
+    },
   }
 }
 
-export function createValidationRepoPg({ query }) {
+export function createValidationRepoPg({ query, getPool }) {
   const item = (r) => r && ({
     id: r.id, evidenceRef: r.evidence_ref, sessionRef: r.session_ref, capabilityId: r.capability_id, sourceType: r.source_type,
     behaviorAnchorId: r.behavior_anchor_id, excerpt: r.excerpt, aiLevel: r.ai_level, aiStatus: r.ai_status, rubricVersion: r.rubric_version,
@@ -81,6 +90,30 @@ export function createValidationRepoPg({ query }) {
     async listRatings() {
       const { rows } = await query('SELECT * FROM evidence_unit_ratings ORDER BY created_at ASC, id ASC')
       return rows.map(rating)
+    },
+    // PROD-READY Phase 3 (K101): the item row is locked (SELECT … FOR
+    // UPDATE) before the count, so concurrent submissions for one item are
+    // serialised and a third rating can never be inserted.
+    async appendRatingWithinLimit({ itemId, raterId, level, cannotRate, limit }) {
+      try {
+        return await withTransaction(getPool, async (c) => {
+          const { rows: [locked] } = await c.query('SELECT id FROM evidence_rating_items WHERE id = $1 FOR UPDATE', [itemId])
+          if (!locked) throw new ApiError('NOT_FOUND', 'Not found')
+          const { rows: existing } = await c.query('SELECT rater_id FROM evidence_unit_ratings WHERE item_id = $1', [itemId])
+          if (existing.some((r) => r.rater_id === raterId)) throw new ApiError('CONFLICT', 'You have already rated this item.')
+          if (existing.length >= limit) throw new ApiError('CONFLICT', 'This item already has its ratings.')
+          const { rows: [r] } = await c.query(
+            'INSERT INTO evidence_unit_ratings (item_id, rater_id, level, cannot_rate) VALUES ($1, $2, $3, $4) RETURNING *',
+            [itemId, raterId, level ?? null, Boolean(cannotRate)],
+          )
+          return rating(r)
+        })
+      } catch (err) {
+        if (err.code === '23505') throw new ApiError('CONFLICT', 'You have already rated this item.')
+        if (err.code === '23503' || err.code === '22P02') throw new ApiError('NOT_FOUND', 'Not found')
+        if (err.code === '23514') throw new ApiError('VALIDATION_FAILED', 'Choose a level from 1 to 5, or "cannot rate".')
+        throw err
+      }
     },
   }
 }

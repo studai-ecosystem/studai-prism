@@ -462,6 +462,14 @@ export function createSessionIoRepoMemory(db) {
       db.artifactVersions.push(row)
       return clone(row)
     },
+    // PROD-READY Phase 3: a version reserved before the engine call is
+    // withdrawn when the engine did not apply the save (only the latest).
+    async withdrawArtifactVersion({ sessionId, artifactId, version }) {
+      const latest = db.artifactVersions.filter((v) => v.sessionId === sessionId && v.artifactId === artifactId).sort((a, b) => b.version - a.version)[0]
+      if (!latest || latest.version !== version) return false
+      db.artifactVersions.splice(db.artifactVersions.indexOf(latest), 1)
+      return true
+    },
   }
 }
 
@@ -896,6 +904,16 @@ export function createSessionIoRepoPg({ query, getPool = null }) {
         if (err.code === '23514') throw new ApiError('VALIDATION_FAILED', 'Invalid version.')
         throw err
       }
+    },
+    // PROD-READY Phase 3: withdraw a version reserved before an engine call
+    // that did not apply (only while it is still the latest one).
+    async withdrawArtifactVersion({ sessionId, artifactId, version: v }) {
+      const { rowCount } = await query(
+        `DELETE FROM assessment_artifact_versions WHERE session_id = $1 AND artifact_id = $2 AND version = $3
+           AND NOT EXISTS (SELECT 1 FROM assessment_artifact_versions x WHERE x.session_id = $1 AND x.artifact_id = $2 AND x.version > $3)`,
+        [sessionId, artifactId, v],
+      )
+      return rowCount > 0
     },
   }
 }

@@ -144,6 +144,11 @@ export function createCampusAdminRepoPg({ query, getPool }) {
       const { rows } = await query('SELECT * FROM organization_memberships WHERE organization_id = $1 ORDER BY created_at, id', [organizationId])
       return rows.map(membership)
     },
+    // Serialises team changes of one organization inside a repository
+    // transaction (PROD-READY Phase 3: the last-owner check cannot race).
+    async lockOrganization(organizationId) {
+      await query('SELECT id FROM organizations WHERE id = $1 FOR UPDATE', [organizationId])
+    },
     async getMembership(id) {
       const { rows } = await query('SELECT * FROM organization_memberships WHERE id = $1', [id])
       return membership(rows[0]) || null

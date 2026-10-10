@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { promises as fs } from 'fs'
 import crypto from 'node:crypto'
+import { pinnedJson, assertNotPinned } from './jsonStoreSnapshot.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.DATA_DIR || join(__dirname, '..', 'data')
@@ -23,6 +24,8 @@ async function ensureFile() {
 }
 
 async function readDB() {
+  const pin = pinnedJson(DB_FILE)
+  if (pin) return pin.parsed && Array.isArray(pin.parsed.users) ? pin.parsed : { users: [] }
   await ensureFile()
   const raw = await fs.readFile(DB_FILE, 'utf-8')
   try {
@@ -35,6 +38,11 @@ async function readDB() {
 }
 
 function writeDB(db) {
+  try {
+    assertNotPinned(DB_FILE)
+  } catch (err) {
+    return Promise.reject(err)
+  }
   writeChain = writeChain.then(() => fs.writeFile(DB_FILE, JSON.stringify(db, null, 2)))
   return writeChain
 }

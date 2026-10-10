@@ -34,6 +34,9 @@ export const redeemPayment = impl.redeemPayment
 export const getPaymentRedemption = impl.getPaymentRedemption
 export const listEntitlementsByUser = impl.listEntitlementsByUser
 export const createSession = impl.createSession
+// PROD-READY Phase 3: both twins record the session's assessment form at
+// creation through the resolver the campus context registers.
+export { registerSessionFormResolver } from './sessionFormResolver.js'
 export const getSession = impl.getSession
 export const getRecentScenarioIdsByUser = impl.getRecentScenarioIdsByUser
 export const getSessionIdsByUser = impl.getSessionIdsByUser

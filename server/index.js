@@ -42,6 +42,10 @@ async function start() {
     const { assertPaymentConfiguration } = await import('./lib/security.js')
     const { anyPaidOfferPurchasable } = await import('./domain/commerce/index.js')
     assertPaymentConfiguration({ paidOfferEnabled: anyPaidOfferPurchasable() })
+    // Phase 3 (P-row): a missing erasure pseudonym key does not stop the
+    // service; erasure itself answers 503 until the key is set.
+    const { warnIfErasureKeyMissing } = await import('./lib/erasureKey.js')
+    warnIfErasureKeyMissing(logger)
   } catch (err) {
     logger.error('startup_check_failed', { detail: err.message })
     process.exit(1)

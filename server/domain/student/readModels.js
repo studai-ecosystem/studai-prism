@@ -10,7 +10,7 @@ import { LEVEL_LABELS_STATUS } from '../evidence/levels.js'
 import { buildClaim, validateClaims, candidateTurnsUnion } from '../reports/claims.js'
 import { behaviourGaps } from '../development/recommendations.js'
 import { ApiError } from '../http/errors.js'
-import { PRIMARY_CAPABILITY_IDS, CORE_DEFINITION_ID, capabilityInfo, definitionForScenario, formForSession } from '../assessments/catalog.js'
+import { PRIMARY_CAPABILITY_IDS, CORE_DEFINITION_ID, capabilityInfo, definitionForScenario, formForSession, recordedFormId } from '../assessments/catalog.js'
 import { playerPath } from '../assessments/assignmentService.js'
 import { isEnabled } from '../flags/index.js'
 import { RIASEC_KEYS, sanitizeInterests } from '../../lib/roleAffinityEngine.js'
@@ -57,11 +57,12 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
         ...(report.moments || []).map((e) => e.id),
         ...(report.boundedObservations || []).map((e) => e.id),
       ])
-      const units = (await evidence.units(s.sessionId)).filter((u) => cited.has(u.evidence_id))
+      const allUnits = await evidence.units(s.sessionId)
+      const units = allUnits.filter((u) => cited.has(u.evidence_id))
       out.push({
         session: s,
         definition,
-        form: formForSession(cat, s.scenarioId),
+        form: formForSession(cat, s.scenarioId, recordedFormId(s, allUnits)),
         published,
         units,
         turns: candidateTurnsUnion(s.history, await actionsFor(s.sessionId)),
@@ -219,7 +220,9 @@ export function createStudentReadModels({ directory, catalog, assignments, evide
           completedAt: current.session.completedAt,
           assessmentTitle: current.definition?.title || null,
           scope: current.session.scope,
-          formId: current.form?.id || report.methodology?.formId || null,
+          // The published report names the form it was built on (persisted
+          // with the run); the session's recorded form is the fallback.
+          formId: report.methodology?.formId || current.form?.id || null,
           methodVersion: report.methodology?.builderVersion || null,
           sufficiencyRulesVersion: report.methodology?.sufficiencyRulesVersion || null,
         },

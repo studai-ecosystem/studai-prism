@@ -11,6 +11,7 @@
     "seed:admin": "node config/runWithRuntimeSecrets.js db/seedAdmin.js",
     "retention:import-rows": "node config/runWithRuntimeSecrets.js db/purgeImportRows.js",
     "erasure:ledger": "node config/runWithRuntimeSecrets.js db/erasureLedger.js",
+    "sessions:pin-forms": "node config/runWithRuntimeSecrets.js db/pinSessionForms.js",
     "test": "node --test"
   },
   "dependencies": {

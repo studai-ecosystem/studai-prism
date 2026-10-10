@@ -23,6 +23,7 @@ import logger from '../../lib/logger.js'
 import { query } from '../../db/pool.js'
 import { requirePermission, consumeApproval } from '../../lib/adminAuth.js'
 import { adminAudit } from '../../lib/adminAudit.js'
+import { erasureKeyStatus } from '../../lib/erasureKey.js'
 import {
   resolveCandidate, buildErasurePlan, executeErasure, buildAccessPackage,
 } from '../../lib/privacyPlanner.js'
@@ -214,6 +215,11 @@ router.post('/:id/execute', requirePermission('privacy:execute'), async (req, re
     const request = await loadRequest(req.params.id)
     if (!request) return res.status(404).json({ error: 'Request not found.' })
     if (request.kind !== 'erasure') return res.status(409).json({ error: 'Execute applies to erasure requests only.' })
+    // PROD-READY Phase 3: without the production pseudonym key nothing is
+    // executed and no approval is consumed.
+    if (!erasureKeyStatus().ok) {
+      return res.status(503).json({ error: 'Erasure is not configured on this server (PRISM_ERASURE_PSEUDONYM_KEY). Nothing was executed and the approval was not used.', code: 'ERASURE_NOT_CONFIGURED' })
+    }
     if (request.status !== 'awaiting_approval' || !request.dry_run_plan) {
       return res.status(409).json({
         error: 'A dry-run plan must be on file before execution — run the dry run first.',

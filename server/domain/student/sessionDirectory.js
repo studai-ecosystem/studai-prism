@@ -48,6 +48,8 @@ export function createSessionDirectory({ repos, legacy }) {
           scope: scope?.sponsorType === 'INSTITUTION' ? 'SPONSORED' : 'PERSONAL',
           sponsorOrganizationId: scope?.sponsorOrganizationId || null,
           scenarioId: session?.scenarioId || report?.scenarioId || null,
+          // PROD-READY Phase 3: the form recorded with the session (0057).
+          assessmentFormId: session?.assessmentFormId || null,
           startedAt: toIso(session?.startedAt),
           completedAt: report ? toIso(report.issuedAt) || toIso(session?.completedAt) : evaluated ? toIso(evaluated.updatedAt) || toIso(session?.completedAt) : null,
           hasReport: Boolean(report) || Boolean(published),

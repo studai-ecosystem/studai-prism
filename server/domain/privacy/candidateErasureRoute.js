@@ -20,6 +20,14 @@ import { findUserById as defaultFindUser } from '../../lib/db.js'
 import { auditLog as defaultAuditLog } from '../../lib/telemetry.js'
 import logger from '../../lib/logger.js'
 import { defaultErasureCascade } from './erasureCascade.js'
+import { erasureKeyStatus } from '../../lib/erasureKey.js'
+
+// Shared 503 body when production lacks the erasure pseudonym key
+// (PROD-READY Phase 3): nothing is erased, the person can retry later.
+export const ERASURE_NOT_CONFIGURED_BODY = Object.freeze({
+  error: 'Erasure is temporarily unavailable. Nothing was deleted; please try again later or contact support@studaione.com.',
+  code: 'ERASURE_NOT_CONFIGURED',
+})
 
 function tokenSubject(req) {
   const header = req.headers?.authorization || ''
@@ -41,6 +49,10 @@ export function createCandidateErasureHandler({
   return async function candidateErasure(req, res) {
     const auth = tokenSubject(req)
     if (!auth) return res.status(401).json({ error: 'Sign in to erase your data.' })
+    if (!erasureKeyStatus().ok) {
+      logger.error('erasure_refused_not_configured', { requestId: req.requestId || null })
+      return res.status(503).json(ERASURE_NOT_CONFIGURED_BODY)
+    }
     try {
       const record = await findUser(auth.id).catch(() => null)
       const receipt = await (cascade || defaultErasureCascade()).run({
@@ -58,6 +70,7 @@ export function createCandidateErasureHandler({
         erasure: { runId: receipt.runId, status: receipt.status, resumed: receipt.resumed },
       })
     } catch (err) {
+      if (err?.code === 'ERASURE_NOT_CONFIGURED') return res.status(503).json(ERASURE_NOT_CONFIGURED_BODY)
       if (err?.code === 'LEGAL_HOLD_ACTIVE') {
         return res.status(409).json({ error: 'Your data is under a legal hold and cannot be erased yet. Contact support@studaione.com.', code: 'LEGAL_HOLD_ACTIVE' })
       }

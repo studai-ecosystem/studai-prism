@@ -33,11 +33,58 @@ import { createValidationRepoMemory, createValidationRepoPg } from '../validatio
 import { createPreparationRepoMemory, createPreparationRepoPg } from '../preparation/repository.js'
 import { createMemorySessionLocks, createPgSessionLocks } from '../assessments/sessionLocks.js'
 import { createCommerceRepoMemory, createCommerceRepoPg } from '../commerce/repository.js'
+import { withTransaction, transactionDeps, inTransaction } from './pgUtil.js'
+
+// Memory "transaction" (no-database development and tests only): one at a
+// time; on failure every collection of the memory db is restored in place to
+// its state when the transaction began. Not isolated from writes made outside
+// a transaction while it runs; the PostgreSQL store is the real guarantee.
+function createMemoryTransaction(db, reposFor) {
+  let tail = Promise.resolve()
+  const restorable = (v) => v instanceof Map || v instanceof Set || Array.isArray(v)
+  const snapshot = () => {
+    const out = new Map()
+    for (const [key, value] of Object.entries(db)) if (restorable(value)) out.set(key, structuredClone(value))
+    return out
+  }
+  const restore = (saved) => {
+    for (const [key, value] of Object.entries(db)) {
+      if (!restorable(value)) continue
+      const before = saved.get(key)
+      if (value instanceof Map) { value.clear(); for (const [k, v] of before || []) value.set(k, v) }
+      else if (value instanceof Set) { value.clear(); for (const v of before || []) value.add(v) }
+      else { value.length = 0; value.push(...(before || [])) }
+    }
+  }
+  return function transaction(fn) {
+    const run = tail.then(async () => {
+      const saved = snapshot()
+      try {
+        return await fn(reposFor())
+      } catch (err) {
+        restore(saved)
+        throw err
+      }
+    })
+    tail = run.catch(() => {})
+    return run
+  }
+}
 
 export function createMemoryCampusRepos(options = {}) {
   const db = options.db || createMemoryDb(options)
-  return {
+  let self = null
+  // Inside a transaction the callback gets a view whose own transaction()
+  // joins the open one (the outer set waits for it to finish).
+  const begin = createMemoryTransaction(db, () => {
+    const view = { ...self }
+    view.transaction = async (fn) => fn(view)
+    return view
+  })
+  self = {
     kind: 'memory',
+    // PROD-READY Phase 3: run several repository writes as one unit.
+    transaction: (fn) => begin(fn),
     db,
     // P10.2 readiness probe: the memory store carries every repo the current
     // schema needs, so it reports the required floor as applied.
@@ -65,14 +112,22 @@ export function createMemoryCampusRepos(options = {}) {
     preparation: createPreparationRepoMemory(db),
     commerce: createCommerceRepoMemory(db),
   }
+  return self
 }
 
 export function createPgCampusRepos({ query, getPool, getLockPool }) {
   const deps = { query, getPool }
   // P10.2 readiness probe (read-only, cached briefly): applied migration names.
   let migrationsCache = null
-  return {
+  const self = {
     kind: 'pg',
+    // PROD-READY Phase 3: fn(txRepos) runs on one connection inside
+    // BEGIN/COMMIT; every repository write in it (their own transactions
+    // become savepoints) commits or rolls back together. Nested calls join.
+    async transaction(fn) {
+      if (inTransaction(getPool)) return fn(self)
+      return withTransaction(getPool, (client) => fn(createPgCampusRepos({ ...transactionDeps(client), getLockPool })))
+    },
     async listAppliedMigrations() {
       if (migrationsCache && Date.now() - migrationsCache.at < 60_000) return migrationsCache.names
       const { rows } = await query('SELECT name FROM schema_migrations ORDER BY name')
@@ -104,4 +159,5 @@ export function createPgCampusRepos({ query, getPool, getLockPool }) {
     preparation: createPreparationRepoPg(deps),
     commerce: createCommerceRepoPg(deps),
   }
+  return self
 }

@@ -4,7 +4,8 @@
 import { isDbConfigured, query, getPool, getSessionLockPool } from '../../db/pool.js'
 import { createPgCampusRepos } from './index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from './context.js'
-import { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport, getEntitlement, createEntitlement, createSession, updateSession } from '../../lib/store.js'
+import { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport, getEntitlement, createEntitlement, createSession, updateSession, registerSessionFormResolver } from '../../lib/store.js'
+import { buildCatalog, formForSession } from '../assessments/catalog.js'
 import { isMailEnabled, sendOrgInviteEmail, sendCampusAssignmentEmail } from '../../lib/mailer.js'
 import { findUserById, findUserByEmail } from '../../lib/db.js'
 import evidenceGraph from '../../lib/evidenceGraph.js'
@@ -40,7 +41,29 @@ const legacyPaths = {
     : `/verify-identity?session=${encodeURIComponent(sessionId)}`),
 }
 
+// The frozen general pool lives with the legacy engine; loaded lazily so the
+// v1 router never imports the engine at module load. DRAFT segments join the
+// bank only when PRISM_DRAFT_CONTENT=true (never by default).
+export async function defaultScenarioSource() {
+  const { SCENARIOS } = await import('../../routes/assessment.js')
+  return { generalScenarios: SCENARIOS, bankScenarios: { ...PRE_APPROVED_SCENARIOS, ...draftBankScenarios() } }
+}
+
+// PROD-READY Phase 3: the form a new session is taken on, from the catalog
+// as it is when the session starts (recorded once on the session).
+let catalogForForms = null
+export async function sessionFormIdFor(scenarioId) {
+  if (!catalogForForms) catalogForForms = defaultScenarioSource().then((src) => buildCatalog(src))
+  try {
+    return formForSession(await catalogForForms, scenarioId)?.id || null
+  } catch (err) {
+    catalogForForms = null
+    throw err
+  }
+}
+
 export function createDefaultCampusContext({ complete = completeViaGateway } = {}) {
+  registerSessionFormResolver(sessionFormIdFor)
   const base = (process.env.PUBLIC_APP_URL || '').replace(/\/$/, '')
   return createCampusContext({
     repos: isDbConfigured() ? createPgCampusRepos({ query, getPool, getLockPool: getSessionLockPool }) : null,
@@ -79,11 +102,7 @@ export function createDefaultCampusContext({ complete = completeViaGateway } = {
     },
     // The frozen general pool lives with the legacy engine; loaded lazily so
     // the v1 router never imports the engine at module load.
-    scenarioSource: async () => {
-      const { SCENARIOS } = await import('../../routes/assessment.js')
-      // DRAFT segments join the bank only when PRISM_DRAFT_CONTENT=true (never by default).
-      return { generalScenarios: SCENARIOS, bankScenarios: { ...PRE_APPROVED_SCENARIOS, ...draftBankScenarios() } }
-    },
+    scenarioSource: defaultScenarioSource,
     evidence: { units: (sessionId) => evidenceGraph.getEvidenceUnits(sessionId) },
     roles: { evaluate: ({ capabilityProfile, candidateInterests }) => roleAffinityEngine.computeRoleAffinity(capabilityProfile, candidateInterests) },
     engine: createEngineAdapter({ invoke: invokeEngine }),

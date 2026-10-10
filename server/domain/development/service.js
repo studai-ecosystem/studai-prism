@@ -692,10 +692,11 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
       return this.interventionSummary(row)
     },
 
-    async syncCohortMember(organizationId, cohortId, userId) {
-      if (!store()) return
-      for (const i of await store().listInterventions(organizationId)) {
-        if (i.status === 'ACTIVE' && i.cohortId === String(cohortId)) await store().addInterventionMember(i.id, userId)
+    async syncCohortMember(organizationId, cohortId, userId, tx = null) {
+      const dev = tx ? tx.development : store()
+      if (!dev) return
+      for (const i of await dev.listInterventions(organizationId)) {
+        if (i.status === 'ACTIVE' && i.cohortId === String(cohortId)) await dev.addInterventionMember(i.id, userId)
       }
     },
 

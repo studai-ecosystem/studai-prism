@@ -3,7 +3,7 @@
 // or invalidated sessions and sessions without an issued report are never
 // formal evidence (K59) and load as null.
 import { evaluateProfile } from '../evidence/sufficiency.js'
-import { PRIMARY_CAPABILITY_IDS, definitionForScenario, formForSession } from '../assessments/catalog.js'
+import { PRIMARY_CAPABILITY_IDS, definitionForScenario, formForSession, recordedFormId } from '../assessments/catalog.js'
 
 const toIso = (v) => {
   if (v == null || v === '') return null
@@ -31,7 +31,7 @@ export function createSessionEntryLoader({ catalog, evidence, legacy, reportRevi
     return {
       session: { sessionId, completedAt: toIso(report.issuedAt) || toIso(session?.completedAt) },
       definition,
-      form: formForSession(cat, scenarioId),
+      form: formForSession(cat, scenarioId, recordedFormId(session, units)),
       decisions: evaluateProfile(units, { capabilityIds: definition?.measures || PRIMARY_CAPABILITY_IDS }),
       reportCorrectionPending,
     }

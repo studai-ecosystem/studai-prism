@@ -938,23 +938,60 @@ export function createAssessmentSessionService({
             throw err
           }
         }
+        // PROD-READY Phase 3 (S6): the version row is appended BEFORE the
+        // engine sees the save. Its primary key (session, artifact, version)
+        // is the cross-instance fence: of two writers holding the same
+        // If-Match only one can append, and only that one reaches the engine.
+        // The content is the engine's own merge rule ({...data, ...updates})
+        // over the engine's current state, read under the session lock. If
+        // the engine then fails, the reserved version is withdrawn.
+        // The candidate's reasoning is kept with the version so a refresh
+        // shows it again (the engine keeps it only inside evidence).
+        const savedNotes = typeof notes === 'string' ? notes : currentNotes
+        const engineState = await legacy.getSession(sessionId)
+        const engineTarget = (engineState?.artifacts?.length ? engineState.artifacts : session.artifacts || []).find((a) => a.artifactId === artifactId) || null
+        const expectedData = updates && typeof updates === 'object' ? { ...(engineTarget?.data || {}), ...updates } : (engineTarget?.data ?? null)
+        let written
+        try {
+          written = await repos.sessionIo.appendArtifactVersion({ sessionId, artifactId, version: currentVersion + 1, content: { data: expectedData, notes: savedNotes }, savedBy: CANDIDATE })
+        } catch (err) {
+          // Another writer appended this version first: the same 409 (with
+          // the server snapshot) as a stale If-Match, and no engine call.
+          const conflict = err?.code === 'CONFLICT' ? await (async () => {
+            const latest = await repos.sessionIo.latestArtifactVersion(sessionId, artifactId)
+            return new ApiError('CONFLICT', 'This work material changed since you opened it.', {
+              details: { version: latest?.version || 0, artifact: latest ? { artifactId, type: engineTarget?.type || null, title: engineTarget?.title || null, data: latest.content?.data ?? null, notes: typeof latest.content?.notes === 'string' ? latest.content.notes : '' } : null },
+            })
+          })() : err
+          await failed(action, conflict)
+          throw conflict
+        }
+        const withdraw = async () => {
+          if (typeof repos.sessionIo.withdrawArtifactVersion !== 'function') return
+          try {
+            await repos.sessionIo.withdrawArtifactVersion({ sessionId, artifactId, version: written.version })
+          } catch (failure) {
+            audit('assessment.artifact_version_withdraw_failed', sessionId, { sessionId, artifactId, version: written.version, code: failure.code || 'WITHDRAW_FAILED', requestId })
+          }
+        }
         try {
           ;({ artifact } = draftSegmentFor(session.scenarioId)
             ? await saveDraftArtifact({ sessionId, artifactId, updates })
             : await engine.saveArtifact({ sessionId, artifactId, updates, notes, authorization, client, requestId }))
         } catch (err) {
+          await withdraw()
           await failed(action, err)
           throw err
         }
         if (!artifact) {
           const err = new ApiError('UPSTREAM_UNAVAILABLE', 'Your work was not saved.')
+          await withdraw()
           await failed(action, err)
           throw err
         }
-        // The candidate's reasoning is kept with the version so a refresh
-        // shows it again (the engine keeps it only inside evidence).
-        const savedNotes = typeof notes === 'string' ? notes : currentNotes
-        const written = await repos.sessionIo.appendArtifactVersion({ sessionId, artifactId, version: currentVersion + 1, content: { data: artifact.data ?? null, notes: savedNotes }, savedBy: CANDIDATE })
+        if (JSON.stringify(artifact.data ?? null) !== JSON.stringify(expectedData)) {
+          audit('assessment.artifact_version_mismatch', sessionId, { sessionId, artifactId, version: written.version, requestId })
+        }
         const response = { artifactId, version: written.version, data: artifact.data ?? null, notes: savedNotes }
         if (universal && action) {
           const opportunitiesBefore = await repos.sessionIo.listOpportunities(sessionId)

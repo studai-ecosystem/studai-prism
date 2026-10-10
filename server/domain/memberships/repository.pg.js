@@ -57,6 +57,13 @@ export function createMembershipsRepoPg({ query }) {
       )
       return invite(rows[0]) || null
     },
+    // Row lock for a multi-write acceptance (PROD-READY Phase 3): inside a
+    // repository transaction a concurrent acceptance waits here until the
+    // first commits, then reads its final status.
+    async lockInvite(id) {
+      const { rows } = await query('SELECT id, status, accepted_by FROM organization_invites WHERE id = $1 FOR UPDATE', [id])
+      return rows[0] ? { id: rows[0].id, status: rows[0].status, acceptedBy: rows[0].accepted_by } : null
+    },
     async updateInvite(id, { status, acceptedBy = null, acceptedAt = null }) {
       const { rows } = await query(
         'UPDATE organization_invites SET status = $2, accepted_by = $3, accepted_at = $4 WHERE id = $1 RETURNING *',

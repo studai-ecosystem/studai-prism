@@ -129,7 +129,6 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
     const turns = candidateTurnsUnion(session?.history || [], actions)
     const definitionId = definitionForScenario(cat, scenarioId)
     const definition = cat.definitions.find((d) => d.id === definitionId) || null
-    const form = cat.forms.find((f) => f.definitionId === definitionId && f.scenarioId === scenarioId) || null
     const bank = scenarios.bankScenarios?.[scenarioId]
     const general = (scenarios.generalScenarios || []).find((s) => s.id === scenarioId)
     const sponsored = scope?.sponsorType === 'INSTITUTION'

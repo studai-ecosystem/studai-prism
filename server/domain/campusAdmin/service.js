@@ -51,6 +51,9 @@ export function createCampusAdminService({
   onRosterSync = async () => {},
 }) {
   const store = () => repos.campusAdmin
+  // Multi-write unit (PROD-READY Phase 3): the store's transaction when it
+  // has one (both campus stores do), otherwise the plain repositories.
+  const inTransaction = (fn) => (typeof repos.transaction === 'function' ? repos.transaction(fn) : fn(repos))
   const nowIso = () => clock().toISOString()
 
   // ── scope helpers ──────────────────────────────────────────────────────
@@ -154,15 +157,19 @@ export function createCampusAdminService({
   }
 
   // Adds the student to every live assignment that targets `cohortId`.
-  async function syncRoster(organizationId, cohortId, userId) {
-    for (const a of await store().listOrgAssignments(organizationId)) {
+  // `tx` (optional): repositories bound to the caller's open transaction
+  // (invite acceptance, PROD-READY Phase 3), so the roster rows commit or
+  // roll back with it.
+  async function syncRoster(organizationId, cohortId, userId, tx = null) {
+    const r = tx || repos
+    for (const a of await r.campusAdmin.listOrgAssignments(organizationId)) {
       if (!['ACTIVE', 'SCHEDULED'].includes(a.status)) continue
-      const targets = await repos.assessments.listTargets(a.id)
+      const targets = await r.assessments.listTargets(a.id)
       if (targets.some((t) => t.targetType === 'COHORT' && t.targetId === String(cohortId))) {
-        await repos.assessments.addStudent({ assignmentId: a.id, userId, status: 'ASSIGNED' })
+        await r.assessments.addStudent({ assignmentId: a.id, userId, status: 'ASSIGNED' })
       }
     }
-    await onRosterSync(organizationId, cohortId, userId)
+    await onRosterSync(organizationId, cohortId, userId, tx)
   }
 
   async function notify({ userId, organizationId, kind, payload }) {
@@ -730,11 +737,22 @@ export function createCampusAdminService({
       const actorIsOwner = actor.memberships.some((x) => x.organizationId === organizationId && x.status === 'ACTIVE' && x.role === 'ORG_OWNER')
       if ((role === 'ORG_OWNER' || m.role === 'ORG_OWNER') && !actorIsOwner) throw new ApiError('FORBIDDEN', 'Only an organization owner can grant or remove owner access.')
       if (m.role === role) return { membershipId: m.id, role }
-      await this.assertNotLastOwner(organizationId, m)
-      await store().setMembershipStatus(m.id, 'REMOVED')
-      const next = await repos.memberships.upsertMembership({ organizationId, userId: m.userId, role, status: 'ACTIVE', departmentId: m.departmentId, scope: m.scope || {}, invitedBy: actor.userId })
-      await orgAudit(req, organizationId, 'role.changed', 'MEMBERSHIP', next.id, { from: m.role, to: role })
-      await notify({ userId: m.userId, organizationId, kind: 'ROLE_CHANGED', payload: { from: m.role, to: role } })
+      // PROD-READY Phase 3: the old role's removal, the new role, the org
+      // audit row and the notification commit together or not at all. The
+      // membership is re-read under the transaction, so a concurrent change
+      // or removal is not applied twice.
+      const next = await inTransaction(async (tx) => {
+        await tx.campusAdmin.lockOrganization(organizationId)
+        const current = await tx.campusAdmin.getMembership(m.id)
+        if (!current || current.status === 'REMOVED' || current.role !== m.role) throw new ApiError('CONFLICT', 'This member changed while you were editing. Reload and try again.')
+        await this.assertNotLastOwner(organizationId, m, tx)
+        await tx.campusAdmin.setMembershipStatus(m.id, 'REMOVED')
+        const created = await tx.memberships.upsertMembership({ organizationId, userId: m.userId, role, status: 'ACTIVE', departmentId: m.departmentId, scope: m.scope || {}, invitedBy: actor.userId })
+        await tx.campusAdmin.appendOrgAudit({ organizationId, actorUserId: req.user.id, action: 'role.changed', targetType: 'MEMBERSHIP', targetId: created.id, details: { from: m.role, to: role }, requestId: req.requestId || null })
+        await tx.campusAdmin.createNotification({ userId: m.userId, organizationId, kind: 'ROLE_CHANGED', payload: { from: m.role, to: role } })
+        return created
+      })
+      audit('campus.role.changed', null, { organizationId, targetType: 'MEMBERSHIP', targetId: String(next.id), requestId: req.requestId || null })
       return { membershipId: next.id, role: next.role }
     },
     async removeMember(req, actor, organizationId, membershipId) {
@@ -745,14 +763,22 @@ export function createCampusAdminService({
       if (m.userId === actor.userId) throw new ApiError('FORBIDDEN', 'You cannot remove yourself.')
       const actorIsOwner = actor.memberships.some((x) => x.organizationId === organizationId && x.status === 'ACTIVE' && x.role === 'ORG_OWNER')
       if (m.role === 'ORG_OWNER' && !actorIsOwner) throw new ApiError('FORBIDDEN', 'Only an organization owner can remove another owner.')
-      await this.assertNotLastOwner(organizationId, m)
-      await store().setMembershipStatus(m.id, 'REMOVED')
-      await orgAudit(req, organizationId, 'member.removed', 'MEMBERSHIP', m.id, { role: m.role })
+      // Same unit as a role change: the last-owner check, the removal and its
+      // audit row commit together, serialised per organization.
+      await inTransaction(async (tx) => {
+        await tx.campusAdmin.lockOrganization(organizationId)
+        const current = await tx.campusAdmin.getMembership(m.id)
+        if (!current || current.status === 'REMOVED') throw new ApiError('NOT_FOUND', 'Not found')
+        await this.assertNotLastOwner(organizationId, m, tx)
+        await tx.campusAdmin.setMembershipStatus(m.id, 'REMOVED')
+        await tx.campusAdmin.appendOrgAudit({ organizationId, actorUserId: req.user.id, action: 'member.removed', targetType: 'MEMBERSHIP', targetId: m.id, details: { role: m.role }, requestId: req.requestId || null })
+      })
+      audit('campus.member.removed', null, { organizationId, targetType: 'MEMBERSHIP', targetId: String(m.id), requestId: req.requestId || null })
       return { removed: true }
     },
-    async assertNotLastOwner(organizationId, m) {
+    async assertNotLastOwner(organizationId, m, tx = null) {
       if (m.role !== 'ORG_OWNER') return
-      const owners = (await store().listOrgMemberships(organizationId)).filter((x) => x.role === 'ORG_OWNER' && x.status === 'ACTIVE')
+      const owners = (await (tx ? tx.campusAdmin : store()).listOrgMemberships(organizationId)).filter((x) => x.role === 'ORG_OWNER' && x.status === 'ACTIVE')
       if (owners.length <= 1) throw new ApiError('CONFLICT', 'An organization needs at least one owner.')
     },
     async resendInvite(req, actor, organizationId, inviteId) {

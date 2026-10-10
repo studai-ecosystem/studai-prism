@@ -103,10 +103,36 @@ export function definitionForScenario(catalog, scenarioId) {
 
 // The frozen form a stored session was taken on, or null when its scenario is
 // no longer in the catalog (then no growth comparison can use it).
-export function formForSession(catalog, scenarioId) {
+// PROD-READY Phase 3: the form id persisted with the session (0057) wins.
+// It is looked up in today's catalog; if a bank version bump has removed it,
+// the session keeps its own form id (status NOT_IN_CATALOG) — it is never
+// remapped to the scenario's current form. Today's catalog mapping is used
+// only when no form id was recorded.
+export function formForSession(catalog, scenarioId, persistedFormId = null) {
+  if (persistedFormId) {
+    const recorded = catalog.forms.find((f) => f.id === persistedFormId)
+    if (recorded) return recorded
+    return {
+      id: persistedFormId,
+      definitionId: scenarioId ? definitionForScenario(catalog, scenarioId) : null,
+      version: null,
+      scenarioId: scenarioId || null,
+      capabilityIds: [],
+      status: 'NOT_IN_CATALOG',
+    }
+  }
   if (!scenarioId) return null
   const definitionId = definitionForScenario(catalog, scenarioId)
   return catalog.forms.find((f) => f.definitionId === definitionId && f.scenarioId === scenarioId) || null
+}
+
+// The form id recorded for a session: the session's own column first, then
+// the single form id its evidence units carry (draft runs record it there);
+// null when neither names exactly one form.
+export function recordedFormId(session, units = []) {
+  if (session?.assessmentFormId) return String(session.assessmentFormId)
+  const ids = [...new Set((units || []).map((u) => u?.assessment_form_id).filter(Boolean))]
+  return ids.length === 1 ? String(ids[0]) : null
 }
 
 export function capabilityName(id) {

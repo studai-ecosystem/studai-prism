@@ -90,6 +90,7 @@ export function createCampusAdminRepoMemory(db) {
     async listOrgMemberships(organizationId) {
       return [...db.memberships.values()].filter((m) => m.organizationId === organizationId).map(clone)
     },
+    async lockOrganization() {},
     async getMembership(id) {
       return clone(db.memberships.get(id) || null)
     },
