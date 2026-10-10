@@ -51,7 +51,7 @@ test('P0 integrated diagnostic and real learner-path baseline on a self-owned da
     const result = await inspectDatabase(guarded)
     assert.equal(denied, true)
     assert.equal(result.status, 'AVAILABLE')
-    assert.equal(result.migrations.appliedKnown, 60) // 0055 PROD-READY Phase 1S, 0056 Phase 2 (erasure cascade), 0057 Phase 3 (integrity guards), 0058 Phase 4 (V3 support routes), 0059 Phase 5 (job queue), 0060 Phase 6 (decision cache)
+    assert.equal(result.migrations.appliedKnown, 62) // 0055 PROD-READY Phase 1S, 0056 Phase 2 (erasure cascade), 0057 Phase 3 (integrity guards), 0058 Phase 4 (V3 support routes), 0059 Phase 5 (job queue), 0060 Phase 6 (decision cache), 0061–0062 Phase 8 (demo organizations, guardian consent)
     assert.deepEqual(await client.query('SELECT COUNT(*) AS n FROM public.v1_users').then((r) => r.rows), before.rows)
     evidence.checks.push({ id: 'CH-41', status: 'PASS', readOnlyWriteRejected: true, migrationsApplied: result.migrations.appliedKnown })
   })

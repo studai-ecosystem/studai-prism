@@ -132,6 +132,8 @@ const MissionPlayerPage = lazy(() => import('../features/development/pages/Missi
 const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusInvitePage.jsx'))
 const StudentReportPage = lazy(() => import('../features/reports/pages/StudentReportPage.jsx'))
 const SharedReportPage = lazy(() => import('../features/reports/pages/SharedReportPage.jsx'))
+// PROD-READY Phase 8: under-18 guardian consent (server-dark: PRISM_UNDER18_PATH).
+const GuardianConsentPage = lazy(() => import('../features/guardian/GuardianConsentPage.jsx'))
 // P8.3 free first experience (public).
 const TryPage = lazy(() => import('../features/preview/pages/TryPage.jsx'))
 
@@ -374,6 +376,7 @@ export default function AppRouter() {
           <Route path="/report/:sessionId/v2" element={<LegacyAlias flag="PRISM_STUDENT_REPORT_V3" requiresShell v3Path="/app/reports/:sessionId" legacy={<StudentReportV2 />} />} />
           <Route path="/report/:sessionId/employee" element={<EmployeeReportV2 />} />
           <Route path="/shared/:token" element={<SharedReportPage />} />
+          <Route path="/guardian-consent/:token" element={<GuardianConsentPage />} />
           <Route path="/missions" element={<DevelopmentMission />} />
           <Route path="/missions/:missionId" element={<LegacyAlias flag="PRISM_DEVELOPMENT_V2" requiresShell v3Path="/app/development/missions/:missionId" legacy={<DevelopmentMission />} />} />
           <Route path="*" element={<Navigate to="/" replace />} />

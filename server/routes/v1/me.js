@@ -14,6 +14,9 @@ export function createMeRouter({ requireUser, campus }) {
       flags: clientFlags(),
       permissions: { global: [] },
       workspaces,
+      // PROD-READY Phase 8: demo accounts belong only to demo organizations
+      // (0061 isolation triggers), so one demo workspace means demo data.
+      demo: workspaces.some((w) => w.isDemo === true),
     })
   }))
 

@@ -59,11 +59,44 @@ def connect():
     return psycopg.connect(_normalize_dburl(url), autocommit=True, **kwargs)
 
 
-def fetch_all(conn, sql: str, params: tuple = ()):  # pragma: no cover - thin
+# PROD-READY Phase 8: synthetic demo organizations (server/db/seedDemoOrg.js,
+# migration 0061) must never enter a calibration run. Every row a job reads
+# through fetch_all() that names a session owned by a demo account is dropped
+# here, whatever the job's own SQL says. The demo session list is the
+# database view ``demo_session_ids``; a database without it (before 0061)
+# has no demo data.
+SESSION_KEYS = ("session_id", "source_session_id", "candidate_session_id", "member_session_id")
+
+
+def demo_session_ids(conn) -> frozenset:
+    """Session ids owned by synthetic demo accounts (empty without the view)."""
+    if conn is None:
+        return frozenset()
+    with conn.cursor() as cur:
+        cur.execute("SELECT to_regclass('public.demo_session_ids') IS NOT NULL")
+        (exists,) = cur.fetchone()
+        if not exists:
+            return frozenset()
+        cur.execute("SELECT session_id FROM demo_session_ids")
+        return frozenset(str(r[0]) for r in cur.fetchall())
+
+
+def exclude_demo(rows: list, demo: frozenset) -> list:
+    """Drop every row that names a demo session in any session column."""
+    if not demo:
+        return rows
+    return [
+        r for r in rows
+        if not any(r.get(k) is not None and str(r.get(k)) in demo for k in SESSION_KEYS)
+    ]
+
+
+def fetch_all(conn, sql: str, params: tuple = ()):
     with conn.cursor() as cur:
         cur.execute(sql, params)
         cols = [d[0] for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        rows = [dict(zip(cols, row)) for row in cur.fetchall()]
+    return exclude_demo(rows, demo_session_ids(conn))
 
 
 def write_run(conn, run_type: str, inputs_summary: dict, outputs: dict) -> str:

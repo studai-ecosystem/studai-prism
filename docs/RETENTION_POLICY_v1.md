@@ -99,3 +99,13 @@ PROVISIONAL like the rest of this policy (HA-003). Nothing above is changed.
 - **Materialised sufficiency decisions** (`session_decision_cache`, migration 0060) are **derived data**: per completed sponsored session, the form, completion date and sufficiency decisions (evidence ids, no free text or quotes) that campus analytics and growth outcomes recompute on demand. They are keyed by session only (no account id) and live exactly as long as the session: the per-session erasure cascade deletes them (last, after the session data), so account erasure removes them through the person's sessions. Nothing is written unless a human turns on `PRISM_ANALYTICS_DECISION_CACHE` (registered OFF) on a PostgreSQL v1 store.
 - **`session_decision_inputs`** is a per-session version counter (session id, a number and a timestamp) bumped by triggers whenever a session's evidence, report, admin hold or erasure marker changes; it is deleted with the session by the same cascade step. It carries no other data.
 - No separate retention period is needed: derived rows never outlive their session, and a rule or catalog change invalidates every row (it is recomputed or overwritten, never served stale).
+
+## Addendum 2026-10-10 — PROD-READY Phase 8 (demo organizations, under-18 guardian consent)
+
+PROVISIONAL like the rest of this policy (HA-003). Nothing above is changed.
+
+- **Guardian consent requests** (`guardian_consents`, migration 0062). These exist only once a human turns on `PRISM_UNDER18_PATH` (registered OFF, HA-006/HA-005). A row holds the guardian's email address, the version of the consent copy, a hash of the link, the state and its times.
+  - **Requests never verified** (DECLINED; EXPIRED; PENDING past its link expiry) are deleted 30 days after they ended. This is the new entity `guardian_consents_unverified`, PROVISIONAL. The purge is `server/domain/privacy/guardianConsentRetention.js`: dry run first, refused under a legal hold, receipt in `retention_runs`. The job `retention.guardian_consents` runs it only while `PRISM_RETENTION_ENFORCEMENT` is on.
+  - **VERIFIED and WITHDRAWN records** are the consent record of the learner's account. They are deleted with the account by the erasure cascade.
+- **Demo accounts marker** (`demo_accounts`, 0061) lists the synthetic accounts the demo seed created. It is deleted with the account. Demo data lives in a separate demo database, which is dropped as a whole; no timer applies.
+- **Pilot technical report exports** leave only an `admin_exports` ledger row with the organization id, format, term and purpose (RETENTION_POLICY §4). The report itself is aggregates only and is not stored.

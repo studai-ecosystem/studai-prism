@@ -36,6 +36,7 @@ import { createCommerceRepoMemory, createCommerceRepoPg } from '../commerce/repo
 import { createAccommodationRequestsRepoMemory, createAccommodationRequestsRepoPg } from '../support/accommodationRepository.js'
 import { createJobsRepoMemory, createJobsRepoPg } from '../jobs/repository.js'
 import { createDecisionCacheRepoPg } from '../analytics/decisionCache.js'
+import { createDemoRepoMemory, createDemoRepoPg } from '../demo/repository.js'
 import { withTransaction, transactionDeps, inTransaction } from './pgUtil.js'
 
 // Memory "transaction" (no-database development and tests only): one at a
@@ -118,6 +119,8 @@ export function createMemoryCampusRepos(options = {}) {
     accommodationRequests: createAccommodationRequestsRepoMemory(db),
     // PROD-READY Phase 5 (0059): background job queue.
     jobs: createJobsRepoMemory(db),
+    // PROD-READY Phase 8 (0061): demo-organization markers.
+    demo: createDemoRepoMemory(db),
   }
   return self
 }
@@ -170,6 +173,8 @@ export function createPgCampusRepos({ query, getPool, getLockPool }) {
     // PROD-READY Phase 6 (0060): materialised sufficiency decisions. PostgreSQL
     // only: the memory store always computes them.
     decisionCache: createDecisionCacheRepoPg(deps),
+    // PROD-READY Phase 8 (0061): demo-organization markers.
+    demo: createDemoRepoPg(deps),
   }
   return self
 }

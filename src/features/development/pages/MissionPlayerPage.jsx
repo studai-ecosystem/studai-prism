@@ -19,6 +19,19 @@ import { MissionFeedback } from '../components/MissionFeedback.jsx'
 import { MissionNextSteps } from '../components/MissionNextSteps.jsx'
 
 const SAVE_DELAY_MS = 1200
+// A submitted attempt has feedback; any other earlier attempt was left
+// unfinished and closed (for example, its intervention ended): read-only.
+const SUBMITTED = new Set(['EVALUATED', 'EVALUATION_UNAVAILABLE'])
+
+// "Go to your work": below lg the scene comes first and the work area (and the
+// Start button) sits below the first screen. The link moves focus there.
+function goToWork(e) {
+  const target = document.getElementById('mission-work-title')
+  if (!target) return
+  e.preventDefault()
+  target.focus()
+  if (typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'start' })
+}
 const ORIGIN_ID = /^[A-Za-z0-9][A-Za-z0-9:_-]{0,127}$/
 
 // Why this practice was started (P2.8). `?source=<sessionId>&moment=<id>`
@@ -170,7 +183,7 @@ export default function MissionPlayerPage() {
   })
   if (state) return <div>{header}{state}</div>
   const { mission, intervention } = missionQuery.data
-  const pastAttempts = missionQuery.data.pastAttempts.filter((p) => p.id !== attempt?.id)
+  const pastAttempts = missionQuery.data.pastAttempts.filter((p) => p.id !== attempt?.id && p.id !== missionQuery.data.openAttemptId)
   const inProgress = attempt?.status === 'IN_PROGRESS' && saveState !== 'closed'
   const uncoached = attempt?.assistance?.mode === 'UNCOACHED'
   // The scene this attempt runs: a fresh challenge may use the mission's
@@ -190,6 +203,14 @@ export default function MissionPlayerPage() {
   return (
     <div className="space-y-6">
       {header}
+      <a
+        href="#mission-work-title"
+        onClick={goToWork}
+        className="inline-flex text-sm font-semibold text-prism-accent-strong underline focus:outline-none focus-visible:ring-2 focus-visible:ring-prism-accent lg:hidden"
+        data-testid="go-to-work"
+      >
+        Go to your work
+      </a>
       <PracticeLabel variant="band" />
       {originKind === 'ASSESSMENT_MOMENT' && (
         <p className="text-sm text-prism-ink-muted" data-testid="practice-origin">
@@ -306,7 +327,15 @@ export default function MissionPlayerPage() {
           {pastAttempts.length > 0 && (
             <Panel title="Earlier attempts" headingLevel={3}>
               <ul className="space-y-1 text-sm">
-                {pastAttempts.map((p) => <li key={p.id}>{formatDate(p.submittedAt) || 'Submitted'}: {p.summary || 'Feedback not available'}</li>)}
+                {pastAttempts.map((p) => (SUBMITTED.has(p.status) ? (
+                  <li key={p.id} data-testid="earlier-attempt" data-status="submitted">{formatDate(p.submittedAt) || 'Submitted'}: {p.summary || 'Feedback not available'}</li>
+                ) : (
+                  <li key={p.id} data-testid="earlier-attempt" data-status="closed">
+                    <span className="font-semibold text-prism-ink">Not finished — closed</span>
+                    {': '}
+                    <span className="text-prism-ink-muted">this attempt was not submitted and can no longer be changed. Your work is kept.</span>
+                  </li>
+                )))}
               </ul>
             </Panel>
           )}

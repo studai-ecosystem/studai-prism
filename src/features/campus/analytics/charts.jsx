@@ -12,6 +12,11 @@ const BUCKET_COLOURS = {
   STRONG: 'var(--prism-ink)',
 }
 
+// Neighbouring stacked segments can be close in colour (the darker levels
+// share the accent family): a surface-coloured edge separates every segment
+// in both themes. The legend and the table still carry the meaning.
+const SEGMENT_EDGE = { stroke: 'var(--prism-surface)', strokeWidth: 2 }
+
 const legendText = (value) => <span style={{ color: 'var(--prism-ink)' }}>{value}</span>
 const AXIS_TICK = { fontSize: 12, fill: 'var(--prism-ink)' }
 
@@ -26,7 +31,7 @@ export function DistributionBars({ rows, bucketLabels, buckets }) {
           <YAxis type="category" dataKey="name" width={110} tick={AXIS_TICK} />
           <Tooltip />
           <Legend formatter={legendText} />
-          {buckets.map((b) => <Bar key={b} dataKey={b} name={bucketLabels[b]} stackId="a" fill={BUCKET_COLOURS[b]} isAnimationActive={false} />)}
+          {buckets.map((b) => <Bar key={b} dataKey={b} name={bucketLabels[b]} stackId="a" fill={BUCKET_COLOURS[b]} {...SEGMENT_EDGE} isAnimationActive={false} />)}
         </BarChart>
       </ResponsiveContainer>
     </div>

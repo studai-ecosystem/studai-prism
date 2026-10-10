@@ -227,6 +227,27 @@ describe('DataTable and Pagination', () => {
     await userEvent.click(screen.getByLabelText('Select all rows'))
     expect(onSel).toHaveBeenCalledWith(['1', '2'])
   })
+  it('stacks rows below md: a real table with explicit roles, every cell labelled with its column header', () => {
+    render(<DataTable caption="Cohorts" columns={[...columns, { key: 'node', header: <span>Members</span>, stackLabel: 'Members', render: () => '12' }]} rows={rows} />)
+    const table = screen.getByRole('table', { name: 'Cohorts' })
+    expect(table).toHaveAttribute('data-stack', 'md')
+    expect(table.className).toMatch(/prism-table-stack/)
+    expect(table).toHaveAttribute('role', 'table')
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent.replace(/[↑↓↕]/g, ''))).toEqual(['Name', 'Status', 'Members'])
+    const first = within(table).getAllByRole('row')[1]
+    const cells = within(first).getAllByRole('cell')
+    expect(cells.map((c) => c.getAttribute('data-label'))).toEqual(['Name', 'Status', 'Members'])
+    expect(cells.map((c) => c.textContent)).toEqual(['Alpha', 'Active', '12'])
+    // The label is generated CSS content, not DOM text, so header text is never duplicated for tests or assistive tech.
+    expect(within(table).getAllByText('Name')).toHaveLength(1)
+  })
+  it('stack={false} keeps the plain table without stacked labels', () => {
+    render(<DataTable caption="Wide" columns={columns} rows={rows} stack={false} />)
+    const table = screen.getByRole('table', { name: 'Wide' })
+    expect(table).not.toHaveAttribute('data-stack')
+    expect(table.className).not.toMatch(/prism-table-stack/)
+    expect(within(table).getAllByRole('cell')[0]).not.toHaveAttribute('data-label')
+  })
   it('Pagination buttons respect availability', async () => {
     const onNext = vi.fn()
     render(<Pagination summary="Page 1" hasPrevious={false} hasNext onNext={onNext} />)

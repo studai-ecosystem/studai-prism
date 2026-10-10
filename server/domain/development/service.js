@@ -389,7 +389,10 @@ export function createDevelopmentService({ repos, evaluator = null, clock = () =
         intervention: intervention ? { id: intervention.id, name: intervention.name, endsOn: intervention.endsOn } : null,
         openAttemptId: open?.id || null,
         allowance: allowanceView(await allowanceFor(user, workspace)),
-        pastAttempts: attempts.filter((a) => a.status !== 'IN_PROGRESS').map((a) => ({ id: a.id, status: a.status, summary: a.evaluation?.summary || null, submittedAt: a.submittedAt })),
+        // PROD-READY Phase 8 (campus P3 UX risk): an attempt left unfinished
+        // when its intervention ended is listed too, read-only, as CLOSED —
+        // it can never be resumed (only `open` can) and never counts.
+        pastAttempts: attempts.filter((a) => a.id !== open?.id).map((a) => ({ id: a.id, status: a.status === 'IN_PROGRESS' ? 'CLOSED' : a.status, summary: a.evaluation?.summary || null, submittedAt: a.submittedAt })),
       }
     },
 

@@ -110,6 +110,16 @@ export async function recordAgeDeclaration(id, declaration) {
   return user
 }
 
+// PROD-READY Phase 8 — twin of dbPg.clearGuardianAgeDeclaration.
+export async function clearGuardianAgeDeclaration(id) {
+  const db = await readDB()
+  const user = db.users.find((u) => u.id === id)
+  if (!user || user.ageDeclaration?.basis !== 'GUARDIAN_CONSENT') return false
+  user.ageDeclaration = null
+  await writeDB(db)
+  return true
+}
+
 export async function updateUser(id, fields) {
   const db = await readDB()
   const user = db.users.find((u) => u.id === id)

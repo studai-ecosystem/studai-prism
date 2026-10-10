@@ -37,6 +37,9 @@ export function createWorkspaceService({ repos, campusAvailable }) {
         role: m.role,
         roles: [m.role],
         permissions,
+        // PROD-READY Phase 8: a synthetic demo organization (0061). The app
+        // shows a persistent "Demo data" banner while the caller has one.
+        isDemo: m.organizationIsDemo === true,
       })
     }
     return out

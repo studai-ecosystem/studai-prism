@@ -50,7 +50,7 @@ export function createOrganizationsAdminRouter({ campus = null, audit = adminAud
       const rows = []
       for (const o of orgs) {
         const contracts = await c.store.billing.listContracts(o.id)
-        rows.push({ id: o.id, name: o.name, slug: o.slug, organizationType: o.organizationType, status: o.status, createdAt: o.createdAt, activeContracts: contracts.filter((x) => x.status === 'ACTIVE').length })
+        rows.push({ id: o.id, name: o.name, slug: o.slug, organizationType: o.organizationType, status: o.status, isDemo: o.isDemo === true, createdAt: o.createdAt, activeContracts: contracts.filter((x) => x.status === 'ACTIVE').length })
       }
       res.json({ rows, total: rows.length, page: 1, pageSize: Math.max(1, rows.length) })
     } catch (err) { fail(res, err, 'admin_organizations_list_failed', req) }

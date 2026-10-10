@@ -116,3 +116,16 @@ socket stickiness, F5b on every replica), with the guarded manifest change.
 | G2 | **HA-016** Sign design partners (terms need E4); **HA-C006** contract | Founder | Signed agreements |
 | G3 | Stage C: one institution pilot (F6–F8 as gated) | Business owner | Pilot measures (ROLLOUT §4) — no validity claim |
 | G4 | **HA-008** psychometrician; **HA-009/HA-010** raters; **HA-011** SME workshops; **HA-012** ethics; **HA-013** studies; **HA-017** outcome-data agreements | Founder / science lead | Per register |
+
+## Addendum 2026-10-10 — PROD-READY Phase 8 flags
+
+Two flags were registered OFF in Phase 8. The table above is unchanged; slot them in as follows.
+
+| # | Flag | Entry criteria (all) | Owner |
+| --- | --- | --- | --- |
+| F6c | `PRISM_PILOT_REPORT_EXPORT` (admin export of the pilot technical report) | F6; template reviewed by the psychometrics lead (**HA-008**); aggregate-reporting policy (**HA-C010**) | Psychometrics lead + operator |
+| — | `PRISM_DEMO_MODE` | Never in the production environment. Set only in a separate demo environment with its own database (`PRISM_DEMO_DATABASE_URL`); business decision to run sales demos | Business owner + operator |
+
+`PRISM_UNDER18_PATH` now has real behaviour behind it (guardian-consent path, migration 0062) and stays in the "Stay OFF" row until **HA-006** and **HA-005** are closed and the DRAFT copy is replaced.
+
+Migrations 0061 (demo-organization marker and isolation triggers) and 0062 (guardian consents) join the release after 0060.

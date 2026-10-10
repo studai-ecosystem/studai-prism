@@ -20,6 +20,7 @@ export const RECURRING_JOBS = Object.freeze([
   { kind: 'retention.enforce', everyMs: DAY },
   { kind: 'retention.import_rows', everyMs: DAY },
   { kind: 'retention.accommodation_requests', everyMs: DAY },
+  { kind: 'retention.guardian_consents', everyMs: DAY },
 ])
 
 export const isRetentionEnforcementOn = (env = process.env) => env.PRISM_RETENTION_ENFORCEMENT === 'true'

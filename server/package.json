@@ -12,6 +12,7 @@
     "retention:import-rows": "node config/runWithRuntimeSecrets.js db/purgeImportRows.js",
     "erasure:ledger": "node config/runWithRuntimeSecrets.js db/erasureLedger.js",
     "sessions:pin-forms": "node config/runWithRuntimeSecrets.js db/pinSessionForms.js",
+    "seed:demo": "node db/seedDemoOrg.js",
     "test": "node --test"
   },
   "dependencies": {

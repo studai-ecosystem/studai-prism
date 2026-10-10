@@ -29,6 +29,7 @@ import { createReadinessHandler } from './lib/readiness.js'
 import { createCandidateErasureHandler } from './domain/privacy/candidateErasureRoute.js'
 import { createErasureCascade } from './domain/privacy/erasureCascade.js'
 import authRouter from './routes/auth.js'
+import { createLearnerGuardianRouter, createGuardianRouter } from './routes/guardianConsent.js'
 import deviceRouter from './routes/device.js'
 import contentRouter from './routes/content.js'
 import psychometricsRouter from './routes/psychometrics.js'
@@ -184,7 +185,10 @@ export function buildApp(v1Deps = {}) {
   })
 
   // ── Routes ───────────────────────────────────────────────────────────────
+  // PROD-READY Phase 8: under-18 guardian consent (dark, PRISM_UNDER18_PATH).
+  app.use('/api/auth/guardian-consent', createLearnerGuardianRouter())
   app.use('/api/auth', authRouter)
+  app.use('/api/guardian-consent', createGuardianRouter())
   app.use('/api/payment', paymentRouter)
   // The legacy report JSON routes check no identity; only the session owner
   // may read them (Campus Phase 12, S7). The legacy router is unchanged.

@@ -5,9 +5,9 @@ import { clone } from '../campusStore/memoryDb.js'
 export function createOrganizationsRepoMemory(db) {
   const now = () => db.clock().toISOString()
   return {
-    async createOrganization({ id, name, slug, organizationType, status, country = null, timezone = null }) {
+    async createOrganization({ id, name, slug, organizationType, status, country = null, timezone = null, isDemo = false }) {
       if ([...db.organizations.values()].some((o) => o.slug === slug)) throw new ApiError('CONFLICT', 'An organization with this slug already exists.')
-      const row = { id: id || db.id(), name, slug, organizationType, status, country, timezone, createdAt: now(), updatedAt: now() }
+      const row = { id: id || db.id(), name, slug, organizationType, status, country, timezone, isDemo: isDemo === true, createdAt: now(), updatedAt: now() }
       db.organizations.set(row.id, row)
       return clone(row)
     },

@@ -195,3 +195,12 @@ rollbacks). Never paste an unfilled template; never edit an earlier entry.
 - health checks: pass|fail (+notes); error-level log lines in the first 10 minutes: <n>
 - rollback: not needed | rolled back to 2b84e13c07f2 via `kubectl rollout undo` at <time> (+cause, + PRISM_PG_STORE restored to false)
 ```
+
+## Addendum 2026-10-10 — PROD-READY Phase 8
+
+If this release is cut from the Phase 8 branch or later, it carries two more migrations, both additive with a `.down.sql`:
+
+- `0061_demo_organizations`: the `organizations.is_demo` marker, `demo_accounts`, isolation triggers and the `demo_session_ids` view.
+- `0062_guardian_consents`: an empty table until `PRISM_UNDER18_PATH` is turned on.
+
+Three dark flags must read OFF in the smoke battery: `PRISM_PILOT_REPORT_EXPORT`, `PRISM_DEMO_MODE` (never set in production) and `PRISM_UNDER18_PATH` (dark check `under18-guardian`). The demo seed is never run against the production database; it refuses to.

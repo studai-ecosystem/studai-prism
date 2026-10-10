@@ -19,6 +19,9 @@ export const MeSchema = z.object({
   flags: z.record(z.boolean()),
   permissions: z.object({ global: z.array(z.string()) }).passthrough(),
   workspaces: z.array(WorkspaceSchema),
+  // PROD-READY Phase 8: true when the caller belongs to a synthetic demo
+  // organization (the app then shows a persistent "Demo data" banner).
+  demo: z.boolean().optional(),
 })
 
 export async function fetchMe() {

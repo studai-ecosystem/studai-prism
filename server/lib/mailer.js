@@ -150,6 +150,35 @@ export async function sendOrgInviteEmail({ to, organizationName, inviteUrl }) {
   return true
 }
 
+// PROD-READY Phase 8 (dark: PRISM_UNDER18_PATH): ask a guardian to agree
+// before a learner under 18 can start an assessment. DRAFT copy pending
+// HA-006 / HA-005. The learner's name is learner-entered text, so it is escaped.
+export async function sendGuardianConsentEmail({ to, url, learnerName = null }) {
+  const transport = await getTransport()
+  if (!transport) throw new Error('mail_not_configured')
+  const fromAddress = process.env.MAIL_FROM || process.env.SMTP_USER
+  const fromName = process.env.MAIL_FROM_NAME || 'StudAI Prism'
+  const who = String(learnerName || 'A learner').replace(/[\r\n]+/g, ' ').slice(0, 120)
+  await transport.sendMail({
+    from: `"${fromName}" <${fromAddress}>`,
+    to,
+    subject: 'Your consent is requested for a learner under 18 (Prism)',
+    text:
+      `${who} told us they are under 18 and named you as their parent or guardian.\n\n` +
+      `They can take a Prism development assessment only if you agree. Open this link to read what that means and to agree or decline:\n\n` +
+      `${url}\n\nIf you do not know this learner, you can ignore this email.\n\n— StudAI Prism`,
+    html:
+      `<div style="font-family:Arial,Helvetica,sans-serif;color:#1A1A2E;line-height:1.6">` +
+      `<p><strong>${escapeHtml(who)}</strong> told us they are under 18 and named you as their parent or guardian.</p>` +
+      `<p>They can take a Prism development assessment only if you agree. Open the link to read what that means and to agree or decline:</p>` +
+      `<p><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></p>` +
+      `<p>If you do not know this learner, you can ignore this email.</p>` +
+      `<p style="color:#7A7F8C;font-size:13px;margin-top:16px">— StudAI Prism</p>` +
+      `</div>`,
+  })
+  return true
+}
+
 // Prism Campus (C7.08): a sponsored assessment was assigned to a student.
 // Institution-entered text is escaped; the link is the app's own URL.
 export async function sendCampusAssignmentEmail({ to, organizationName, assessmentTitle, dueAt = null, url }) {

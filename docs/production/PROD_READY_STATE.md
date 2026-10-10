@@ -14,8 +14,8 @@ Formats follow [CAMPUS_PROGRAM_STATE.md](../campus/CAMPUS_PROGRAM_STATE.md):
 - Status values: `NOT_STARTED` | `IN_PROGRESS` | `COMPLETE`.
 
 <!-- PROD-STATE:BEGIN
-active_phase: 7
-branch: prod/p07-deployment
+active_phase: 8
+branch: prod/p08-sales-readiness
 last_updated: 2026-10-10
 PROD-STATE:END -->
 
@@ -25,7 +25,7 @@ PROD-STATE:END -->
 | --- | --- |
 | Charter baseline | `main` @ `609f748` |
 | Actual starting HEAD | `ui/prism-brand-transformation` @ `4e417a9` — a superset of `main` (68 commits ahead; `main` has no content the branch lacks). See P1 |
-| Migrations at start | 0001–0054 (0040–0054 are on the branch, not on `main`); new migrations start at 0055 (P2). Phase 1S added 0055, Phase 2 added 0056, Phase 3 added 0057, Phase 4 added 0058, Phase 5 added 0059, Phase 6 added 0060 |
+| Migrations at start | 0001–0054 (0040–0054 are on the branch, not on `main`); new migrations start at 0055 (P2). Phase 1S added 0055, Phase 2 added 0056, Phase 3 added 0057, Phase 4 added 0058, Phase 5 added 0059, Phase 6 added 0060, Phase 8 added 0061–0062 |
 | Production image | `2b84e13c07f2` (released 2026-08-05 per [RELEASE_RECORDS.md](../remediation/RELEASE_RECORDS.md); last entry). Campus V1, the UI rebuild and everything after 2b84e13 are **undeployed**. Images were built from `main` on 2026-10-01/02 (Build Image runs 36879290369, 36978677257) but no release record shows them deployed; not independently verifiable from the engineering workstation |
 | `main` CI | last push run on `main` (36978675693, 2026-10-02) FAILED: `src/features/development/development.test.jsx` mission-player test; the branch's later CI runs are green (37442643787) |
 | Build Image | last run (37365615065, branch, 2026-10-05) FAILED: `sts:AssumeRoleWithWebIdentity` denied for `studai-prism-github-deploy` (HA-024 / operator) |
@@ -385,7 +385,131 @@ One deployment path (EKS) with the legacy ECS and Azure workflows removed (P70).
 
 
 ## Phase 8 — Sales-readiness engineering
-Status: NOT_STARTED
+Status: COMPLETE (dark; nothing deployed, no flag flipped, no human action closed)
+Branch: `prod/p08-sales-readiness` (from `prod/p07-deployment` @ `d42bb29`)
+Commit: see the follow-up commit recording this hash
+Gates: see table
+
+Phase 8 delivered five pieces of work, all dark:
+
+- **Demo organization.** A synthetic demo college can be seeded, only with `--demo`. In production the seed also needs `PRISM_DEMO_MODE` and a separate demo database (P82). Demo organizations are marked in the data model, triggers keep them apart from real ones, and calibration and the rating queue exclude them (P83). Every screen shows a "Demo data" banner.
+- **College pilot onboarding runbook**, accurate to the code. Its gaps are listed in Risks (P89).
+- **Pilot technical report export** on the admin plane, dark behind the new flag `PRISM_PILOT_REPORT_EXPORT`. It applies small-group suppression, including complementary cells and rates, and shows PROVISIONAL and INSUFFICIENT as computed (P84).
+- **Under-18 guardian-consent path** behind the existing flag `PRISM_UNDER18_PATH`. Its copy is DRAFT pending HA-006 and HA-005 (P85).
+- **The six campus P3 UX items are cleared**, with vitest, axe and 360/768/1280 Playwright tests (P86).
+
+Two migrations were added (0061, 0062). Two flags were registered OFF (`PRISM_PILOT_REPORT_EXPORT`, `PRISM_DEMO_MODE`).
+
+- [x] P8.01 Demo organization seed `server/db/seedDemoOrg.js` + `npm --prefix server run seed:demo -- --demo` (P82).
+  - Refusals:
+    - without `--demo`;
+    - in production unless `PRISM_DEMO_MODE=true` and `PRISM_DEMO_DATABASE_URL` differs from `DATABASE_URL`;
+    - with no database, or a schema older than 0061.
+  - It writes only to the demo target, never through the runtime-secret loader.
+  - It creates "Demo College (synthetic)" with:
+    - 2 departments and 3 cohorts, one of them small;
+    - "Demo Admin (synthetic)", "Demo Placement Officer (synthetic)" and "Demo Student 001…", with addresses at `demo-college.example.invalid`;
+    - 2 assignments, plus sessions, reports and evidence quoting "Demo response (synthetic text)".
+  - It is idempotent.
+  - Evidence:
+    - `demoOrg.test.js`: seed refusals, flag, and an npm script that never loads secrets;
+    - `demoOrg.db.test.js`: "seed: one synthetic college…";
+    - the CLI run against a scratch demo database: 38 accounts, 54 sessions, 48 reports, 660 units. A second run wrote nothing. The refusals `DEMO_FLAG_REQUIRED` and `DEMO_DATABASE_NOT_SEPARATE` were observed.
+- [x] P8.02 Migration 0061 (+ down):
+  - `organizations.is_demo`, immutable;
+  - the `demo_accounts` table;
+  - isolation triggers on memberships, cohort members and roster rows, in both directions;
+  - the view `demo_session_ids`.
+
+  Evidence: `demoOrg.db.test.js` "0061 isolation…" and "down/up is clean".
+- [x] P8.03 No synthetic data enters real organizations, analytics, calibration or rating (P83).
+  - A real organization's capabilities and sufficiency analytics are deep-equal before and after the demo seed, and never mention a demo id.
+  - `calibration/jobs/_base.py` `fetch_all` drops any row that names a demo session in a session column.
+  - `validation/service.js` refuses demo sessions.
+  - Evidence: `demoOrg.db.test.js` (analytics, rating queue); `calibration/tests/test_demo_exclusion.py` (5); `demoOrg.test.js` (rating queue, memory store).
+- [x] P8.04 Demo reports are honest. The per-capability statuses come from the real sufficiency rules, so the demo shows PROVISIONAL and INSUFFICIENT_EVIDENCE and never SUFFICIENT (the rules are UNCALIBRATED). The small cohort is suppressed in the comparison. Evidence: `demoOrg.db.test.js` "demo analytics and reports are honest…"
+- [x] P8.05 "Demo data" banner.
+  - `/api/v1/me` carries `demo`, and each campus workspace carries `isDemo`.
+  - `DemoDataBanner` is persistent and cannot be dismissed. It is in `AppShell` (the student and campus admin shells and the report pages inside them) and in `AssessmentShell`.
+  - The admin console's organization list carries `isDemo`.
+  - A demo pilot report says DEMO DATA at the top and the bottom.
+  - Evidence:
+    - `demoOrg.test.js` "/me…";
+    - vitest `demoDataBanner.test.jsx` (4);
+    - Playwright `prod-p08-demo-banner.spec.js` at 360/768/1280 on chromium and mobile-chromium: axe clean, no overflow, and no banner for a real account.
+- [x] P8.06 `docs/production/COLLEGE_PILOT_ONBOARDING.md` covers:
+  - organization creation and roles;
+  - the CSV format, taken from the importer;
+  - sponsorship pools;
+  - the disclosure flow and report access;
+  - support and review (Phase 4, flag-gated);
+  - data deletion at pilot end (Phase 2 cascade and an operator checklist);
+  - the pilot report export, the demo organization and the under-18 path.
+
+  Flag-dependent steps are marked. No prices or approvals are invented, and code gaps are stated plainly (P89).
+- [x] P8.07 Pilot technical report generator (P84).
+  - Route: `POST /api/admin/organizations/:orgId/pilot-report`, Markdown or JSON (`server/routes/admin/pilotReport.js`, `server/domain/pilotReport/service.js`).
+  - Dark behind `PRISM_PILOT_REPORT_EXPORT`, which is registered OFF.
+  - Requires `organizations:read` + `exports:create` and a stated purpose. Each export writes an `admin_exports` ledger row and an audit event.
+  - Fills template sections 1–5 from live aggregates. Anything not measured reads UNKNOWN, or PENDING with its HA id. There is no composite score, no ranking and no individual result.
+  - Evidence: `pilotReport.test.js` (4 tests):
+    - 404 while dark;
+    - RBAC, purpose, ledger and audit;
+    - every template section present;
+    - honest statuses;
+    - suppression at 9, 10, and 6 with a minimum of 5, held sessions, the complementary cell and the rate rule;
+    - the demo label.
+
+    The report was also rendered against the scratch demo database.
+- [x] P8.08 Under-18 guardian-consent path behind `PRISM_UNDER18_PATH` (existing flag, still OFF; description updated), with migration 0062 `guardian_consents`.
+  - The flag-off test shows today's behaviour unchanged and every guardian route returning 404.
+  - With the flag on:
+    - an under-18 registration gets no declaration, so assessment starts stay blocked;
+    - when the guardian agrees, a declaration with basis `GUARDIAN_CONSENT` is written and starts pass;
+    - when the guardian withdraws, starts are blocked again;
+    - a decline, an expired link, and a learner's own declaration are each handled.
+  - Copy: DRAFT constants pending HA-006/HA-005 (`server/domain/guardian/copy.js`, `src/lib/copy/guardianConsent.js`), and the guardian page `/guardian-consent/:token` (P85).
+  - Evidence: `guardianConsent.test.js` (5), vitest `guardianConsent.test.jsx` (4), `demoOrg.db.test.js` (PG repository, erasure, retention).
+- [x] P8.09 Law 7 for the new tables.
+  - `demo_accounts` and `guardian_consents` are registered in `personalDataRegistry.js` and erased by the account cascade (PG and memory).
+  - New retention entity `guardian_consents_unverified`: 30 days, PROVISIONAL, HA-003.
+  - Purge `guardianConsentRetention.js`, run by the job `retention.guardian_consents` only under `PRISM_RETENTION_ENFORCEMENT`.
+  - A RETENTION_POLICY addendum records this.
+  - Evidence: `personalDataRegistry.test.js` green; `jobRunner.test.js`; `demoOrg.db.test.js`.
+- [x] P8.10 Campus P3 UX items cleared (P86):
+  - analytics tabs show their own 403/402/500 states;
+  - every tab panel has an h2;
+  - filters sit behind a disclosure below `lg`;
+  - stacked-bar segments have edges;
+  - "Earlier attempts" lists unfinished attempts read-only as CLOSED (the server's `getMission` now returns them);
+  - a "Go to your work" jump link appears below `lg`;
+  - DataTable rows stack below `md`.
+
+  Evidence:
+  - vitest `analyticsPolish.test.jsx` (6), `missionPolish.test.jsx` (4), `primitives.test.jsx` (+2);
+  - `campusDevelopment.test.js` (+1 assertion);
+  - Playwright `prod-p08-ux-polish.spec.js` at 360/768/1280 on chromium and mobile-chromium: axe 0 serious/critical, no horizontal overflow.
+- [x] P8.11 Flags and release documents (P91):
+  - `PRISM_PILOT_REPORT_EXPORT` and `PRISM_DEMO_MODE` are registered OFF and classified dark in the smoke battery;
+  - new dark check `under18-guardian` (`/api/auth/guardian-consent`);
+  - addenda to GO_LIVE_CHECKLIST (F6c and the demo row), RELEASE_TEMPLATE and AGE_GATING_POLICY.
+- [x] P8.12 Migration count pins raised from 60 to 62 (`scripts/rehearse-migrations.mjs`, `experienceBaseline.db.test.js`) (P87).
+- [x] P8.13 Tests changed with reasons; none weakened (P88).
+- [H] P8.14 Under-18 decision, guardian copy and verification method — HA-006, HA-005 (PREPARED status unchanged; nothing closed).
+- [H] P8.15 Pilot report review before any external use — HA-008, HA-C010.
+
+| Gate (2026-10-10/11, Node 24.12 locally) | Phase 8 result |
+| --- | --- |
+| `npm --prefix server test` (no DB) | 1133 tests · 1066 pass · 0 fail · 67 skipped (Phase 7: 1111/1053/0/58; +4 `pilotReport.test.js`, +5 `guardianConsent.test.js`, +4 `demoOrg.test.js`, +9 `demoOrg.db.test.js` skipped without a database) |
+| Server DB suites (`test/*.db.test.js`, serial, fresh scratch database `prism_p08`) | 154 tests · 151 pass · 0 fail · 3 skipped (Phase 6: 145/142/0/3; +9 `demoOrg.db.test.js`). Run on the helper's own cluster at port 55442, not 55432 (P90) |
+| DB pipeline | PASS; every script exited 0. `run-experience-baseline-tests.mjs database` 27/27; `p2` 21/21; `run-cr03-runtime-tests.mjs` 18/18; `rehearse:migrations` pin 62, head `0062_guardian_consents`, 23 migrations (0040–0062) rolled back and re-applied, idempotent; `rehearse:rollback` 1/1 |
+| `npx vitest run` | 46 files · 566 tests · 566 pass (Phase 7: 42 files / 546 tests). New files: `demoDataBanner`, `guardianConsent`, `analyticsPolish`, `missionPolish`; +2 tests in `primitives` |
+| `python -m pytest calibration/tests -q` | 69 passed (+5 `test_demo_exclusion.py`) |
+| `npm run build` | PASS (entry 412.42 kB / 124.40 kB gzip; charts 374.22 kB / 103.79 kB gzip) |
+| `npm run audit:static` | PASS |
+| Playwright, new specs | `prod-p08-demo-banner` + `prod-p08-ux-polish` at 360/768/1280: chromium 6/6, mobile-chromium 6/6. Audit servers on ports 4273/4274, own Postgres on 55442, scratch databases `prism_p08_e2e*` |
+| Playwright, touched specs (chromium) | 8 specs: `campus-analytics`, `campus-development`, `campus-a11y-sweep`, `campus-shell`, `campus-student`, `campus-workspace`, `p1-account-entry`, `campus-journey-c`. Result: 33 passed, 2 failed. Neither failure is a Phase 8 regression (P90): both fail identically on a clean worktree of the base commit `d42bb29` with the same harness. **`CAMPUS-SHELL-04`** (flags-off launcher): `/api/v1/me` returns 500 because `server/.env` points the legacy audit server at port 55433, which was down. **`campus-workspace` "resume after refresh"**: the "Begin timed assessment" dialog never appears. The UX agent also ran `campus-analytics`, `campus-development` and `campus-a11y-sweep` on mobile-chromium: all pass. `@critical` across all projects is left to the orchestrator's gate |
+| `npm audit --omit=dev` | unchanged (no dependency change) |
 
 ## Phase 9 — Employer development-use workspace (dark)
 Status: NOT_STARTED
@@ -483,6 +607,16 @@ Format: date · id · decision · reason · charter § · reversible.
 | 2026-10-10 | P79 | `docs/production/GO_LIVE_CHECKLIST.md` orders A security (HA-001, HA-002, HA-018) → B platform/CI/staging (HA-C007, HA-024 incl. the trust-policy switch before merge, digests, staging, CA bundle, rehearsals incl. old image on the 0060 schema, HA-C012, HA-C013) → C the release window with the cutover (HA-023) → D operations (HA-019, HA-022, pool sizing, payments review, HA-021) → E gating decisions (HA-C002, HA-C005/HA-005, HA-003, HA-004, HA-C010, HA-C009, HA-C004, HA-C003, HA-015/HA-C006, HA-006/HA-007, HA-C011) → F flag flips in ROLLOUT order with this programme's flags slotted in (`PRISM_V3_SUPPORT_ROUTES` with step 4, `PRISM_JOB_WORKER` after step 5, `PRISM_ANALYTICS_DECISION_CACHE` after step 6, `PRISM_RETENTION_ENFORCEMENT` last) → G pilot stages and the science programme (HA-008–HA-014, HA-016, HA-017). Every register id appears (checked); nothing is marked closed and the registers are unchanged | Charter Phase 7.5; law 2 | Phase 7.5, Law 2 | Yes |
 | 2026-10-10 | P80 | `scripts/check-final-handover.mjs` (part of `validate:p10`, not a CI gate): the pinned 54 / `0054_report_publication_note` is the P10 handover RECORD and stays pinned. Added, without relaxing anything: the recorded head must exist in `server/db/migrations`, exactly 54 up-migrations must lead up to it, numbering must be contiguous, and later migrations are reported (`afterHandover`: 0055–0060). `validate:p10` as a whole stops locally at `check-p10-route-manifest.mjs`, which reads Playwright artefacts in `audit-results/` — pre-existing and environment-dependent, unchanged | The audit flagged the pin as stale; it is a record, so the fix is to prove the record against the repository rather than move the number | Law 4 | Yes |
 | 2026-10-10 | P81 | Tests changed, none weakened. `server/test/platform.test.js`: (1) the single-writer pin now reads `infra/aws/eks/base/deployment.yaml` and additionally forbids any overlay from changing replicas or using RollingUpdate; (2) "deploy-aws.yml is guarded against casual dispatch" asserted properties of a file removed by P70 — replaced by "legacy ECS / Azure deploy paths are gone and no workflow deploys" (the files must not exist, no workflow may run `cloudformation deploy`, `aws ecs`, `webapps-deploy` or a mutating `kubectl`, the ECS template must carry its DO-NOT-DEPLOY header, the old manifest must hold no object), which is strictly stronger than a typed-phrase guard; (3) the secret-material test now scans every workflow, every EKS file and the ECS template instead of three fixed files; (4) new tests: image placeholder, hardening, staging isolation, operator Jobs, build-image safety. The runbook-content test is unchanged and green (addenda only append). New file `server/test/postDeploySmoke.test.js` (7) | Law 4: the removed guard's file no longer exists by decision; its intent (no casual ECS deploy) is enforced more strictly | Law 4 | Yes |
+| 2026-10-10 | P82 | Demo organization design. `server/db/seedDemoOrg.js` runs only with `--demo`. With `NODE_ENV=production` it also requires `PRISM_DEMO_MODE=true` (new flag, registered OFF) and a `PRISM_DEMO_DATABASE_URL` different from `DATABASE_URL`, and then writes only there. `npm run seed:demo` does not use `runWithRuntimeSecrets.js`. Demo organizations are marked by `organizations.is_demo` (0061; immutable by trigger) and their accounts by `demo_accounts`. The seed attaches sessions to a real catalog form. It writes sessions, `v1_reports` and synthetic evidence units; per-capability statuses are computed by the real sufficiency rules at read time. It does NOT write Student Report V3 versions: publication needs a genuine pinned run (`resolvePinnedMethod`), and fabricating one would be fabricated provenance. The seed is idempotent and has no reset; to start over, drop the demo database. | Charter Phase 8.1 and law 2: every value synthetic and obviously so; never in a real organization; production refusal unless a separate demo database is configured | Phase 8.1, law 2 | Yes |
+| 2026-10-10 | P83 | Isolation is enforced in the database, not only in code. The 0061 triggers refuse a membership, cohort member or roster row that mixes a demo account with a real organization, or a real account with a demo organization. Calibration exclusion is generic: every job reads through `_base.fetch_all`, which drops rows naming a session from the view `demo_session_ids` in any session column. The rating queue (`validation/service.js`) refuses demo sessions before reading evidence. Platform-wide admin dashboards (outside organization analytics) are not filtered. Production keeps demo data in a separate database, so they never see it there; on a shared development database they would count demo rows. | "No synthetic data may ever enter a real organization, analytics or calibration run (add a test)" | Phase 8.1 | Yes |
+| 2026-10-10 | P84 | Pilot technical report: `POST /api/admin/organizations/:orgId/pilot-report`, dark behind the new flag `PRISM_PILOT_REPORT_EXPORT` (registered OFF). It needs `organizations:read` + `exports:create` (two existing permissions, so no RBAC catalogue change) and a purpose, and every export is ledgered and audited. The report reads only the existing aggregate read models through an admin-plane actor with organization-owner scope. Suppression rules, stricter than the analytics views where the report adds totals: (a) every non-zero learner count below the organization's minimum is suppressed; (b) in a row whose total is shown, a lone suppressed cell suppresses the smallest visible non-zero cell too ("complementary"); (c) a rate is shown only when every count in it is shown; (d) the band table's PROVISIONAL count reuses the status cell. Items not measured per organization are UNKNOWN (identity-assurance distribution); studies are PENDING with their HA ids. | Template rule "every number from the live system, PENDING/UNKNOWN otherwise"; found while rendering the demo: a 24.2% rate next to a suppressed cell revealed it | Phase 8.3, laws 2 and 6 | Yes |
+| 2026-10-10 | P85 | Under-18 path on the EXISTING flag `PRISM_UNDER18_PATH` (registered OFF since charter §12; its description was updated, and no new flag was added). The account of an under-18 learner gets no declaration, so the frozen router's existing commencement gate keeps blocking every start; the frozen router is untouched. A verified guardian consent writes a declaration with version `guardian-consent-u18-v0-draft` and basis `GUARDIAN_CONSENT`. A withdrawal removes only that basis (`clearGuardianAgeDeclaration`, PG and JSON twins), never a learner's own declaration. Verification is possession of the emailed single-use link (only its hash stored, 14-day decision window). Data: guardian email, copy version, state and times (0062), erased with the account; unverified requests are purged after 30 days (PROVISIONAL). Not built: a registration-form control (a pre-sign-in client cannot see a server flag) and any age verification; both belong to the HA-006 decision. | Charter Phase 8.4; HA-006 and HA-005 stay PENDING; copy is DRAFT | Phase 8.4, laws 5 and 7 | Yes |
+| 2026-10-10 | P86 | The campus P3 UX items are cleared on the client: tab-level error states, h2 in tab panels, filter disclosure below `lg`, segment edges, jump link, stacked DataTable rows below `md`. For "earlier attempts" the server had dropped unfinished attempts: `getMission` filtered `status !== 'IN_PROGRESS'`. It now returns every attempt except the resumable open one, reporting an attempt left open in an ended intervention as `CLOSED` (read-only; it never counts). This server change ships under the already-dark `PRISM_DEVELOPMENT_V2`. The development-plan list still shows finished attempts only, and the mission page itself still 404s once the only intervention offering a mission has ended (`missionFor`); both are recorded in Risks. | Charter Phase 8.5; the UX agent found the server gap | Phase 8.5 | Yes |
+| 2026-10-10 | P87 | Migration count pins raised from 60 to 62 (`scripts/rehearse-migrations.mjs`, `server/test/experienceBaseline.db.test.js`) for 0061 and 0062 | Same rule as P22/P31/P68 | Law 3 | Yes |
+| 2026-10-10 | P88 | Tests changed, none weakened. (1) `track0.test.js`: `demo_accounts` and `guardian_consents` were added BY NAME to the identity-plane allowlist, with reasons, as every earlier phase did; research tables stay guarded. (2) `jobRunner.test.js` / `jobRunner.db.test.js`: the expected recurring-job lists gain `retention.guardian_consents`; the retention test now also asserts that the new handler is a no-op while enforcement is off and runs dry-then-enforce when on (stronger). (3) `campusDevelopment.test.js`: one assertion added (the unfinished attempt is listed as CLOSED). Every other change is a new test file. | Law 4 | Law 4 | Yes |
+| 2026-10-10 | P89 | The onboarding runbook states the code's gaps instead of papering over them: no admin-console or API route creates an organization or its first owner (manual database path documented); no route removes a student or revokes a pending invite, and nothing sets an organization SUSPENDED or ARCHIVED; the last owner cannot be removed through the API; uncommitted CSV previews are never purged; unsent invite links cannot be recovered without mail. These are recorded in Risks and were not built in this phase. | Charter Phase 8.2 asks for a runbook accurate to the code; building organization lifecycle routes is new behaviour beyond item 2 | Phase 8.2, law 2 | Yes |
+| 2026-10-10 | P90 | Gate environment. (a) The throwaway cluster on port 55432 was left unusable mid-run: its postmaster exited while an orphaned child kept the listening socket, so connections timed out. Killing the orphan was refused by the permission system, so the DB suites ran on the helper's own cluster at port 55442 (fresh `prism_p08`). An operator may need to stop the orphaned `postgres.exe` holding 55432. (b) Playwright: `CAMPUS-SHELL-04` and the `campus-workspace` "resume after refresh" journey fail in this harness, and fail identically on a clean worktree of `d42bb29`. For SHELL-04 the cause is visible: `server/.env` points the legacy audit server's `DATABASE_URL` at 55433 (the orchestrator's port, down at the time). The workspace failure's cause was not identified. | Honesty about gate evidence | §2 | — |
+| 2026-10-10 | P91 | Flags and release documents: `PRISM_PILOT_REPORT_EXPORT` and `PRISM_DEMO_MODE` are registered OFF and classified dark in `scripts/post-deploy-smoke.mjs`. A new dark check `under18-guardian` calls `GET /api/auth/guardian-consent` unauthenticated, which returns 404 when off and 401 when on. Dated addenda were added to GO_LIVE_CHECKLIST (F6c; `PRISM_DEMO_MODE` never in production), RELEASE_TEMPLATE_PROD_READY (0061/0062), AGE_GATING_POLICY_v1 and RETENTION_POLICY_v1; the records above them are unchanged | P79 rule: every new flag classified | Law 5 | Yes |
 
 ## Risks
 
@@ -529,6 +663,13 @@ Format: date · id · decision · reason · charter § · reversible.
 | `PRISM_RELEASE_STAGE` defaults to `LOCAL_CI` (accepts DRAFT content) when unset; production does not set it yet (P73) | P2 | Product + Operator | Set it with the first V3 flag decision (GO_LIVE F0); staging sets `STAGING` | Any V3 flag |
 | No preStop hook or ALB deregistration delay: during a shutdown the ALB can still send a few requests to a draining pod; with `Recreate` and one replica a release is a short outage anyway (P72) | P3 | Engineering | Revisit with `replicas > 1` (native `preStop.sleep` once the cluster version is confirmed, or `deregistration_delay` on the target group) | `replicas > 1` |
 | Staging needs its own IRSA role, secret, database, DNS and (by default) its own ALB; none exists yet (P73) | P2 | Operator | GO_LIVE B5 | ROLLOUT stage A |
+| No route creates an organization or its first owner; there is no student removal route, no pending-invite revocation and no organization suspend/archive; the last owner cannot be removed through the API (found by the Phase 8 runbook, P89). ROLLOUT step 5's "internal QA organization created in the console" has no console path | P1 | Engineering / Product | The onboarding runbook documents a manual, recorded database path for operators. Build the organization lifecycle on the admin plane in a reviewed change | First college pilot |
+| Uncommitted CSV import previews are never purged (no cancel route for PREVIEW jobs; the purge selects COMMITTED/CANCELLED only) (P89) | P2 | Engineering | Commit or have an operator cancel previews; add a preview-expiry purge with the retention work | Before a paid pilot |
+| The development-plan list still shows finished attempts only, and the mission page 404s once the only intervention offering it has ended, so a CLOSED attempt is visible only while the mission stays reachable (P86) | P3 | Engineering | Extend `listAttemptHistory`/plan view in a later change | No |
+| The under-18 path cannot be started from the registration form (no client control; the server path exists dark) and verifies a guardian only by possession of an emailed link (P85) | P2 | Product / Counsel (HA-006, HA-005) | Part of the HA-006 decision memo (Phase 10) | `PRISM_UNDER18_PATH` flip |
+| The pilot technical report export is API-only (no console screen), and its identity-assurance line is UNKNOWN (not aggregated per organization) (P84) | P3 | Engineering | Console screen with the flag; per-organization assurance counts from `v1_verifications` in a later change | Flag flip |
+| Demo data on a shared non-production database is visible to platform-wide admin dashboards (only organization analytics, calibration and rating exclude it) (P83) | P3 | Operator | Keep demo organizations in a separate demo database, as the seed's production refusal enforces | No |
+| The throwaway Postgres on port 55432 was left with an orphaned child holding the socket after a gate run; Phase 8 DB suites ran on 55442 (P90) | P3 | Operator | Stop the orphaned `postgres.exe` on 55432 before the next phase uses it | No |
 
 ### Campus risk dispositions (Phase 3)
 
@@ -544,11 +685,13 @@ The rows below are in the [CAMPUS_PROGRAM_STATE.md](../campus/CAMPUS_PROGRAM_STA
 | A session's form is resolved from today's catalog (`formForSession`) | **Closed for new sessions** (P37); older sessions after the operator runs `sessions:pin-forms` | Bank-bump unit test, DB persistence/backfill tests |
 | Campus admin list endpoints compute in the service (per-student user lookups, per-assignment roster reads), O(students × assignments) (Phase 6) | **Closed in code** (P61–P63): SQL-side directory, overview and paging, batched user directory, one roster plan per import/move; list p95 at 2,000 students 13–131 ms on the workstation (P65) | `campusScale.test.js`, `campusScale.db.test.js` (SQL == in-process), PERFORMANCE_REVIEW addendum |
 | Analytics compute every student's decisions per request (Phase 6) | **Mitigated, dark** (P64): materialised per-session decisions behind `PRISM_ANALYTICS_DECISION_CACHE` (OFF); 5–9 s → 0.5–0.7 s p95 under 10 concurrent requests at 2,000 students. An organization-level aggregate would be the next step | `campusScale.db.test.js` (cached == computed after every invalidating event) |
+| Campus analytics polish (UX audit P10 WARNs): tab-level 403/402/500 copy, h2 skip in tab panels, 360px filter bar, close stacked-bar colours | **Resolved (Phase 8, P86)**: each tab renders its own 403/402/500 state; every tab panel opens with an h2; filters sit behind a disclosure below `lg`; segments carry a surface-colour edge (the data ramp itself is unchanged, as there are no dark-mode ramp tokens) | vitest `analyticsPolish.test.jsx` (6); Playwright `prod-p08-ux-polish.spec.js` 360/768/1280 chromium + mobile-chromium, axe 0 serious/critical |
+| Phase 8 UX follow-ups: unfinished attempts missing from "Earlier attempts"; "Start mission" below the first screen at 360/768; interventions table scrolls sideways at 360 | **Resolved (Phase 8, P86)**: the server returns unfinished attempts as CLOSED and the page lists them read-only; a "Go to your work" jump link appears below `lg`; DataTable rows stack below `md`. The plan-list and ended-mission limits remain (Risks row) | `missionPolish.test.jsx` (4), `primitives.test.jsx` (+2), `campusDevelopment.test.js` (+1); Playwright `prod-p08-ux-polish.spec.js` |
 
 ## Session handoff
 
 1. Read this file, then the charter, then the active phase section.
 2. `git -C studai-prism status` — never overwrite uncommitted human work. Untracked at programme start (not ours, never commit): `PRISM_NEXT_REALITY_AUDIT_2026.md`, `StudAI_Prism_Complete_Brand_Pack*`, `data/` (contains user records — see Phase 1S).
 3. Branches are local and stacked: `prod/p00-baseline` → `prod/p01-dependencies` → `prod/p01s-security-hotfix` → `prod/p02-...` and so on.
-4. New migrations: the head is `0060_session_decision_cache` (Phase 6; Phase 7 added none). Each new migration also updates the pinned count in `scripts/rehearse-migrations.mjs` and `server/test/experienceBaseline.db.test.js` (P22, P31), and must register every personal-data column in `server/domain/privacy/personalDataRegistry.js` (the ratchet test fails otherwise; law 7).
+4. New migrations: the head is `0062_guardian_consents` (Phase 8 added 0061 and 0062; Phase 7 added none). Each new migration also updates the pinned count in `scripts/rehearse-migrations.mjs` and `server/test/experienceBaseline.db.test.js` (P22, P31), and must register every personal-data column in `server/domain/privacy/personalDataRegistry.js` (the ratchet test fails otherwise; law 7).
 5. Deployment (Phase 7 onward): the manifest is the kustomize tree `infra/aws/eks/` (never commit a concrete image tag; `infra/aws/prism-eks.yml` is a tombstone); the release inputs are `docs/production/RELEASE_TEMPLATE_PROD_READY.md`, the human sequence is `docs/production/GO_LIVE_CHECKLIST.md`, and every new feature flag must also be classified in `scripts/post-deploy-smoke.mjs` (`postDeploySmoke.test.js` fails otherwise).

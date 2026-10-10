@@ -5,6 +5,8 @@ import logger from '../lib/logger.js'
 import { getJwtSecret } from '../lib/security.js'
 import { findUserByEmail, findUserById, createUser, updateUser, updateUserAccount, publicUser, recordAgeDeclaration } from '../lib/db.js'
 import { AGE_DECLARATION_VERSION } from '../lib/sharedConstants.js'
+import { isUnder18PathEnabled, normalizeGuardianEmail } from '../domain/guardian/service.js'
+import { defaultGuardianService } from './guardianConsent.js'
 
 const router = Router()
 
@@ -34,7 +36,7 @@ function tokenVersionValid(payload, user) {
 // ── POST /api/auth/register ──────────────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, college, year, password, ageConfirmed } = req.body || {}
+    const { name, email, college, year, password, ageConfirmed, under18, guardianEmail } = req.body || {}
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' })
@@ -49,11 +51,23 @@ router.post('/register', async (req, res) => {
     // an explicit, version-stamped confirmation — not Terms fine print. The
     // under-18 path stays feature-gated OFF (PRISM_UNDER18_PATH) pending the
     // guardian-consent decision (HA-006). No date of birth is collected.
-    if (ageConfirmed !== true) {
+    // PROD-READY Phase 8: the under-18 guardian-consent path is DARK
+    // (PRISM_UNDER18_PATH registered OFF, copy DRAFT pending HA-006/HA-005).
+    // Off: exactly today's behaviour — no age confirmation, no account.
+    const guardianPath = ageConfirmed !== true && under18 === true && isUnder18PathEnabled()
+    if (ageConfirmed !== true && !guardianPath) {
       return res.status(400).json({
         error: 'Prism is currently available to candidates aged 18 or older. Please confirm your age to register.',
         code: 'AGE_CONFIRMATION_REQUIRED',
       })
+    }
+    let guardianAddress = null
+    if (guardianPath) {
+      try {
+        guardianAddress = normalizeGuardianEmail(guardianEmail, email)
+      } catch (err) {
+        return res.status(400).json({ error: err.message, code: err.code })
+      }
     }
 
     const passwordHash = await bcrypt.hash(String(password), 10)
@@ -62,7 +76,9 @@ router.post('/register', async (req, res) => {
     try {
       user = await createUser({
         name, email, college, year, passwordHash,
-        ageDeclaration: {
+        // Under 18: no declaration until a guardian agrees, so the existing
+        // commencement gate keeps blocking every start until then.
+        ageDeclaration: guardianPath ? null : {
           version: AGE_DECLARATION_VERSION,
           at: new Date().toISOString(),
           meta: { ip: req.ip, userAgent: req.get('user-agent') || '' },
@@ -76,6 +92,10 @@ router.post('/register', async (req, res) => {
     }
 
     const token = signToken(user)
+    if (guardianPath) {
+      const { consent, emailSent } = await defaultGuardianService().request(user, guardianAddress)
+      return res.status(201).json({ token, user: publicUser(user), guardianConsent: { ...consent, emailSent } })
+    }
     res.status(201).json({ token, user: publicUser(user) })
   } catch (err) {
     logger.captureException(err, { msg: 'auth_register_failed', requestId: req.requestId })

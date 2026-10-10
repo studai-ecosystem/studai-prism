@@ -3,7 +3,7 @@ import { clone } from '../campusStore/memoryDb.js'
 
 export function createMembershipsRepoMemory(db) {
   const now = () => db.clock().toISOString()
-  const withOrg = (m) => m && ({ ...clone(m), organizationName: db.organizations.get(m.organizationId)?.name ?? null, organizationStatus: db.organizations.get(m.organizationId)?.status ?? null })
+  const withOrg = (m) => m && ({ ...clone(m), organizationName: db.organizations.get(m.organizationId)?.name ?? null, organizationStatus: db.organizations.get(m.organizationId)?.status ?? null, organizationIsDemo: db.organizations.get(m.organizationId)?.isDemo === true })
   return {
     async upsertMembership({ organizationId, userId, role, status, departmentId = null, scope = {}, invitedBy = null }) {
       const existing = [...db.memberships.values()].find((m) => m.organizationId === organizationId && m.userId === userId && m.role === role)

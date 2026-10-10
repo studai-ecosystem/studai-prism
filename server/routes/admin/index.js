@@ -50,6 +50,7 @@ import auditRouter from './audit.js'
 import accommodationsRouter from './accommodations.js'
 import marginRouter from './margin.js'
 import organizationsRouter from './organizations.js'
+import pilotReportRouter from './pilotReport.js'
 import validationRouter from './validation.js'
 import qualityRouter from './quality.js'
 import reportReviewsRouter from './reportReviews.js'
@@ -140,6 +141,8 @@ router.use('/accommodations', accommodationsRouter)
 // Charter Phase 5 — commercial readiness (§23 contribution margin).
 router.use('/margin', marginRouter)
 // Campus Phase 11 — campus organizations, sponsorship pools and contracts.
+// PROD-READY Phase 8 — pilot technical report export (dark behind PRISM_PILOT_REPORT_EXPORT).
+router.use('/organizations', pilotReportRouter)
 router.use('/organizations', organizationsRouter)
 // Campus Phase 12 — blinded double-rating queue for V3 evidence (dark behind PRISM_V3_RATING_QUEUE).
 router.use('/validation', validationRouter)

@@ -347,6 +347,20 @@ export const PERSONAL_DATA_REGISTRY = Object.freeze({
     session_id: D('Per-session version counter for cache invalidation; deleted with the session'),
   }, 'Version counter bumped by triggers on every write that can change a cached decision'),
 
+  // ── 0061 demo organizations (PROD-READY Phase 8) ──
+  // Every account listed here was created by server/db/seedDemoOrg.js and is
+  // synthetic; the marker goes with the account like any other account row.
+  demo_accounts: user({
+    user_id: D('Synthetic demo account marker; deleted with the account (after its memberships, so the isolation triggers never see a half-erased account)'),
+  }, 'Marker of the synthetic accounts of a demo organization (no real person)'),
+
+  // ── 0062 under-18 guardian consent (PROD-READY Phase 8, dark: PRISM_UNDER18_PATH) ──
+  guardian_consents: user({
+    user_id: D('The learner the request is about; every request of the person is deleted with the account'),
+    guardian_email: D('Guardian contact address (the only guardian detail collected); deleted with the learner\'s account, and requests never verified are deleted 30 days after they ended (guardian_consents_unverified, PROVISIONAL, HA-003)'),
+    token_hash: D(ROW_GONE),
+  }, 'Guardian consent requests and records for learners under 18 (AGE_GATING_POLICY_v1 addendum; copy DRAFT pending HA-006/HA-005)'),
+
   // ── 0056 erasure ledger (this phase) ──
   privacy_erasure_runs: none({
     subject_ref: R('Keyed one-way hash of the account id (no personal data); lets an operator prove completion'),

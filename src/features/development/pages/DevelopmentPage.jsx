@@ -173,7 +173,9 @@ export default function DevelopmentPage() {
               <li key={a.attemptId}>
                 <Card className="p-4">
                   <p className="text-sm font-semibold text-prism-ink">{a.title || 'Practice mission'}</p>
-                  <p className="text-sm text-prism-ink-muted">{a.summary || 'Feedback not available'}</p>
+                  {!a.status || a.status === 'EVALUATED' || a.status === 'EVALUATION_UNAVAILABLE'
+                    ? <p className="text-sm text-prism-ink-muted">{a.summary || 'Feedback not available'}</p>
+                    : <p className="text-sm text-prism-ink-muted" data-testid="closed-attempt"><span className="font-semibold text-prism-ink">Not finished — closed</span>: this attempt was not submitted and can no longer be changed. Your work is kept.</p>}
                   {formatDate(a.submittedAt) && <p className="text-xs text-prism-ink-subtle">{formatDate(a.submittedAt)}</p>}
                 </Card>
               </li>

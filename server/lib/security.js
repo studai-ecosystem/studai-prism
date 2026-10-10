@@ -146,6 +146,10 @@ const baseOptions = {
 // Brute-force guard for credential endpoints: 5 attempts/min/IP.
 export const authLimiter = rateLimit({ ...baseOptions, windowMs: 60 * 1000, limit: 5 })
 
+// PROD-READY Phase 8: the public guardian-consent link (dark behind
+// PRISM_UNDER18_PATH). A guardian reads, decides and may withdraw.
+export const guardianLinkLimiter = rateLimit({ ...baseOptions, windowMs: 60 * 1000, limit: 30 })
+
 // Server transcription is the main cost-abuse vector: 20/min/IP comfortably
 // covers one candidate answering questions, not a script farming STT.
 export const transcribeLimiter = rateLimit({ ...baseOptions, windowMs: 60 * 1000, limit: 20 })

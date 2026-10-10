@@ -1,5 +1,9 @@
 import { cx } from '../../lib/cx.js'
 import { Button } from './Button.jsx'
+import './DataTable.css'
+
+// The column header as plain text, for the stacked (small screen) label.
+const labelOf = (c) => (typeof c.header === 'string' ? c.header : (c.stackLabel || undefined))
 
 function ariaSort(column, sort) {
   if (!column.sortable) return undefined
@@ -23,6 +27,9 @@ export function DataTable({
   onSelectedChange,
   isRowSelectable = () => true,
   rowLabel = (r) => String(rowKey(r)),
+  // Below the md breakpoint rows stack as label/value cards instead of
+  // scrolling sideways (each cell labelled with its column header).
+  stack = true,
   className,
 }) {
   const allIds = rows.filter(isRowSelectable).map(rowKey)
@@ -30,20 +37,22 @@ export function DataTable({
   const toggle = (id) => onSelectedChange?.(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
 
   return (
-    // On narrow screens the table scrolls sideways: the region is focusable
-    // so keyboard users can scroll it too (WCAG 2.1.1, axe scrollable-region-focusable).
+    // Below md the rows stack (DataTable.css); from md up a wide table scrolls
+    // sideways inside this region, which is focusable so keyboard users can
+    // scroll it too (WCAG 2.1.1, axe scrollable-region-focusable). Explicit
+    // roles keep the table semantics when the stacked layout changes display.
     <div
       role="region"
       aria-label={typeof caption === 'string' ? caption : 'Table'}
       tabIndex={0}
       className={cx('relative overflow-x-auto rounded-[var(--prism-radius-lg)] border border-prism-border bg-prism-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--prism-accent)]', className)}
     >
-      <table className="min-w-full border-collapse text-left text-sm" aria-busy={loading || undefined}>
+      <table role={stack ? 'table' : undefined} className={cx('min-w-full border-collapse text-left text-sm', stack && 'prism-table-stack')} aria-busy={loading || undefined} data-stack={stack ? 'md' : undefined}>
         <caption className="sr-only">{caption}</caption>
-        <thead className="bg-prism-subtle text-prism-ink-muted">
-          <tr>
+        <thead role={stack ? 'rowgroup' : undefined} className="bg-prism-subtle text-prism-ink-muted">
+          <tr role={stack ? 'row' : undefined}>
             {selectable && (
-              <th scope="col" className="w-10 px-3 py-2">
+              <th scope="col" role={stack ? 'columnheader' : undefined} className="w-10 px-3 py-2">
                 <input
                   type="checkbox"
                   aria-label="Select all rows"
@@ -56,7 +65,7 @@ export function DataTable({
               </th>
             )}
             {columns.map((c) => (
-              <th key={c.key} scope="col" aria-sort={ariaSort(c, sort)} className={cx('px-3 py-2 font-semibold', c.align === 'right' && 'text-right')}>
+              <th key={c.key} scope="col" role={stack ? 'columnheader' : undefined} aria-sort={ariaSort(c, sort)} className={cx('px-3 py-2 font-semibold', c.align === 'right' && 'text-right')}>
                 {c.sortable ? (
                   <button
                     type="button"
@@ -71,24 +80,24 @@ export function DataTable({
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody role={stack ? 'rowgroup' : undefined}>
           {loading ? (
-            <tr><td colSpan={columns.length + (selectable ? 1 : 0)} className="px-3 py-6 text-center text-prism-ink-muted" role="status">Loading…</td></tr>
+            <tr role={stack ? 'row' : undefined}><td colSpan={columns.length + (selectable ? 1 : 0)} className="px-3 py-6 text-center text-prism-ink-muted" role="status">Loading…</td></tr>
           ) : rows.length === 0 ? (
-            <tr><td colSpan={columns.length + (selectable ? 1 : 0)} className="px-3 py-6 text-center text-prism-ink-muted">{emptyMessage}</td></tr>
+            <tr role={stack ? 'row' : undefined}><td role={stack ? 'cell' : undefined} colSpan={columns.length + (selectable ? 1 : 0)} className="px-3 py-6 text-center text-prism-ink-muted">{emptyMessage}</td></tr>
           ) : rows.map((r) => {
             const id = rowKey(r)
             return (
-              <tr key={id} className="border-t border-prism-border">
+              <tr key={id} role={stack ? 'row' : undefined} className="border-t border-prism-border">
                 {selectable && (
-                  <td className="px-3 py-2">
+                  <td role={stack ? 'cell' : undefined} className="px-3 py-2">
                     {isRowSelectable(r) && (
                       <input type="checkbox" aria-label={`Select ${rowLabel(r)}`} checked={selected.includes(id)} onChange={() => toggle(id)} className="h-4 w-4 accent-[var(--prism-accent)]" />
                     )}
                   </td>
                 )}
                 {columns.map((c) => (
-                  <td key={c.key} className={cx('px-3 py-2 text-prism-ink', c.align === 'right' && 'text-right')}>
+                  <td key={c.key} role={stack ? 'cell' : undefined} data-label={stack ? labelOf(c) : undefined} className={cx('px-3 py-2 text-prism-ink', c.align === 'right' && 'text-right')}>
                     {c.render ? c.render(r) : r[c.key]}
                   </td>
                 ))}

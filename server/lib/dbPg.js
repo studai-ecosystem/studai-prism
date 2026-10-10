@@ -85,6 +85,17 @@ export async function recordAgeDeclaration(id, declaration) {
   return user
 }
 
+// PROD-READY Phase 8 (dark under-18 path): a guardian's withdrawal removes
+// ONLY a declaration whose basis is that guardian consent; a learner's own
+// 18+ declaration is never touched (write-once stays the rule for it).
+export async function clearGuardianAgeDeclaration(id) {
+  const r = await query(
+    `UPDATE v1_users SET age_declaration = NULL WHERE id = $1 AND age_declaration->>'basis' = 'GUARDIAN_CONSENT'`,
+    [id],
+  )
+  return r.rowCount > 0
+}
+
 export async function updateUser(id, fields) {
   const user = await findUserById(id)
   if (!user) throw new Error('USER_NOT_FOUND')

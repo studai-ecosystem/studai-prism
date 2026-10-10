@@ -39,6 +39,7 @@ import {
 import { sessionCache as defaultSessionCache } from '../../lib/sessionCache.js'
 import { createActorHasher } from '../telemetry/events.js'
 import { markMemorySessionErased } from '../assessments/publicationFence.js'
+import { eraseGuardianConsentsFromMemory } from '../guardian/repository.js'
 
 export { pseudonymFor, subjectRef, ERASED_TEXT, sessionPseudonymFor }
 
@@ -223,6 +224,15 @@ export const USER_STATEMENTS = Object.freeze([
   ['candidate_mission_attempts', (run, c) => run(
     'DELETE FROM candidate_mission_attempts WHERE candidate_id = $1 OR ($2::text IS NOT NULL AND candidate_id = $2)', [c.uid, c.candidateId],
   )],
+  // PROD-READY Phase 8 (0062): guardian consent requests and records of an
+  // under-18 learner (dark path; the table is empty while the flag is off).
+  ['guardian_consents', async (run, c) => (await tableExists('guardian_consents', run)
+    ? run('DELETE FROM guardian_consents WHERE user_id = $1', [c.uid]) : { rowCount: 0 })],
+  // PROD-READY Phase 8 (0061): the synthetic-account marker, removed after
+  // the memberships, cohort and roster rows above (the isolation triggers fire
+  // only on inserts/updates of those rows, never on these deletes).
+  ['demo_accounts', async (run, c) => (await tableExists('demo_accounts', run)
+    ? run('DELETE FROM demo_accounts WHERE user_id = $1', [c.uid]) : { rowCount: 0 })],
 ])
 
 // Every table the cascade writes to (session steps, account statements, the
@@ -376,6 +386,10 @@ export function eraseUserFromMemoryDb(db, c) {
   counts.application_checkins = dropFrom(db.applicationCheckins, (r) => r.userId === uid)
   counts.product_grants = patchMap(db.productGrants, (g) => g.userId === uid, () => ({ userId: pseudo }))
   counts.preview_attempts = dropMap(db.previewAttempts, (p) => p.claimedUserId === uid)
+  // PROD-READY Phase 8: guardian consents (in-process store without a
+  // database) and the demo-account marker of the memory store.
+  counts.guardian_consents = eraseGuardianConsentsFromMemory(uid)
+  counts.demo_accounts = dropMap(db.demoAccounts, (d) => d.userId === uid)
   return counts
 }
 

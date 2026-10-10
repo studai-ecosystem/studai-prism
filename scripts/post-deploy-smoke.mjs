@@ -44,6 +44,8 @@ export const EXPECTED_DARK_FLAGS = Object.freeze([
   'PRISM_CAMPUS_ENABLED', 'PRISM_CAMPUS_ANALYTICS', 'PRISM_DEVELOPMENT_V2', 'PRISM_GROWTH_ENABLED',
   'PRISM_ROLE_EXPLORATION_V2', 'PRISM_PREPARATION_V1', 'PRISM_V3_SUPPORT_ROUTES', 'PRISM_JOB_WORKER',
   'PRISM_ANALYTICS_DECISION_CACHE', 'PRISM_V3_RATING_QUEUE',
+  // PROD-READY Phase 8
+  'PRISM_PILOT_REPORT_EXPORT', 'PRISM_DEMO_MODE',
 ])
 
 // Must be ON in production for this image to have started at all (DEF-07).
@@ -89,6 +91,7 @@ export function buildChecks({ id = randomUUID } = {}) {
     dark('support-accommodation', 'V3 pre-start accommodation route dark (Phase 4)', `/api/v1/assessment-assignments/${id()}/accommodation`, ['PRISM_V3_SUPPORT_ROUTES'], ['PRISM_APP_SHELL_V3', 'PRISM_V3_SUPPORT_ROUTES']),
     dark('support-requests', 'V3 support request list dark (Phase 4)', '/api/v1/me/support-requests', ['PRISM_V3_SUPPORT_ROUTES'], ['PRISM_APP_SHELL_V3', 'PRISM_V3_SUPPORT_ROUTES']),
     dark('rating-queue', 'Evidence rating queue dark', '/api/validation/rater/next', ['PRISM_V3_RATING_QUEUE']),
+    dark('under18-guardian', 'Under-18 guardian-consent path dark (Phase 8)', '/api/auth/guardian-consent', ['PRISM_UNDER18_PATH']),
 
     { id: 'legacy-report-owner-only', title: 'Legacy report is owner-only (K103): unknown id signed out → 404', kind: 'guard', method: 'GET', path: `/api/assessment/report/${id()}`, expect: { status: 404 } },
     { id: 'legacy-erasure-guard', title: 'Legacy erasure needs the signed-in owner (Phase 1S N1): random id signed out → 404', kind: 'guard', method: 'DELETE', probe: true, path: `/api/assessment/data/${id()}`, expect: { status: 404 } },

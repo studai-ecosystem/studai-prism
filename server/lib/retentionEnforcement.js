@@ -38,6 +38,7 @@ export const RETENTION_DEFAULTS = [
   { entity: 'payment_records', retentionDays: 2920, basis: `${PROVISIONAL_BASIS} Statutory retention, provisionally configured around 8 years — NOT legally approved until counsel signs off.` },
   { entity: 'revoked_credential_tombstone', retentionDays: null, basis: 'Content-free tombstone retained indefinitely for verification integrity.' },
   { entity: 'student_import_rows_raw', retentionDays: 30, basis: `${PROVISIONAL_BASIS} Raw CSV cells of student imports (emails, names, roll numbers): cleared 30 days after the import is committed or cancelled (PROD-READY Phase 2, SECURITY_REVIEW S8).` },
+  { entity: 'guardian_consents_unverified', retentionDays: 30, basis: `${PROVISIONAL_BASIS} Under-18 guardian consent requests that were never verified (PENDING past expiry, DECLINED, EXPIRED; guardian email address): deleted 30 days after they ended. VERIFIED and WITHDRAWN records go with the learner's account (PROD-READY Phase 8; path dark, PRISM_UNDER18_PATH).` },
   { entity: 'accommodation_requests_unstarted', retentionDays: 30, basis: `${PROVISIONAL_BASIS} Pre-start accommodation requests whose assessment never started (needs text may reference disability): deleted 30 days after the assignment window ended or the assignment was closed (PROD-READY Phase 5).` },
 ]
 
@@ -58,6 +59,13 @@ export const IMPORT_ROW_RAW_RETENTION_DAYS = 30
 // scheduled by the job runner only while PRISM_RETENTION_ENFORCEMENT is on.
 export const ACCOMMODATION_REQUEST_UNSTARTED_ENTITY = 'accommodation_requests_unstarted'
 export const ACCOMMODATION_REQUEST_UNSTARTED_RETENTION_DAYS = 30
+
+// Governed constant (PROVISIONAL pending HA-003): days after a guardian
+// consent request ended (expiry, decline) before it is deleted when it was
+// never verified. Purge: server/domain/privacy/guardianConsentRetention.js,
+// scheduled by the job runner only while PRISM_RETENTION_ENFORCEMENT is on.
+export const GUARDIAN_CONSENT_UNVERIFIED_ENTITY = 'guardian_consents_unverified'
+export const GUARDIAN_CONSENT_UNVERIFIED_RETENTION_DAYS = 30
 
 // Idempotent seed of the charter categories into data_retention_rules,
 // labelled provisional. Existing operator-decided rows are never overwritten.

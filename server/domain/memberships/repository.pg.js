@@ -6,6 +6,7 @@ const membership = (r) => r && ({
   departmentId: r.department_id, scope: r.scope || {}, invitedBy: r.invited_by, joinedAt: iso(r.joined_at),
   createdAt: iso(r.created_at), updatedAt: iso(r.updated_at),
   organizationName: r.organization_name ?? null, organizationStatus: r.organization_status ?? null,
+  organizationIsDemo: r.organization_is_demo === true,
 })
 const invite = (r) => r && ({
   id: r.id, organizationId: r.organization_id, email: r.email, role: r.role, cohortId: r.cohort_id,
@@ -34,7 +35,7 @@ export function createMembershipsRepoPg({ query }) {
     },
     async listMembershipsForUser(userId) {
       const { rows } = await query(
-        `SELECT m.*, o.name AS organization_name, o.status AS organization_status
+        `SELECT m.*, o.name AS organization_name, o.status AS organization_status, o.is_demo AS organization_is_demo
          FROM organization_memberships m JOIN organizations o ON o.id = m.organization_id
          WHERE m.user_id = $1 ORDER BY m.created_at ASC`,
         [userId],

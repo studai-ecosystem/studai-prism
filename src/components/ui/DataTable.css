@@ -1,0 +1,49 @@
+/* Stacked rows below the md breakpoint (48rem): each row becomes a card of
+   label/value pairs so a table never scrolls sideways on a phone. The table
+   keeps its semantics (explicit ARIA roles survive the display change) and
+   the header row stays available to assistive technology. Each cell shows its
+   column header as a visual label; the generated label carries empty
+   alternative text so screen readers do not hear the header twice (browsers
+   without that syntax fall back to the first declaration). */
+@media (max-width: 47.99rem) {
+  .prism-table-stack,
+  .prism-table-stack > tbody,
+  .prism-table-stack > tbody > tr,
+  .prism-table-stack > tbody > tr > td {
+    display: block;
+    width: 100%;
+  }
+  .prism-table-stack > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .prism-table-stack > tbody > tr {
+    padding-block: var(--space-2, 0.5rem);
+  }
+  .prism-table-stack > tbody > tr > td[data-label] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1, 0.25rem) var(--space-3, 0.75rem);
+    padding-block: var(--space-1, 0.25rem);
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .prism-table-stack > tbody > tr > td[data-label]::before {
+    content: attr(data-label);
+    content: attr(data-label) / "";
+    flex: 0 1 auto;
+    max-width: 50%;
+    text-align: left;
+    font-weight: 600;
+    color: var(--prism-ink-muted);
+  }
+}

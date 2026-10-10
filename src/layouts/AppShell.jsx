@@ -7,6 +7,7 @@ import { BottomNav } from '../components/navigation/BottomNav.jsx'
 import { TopBar } from '../components/navigation/TopBar.jsx'
 import { Drawer } from '../components/ui/Drawer.jsx'
 import { OfflineReconnectBanner } from '../components/states/OfflineReconnectBanner.jsx'
+import { DemoDataBanner } from '../components/states/DemoDataBanner.jsx'
 import { WorkspaceContent } from '../app/providers/WorkspaceProvider.jsx'
 
 // After client-side navigation, move focus to the new page's <h1> so screen
@@ -64,6 +65,7 @@ export function AppShell({ navLabel, items, footerItems = [], bottomItems, child
     <div className="prism-app flex min-h-screen flex-col">
       <SkipLink />
       <TopBar onOpenNav={bottomItems ? undefined : () => setDrawerOpen(true)} />
+      <DemoDataBanner />
       <OfflineReconnectBanner message="Reconnecting… Nothing you have already saved is lost." />
       <div className="flex flex-1">
         <aside

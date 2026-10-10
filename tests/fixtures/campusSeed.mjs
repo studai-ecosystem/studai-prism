@@ -137,3 +137,24 @@ export async function seedOrganization({ databaseUrl, ownerUserId }) {
   await repos.memberships.upsertMembership({ organizationId: org.id, userId: ownerUserId, role: 'ORG_OWNER', status: 'ACTIVE' })
   return { organizationId: org.id, organizationName: org.name }
 }
+
+// PROD-READY Phase 8: a synthetic DEMO organization (is_demo, 0061) with the
+// given account registered as a demo account and a student of it. Only in the
+// throwaway e2e database. The 0061 triggers require the demo-account marker
+// before the membership.
+export async function seedDemoMembership({ databaseUrl, userId, role = 'STUDENT' }) {
+  if (!databaseUrl) throw new Error('seedDemoMembership needs the throwaway e2e database')
+  process.env.DATABASE_URL = databaseUrl
+  const pool = await import('../../server/db/pool.js')
+  const { createPgCampusRepos } = await import('../../server/domain/campusStore/index.js')
+  const repos = createPgCampusRepos({ query: pool.query, getPool: pool.getPool })
+  const id = randomUUID()
+  const suffix = id.slice(0, 8)
+  await pool.query(
+    `INSERT INTO organizations (id, name, slug, organization_type, status, is_demo) VALUES ($1, $2, $3, 'COLLEGE', 'ACTIVE', TRUE)`,
+    [id, 'Demo College (synthetic)', `demo-college-e2e-${suffix}`],
+  )
+  await pool.query('INSERT INTO demo_accounts (user_id, organization_id) VALUES ($1, $2)', [userId, id])
+  await repos.memberships.upsertMembership({ organizationId: id, userId, role, status: 'ACTIVE' })
+  return { organizationId: id }
+}

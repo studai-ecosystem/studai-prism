@@ -177,6 +177,14 @@ test('T0 gate: research tables define no PII columns and never reference user_id
       // plane like v1_accommodations, in the erasure cascade; never read by
       // the evaluator or joined into research tables.
       'assessment_accommodation_requests',
+      // PROD-READY Phase 8 (0061): WHICH accounts are synthetic demo accounts
+      // (so they can be kept out of real organizations, calibration and the
+      // rating queue) — identity plane, in the erasure cascade.
+      'demo_accounts',
+      // PROD-READY Phase 8 (0062, dark): the guardian consent of one under-18
+      // account (WHO agreed for WHOM) — identity plane, in the erasure cascade
+      // and the retention policy; never joins research tables.
+      'guardian_consents',
     ])
     const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)]
     for (const [, name, body] of tables) {

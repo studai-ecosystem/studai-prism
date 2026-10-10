@@ -305,7 +305,7 @@ test('scheduler: one job per kind per time bucket across replicas; retention pas
   const r1 = await scheduleRecurring({ repo: m.repo, now: m.clock() })
   const r2 = await scheduleRecurring({ repo: m.repo, now: new Date('2026-10-10T09:14:59.000Z') })
   assert.deepEqual(r1.scheduled.sort(), ['campus.reminders_scan', 'campus.seat_release_scan', 'jobs.prune'])
-  assert.deepEqual(r1.skipped.sort(), ['retention.accommodation_requests', 'retention.enforce', 'retention.import_rows'])
+  assert.deepEqual(r1.skipped.sort(), ['retention.accommodation_requests', 'retention.enforce', 'retention.guardian_consents', 'retention.import_rows'])
   assert.deepEqual(r2.scheduled, [], 'second replica in the same bucket is a no-op')
   const r3 = await scheduleRecurring({ repo: m.repo, now: new Date('2026-10-10T09:15:00.000Z') })
   assert.deepEqual(r3.scheduled.sort(), ['campus.reminders_scan', 'campus.seat_release_scan'], 'next 15-minute bucket; prune stays daily')
@@ -314,7 +314,7 @@ test('scheduler: one job per kind per time bucket across replicas; retention pas
   assert.equal(bucketStart(Date.parse('2026-10-10T23:59:59Z'), 24 * 60 * MIN), '2026-10-10T00:00:00.000Z')
   await withFlag('PRISM_RETENTION_ENFORCEMENT', 'true', async () => {
     const r4 = await scheduleRecurring({ repo: m.repo, now: new Date('2026-10-10T09:16:00.000Z') })
-    assert.deepEqual(r4.scheduled.sort(), ['retention.accommodation_requests', 'retention.enforce', 'retention.import_rows'])
+    assert.deepEqual(r4.scheduled.sort(), ['retention.accommodation_requests', 'retention.enforce', 'retention.guardian_consents', 'retention.import_rows'])
   })
   assert.ok(RECURRING_JOBS.every((d) => JOB_KINDS[d.kind]?.recurring))
   // The worker's tick uses the same path (and starts nothing else here).
@@ -327,17 +327,21 @@ test('retention jobs: a no-op while PRISM_RETENTION_ENFORCEMENT is off; dry run 
   const calls = []
   const purge = async (opts) => { calls.push(opts.dryRun ? 'dry' : 'enforce'); return opts.dryRun ? { ok: true, matched: 3 } : { ok: true, matched: 3, cleared: 3, effectiveDays: 30 } }
   const held = async (opts) => (opts.dryRun ? { ok: true, matched: 1 } : { ok: false, error: 'ENTITY_LEGAL_HOLD' })
-  const retention = { purgeImportRowRaw: purge, purgeUnstartedAccommodationRequests: held, ENFORCEABLE_ENTITIES: ['integrity_telemetry'], runRetention: async () => ({ ok: true, receipt: { matched: 2, deleted: 2 } }) }
+  const retention = { purgeImportRowRaw: purge, purgeUnstartedAccommodationRequests: held, purgeUnverifiedGuardianConsents: purge, ENFORCEABLE_ENTITIES: ['integrity_telemetry'], runRetention: async () => ({ ok: true, receipt: { matched: 2, deleted: 2 } }) }
   let on = false
   const handlers = createJobHandlers({ campus: null, repo: m.repo, retention, retentionOn: () => on })
   const ctx = { now: () => m.clock() }
   assert.deepEqual(await handlers['retention.import_rows'].run({}, ctx), { skipped: 'RETENTION_ENFORCEMENT_OFF' })
   assert.deepEqual(await handlers['retention.enforce'].run({}, ctx), { skipped: 'RETENTION_ENFORCEMENT_OFF' })
+  assert.deepEqual(await handlers['retention.guardian_consents'].run({}, ctx), { skipped: 'RETENTION_ENFORCEMENT_OFF' })
   assert.deepEqual(calls, [], 'nothing runs while the flag is off')
   on = true
   assert.deepEqual(await handlers['retention.import_rows'].run({}, ctx), { matched: 3, cleared: 3, effectiveDays: 30 })
   assert.deepEqual(calls, ['dry', 'enforce'], 'a dry-run receipt precedes every real run')
   assert.deepEqual(await handlers['retention.accommodation_requests'].run({}, ctx), { skipped: 'ENTITY_LEGAL_HOLD', matched: 1 })
+  // PROD-READY Phase 8: unverified guardian consent requests, same discipline.
+  assert.deepEqual(await handlers['retention.guardian_consents'].run({}, ctx), { matched: 3, cleared: 3, effectiveDays: 30 })
+  assert.deepEqual(calls, ['dry', 'enforce', 'dry', 'enforce'])
   assert.deepEqual(await handlers['retention.enforce'].run({}, ctx), { integrity_telemetry: { matched: 2, deleted: 2 } })
   const refused = createJobHandlers({ campus: null, repo: m.repo, retentionOn: () => true, retention: { ...retention, purgeImportRowRaw: async () => ({ ok: false, error: 'DRY_RUN_REQUIRED' }) } })
   await assert.rejects(() => refused['retention.import_rows'].run({}, ctx), /DRY_RUN_REQUIRED/)

@@ -16,8 +16,7 @@ import { analyticsApi } from '../../../api/analytics.js'
 import { ANALYTICS_COPY } from '../../../lib/copy/campus.js'
 import { CampusPage, MutationError, downloadText } from '../components/CampusPage.jsx'
 import { useCampusOrg, useCohorts, useStructure, usePrograms } from '../hooks.js'
-import { CapabilityDistributionChart, CohortCapabilityHeatmap, InterventionOutcomeChart, CohortFilterBar, SuppressedNote, TableEquivalent } from '../analytics/components.jsx'
-import { queryStateView } from '../../student/QueryState.jsx'
+import { CapabilityDistributionChart, CohortCapabilityHeatmap, InterventionOutcomeChart, CohortFilterBar, SuppressedNote, TableEquivalent, AnalyticsTabPanel, analyticsViewState } from '../analytics/components.jsx'
 
 function ExportButton({ view, filters, groupBy }) {
   const { orgId, can } = useCampusOrg()
@@ -35,37 +34,49 @@ function ExportButton({ view, filters, groupBy }) {
   )
 }
 
+// A view's own loading/403/402/error state, inside its tab panel (the page,
+// its filters and the other views stay usable).
 function Section({ query, children, loading }) {
-  return queryStateView(query, { label: loading }) || children(query.data)
+  return analyticsViewState(query, { label: loading }) || children(query.data)
+}
+
+const VIEW_TITLES = {
+  capabilities: 'Capability levels',
+  evidence: 'Evidence sufficiency',
+  comparison: 'Comparison by cohort or department',
+  completion: 'Assessment completion',
+  interventions: 'Intervention outcomes',
 }
 
 function CapabilitiesTab({ filters }) {
   const { orgId, key } = useCampusOrg()
   const query = useQuery({ queryKey: key('analytics', 'capabilities', filters), queryFn: () => analyticsApi.capabilities(orgId, filters) })
   return (
-    <Section query={query} loading="Loading capability analytics">
-      {(v) => (
-        <div className="space-y-4">
-          {!v.suppressed && <p className="text-sm text-prism-ink-muted">{v.assessed} assessed {v.assessed === 1 ? 'student' : 'students'}.{v.underReview ? ` ${ANALYTICS_COPY.underReview(v.underReview)}` : ''}</p>}
-          {v.suppressed ? <SuppressedNote /> : v.capabilities.length === 0 ? <EmptyState title="Nothing to show yet" description={ANALYTICS_COPY.empty} headingLevel={3} /> : (
-            <>
-              <Panel title="Top development needs" headingLevel={3}>
-                {v.topNeeds.length === 0 ? <p className="text-sm text-prism-ink-muted">No capability needs further development in this group.</p> : (
-                  <ol className="list-decimal space-y-1 pl-5 text-sm text-prism-ink" data-testid="top-needs">
-                    {v.topNeeds.map((n) => <li key={n.capabilityId}><span className="font-medium">{n.name}</span> — {ANALYTICS_COPY.needs(n.needs, n.of)}</li>)}
-                  </ol>
-                )}
-                <p className="mt-2 text-xs text-prism-ink-subtle">{v.method}</p>
-              </Panel>
-              <Panel title="Capability distribution" headingLevel={3}>
-                <CapabilityDistributionChart view={v} />
-              </Panel>
-            </>
-          )}
-          <ExportButton view="capabilities" filters={filters} />
-        </div>
-      )}
-    </Section>
+    <AnalyticsTabPanel id="capabilities" title={VIEW_TITLES.capabilities}>
+      <Section query={query} loading="Loading capability analytics">
+        {(v) => (
+          <div className="space-y-4">
+            {!v.suppressed && <p className="text-sm text-prism-ink-muted">{v.assessed} assessed {v.assessed === 1 ? 'student' : 'students'}.{v.underReview ? ` ${ANALYTICS_COPY.underReview(v.underReview)}` : ''}</p>}
+            {v.suppressed ? <SuppressedNote /> : v.capabilities.length === 0 ? <EmptyState title="Nothing to show yet" description={ANALYTICS_COPY.empty} headingLevel={3} /> : (
+              <>
+                <Panel title="Top development needs" headingLevel={3}>
+                  {v.topNeeds.length === 0 ? <p className="text-sm text-prism-ink-muted">No capability needs further development in this group.</p> : (
+                    <ol className="list-decimal space-y-1 pl-5 text-sm text-prism-ink" data-testid="top-needs">
+                      {v.topNeeds.map((n) => <li key={n.capabilityId}><span className="font-medium">{n.name}</span> — {ANALYTICS_COPY.needs(n.needs, n.of)}</li>)}
+                    </ol>
+                  )}
+                  <p className="mt-2 text-xs text-prism-ink-subtle">{v.method}</p>
+                </Panel>
+                <Panel title="Capability distribution" headingLevel={3}>
+                  <CapabilityDistributionChart view={v} />
+                </Panel>
+              </>
+            )}
+            <ExportButton view="capabilities" filters={filters} />
+          </div>
+        )}
+      </Section>
+    </AnalyticsTabPanel>
   )
 }
 
@@ -73,26 +84,28 @@ function EvidenceTab({ filters }) {
   const { orgId, key } = useCampusOrg()
   const query = useQuery({ queryKey: key('analytics', 'sufficiency', filters), queryFn: () => analyticsApi.sufficiency(orgId, filters) })
   return (
-    <Section query={query} loading="Loading evidence analytics">
-      {(v) => (
-        <div className="space-y-4">
-          {v.suppressed ? <SuppressedNote /> : v.capabilities.length === 0 ? <EmptyState title="Nothing to show yet" description={ANALYTICS_COPY.empty} headingLevel={3} /> : (
-            <DataTable
-              caption="Evidence sufficiency by capability"
-              rowKey={(r) => r.capabilityId}
-              rows={v.capabilities}
-              columns={[
-                { key: 'name', header: 'Capability', render: (r) => r.name || r.capabilityId },
-                { key: 'n', header: 'Students assessed', render: (r) => (r.suppressed ? ANALYTICS_COPY.hidden : r.n) },
-                ...['SUFFICIENT', 'PROVISIONAL', 'INSUFFICIENT_EVIDENCE', 'HUMAN_REVIEW_REQUIRED'].map((s) => ({ key: s, header: ANALYTICS_COPY.statusLabels[s], render: (r) => (r.suppressed ? '—' : r.statuses[s]) })),
-              ]}
-            />
-          )}
-          {!v.suppressed && v.capabilities.some((c) => c.suppressed) && <SuppressedNote />}
-          <ExportButton view="sufficiency" filters={filters} />
-        </div>
-      )}
-    </Section>
+    <AnalyticsTabPanel id="evidence" title={VIEW_TITLES.evidence}>
+      <Section query={query} loading="Loading evidence analytics">
+        {(v) => (
+          <div className="space-y-4">
+            {v.suppressed ? <SuppressedNote /> : v.capabilities.length === 0 ? <EmptyState title="Nothing to show yet" description={ANALYTICS_COPY.empty} headingLevel={3} /> : (
+              <DataTable
+                caption="Evidence sufficiency by capability"
+                rowKey={(r) => r.capabilityId}
+                rows={v.capabilities}
+                columns={[
+                  { key: 'name', header: 'Capability', render: (r) => r.name || r.capabilityId },
+                  { key: 'n', header: 'Students assessed', render: (r) => (r.suppressed ? ANALYTICS_COPY.hidden : r.n) },
+                  ...['SUFFICIENT', 'PROVISIONAL', 'INSUFFICIENT_EVIDENCE', 'HUMAN_REVIEW_REQUIRED'].map((s) => ({ key: s, header: ANALYTICS_COPY.statusLabels[s], render: (r) => (r.suppressed ? '—' : r.statuses[s]) })),
+                ]}
+              />
+            )}
+            {!v.suppressed && v.capabilities.some((c) => c.suppressed) && <SuppressedNote />}
+            <ExportButton view="sufficiency" filters={filters} />
+          </div>
+        )}
+      </Section>
+    </AnalyticsTabPanel>
   )
 }
 
@@ -101,7 +114,7 @@ function ComparisonTab({ filters }) {
   const [groupBy, setGroupBy] = useState('cohort')
   const query = useQuery({ queryKey: key('analytics', 'comparison', groupBy, filters), queryFn: () => analyticsApi.comparison(orgId, filters, groupBy) })
   return (
-    <div className="space-y-4">
+    <AnalyticsTabPanel id="comparison" title={VIEW_TITLES.comparison}>
       <fieldset className="flex flex-wrap items-center gap-4">
         <legend className="sr-only">Compare by</legend>
         {['cohort', 'department'].map((g) => (
@@ -115,7 +128,7 @@ function ComparisonTab({ filters }) {
         {(v) => (v.groups.length === 0 ? <EmptyState title="Nothing to compare yet" description={ANALYTICS_COPY.empty} headingLevel={3} /> : <CohortCapabilityHeatmap view={v} />)}
       </Section>
       <ExportButton view="comparison" filters={filters} groupBy={groupBy} />
-    </div>
+    </AnalyticsTabPanel>
   )
 }
 
@@ -123,26 +136,28 @@ function CompletionTab({ filters }) {
   const { orgId, key } = useCampusOrg()
   const query = useQuery({ queryKey: key('analytics', 'completion', filters), queryFn: () => analyticsApi.completion(orgId, filters) })
   return (
-    <Section query={query} loading="Loading completion">
-      {(v) => (
-        <div className="space-y-4">
-          <p className="text-sm text-prism-ink-muted">Across {v.assignments} sponsored {v.assignments === 1 ? 'assessment' : 'assessments'}.</p>
-          <TableEquivalent
-            caption="Assessment completion funnel"
-            defaultOpen
-            rowKey={(r) => r.stage}
-            rows={[
-              { stage: 'Assigned', n: v.funnel.assigned },
-              { stage: 'Acknowledged', n: v.funnel.acknowledged },
-              { stage: 'Started', n: v.funnel.started },
-              { stage: 'Completed', n: v.funnel.completed },
-            ]}
-            columns={[{ key: 'stage', header: 'Stage' }, { key: 'n', header: 'Students', render: (r) => `${r.n} of ${v.funnel.assigned}` }]}
-          />
-          <ExportButton view="completion" filters={filters} />
-        </div>
-      )}
-    </Section>
+    <AnalyticsTabPanel id="completion" title={VIEW_TITLES.completion}>
+      <Section query={query} loading="Loading completion">
+        {(v) => (
+          <div className="space-y-4">
+            <p className="text-sm text-prism-ink-muted">Across {v.assignments} sponsored {v.assignments === 1 ? 'assessment' : 'assessments'}.</p>
+            <TableEquivalent
+              caption="Assessment completion funnel"
+              defaultOpen
+              rowKey={(r) => r.stage}
+              rows={[
+                { stage: 'Assigned', n: v.funnel.assigned },
+                { stage: 'Acknowledged', n: v.funnel.acknowledged },
+                { stage: 'Started', n: v.funnel.started },
+                { stage: 'Completed', n: v.funnel.completed },
+              ]}
+              columns={[{ key: 'stage', header: 'Stage' }, { key: 'n', header: 'Students', render: (r) => `${r.n} of ${v.funnel.assigned}` }]}
+            />
+            <ExportButton view="completion" filters={filters} />
+          </div>
+        )}
+      </Section>
+    </AnalyticsTabPanel>
   )
 }
 
@@ -150,36 +165,38 @@ function InterventionsTab() {
   const { orgId, key } = useCampusOrg()
   const query = useQuery({ queryKey: key('analytics', 'interventions'), queryFn: () => analyticsApi.interventions(orgId) })
   return (
-    <Section query={query} loading="Loading intervention outcomes">
-      {(v) => (
-        <div className="space-y-4">
-          <p className="text-sm text-prism-ink-muted">{ANALYTICS_COPY.filtersNotApplied}</p>
-          {v.interventions.length === 0 ? <p className="text-sm text-prism-ink-muted">No practice interventions yet.</p> : (
-            <DataTable
-              caption="Practice interventions"
-              rowKey={(r) => r.interventionId}
-              rows={v.interventions}
-              columns={[
-                { key: 'name', header: 'Intervention' },
-                { key: 'capability', header: 'Target capability', render: (r) => r.targetCapability.name || r.targetCapability.id },
-                { key: 'members', header: 'Students', render: (r) => (r.suppressed ? ANALYTICS_COPY.hidden : r.members) },
-                { key: 'started', header: 'Started', render: (r) => (r.suppressed ? '—' : r.started) },
-                { key: 'done', header: 'Finished all missions', render: (r) => (r.suppressed ? '—' : r.completedAll) },
-              ]}
-            />
-          )}
-          {v.interventions.some((i) => i.suppressed) && <SuppressedNote />}
-          <h3 className="text-base font-semibold text-prism-ink">Baseline and reassessment</h3>
-          {v.reassessments.length === 0 ? <p className="text-sm text-prism-ink-muted">No reassessment outcomes yet. Change is shown only between assessment forms approved as comparable.</p>
-            : v.reassessments.map((o) => (
-              <Panel key={o.cycle.id} title={o.cycle.name} headingLevel={4}>
-                <InterventionOutcomeChart outcome={o} />
-              </Panel>
-            ))}
-          <ExportButton view="missions" filters={{}} />
-        </div>
-      )}
-    </Section>
+    <AnalyticsTabPanel id="interventions" title={VIEW_TITLES.interventions}>
+      <Section query={query} loading="Loading intervention outcomes">
+        {(v) => (
+          <div className="space-y-4">
+            <p className="text-sm text-prism-ink-muted">{ANALYTICS_COPY.filtersNotApplied}</p>
+            {v.interventions.length === 0 ? <p className="text-sm text-prism-ink-muted">No practice interventions yet.</p> : (
+              <DataTable
+                caption="Practice interventions"
+                rowKey={(r) => r.interventionId}
+                rows={v.interventions}
+                columns={[
+                  { key: 'name', header: 'Intervention' },
+                  { key: 'capability', header: 'Target capability', render: (r) => r.targetCapability.name || r.targetCapability.id },
+                  { key: 'members', header: 'Students', render: (r) => (r.suppressed ? ANALYTICS_COPY.hidden : r.members) },
+                  { key: 'started', header: 'Started', render: (r) => (r.suppressed ? '—' : r.started) },
+                  { key: 'done', header: 'Finished all missions', render: (r) => (r.suppressed ? '—' : r.completedAll) },
+                ]}
+              />
+            )}
+            {v.interventions.some((i) => i.suppressed) && <SuppressedNote />}
+            <h3 className="text-base font-semibold text-prism-ink">Baseline and reassessment</h3>
+            {v.reassessments.length === 0 ? <p className="text-sm text-prism-ink-muted">No reassessment outcomes yet. Change is shown only between assessment forms approved as comparable.</p>
+              : v.reassessments.map((o) => (
+                <Panel key={o.cycle.id} title={o.cycle.name} headingLevel={4}>
+                  <InterventionOutcomeChart outcome={o} />
+                </Panel>
+              ))}
+            <ExportButton view="missions" filters={{}} />
+          </div>
+        )}
+      </Section>
+    </AnalyticsTabPanel>
   )
 }
 

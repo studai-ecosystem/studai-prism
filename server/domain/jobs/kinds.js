@@ -31,6 +31,8 @@ export const JOB_KINDS = Object.freeze({
   'retention.enforce': { schema: bucket, maxAttempts: 3, recurring: true, retention: true },
   'retention.import_rows': { schema: bucket, maxAttempts: 3, recurring: true, retention: true },
   'retention.accommodation_requests': { schema: bucket, maxAttempts: 3, recurring: true, retention: true },
+  // PROD-READY Phase 8: unverified under-18 guardian consent requests (dark path).
+  'retention.guardian_consents': { schema: bucket, maxAttempts: 3, recurring: true, retention: true },
 })
 
 export const JOB_STATUSES = Object.freeze(['PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'DEAD', 'CANCELLED'])

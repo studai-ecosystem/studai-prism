@@ -3,6 +3,8 @@ import { ApiError } from '../http/errors.js'
 
 const org = (r) => r && ({
   id: r.id, name: r.name, slug: r.slug, organizationType: r.organization_type, status: r.status,
+  // PROD-READY Phase 8 (0061): synthetic demo organization marker.
+  isDemo: r.is_demo === true,
   country: r.country, timezone: r.timezone, createdAt: r.created_at?.toISOString?.() ?? r.created_at, updatedAt: r.updated_at?.toISOString?.() ?? r.updated_at,
 })
 const cohort = (r) => r && ({

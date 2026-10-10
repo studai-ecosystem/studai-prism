@@ -38,6 +38,13 @@ export function useFeatureFlags() {
   return ctx
 }
 
+// PROD-READY Phase 8: whether the signed-in caller is viewing synthetic demo
+// data. Safe outside the provider (false), so shells render in isolation.
+export function useDemoData() {
+  const ctx = useContext(FlagContext)
+  return ctx?.me?.demo === true
+}
+
 export function useFlag(key) {
   const { flags, loading } = useFeatureFlags()
   return { enabled: flags[key] === true, loading }

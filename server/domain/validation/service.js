@@ -9,6 +9,8 @@ import { agreementReport } from './agreement.js'
 
 export function createValidationService({
   repos, evidence = { units: async () => [] }, candidateNameFor = async () => null, sessionState = async () => null,
+  // PROD-READY Phase 8: synthetic demo sessions (0061) are never rating data.
+  isDemoSession = async (sessionId) => (repos?.demo ? repos.demo.isDemoSession(sessionId) : false),
   salt = process.env.PRISM_RATING_REF_SALT || 'prism-rating-v1',
 }) {
   const store = () => {
@@ -20,6 +22,7 @@ export function createValidationService({
       // Held or invalidated sessions are not validation data (K59).
       const state = await sessionState(sessionId)
       if (state?.invalid || state?.reviewState === 'held') throw new ApiError('CONFLICT', 'This session is held or invalidated and cannot be rated.')
+      if (await isDemoSession(sessionId)) throw new ApiError('CONFLICT', 'This is a synthetic demo session and is never rating or calibration data. Nothing was queued.')
       const units = await evidence.units(sessionId)
       if (!units.length) throw new ApiError('NOT_FOUND', 'No evidence units for this session.')
       // Fail closed: without the candidate's name it cannot be removed from

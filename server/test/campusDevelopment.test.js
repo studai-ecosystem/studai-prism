@@ -385,6 +385,9 @@ test('interventions: scoped per role, cohort members assigned, completion counts
     const view = await w.call('late', 'GET', `/missions/${MID}`, undefined, ws(lateWs.id))
     assert.equal(view.body.data.intervention.id, next.body.data.id)
     assert.equal(view.body.data.openAttemptId, null)
+    // PROD-READY Phase 8: the unfinished attempt of the ended intervention is
+    // listed under earlier attempts, read-only (CLOSED), never as the open one.
+    assert.deepEqual(view.body.data.pastAttempts.map((p) => [p.id, p.status]), [[lid, 'CLOSED']])
     const fresh = await w.call('late', 'POST', `/missions/${MID}/attempts`, {}, { 'Idempotency-Key': 'late-2', ...ws(lateWs.id) })
     assert.equal(fresh.status, 201)
     assert.notEqual(fresh.body.data.id, lid)

@@ -12,12 +12,13 @@ export const JOB_RETENTION_DAYS = 30
 const DAY_MS = 24 * 60 * 60 * 1000
 
 async function defaultRetention() {
-  const [{ runRetention, ENFORCEABLE_ENTITIES }, { purgeImportRowRaw }, { purgeUnstartedAccommodationRequests }] = await Promise.all([
+  const [{ runRetention, ENFORCEABLE_ENTITIES }, { purgeImportRowRaw }, { purgeUnstartedAccommodationRequests }, { purgeUnverifiedGuardianConsents }] = await Promise.all([
     import('../../lib/retentionEnforcement.js'),
     import('../privacy/importRowRetention.js'),
     import('../privacy/accommodationRequestRetention.js'),
+    import('../privacy/guardianConsentRetention.js'),
   ])
-  return { runRetention, ENFORCEABLE_ENTITIES, purgeImportRowRaw, purgeUnstartedAccommodationRequests }
+  return { runRetention, ENFORCEABLE_ENTITIES, purgeImportRowRaw, purgeUnstartedAccommodationRequests, purgeUnverifiedGuardianConsents }
 }
 
 class RetentionRefusedError extends Error {
@@ -117,6 +118,14 @@ export function createJobHandlers({
         if (off) return off
         const { purgeUnstartedAccommodationRequests } = await r()
         return dryThenEnforce(purgeUnstartedAccommodationRequests, now())
+      },
+    },
+    'retention.guardian_consents': {
+      async run(_payload, { now }) {
+        const off = retentionGuard()
+        if (off) return off
+        const { purgeUnverifiedGuardianConsents } = await r()
+        return dryThenEnforce(purgeUnverifiedGuardianConsents, now())
       },
     },
   }

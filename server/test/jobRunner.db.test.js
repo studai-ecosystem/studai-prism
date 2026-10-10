@@ -168,7 +168,7 @@ test('scheduler: two replicas ticking the same bucket enqueue each recurring job
     scheduleRecurring({ repo: a.repo, now: new Date(bucketDay.getTime() + 120_000), retentionOn: () => true }),
   ])
   const scheduled = ticks.flatMap((x) => x.scheduled).sort()
-  assert.deepEqual(scheduled, ['campus.reminders_scan', 'campus.seat_release_scan', 'jobs.prune', 'retention.accommodation_requests', 'retention.enforce', 'retention.import_rows'])
+  assert.deepEqual(scheduled, ['campus.reminders_scan', 'campus.seat_release_scan', 'jobs.prune', 'retention.accommodation_requests', 'retention.enforce', 'retention.guardian_consents', 'retention.import_rows'])
   const bucket15 = new Date(Math.floor(bucketDay.getTime() / 900_000) * 900_000).toISOString()
   assert.equal(await n(`SELECT count(*)::int AS n FROM jobs WHERE kind = 'campus.reminders_scan' AND payload->>'bucket' = $1`, [bucket15]), 1)
 })
