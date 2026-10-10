@@ -54,6 +54,9 @@ export const ERROR_STATUS = Object.freeze({
   ACCOMMODATION_ALREADY_DECIDED: 409,
   ACCOMMODATIONS_NOT_REQUESTABLE: 409,
   IDENTITY_LEVEL_NOT_AVAILABLE: 409,
+  // PROD-READY Phase 9: an employer request asked for a ranking, a sort or
+  // filter by level or score, or a cut-off — refused, never ignored.
+  PROHIBITED_USE: 422,
   NOT_IMPLEMENTED: 501,
   INTERNAL: 500,
 })

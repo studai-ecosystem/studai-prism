@@ -74,7 +74,7 @@ export function ShareReportDialog({ open, onClose, sessionId, organizations = []
 
   const recipientOptions = [
     { value: 'LINK', label: S.link },
-    ...organizations.map((o) => ({ value: `ORG:${o.id}`, label: `${S.organization}: ${o.name}` })),
+    ...organizations.map((o) => ({ value: `ORG:${o.id}`, label: `${o.employer ? S.employer : S.organization}: ${o.name}` })),
   ]
 
   return (

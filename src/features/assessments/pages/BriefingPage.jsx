@@ -19,6 +19,7 @@ import { AccommodationRequestPanel } from '../../support/components/Accommodatio
 import {
   BRIEFING_COPY, INTEGRITY_COPY, NOT_MEASURED_COPY, SCOPE_LABEL, SPONSORED_DISCLOSURE, SPONSORED_DISCLOSURE_VERSION, START_REASON_COPY,
 } from '../../../lib/copy/student.js'
+import { EMPLOYER_ASSESSMENT_DISCLOSURE_VERSION } from '../../../lib/copy/employer.js'
 
 export function assignmentBase(active, assignmentId) {
   return active.type === 'CAMPUS_STUDENT'
@@ -74,7 +75,10 @@ export default function BriefingPage() {
   const sponsored = s.scope === 'SPONSORED'
   const sponsorName = s.sponsorName || 'your institution'
   const integrity = INTEGRITY_COPY[a.integrityMode] || INTEGRITY_COPY.STANDARD
-  const copyMismatch = sponsored && s.disclosureCopyVersion !== SPONSORED_DISCLOSURE_VERSION
+  // PROD-READY Phase 9: an employer-sponsored assessment shows the employer
+  // disclosure served with the briefing (never the campus one).
+  const employerDisclosure = sponsored && s.sponsorType === 'EMPLOYER' ? s.disclosure : null
+  const copyMismatch = sponsored && s.disclosureCopyVersion !== (employerDisclosure ? EMPLOYER_ASSESSMENT_DISCLOSURE_VERSION : SPONSORED_DISCLOSURE_VERSION)
   const base = assignmentBase(active, assignmentId)
 
   return (
@@ -124,7 +128,16 @@ export default function BriefingPage() {
           {sponsored ? (
             <div className="space-y-3">
               <div className="rounded-[var(--prism-radius-md)] border border-prism-border bg-prism-subtle p-4 text-prism-ink" data-testid="sponsored-disclosure">
-                {SPONSORED_DISCLOSURE(sponsorName).map((line) => <p key={line}>{line}</p>)}
+                {employerDisclosure ? (
+                  <>
+                    <p className="font-medium">{employerDisclosure.heading}</p>
+                    {employerDisclosure.lines.map((line) => <p key={line}>{line}</p>)}
+                    <ul className="mt-2 list-disc space-y-1 pl-5" data-testid="employer-prohibited-uses">
+                      {employerDisclosure.prohibitedUses.map((line) => <li key={line}>{line}</li>)}
+                    </ul>
+                    <p className="mt-2 text-sm text-prism-ink-muted">{employerDisclosure.draftNotice}</p>
+                  </>
+                ) : SPONSORED_DISCLOSURE(sponsorName).map((line) => <p key={line}>{line}</p>)}
               </div>
               {copyMismatch ? (
                 <Callout tone="partial" title="This disclosure was updated">Reload the page to read the latest version before you continue.</Callout>
@@ -134,7 +147,7 @@ export default function BriefingPage() {
                 <div className="space-y-3">
                   <Checkbox
                     id="sponsored-ack"
-                    label={`I understand what ${sponsorName} can and cannot see`}
+                    label={employerDisclosure ? employerDisclosure.acknowledge : `I understand what ${sponsorName} can and cannot see`}
                     checked={checked}
                     onChange={(e) => setChecked(e.target.checked)}
                   />

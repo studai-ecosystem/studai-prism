@@ -204,3 +204,11 @@ If this release is cut from the Phase 8 branch or later, it carries two more mig
 - `0062_guardian_consents`: an empty table until `PRISM_UNDER18_PATH` is turned on.
 
 Three dark flags must read OFF in the smoke battery: `PRISM_PILOT_REPORT_EXPORT`, `PRISM_DEMO_MODE` (never set in production) and `PRISM_UNDER18_PATH` (dark check `under18-guardian`). The demo seed is never run against the production database; it refuses to.
+
+## Addendum 2026-10-11 — PROD-READY Phase 9
+
+If this release is cut from the Phase 9 branch or later, it carries one more migration, additive with a `.down.sql`:
+
+- `0063_employer_lnd`: `consent_records.consent_type` accepts `EMPLOYER_DEVELOPMENT_DISCLOSURE` and `EMPLOYER_ASSESSMENT_DISCLOSURE`; a trigger refuses an individual-visibility session scope for an EMPLOYER sponsor; `organizations.organization_type` cannot change to or from `EMPLOYER`. No table or column is added. The down refuses (and stops the rollback) while any employer consent record exists, so employee consent evidence is never deleted by a rollback.
+
+One more dark flag must read OFF in the smoke battery: `PRISM_EMPLOYER_LND` (dark checks `employer-lnd` and `hire-handoff`).

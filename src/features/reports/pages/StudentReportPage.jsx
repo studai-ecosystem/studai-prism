@@ -29,6 +29,7 @@ import { IdentityCheckCard } from '../../support/components/IdentityCheckCard.js
 function visibilityText(data) {
   const v = data.privacy?.visibility
   if (v === 'OWNER_AND_SPONSOR') return REPORT_COPY.visibility.OWNER_AND_SPONSOR(data.report.header.sponsor?.name || 'Your institution')
+  if (v === 'OWNER_AND_SPONSOR_AGGREGATE_ONLY') return REPORT_COPY.visibility.OWNER_AND_SPONSOR_AGGREGATE_ONLY(data.report.header.sponsor?.name || 'Your employer')
   return REPORT_COPY.visibility[v] || null
 }
 
@@ -141,9 +142,13 @@ export default function StudentReportPage() {
   const data = query.data
   // A personal report can be shared with the student's institutions; a
   // sponsored report is already visible to its sponsor, so only a link is offered.
+  // PROD-READY Phase 9: an employer sees its sponsored reports only when the
+  // employee shares them, so that employer is offered here too.
   const organizations = data.report.header.scope === 'PERSONAL'
-    ? workspaces.filter((w) => w.type === 'CAMPUS_STUDENT').map((w) => ({ id: w.organizationId, name: w.organizationName || w.name }))
-    : []
+    ? workspaces.filter((w) => w.type === 'CAMPUS_STUDENT').map((w) => ({ id: w.organizationId, name: w.organizationName || w.name, employer: w.organizationType === 'EMPLOYER' }))
+    : data.privacy?.visibility === 'OWNER_AND_SPONSOR_AGGREGATE_ONLY' && active.type === 'CAMPUS_STUDENT'
+      ? [{ id: active.organizationId, name: active.organizationName || active.name, employer: true }]
+      : []
   const actions = (
     <>
       {data.privacy?.canShare && <Button variant="primary" onClick={() => setShareOpen(true)}>{REPORT_COPY.share.open}</Button>}

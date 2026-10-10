@@ -129,3 +129,14 @@ Two flags were registered OFF in Phase 8. The table above is unchanged; slot the
 `PRISM_UNDER18_PATH` now has real behaviour behind it (guardian-consent path, migration 0062) and stays in the "Stay OFF" row until **HA-006** and **HA-005** are closed and the DRAFT copy is replaced.
 
 Migrations 0061 (demo-organization marker and isolation triggers) and 0062 (guardian consents) join the release after 0060.
+
+## Addendum 2026-10-11 — PROD-READY Phase 9 flag and human dependencies
+
+One flag was registered OFF in Phase 9. The tables above are unchanged; slot it in as follows.
+
+| # | Flag | Entry criteria (all) | Owner |
+| --- | --- | --- | --- |
+| F6d | `PRISM_EMPLOYER_LND` (employer development-use workspace; also exposes the StudAI Hire hand-off interface, which answers 501) | F5 (`PRISM_CAMPUS_ENABLED`) live; employer disclosure and consent copy approved by counsel (**HA-005**); employer prohibited-use terms approved (**HA-004**); the shared-report view needs F4 (`PRISM_STUDENT_REPORT_V3`), group summaries need F6 (`PRISM_CAMPUS_ANALYTICS`, **HA-C010**), development missions need F7 (`PRISM_DEVELOPMENT_V2`); the employer organization is created by an operator (`organization_type = 'EMPLOYER'`, no route creates one) | Governance + operator |
+| — | StudAI Hire evidence hand-off (connection, not a flag) | Stays unconnected (501) until **HA-025** (written decision on Prism → Hire evidence sharing, ECOSYSTEM_SEPARATION_POLICY_v1 rule 2) is closed, with HA-005 and HA-004; then a separately reviewed change ([HIRE_HANDOFF_INTERFACE.md](./HIRE_HANDOFF_INTERFACE.md) §6) | Founder + science lead |
+
+Until F6d, the smoke battery asserts the dark checks `employer-lnd` and `hire-handoff`. Migration 0063 (`0063_employer_lnd`: two employer consent types, the employer-visibility trigger on session scopes, organization type immutable to/from EMPLOYER) joins the release after 0062. **HA-025** is a new register row (OPEN).

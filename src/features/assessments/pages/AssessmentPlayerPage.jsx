@@ -462,7 +462,7 @@ export default function AssessmentPlayerPage() {
             <h2 className="font-semibold text-prism-ink">Who can see the result</h2>
             <p className="mt-1 text-prism-ink-muted">
               {contract.scope === 'SPONSORED'
-                ? PLAYER_COPY.sponsoredVisibility(contract.sponsorName || 'Your institution')
+                ? (active.organizationType === 'EMPLOYER' ? PLAYER_COPY.employerVisibility(contract.sponsorName || 'Your employer') : PLAYER_COPY.sponsoredVisibility(contract.sponsorName || 'Your institution'))
                 : PLAYER_COPY.personalVisibility}
             </p>
           </div>

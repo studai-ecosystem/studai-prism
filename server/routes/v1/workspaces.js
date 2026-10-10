@@ -19,7 +19,7 @@ export function createWorkspacesRouter({ requireUser, campus }) {
     if (!ID.test(req.params.id)) throw new ApiError('NOT_FOUND', 'Not found')
     const workspace = await campus.workspaceService.getWorkspace(req.user, req.params.id)
     if (!workspace) throw new ApiError('NOT_FOUND', 'Not found')
-    const entitlement = workspace.type === 'CAMPUS_ADMIN'
+    const entitlement = workspace.type === 'CAMPUS_ADMIN' || workspace.type === 'EMPLOYER'
       ? null
       : await campus.resolver.resolveEntitlement({ user: req.user, workspace, action: 'assessment.start' })
     return ok(res, {

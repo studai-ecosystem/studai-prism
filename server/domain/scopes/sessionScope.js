@@ -29,7 +29,10 @@ export function createSessionScopeService({ repos, clock = () => new Date(), ses
   return {
     resolveSessionScope,
 
-    async recordSponsoredStart({ sessionId, user, workspace, cohortId = null, programId = null, visibilityPolicy = 'OWNER_AND_SPONSOR' }) {
+    // PROD-READY Phase 9: the workspace's own policy applies, so an employer
+    // workspace (OWNER_AND_SPONSOR_AGGREGATE_ONLY) never records a session the
+    // employer could read individually; campus workspaces are unchanged.
+    async recordSponsoredStart({ sessionId, user, workspace, cohortId = null, programId = null, visibilityPolicy = workspace?.visibilityPolicy || 'OWNER_AND_SPONSOR' }) {
       if (workspace?.type !== 'CAMPUS_STUDENT') {
         const { implicit: _implicit, ...personal } = personalScopeFor(sessionId, user.id)
         return repos.scopes.createSessionScope(personal)
@@ -60,7 +63,11 @@ export function createSessionScopeService({ repos, clock = () => new Date(), ses
         scope = personalScopeFor(sessionId, owner)
       }
       const ownedByOrg = scope.sponsorType === 'INSTITUTION' && scope.sponsorOrganizationId === organizationId
-      if (ownedByOrg && scope.visibilityPolicy === 'OWNER_AND_SPONSOR') {
+      // PROD-READY Phase 9: an EMPLOYER never reads through sponsorship, only
+      // through the employee's share grant (also enforced by 0063).
+      const employer = ownedByOrg && typeof repos.organizations?.getOrganization === 'function'
+        && (await repos.organizations.getOrganization(organizationId))?.organizationType === 'EMPLOYER'
+      if (ownedByOrg && !employer && scope.visibilityPolicy === 'OWNER_AND_SPONSOR') {
         const cohort = scope.cohortId ? await repos.organizations.getCohort(scope.cohortId) : null
         const decision = can(actor, 'students.sponsored_result.read', {
           organizationId,

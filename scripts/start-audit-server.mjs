@@ -45,6 +45,10 @@ if (process.env.PRISM_AUDIT_CAMPUS === 'true') {
   // this throwaway campus audit process. Never set in .env or any real
   // environment.
   if (process.env.PRISM_AUDIT_SUPPORT_ROUTES === 'true') process.env.PRISM_V3_SUPPORT_ROUTES = 'true'
+  // PROD-READY Phase 9 journey (prod-p09-employer-lnd.spec.js): the employer
+  // development workspace inside this throwaway campus audit process only.
+  // Never set in .env or any real environment.
+  if (process.env.PRISM_AUDIT_EMPLOYER_LND === 'true') process.env.PRISM_EMPLOYER_LND = 'true'
   // Campus store for org/membership e2e (Journey B): ONLY a throwaway test
   // database handed in by the runner (local PGlite / CI service container).
   if (process.env.PRISM_AUDIT_CAMPUS_DATABASE_URL) {

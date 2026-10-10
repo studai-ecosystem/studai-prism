@@ -117,7 +117,7 @@ export const ReportSchema = z.object({
 
 const Share = z.object({ id: z.string(), recipientType: z.enum(['LINK', 'ORGANIZATION']), organizationName: z.string().nullable(), expiresAt: z.string(), disclosureLevel: z.enum(['SUMMARY', 'FULL']) })
 
-const ReportResponse = z.object({
+export const ReportResponse = z.object({
   report: ReportSchema,
   version: z.object({ number: z.number().int(), createdAt: z.string().nullable(), reason: z.string().nullable().optional().default(null), priorVersion: z.number().int().nullable().optional().default(null) }),
   audience: z.enum(['OWNER', 'SPONSOR', 'SHARE_LINK']),

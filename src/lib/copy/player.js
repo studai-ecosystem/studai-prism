@@ -9,6 +9,8 @@ export const PLAYER_COPY = {
   reportPending: 'Your report will appear in Assessments when it is ready.',
   personalVisibility: 'This is a personal assessment. Only you can see the result unless you choose to share it.',
   sponsoredVisibility: (sponsor) => `${sponsor} can see the result of this sponsored assessment. Your personal Prism results stay private.`,
+  // PROD-READY Phase 9: an employer sees group summaries only.
+  employerVisibility: (sponsor) => `${sponsor} sees group summaries only. It sees your report only if you share it with them.`,
   loadFailed: 'Your assessment could not be loaded',
   offlineTitle: 'You appear to be offline',
   offlineBody: 'Your latest saved work is safe. The assessment will load when your connection is back.',

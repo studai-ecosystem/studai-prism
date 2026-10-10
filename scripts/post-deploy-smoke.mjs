@@ -46,6 +46,8 @@ export const EXPECTED_DARK_FLAGS = Object.freeze([
   'PRISM_ANALYTICS_DECISION_CACHE', 'PRISM_V3_RATING_QUEUE',
   // PROD-READY Phase 8
   'PRISM_PILOT_REPORT_EXPORT', 'PRISM_DEMO_MODE',
+  // PROD-READY Phase 9
+  'PRISM_EMPLOYER_LND',
 ])
 
 // Must be ON in production for this image to have started at all (DEF-07).
@@ -92,6 +94,8 @@ export function buildChecks({ id = randomUUID } = {}) {
     dark('support-requests', 'V3 support request list dark (Phase 4)', '/api/v1/me/support-requests', ['PRISM_V3_SUPPORT_ROUTES'], ['PRISM_APP_SHELL_V3', 'PRISM_V3_SUPPORT_ROUTES']),
     dark('rating-queue', 'Evidence rating queue dark', '/api/validation/rater/next', ['PRISM_V3_RATING_QUEUE']),
     dark('under18-guardian', 'Under-18 guardian-consent path dark (Phase 8)', '/api/auth/guardian-consent', ['PRISM_UNDER18_PATH']),
+    dark('employer-lnd', 'Employer development workspace dark (Phase 9)', `/api/v1/employer/organizations/${id()}`, ['PRISM_EMPLOYER_LND'], ['PRISM_CAMPUS_ENABLED', 'PRISM_EMPLOYER_LND']),
+    dark('hire-handoff', 'StudAI Hire evidence hand-off interface dark (Phase 9)', '/api/v1/integrations/hire/handoff', ['PRISM_EMPLOYER_LND']),
 
     { id: 'legacy-report-owner-only', title: 'Legacy report is owner-only (K103): unknown id signed out → 404', kind: 'guard', method: 'GET', path: `/api/assessment/report/${id()}`, expect: { status: 404 } },
     { id: 'legacy-erasure-guard', title: 'Legacy erasure needs the signed-in owner (Phase 1S N1): random id signed out → 404', kind: 'guard', method: 'DELETE', probe: true, path: `/api/assessment/data/${id()}`, expect: { status: 404 } },

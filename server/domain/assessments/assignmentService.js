@@ -9,6 +9,15 @@ import { ApiError } from '../http/errors.js'
 import { fromLegacyEntitlement } from '../entitlements/legacyAdapter.js'
 import { PERSONAL_SOURCES } from '../entitlements/resolver.js'
 import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../sharing/copyVersions.js'
+import { employerAssessmentDisclosure, EMPLOYER_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../employer/copy.js'
+
+// PROD-READY Phase 9: an employer-sponsored assessment shows and records the
+// employer disclosure (the employer sees completion and suppressed group
+// summaries, never the report unless the employee shares it). Campus
+// assessments are unchanged.
+const employerWorkspace = (workspace) => workspace?.organizationType === 'EMPLOYER'
+const disclosureVersionFor = (workspace) => (employerWorkspace(workspace) ? EMPLOYER_ASSESSMENT_DISCLOSURE_COPY_VERSION : CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION)
+const disclosureTypeFor = (workspace) => (employerWorkspace(workspace) ? 'EMPLOYER_ASSESSMENT_DISCLOSURE' : 'CAMPUS_ASSESSMENT_DISCLOSURE')
 import { CORE_DEFINITION_ID, definitionForScenario, capabilityName } from './catalog.js'
 import { isEnabled } from '../flags/index.js'
 import { draftContentEnabled } from './draftSegments.js'
@@ -250,7 +259,10 @@ export function createAssignmentService({ repos, catalog, directory, legacy, res
           integrityModes: d.integrityModes,
         },
         sponsorship: card.scope === 'SPONSORED'
-          ? { scope: 'SPONSORED', sponsorName: card.sponsor?.name || null, disclosureCopyVersion: CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION, acknowledged: card.acknowledged, acknowledgedAt: item.student.acknowledgedAt || null }
+          ? {
+            scope: 'SPONSORED', sponsorName: card.sponsor?.name || null, disclosureCopyVersion: disclosureVersionFor(workspace), acknowledged: card.acknowledged, acknowledgedAt: item.student.acknowledgedAt || null,
+            ...(employerWorkspace(workspace) ? { sponsorType: 'EMPLOYER', disclosure: employerAssessmentDisclosure(card.sponsor?.name || null) } : {}),
+          }
           : { scope: 'PERSONAL', sponsorName: null, disclosureCopyVersion: null, acknowledged: false, acknowledgedAt: null },
         start,
       }
@@ -260,8 +272,10 @@ export function createAssignmentService({ repos, catalog, directory, legacy, res
       const item = await findItem(user, workspace, assignmentId)
       if (!item) throw new ApiError('NOT_FOUND', 'Not found')
       if (item.assignment.sponsorType !== 'INSTITUTION') throw new ApiError('VALIDATION_FAILED', 'Personal assessments do not need a sponsorship acknowledgement.')
-      if (copyVersion !== CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION) {
-        throw new ApiError('CONFLICT', 'The disclosure has changed. Please read it again.', { details: { copyVersion: CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } })
+      const expectedVersion = disclosureVersionFor(workspace)
+      const consentType = disclosureTypeFor(workspace)
+      if (copyVersion !== expectedVersion) {
+        throw new ApiError('CONFLICT', 'The disclosure has changed. Please read it again.', { details: { copyVersion: expectedVersion } })
       }
       if (item.student.acknowledgedAt) return { acknowledged: true, acknowledgedAt: item.student.acknowledgedAt, copyVersion }
       const card = view(item, workspace, clock())
@@ -269,10 +283,10 @@ export function createAssignmentService({ repos, catalog, directory, legacy, res
       const grantedAt = clock().toISOString()
       // One consent record per sponsor and disclosure version: a retry after a
       // partial failure reuses it instead of writing a second one.
-      const existing = (await repos.sharing.listConsents(user.id)).find((c) => c.consentType === 'CAMPUS_ASSESSMENT_DISCLOSURE'
+      const existing = (await repos.sharing.listConsents(user.id)).find((c) => c.consentType === consentType
         && c.organizationId === item.assignment.organizationId && c.copyVersion === copyVersion && !c.withdrawnAt)
       const consent = existing || await repos.sharing.recordConsent({
-        userId: user.id, organizationId: item.assignment.organizationId, consentType: 'CAMPUS_ASSESSMENT_DISCLOSURE', copyVersion, grantedAt,
+        userId: user.id, organizationId: item.assignment.organizationId, consentType, copyVersion, grantedAt,
       })
       const patch = { consentRecordId: consent.id, acknowledgedAt: grantedAt }
       if (item.student.status === 'ASSIGNED') patch.status = 'ACKNOWLEDGED'

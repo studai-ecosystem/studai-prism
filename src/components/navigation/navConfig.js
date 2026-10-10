@@ -100,6 +100,24 @@ export const CAMPUS_NAV = [
   { id: 'settings', label: 'Settings', path: 'settings', icon: SlidersHorizontal, permission: 'org.settings.read', group: 'admin' },
 ]
 
+// PROD-READY Phase 9: employer development-use (L&D) workspace navigation
+// (server-dark: PRISM_EMPLOYER_LND). Visibility follows the same server
+// permissions; there is no people-results view and no individual export.
+export const EMPLOYER_NAV = [
+  { id: 'overview', label: 'Overview', path: 'overview', icon: LayoutDashboard, permission: 'org.overview.read' },
+  { id: 'people', label: 'People', path: 'people', icon: Users, permission: 'students.read', group: 'people' },
+  { id: 'shared', label: 'Shared reports', path: 'shared-reports', icon: Share2, permission: 'students.read', group: 'people' },
+  { id: 'assessments', label: 'Assessments', path: 'assessments', icon: ClipboardCheck, permission: 'assignments.read', group: 'assess' },
+  { id: 'development', label: 'Development', path: 'development', icon: Sprout, permission: 'interventions.read', group: 'assess' },
+  { id: 'insights', label: 'Group summaries', path: 'insights', icon: BarChart3, permission: 'analytics.read', group: 'insight' },
+]
+
+export function employerNavFor(organizationId, permissions = []) {
+  return EMPLOYER_NAV
+    .filter((item) => permissions.includes(item.permission))
+    .map((item) => ({ ...item, to: `/employer/${organizationId}/${item.path}` }))
+}
+
 export function campusNavFor(organizationId, permissions = []) {
   return CAMPUS_NAV
     .filter((item) => permissions.includes(item.permission))

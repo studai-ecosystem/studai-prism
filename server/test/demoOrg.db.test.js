@@ -87,8 +87,9 @@ async function setup() {
 
 test('0061/0062: down/up is clean', { skip }, async () => {
   await migrateUp()
-  await migrateDown()
-  await migrateDown()
+  // Roll back to just before 0061 (later migrations, e.g. 0063, go first; P94).
+  const latest = async () => (await query('SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1')).rows[0].name
+  while ((await latest()) >= '0061') await migrateDown()
   assert.equal((await query(`SELECT to_regclass('public.demo_accounts') AS t`)).rows[0].t, null)
   assert.equal((await query(`SELECT to_regclass('public.guardian_consents') AS t`)).rows[0].t, null)
   assert.equal((await query(`SELECT 1 FROM information_schema.columns WHERE table_name = 'organizations' AND column_name = 'is_demo'`)).rows.length, 0)

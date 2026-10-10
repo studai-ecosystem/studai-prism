@@ -51,7 +51,13 @@ const BANNED_CLAIMS = [
 // the report emails in lib/mailer.js carried "certified" + the composite while
 // only src/** was scanned. Server-side candidate-visible templates are now in
 // the scan set permanently.
-const SERVER_PUBLIC_COPY = [join(ROOT, 'server', 'lib', 'mailer.js')]
+// PROD-READY Phase 9: the employer disclosure, consent and staff copy, and the
+// StudAI Hire hand-off contract, are served to employees and employers.
+const SERVER_PUBLIC_COPY = [
+  join(ROOT, 'server', 'lib', 'mailer.js'),
+  join(ROOT, 'server', 'domain', 'employer', 'copy.js'),
+  join(ROOT, 'server', 'domain', 'integrations', 'hire', 'index.js'),
+]
 
 async function publicFiles() {
   const files = [join(ROOT, 'index.html'), join(ROOT, 'server', 'data', 'content.json'), ...SERVER_PUBLIC_COPY]
@@ -121,4 +127,17 @@ test('CLAIMS CEILING: dark features have zero public marketing copy', async () =
       assert.ok(!rx.test(text), `dark-feature marketing in ${f}: ${rx}`)
     }
   }
+})
+
+test('CLAIMS CEILING: employer surfaces are in the scan set (PROD-READY Phase 9)', async () => {
+  const files = (await publicFiles()).map((f) => f.replace(/\\/g, '/'))
+  for (const want of [
+    'server/domain/employer/copy.js',
+    'server/domain/integrations/hire/index.js',
+    'src/lib/copy/employer.js',
+    'src/lib/copy/employerPages.js',
+    'src/layouts/EmployerShell.jsx',
+    'src/features/employer/pages/EmployerOverviewPage.jsx',
+    'src/features/employer/pages/EmployerReportPage.jsx',
+  ]) assert.ok(files.some((f) => f.endsWith(want)), `${want} is scanned`)
 })

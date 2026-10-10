@@ -14,9 +14,9 @@ Formats follow [CAMPUS_PROGRAM_STATE.md](../campus/CAMPUS_PROGRAM_STATE.md):
 - Status values: `NOT_STARTED` | `IN_PROGRESS` | `COMPLETE`.
 
 <!-- PROD-STATE:BEGIN
-active_phase: 8
-branch: prod/p08-sales-readiness
-last_updated: 2026-10-10
+active_phase: 9
+branch: prod/p09-employer-lnd
+last_updated: 2026-10-11
 PROD-STATE:END -->
 
 ## Baseline
@@ -25,7 +25,7 @@ PROD-STATE:END -->
 | --- | --- |
 | Charter baseline | `main` @ `609f748` |
 | Actual starting HEAD | `ui/prism-brand-transformation` @ `4e417a9` — a superset of `main` (68 commits ahead; `main` has no content the branch lacks). See P1 |
-| Migrations at start | 0001–0054 (0040–0054 are on the branch, not on `main`); new migrations start at 0055 (P2). Phase 1S added 0055, Phase 2 added 0056, Phase 3 added 0057, Phase 4 added 0058, Phase 5 added 0059, Phase 6 added 0060, Phase 8 added 0061–0062 |
+| Migrations at start | 0001–0054 (0040–0054 are on the branch, not on `main`); new migrations start at 0055 (P2). Phase 1S added 0055, Phase 2 added 0056, Phase 3 added 0057, Phase 4 added 0058, Phase 5 added 0059, Phase 6 added 0060, Phase 8 added 0061–0062, Phase 9 added 0063 |
 | Production image | `2b84e13c07f2` (released 2026-08-05 per [RELEASE_RECORDS.md](../remediation/RELEASE_RECORDS.md); last entry). Campus V1, the UI rebuild and everything after 2b84e13 are **undeployed**. Images were built from `main` on 2026-10-01/02 (Build Image runs 36879290369, 36978677257) but no release record shows them deployed; not independently verifiable from the engineering workstation |
 | `main` CI | last push run on `main` (36978675693, 2026-10-02) FAILED: `src/features/development/development.test.jsx` mission-player test; the branch's later CI runs are green (37442643787) |
 | Build Image | last run (37365615065, branch, 2026-10-05) FAILED: `sts:AssumeRoleWithWebIdentity` denied for `studai-prism-github-deploy` (HA-024 / operator) |
@@ -512,7 +512,93 @@ Two migrations were added (0061, 0062). Two flags were registered OFF (`PRISM_PI
 | `npm audit --omit=dev` | unchanged (no dependency change) |
 
 ## Phase 9 — Employer development-use workspace (dark)
-Status: NOT_STARTED
+Status: COMPLETE (dark; nothing deployed, no flag flipped, no human action closed)
+Branch: `prod/p09-employer-lnd` (from `prod/p08-sales-readiness` @ `e38cfdd`)
+Commit: see the follow-up commit recording this hash
+Gates: see table
+
+Phase 9 builds a minimal employer development-use (L&D) mode on the campus machinery, dark behind the new flag `PRISM_EMPLOYER_LND` (registered OFF):
+
+- **Employer workspace.** An `EMPLOYER` organization's staff open an `EMPLOYER` workspace; its employees use the sponsored learner workspace, whose visibility is aggregate-only for the employer (P92). Employers invite new hires and fresher groups, sponsor in-scope assessments, see suppressed group summaries, assign development missions, and read an individual report only while its owner shares it.
+- **Prohibited by design, enforced on the server and in the database.** Ranking, sort/filter by level or score and cut-off parameters are refused with 422 `PROHIBITED_USE`. Exports are aggregate-only. No route exports, ranks or lists results per person. Job families stay within JOB_FAMILY_SCOPE_v1. Migration 0063 makes an individual sponsor read of an employer session impossible (P97, P98).
+- **Copy.** Development and structured onboarding only. The employer disclosure and consent text are DRAFT pending HA-005 and HA-004. The prohibited-use lines restate PROHIBITED_USES_POLICY_v1 and add nothing it does not say (P93).
+- **Separation.** Campus organization routes never serve an EMPLOYER organization (P95).
+- **StudAI Hire evidence hand-off.** Interface only; it answers 501. ECOSYSTEM_SEPARATION_POLICY_v1 rule 2 requires a written decision first, recorded as the new register row HA-025 (OPEN) (P96). Contract: [HIRE_HANDOFF_INTERFACE.md](./HIRE_HANDOFF_INTERFACE.md).
+
+One migration was added (0063). One flag was registered OFF (`PRISM_EMPLOYER_LND`).
+
+- [x] P9.01 Flag `PRISM_EMPLOYER_LND` registered OFF (`server/lib/flagRegistry.js`; client-visible boolean in `server/domain/flags/index.js`). Flag off:
+  - every `/api/v1/employer/*` route and `/api/v1/integrations/hire/handoff` is 404, signed in or out;
+  - an employer organization opens no workspace;
+  - its invitations are "not valid";
+  - an employee cannot share with it;
+  - `/employer/*` never renders.
+
+  Campus payloads are byte-identical: `organizationType` is added only to employer workspaces and invites.
+  Evidence: `employerLnd.test.js` "flag off…"; vitest `employer.test.jsx` "dark"; Playwright `PROD-P09-OFF`.
+- [x] P9.02 Employer organization on the campus machinery (P92).
+  - Staff roles map to employer labels (Workspace owner, Learning and development lead/coordinator, Mentor, Employee). No new database role.
+  - `workspaceTypeForRole(role, organizationType)` gives staff the `EMPLOYER` workspace. Employees get `CAMPUS_STUDENT` with `OWNER_AND_SPONSOR_AGGREGATE_ONLY`, which `recordSponsoredStart` now writes from the workspace (campus default unchanged).
+  - Membership and invite reads carry `organizationType` (PG and memory).
+  - Routes: `server/routes/v1/employer.js` (`/api/v1/employer/organizations/:orgId/*`, 18 routes) over `server/domain/employer/service.js`.
+  - Evidence: `employerLnd.test.js` "workspaces…", "summary, cohorts…"; `employerLnd.db.test.js` "employer workspace on PostgreSQL…".
+- [x] P9.03 Invite new hires and fresher groups.
+  - Groups carry an optional job family from JOB_FAMILY_SCOPE_v1 only (stored as the cohort tag `job-family:<id>`). Free-text tags are refused.
+  - Invitations reuse the invite service. Accepting records `EMPLOYER_DEVELOPMENT_DISCLOSURE` with version `employer-development-disclosure.v0-draft`. Staff invitations open the employer workspace.
+  - Evidence: `employerLnd.test.js` "joining an employer…"; Playwright journey.
+- [x] P9.04 Sponsor assessments within scope. Only definitions whose every form uses a scenario mapped in `JOB_FAMILY_SCOPE` can be sponsored. Today that is the governed general pool; the marketing bank scenario and DRAFT content are excluded. Integrity is fixed at STANDARD (no proctoring options on the employer surface). The briefing shows and records the employer assessment disclosure (`EMPLOYER_ASSESSMENT_DISCLOSURE`); the campus disclosure version is refused (409). Evidence: `employerLnd.test.js` "sponsored assessments stay within JOB_FAMILY_SCOPE_v1…"; Playwright (employee acknowledgement stored as an employer consent).
+- [x] P9.05 Individual reports only with the employee's sharing consent (reused share grants).
+  - `authorizeSponsorRead` never grants an EMPLOYER read through sponsorship, even for a wrongly written scope (memory store), and 0063 forbids such a scope in PostgreSQL.
+  - The employer lists active shares (`listActiveOrgGrants`, PG and memory) and opens one report through `reports.forSponsor`. The read is audited and carries the use notice.
+  - Revocation closes access at once. The employee's own report says the employer sees group summaries only, and the share dialog offers the employer.
+  - Evidence: `employerLnd.test.js` "individual reports only with the employee's share grant…"; `employerLnd.db.test.js`; vitest "shared report…".
+- [x] P9.06 Suppressed cohort aggregates. Group summaries reuse the campus analytics service: capabilities, participation and practice, with suppression whole and complementary. `GET …/insights` accepts no filters at all. Export is aggregate-only (`capabilities` / `completion` / `missions`), audited, and needs `exports.cohort`. Evidence: `employerLnd.test.js` "group summaries are suppressed…", "exports are aggregate-only…"; vitest; Playwright.
+- [x] P9.07 Development missions. Employer interventions reuse Development V2 (`PRISM_DEVELOPMENT_V2` also required). Evidence: `employerLnd.test.js`; vitest "development…".
+- [x] P9.08 Prohibited by design, with tests (P97).
+  - `refuseSelectionParams` answers 422 `PROHIBITED_USE` for any query or body key asking for ranking, sort/order, level/band/score/percentile or threshold/cut-off.
+  - People are listed in a fixed name order with participation only.
+  - There is no individual-export route. The router is walked in a test, and the campus `students/export` is 404 for employers.
+  - No sortable column, bulk selection or export-people control exists on the pages (source and rendered checks).
+  - Evidence: `employerLnd.test.js` "prohibited by design…", "exports…"; `campusCopyCeiling.test.js` (2 new tests); vitest; Playwright.
+- [x] P9.09 Copy: development and structured onboarding only, and DRAFT (P93).
+  - Server: `server/domain/employer/copy.js` (versions `employer-development-disclosure.v0-draft` and `employer-assessment-disclosure.v0-draft`; pending HA-005 and HA-004).
+  - Client: `src/lib/copy/employer.js` (employee side, identical to the server copy by test) and `src/lib/copy/employerPages.js` (staff page chrome).
+  - The employee-facing disclosure states the employer may not use a result as the sole or primary basis for any selection, employment, promotion or termination decision, may not rank or set cut-offs, and sees a report only if shared.
+- [x] P9.10 Claims ceiling and campus copy ceiling extended to employer surfaces.
+  - `claimsCeiling.test.js`: the employer copy and the Hire contract are in `SERVER_PUBLIC_COPY`, plus a scan-set test.
+  - `campusCopyCeiling.test.js`: every string literal on every employer surface is free of selection wording (hire / fit / suitable / recommend for role / rank / shortlist / pass-fail / cut-off / top performer / predict). The governed prohibited-use negations are allowed only in the two copy modules.
+  - Rendered pages: vitest `employer.test.jsx`, and Playwright on each page (text outside the governed lines).
+- [x] P9.11 StudAI Hire evidence hand-off interface (P96).
+  - `server/domain/integrations/hire/index.js` (contract + provider, no network code) and `server/routes/v1/evidenceHandoff.js`. `GET` describes the contract; `POST` is 501, mirroring the SSO interface.
+  - Contract: candidate-only, a consent record per hand-off, a minimal payload, raw transcripts never, revocation and erasure semantics.
+  - The live `/api/ecosystem/handover-token` carries identity only; its server-to-server body is pinned by test.
+  - Doc: [HIRE_HANDOFF_INTERFACE.md](./HIRE_HANDOFF_INTERFACE.md). HA-025 added to the register (OPEN).
+- [x] P9.12 Migration 0063 (+ down) (P98).
+  - Adds the employer consent types.
+  - Trigger `assessment_session_scopes_employer_visibility`: an EMPLOYER sponsor scope must be `OWNER_ONLY` or `OWNER_AND_SPONSOR_AGGREGATE_ONLY`.
+  - Trigger `organizations_employer_type_immutable`.
+  - The down refuses while employer consent records exist.
+  - Evidence: `employerLnd.db.test.js` "0063…" (2 tests) and "law 7…".
+- [x] P9.13 Law 7: no new table or column. Employer consent records are `consent_records` rows, erased with the account (registry unchanged, ratchet green). RETENTION_POLICY addendum.
+- [x] P9.14 UI on the existing design system, flag-gated: `EmployerShell` (AppShell + employer navigation by server permissions) and pages Overview, People (groups, invitations, roster), Person, Shared reports, Shared report, Assessments, Development and Group summaries (`src/features/employer/**`, `src/api/employer.js`, `/employer/:organizationId/*` behind `PRISM_CAMPUS_ENABLED` + `PRISM_EMPLOYER_LND` and `WorkspaceGuard type="EMPLOYER"`). Employee side reuses the invite page, consent panel, sponsored card, privacy badge, briefing, player and report/share UI with employer copy. Evidence: vitest `employer.test.jsx` (14), Playwright `prod-p09-employer-lnd.spec.js` (chromium, axe 0 serious/critical, no horizontal overflow).
+- [x] P9.15 Smoke battery and release documents. `PRISM_EMPLOYER_LND` is classified dark, with new dark checks `employer-lnd` and `hire-handoff`. Addenda: GO_LIVE_CHECKLIST (F6d + HA-025), RELEASE_TEMPLATE_PROD_READY (0063), RETENTION_POLICY_v1 (P100).
+- [x] P9.16 Migration count pins 62 → 63; tests changed with reasons, none weakened (P94).
+- [H] P9.17 Employer disclosure, consent and prohibited-use copy approval — HA-005, HA-004 (OPEN; nothing closed).
+- [H] P9.18 Any connection of the StudAI Hire evidence hand-off — HA-025 (new, OPEN), with HA-005 and HA-004.
+
+| Gate (2026-10-11, Node 24.12 locally) | Phase 9 result |
+| --- | --- |
+| `npm --prefix server test` (no DB) | 1154 tests · 1081 pass · 0 fail · 73 skipped (Phase 8: 1133/1066/0/67; +12 `employerLnd.test.js`, +6 `employerLnd.db.test.js` skipped without a database, +2 `campusCopyCeiling.test.js`, +1 `claimsCeiling.test.js`) |
+| Server DB suites (`test/*.db.test.js`, serial, fresh scratch database `prism_p09`) | 160 tests · 157 pass · 0 fail · 3 skipped (Phase 8: 154/151/0/3; +6 `employerLnd.db.test.js`). Helper cluster on port 55452 |
+| DB pipeline | PASS. `run-experience-baseline-tests.mjs database` 27/27; `p2` 21/21; `run-cr03-runtime-tests.mjs` 18/18 (the gate run exited 1 only on a Windows `EBUSY` while removing its disposable cluster after all 18 passed; a rerun exited 0, 18/18); `rehearse:migrations` pin 63, head `0063_employer_lnd`, 24 migrations (0040–0063) rolled back and re-applied, idempotent; `rehearse:rollback` 1/1 |
+| `npx vitest run` | 47 files · 580 tests · 580 pass (Phase 8: 46 files / 566; +14 `employer.test.jsx`) |
+| `python -m pytest calibration/tests -q` | not re-run: calibration untouched in this phase (Phase 8: 69 passed) |
+| `npm run build` | PASS (entry 419.75 kB / 126.11 kB gzip; Phase 8 412.42 / 124.40 — the employer shell, routes and employee-side employer copy; staff pages are lazy chunks) |
+| `npm run audit:static` | PASS |
+| Playwright, new spec | `prod-p09-employer-lnd` chromium, employer flag ON: 1 passed (journey + prohibited-use API checks + axe 0 serious/critical + no horizontal overflow), 1 skipped (the OFF test); employer flag OFF: 1 passed (the OFF test), 1 skipped. Audit servers on 4273/4274, PostgreSQL 55452, scratch database `prism_p09_e2e` |
+| Playwright, touched specs (chromium, employer flag off) | `campus-join` 1/1, `campus-student` 3/3, `campus-journey-c` 1/1, `campus-a11y-sweep` 1/1, `campus-shell` 20 passed 1 failed (CAMPUS-SHELL-04), `campus-workspace` 2 passed 1 failed ("resume after refresh") — the two P90 harness failures (P99). `@critical` across all projects is left to the orchestrator's gate |
+| `npm audit --omit=dev` | unchanged (no dependency change) |
+
 
 ## Phase 10 — Human-action preparation pack
 Status: NOT_STARTED
@@ -617,6 +703,15 @@ Format: date · id · decision · reason · charter § · reversible.
 | 2026-10-10 | P89 | The onboarding runbook states the code's gaps instead of papering over them: no admin-console or API route creates an organization or its first owner (manual database path documented); no route removes a student or revokes a pending invite, and nothing sets an organization SUSPENDED or ARCHIVED; the last owner cannot be removed through the API; uncommitted CSV previews are never purged; unsent invite links cannot be recovered without mail. These are recorded in Risks and were not built in this phase. | Charter Phase 8.2 asks for a runbook accurate to the code; building organization lifecycle routes is new behaviour beyond item 2 | Phase 8.2, law 2 | Yes |
 | 2026-10-10 | P90 | Gate environment. (a) The throwaway cluster on port 55432 was left unusable mid-run: its postmaster exited while an orphaned child kept the listening socket, so connections timed out. Killing the orphan was refused by the permission system, so the DB suites ran on the helper's own cluster at port 55442 (fresh `prism_p08`). An operator may need to stop the orphaned `postgres.exe` holding 55432. (b) Playwright: `CAMPUS-SHELL-04` and the `campus-workspace` "resume after refresh" journey fail in this harness, and fail identically on a clean worktree of `d42bb29`. For SHELL-04 the cause is visible: `server/.env` points the legacy audit server's `DATABASE_URL` at 55433 (the orchestrator's port, down at the time). The workspace failure's cause was not identified. | Honesty about gate evidence | §2 | — |
 | 2026-10-10 | P91 | Flags and release documents: `PRISM_PILOT_REPORT_EXPORT` and `PRISM_DEMO_MODE` are registered OFF and classified dark in `scripts/post-deploy-smoke.mjs`. A new dark check `under18-guardian` calls `GET /api/auth/guardian-consent` unauthenticated, which returns 404 when off and 401 when on. Dated addenda were added to GO_LIVE_CHECKLIST (F6c; `PRISM_DEMO_MODE` never in production), RELEASE_TEMPLATE_PROD_READY (0061/0062), AGE_GATING_POLICY_v1 and RETENTION_POLICY_v1; the records above them are unchanged | P79 rule: every new flag classified | Law 5 | Yes |
+| 2026-10-11 | P92 | Employer L&D mode reuses the campus machinery rather than a parallel data model. An `EMPLOYER` organization's staff (campus roles relabelled: ORG_OWNER "Workspace owner", PLACEMENT_DIRECTOR/OFFICER "Learning and development lead/coordinator", FACULTY_MENTOR "Mentor"; DEPARTMENT_COORDINATOR not offered) open the `EMPLOYER` workspace type the schema already allowed; employees (role STUDENT, label "Employee") keep the `CAMPUS_STUDENT` workspace so every learner path (briefing, player, report, sharing, missions) is reused, with visibility `OWNER_AND_SPONSOR_AGGREGATE_ONLY` (an existing enum value). Staff use a dedicated router `/api/v1/employer/organizations/:orgId/*` over `domain/employer/service.js`, which calls the campus services and only narrows them. It also needs the campus flags it builds on: `PRISM_CAMPUS_ENABLED` always, `PRISM_STUDENT_REPORT_V3` for shared reports, `PRISM_CAMPUS_ANALYTICS` for group summaries, `PRISM_DEVELOPMENT_V2` for missions. No new database role and no new table | Charter Phase 9 ("reuse the campus machinery"); the smallest change that keeps every learner protection already tested | Phase 9 | Yes |
+| 2026-10-11 | P93 | Employer copy restates PROHIBITED_USES_POLICY_v1 and adds nothing to it. The employee-facing line is "may not use a Prism result as the sole or primary basis for any selection, employment, promotion or termination decision" (policy item 1), plus "may not rank people … or set cut-off scores" (items 2, 3), "may not see a report of yours unless you share it, and may not obtain it any other way" (item 9) and one statement of product fact ("no ranking, no cut-off scores and no export of individual results"). The brief asked for "cannot use results for hiring/firing/promotion decisions"; an absolute ban is stronger than the DRAFT policy, so writing it would invent a legal claim — whether employer L&D terms should forbid any such use is left to HA-004. All employer copy is DRAFT (versions `employer-development-disclosure.v0-draft`, `employer-assessment-disclosure.v0-draft`) pending HA-005 and HA-004; the client copies of the employee lists are identical to the server's by test | Law 2 / law 6; "align exactly; don't invent legal claims" | Phase 9, laws 2 and 6 | Yes |
+| 2026-10-11 | P94 | Tests changed, none weakened. (1) Migration count pins 62 → 63 (`scripts/rehearse-migrations.mjs`, `experienceBaseline.db.test.js`), same rule as P22/P31/P68/P87. (2) `demoOrg.db.test.js` "0061/0062: down/up is clean" called `migrateDown()` twice, which assumed 0062 was the head; it now rolls back while the head is ≥ 0061 (0063, 0062, 0061) and keeps every assertion — the intent (0061 and 0062 roll back cleanly) is unchanged. (3) `claimsCeiling.test.js` and `campusCopyCeiling.test.js` gained files and tests only (employer copy and Hire contract in `SERVER_PUBLIC_COPY`; a scan-set test; two employer-surface tests). Every other change is a new test file (`employerLnd.test.js` 12, `employerLnd.db.test.js` 6, vitest `employer.test.jsx` 14, Playwright `prod-p09-employer-lnd.spec.js` 2) | Law 4 | Law 4 | Yes |
+| 2026-10-11 | P95 | Campus ↔ employer separation: every `/api/v1/organizations/:orgId/*` route answers 404 for an `EMPLOYER` organization whatever the flag says (`domain/employer/separation.js`, mounted before the campus routers). The campus admin surface has views an employer must never have (student CSV export, sponsor report reads, per-student assignment rosters with report links), and an EMPLOYER organization reaching them is a latent prohibited-use path. This ships on: it changes nothing for any non-employer organization (one primary-key read per campus organization request, only while the campus is on) and no route creates an EMPLOYER organization, so none exists outside operator SQL. With the flag off an employer also opens no workspace, its invitations are "not valid" and employees cannot share with it | Prohibited by design must hold even if an operator creates an employer organization before the flip | Phase 9, law 5 | Yes |
+| 2026-10-11 | P96 | StudAI Hire evidence hand-off: interface only (`domain/integrations/hire/index.js`, `routes/v1/evidenceHandoff.js`), dark behind `PRISM_EMPLOYER_LND` and 501 when on, like the SSO interface (HA-C011). ECOSYSTEM_SEPARATION_POLICY_v1 rule 2 ("any future data sharing requires a written decision recorded in the human-action register") is not met, so the policy does not allow a Prism → Hire evidence flow today; the decision is a new register row **HA-025** (OPEN). Contract decisions: candidate-initiated only, no pull API; one consent record per hand-off (new type added by a migration when connected); minimal payload (pseudonymous ecosystem id, statuses and provisional labels, tri-status integrity, notices); **raw transcripts never, even with consent** — the brief allowed "unless consented", but BUYER_ACCESS_SPEC_v1 forbids them to any recipient and is stricter; revocation and erasure semantics written. The live `/api/ecosystem/handover-token` (Phase 1S) stays identity-only; a test pins its server-to-server body so it cannot become a second, unguarded evidence path | Charter Phase 9 bullet 4; separation policy; buyer-access spec | Phase 9, laws 1, 2, 6 | Yes |
+| 2026-10-11 | P97 | Prohibited uses are refused, never silently ignored: `refuseSelectionParams` answers 422 `PROHIBITED_USE` ("Prism does not rank, sort or filter people by level or score, and has no cut-offs") for any query or top-level body key naming a sort/order, rank/top, level/band/score/percentile/grade, threshold/cut-off/pass mark or fit/suitability, so a client can never believe it received a ranked or filtered list. The people list has a fixed name order and participation only; group summaries accept no filters; the only export is the campus aggregate CSV for `capabilities`, `completion` or `missions`; employer sponsorship is `integrityPolicy: STANDARD` only (charter §14: proctoring off by default for development use) | Charter Phase 9: "enforce server-side … and in copy tests" | Phase 9, law 6 | Yes |
+| 2026-10-11 | P98 | Migration 0063 enforces the employer rules in the database: `consent_records` accepts `EMPLOYER_DEVELOPMENT_DISCLOSURE` and `EMPLOYER_ASSESSMENT_DISCLOSURE`; a trigger refuses any session scope that would let an EMPLOYER sponsor read an individual result (must be `OWNER_ONLY` or `OWNER_AND_SPONSOR_AGGREGATE_ONLY`); a trigger keeps `organization_type` from changing to or from EMPLOYER. The down refuses (and the rollback stops) while employer consent records exist — consent evidence is never deleted by a schema rollback; `employerLnd.db.test.js` removes its synthetic rows because later suites roll back through 0063 | Defence in depth beyond the code path; law 3 (new migration, frozen ones untouched) | Phase 9, laws 3 and 7 | Yes |
+| 2026-10-11 | P99 | Gate environment. DB suites and the DB pipeline ran on the helper's cluster at port 55452 (fresh `prism_p09`); Playwright on this phase's own audit servers at 4273/4274 with `prism_p09_e2e`. Touched campus specs (chromium, employer flag off): `campus-shell` CAMPUS-SHELL-04 and the `campus-workspace` "resume after refresh" journey fail — the same two tests P90 recorded as failing identically on a clean base with this harness (SHELL-04: `server/.env` points the legacy audit server's `DATABASE_URL` at 55433). They were not re-run on a clean `e38cfdd` worktree in this phase | Honesty about gate evidence | §2 | — |
+| 2026-10-11 | P100 | Flags and release documents: `PRISM_EMPLOYER_LND` registered OFF and classified dark in `scripts/post-deploy-smoke.mjs` with two new dark checks, `employer-lnd` (`/api/v1/employer/organizations/<uuid>`: 404 off, 503/401 on) and `hire-handoff` (`/api/v1/integrations/hire/handoff`: 404 off, 401 on). Dated addenda: GO_LIVE_CHECKLIST (F6d after F6 + the HA-025 row), RELEASE_TEMPLATE_PROD_READY (0063), RETENTION_POLICY_v1 (employer consent records, no new table). HA-025 appended to HUMAN_ACTION_REGISTER.md as OPEN; no other register row changed | P79 rule: every new flag classified | Law 5 | Yes |
 
 ## Risks
 
@@ -670,6 +765,12 @@ Format: date · id · decision · reason · charter § · reversible.
 | The pilot technical report export is API-only (no console screen), and its identity-assurance line is UNKNOWN (not aggregated per organization) (P84) | P3 | Engineering | Console screen with the flag; per-organization assurance counts from `v1_verifications` in a later change | Flag flip |
 | Demo data on a shared non-production database is visible to platform-wide admin dashboards (only organization analytics, calibration and rating exclude it) (P83) | P3 | Operator | Keep demo organizations in a separate demo database, as the seed's production refusal enforces | No |
 | The throwaway Postgres on port 55432 was left with an orphaned child holding the socket after a gate run; Phase 8 DB suites ran on 55442 (P90) | P3 | Operator | Stop the orphaned `postgres.exe` on 55432 before the next phase uses it | No |
+| Employer staff see each employee's participation (joined, group, latest assessment status, practice started) by name — participation, never results — and the participation funnel is not small-group suppressed, as on campus (P92) | P2 | Product / Counsel (HA-005) | Stated in the employer disclosure ("can see … whether you started or completed …"); counsel review of that line with HA-005 | `PRISM_EMPLOYER_LND` flip |
+| An employee may share a FULL report (evidence quotes) with the employer; that is their choice under the share-grant model, but employer reads of quotes have no extra warning beyond the use notice | P3 | Product | Revisit with HA-005; the share dialog labels the employer option "for a development conversation" | No |
+| No route creates an EMPLOYER organization or its first owner (same gap as P89); the separation guard makes a manually created one safe (P95) | P3 | Operator | Operator SQL per COLLEGE_PILOT_ONBOARDING with `organization_type = 'EMPLOYER'` | Employer pilot |
+| The employer journey in Playwright does not open a shared report with a real published V3 report (needs a full run); that path is covered by server and vitest tests only | P3 | Engineering | Add to the Phase 11 full run with the draft-content harness | No |
+| Employer copy is DRAFT; the prohibited-use line follows the policy's "sole or primary basis" wording, not an absolute ban (P93) | P2 | Counsel (HA-004, HA-005) | Phase 10 counsel packet includes every employer string | `PRISM_EMPLOYER_LND` flip |
+| The StudAI Hire hand-off is unconnected; StudAI Hire's own consumers of `/api/ecosystem/handover-token` must not treat `source_credential_id` as evidence (P96) | P3 | Founder (HA-025) | Contract §3; identity body pinned by test | No |
 
 ### Campus risk dispositions (Phase 3)
 
@@ -693,5 +794,5 @@ The rows below are in the [CAMPUS_PROGRAM_STATE.md](../campus/CAMPUS_PROGRAM_STA
 1. Read this file, then the charter, then the active phase section.
 2. `git -C studai-prism status` — never overwrite uncommitted human work. Untracked at programme start (not ours, never commit): `PRISM_NEXT_REALITY_AUDIT_2026.md`, `StudAI_Prism_Complete_Brand_Pack*`, `data/` (contains user records — see Phase 1S).
 3. Branches are local and stacked: `prod/p00-baseline` → `prod/p01-dependencies` → `prod/p01s-security-hotfix` → `prod/p02-...` and so on.
-4. New migrations: the head is `0062_guardian_consents` (Phase 8 added 0061 and 0062; Phase 7 added none). Each new migration also updates the pinned count in `scripts/rehearse-migrations.mjs` and `server/test/experienceBaseline.db.test.js` (P22, P31), and must register every personal-data column in `server/domain/privacy/personalDataRegistry.js` (the ratchet test fails otherwise; law 7).
+4. New migrations: the head is `0063_employer_lnd` (Phase 9 added 0063; Phase 8 added 0061 and 0062; Phase 7 added none). The 0063 down refuses while employer consent records exist, so a DB test that writes them must remove them (P98). Each new migration also updates the pinned count in `scripts/rehearse-migrations.mjs` and `server/test/experienceBaseline.db.test.js` (P22, P31), and must register every personal-data column in `server/domain/privacy/personalDataRegistry.js` (the ratchet test fails otherwise; law 7).
 5. Deployment (Phase 7 onward): the manifest is the kustomize tree `infra/aws/eks/` (never commit a concrete image tag; `infra/aws/prism-eks.yml` is a tombstone); the release inputs are `docs/production/RELEASE_TEMPLATE_PROD_READY.md`, the human sequence is `docs/production/GO_LIVE_CHECKLIST.md`, and every new feature flag must also be classified in `scripts/post-deploy-smoke.mjs` (`postDeploySmoke.test.js` fails otherwise).

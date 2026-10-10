@@ -7,12 +7,15 @@ const membership = (r) => r && ({
   createdAt: iso(r.created_at), updatedAt: iso(r.updated_at),
   organizationName: r.organization_name ?? null, organizationStatus: r.organization_status ?? null,
   organizationIsDemo: r.organization_is_demo === true,
+  // PROD-READY Phase 9: EMPLOYER organizations open employer workspaces.
+  organizationType: r.organization_type ?? null,
 })
 const invite = (r) => r && ({
   id: r.id, organizationId: r.organization_id, email: r.email, role: r.role, cohortId: r.cohort_id,
   departmentId: r.department_id, tokenHash: r.token_hash, status: r.status, invitedBy: r.invited_by,
   expiresAt: iso(r.expires_at), acceptedBy: r.accepted_by, acceptedAt: iso(r.accepted_at), createdAt: iso(r.created_at),
   organizationName: r.organization_name ?? undefined, organizationStatus: r.organization_status ?? undefined,
+  organizationType: r.organization_type ?? undefined,
 })
 
 export function createMembershipsRepoPg({ query }) {
@@ -30,12 +33,12 @@ export function createMembershipsRepoPg({ query }) {
          RETURNING *`,
         [organizationId, userId, role, status, departmentId, JSON.stringify(scope || {}), invitedBy],
       )
-      const { rows: named } = await query('SELECT name, status FROM organizations WHERE id = $1', [organizationId])
-      return membership({ ...rows[0], organization_name: named[0]?.name, organization_status: named[0]?.status })
+      const { rows: named } = await query('SELECT name, status, organization_type FROM organizations WHERE id = $1', [organizationId])
+      return membership({ ...rows[0], organization_name: named[0]?.name, organization_status: named[0]?.status, organization_type: named[0]?.organization_type })
     },
     async listMembershipsForUser(userId) {
       const { rows } = await query(
-        `SELECT m.*, o.name AS organization_name, o.status AS organization_status, o.is_demo AS organization_is_demo
+        `SELECT m.*, o.name AS organization_name, o.status AS organization_status, o.is_demo AS organization_is_demo, o.organization_type
          FROM organization_memberships m JOIN organizations o ON o.id = m.organization_id
          WHERE m.user_id = $1 ORDER BY m.created_at ASC`,
         [userId],
@@ -52,7 +55,7 @@ export function createMembershipsRepoPg({ query }) {
     },
     async findInviteByTokenHash(tokenHash) {
       const { rows } = await query(
-        `SELECT i.*, o.name AS organization_name, o.status AS organization_status
+        `SELECT i.*, o.name AS organization_name, o.status AS organization_status, o.organization_type
          FROM organization_invites i JOIN organizations o ON o.id = i.organization_id WHERE i.token_hash = $1`,
         [tokenHash],
       )
@@ -62,7 +65,7 @@ export function createMembershipsRepoPg({ query }) {
     // email job runs, then gets the token that the email carries.
     async getInviteById(id) {
       const { rows } = await query(
-        `SELECT i.*, o.name AS organization_name, o.status AS organization_status
+        `SELECT i.*, o.name AS organization_name, o.status AS organization_status, o.organization_type
          FROM organization_invites i JOIN organizations o ON o.id = i.organization_id WHERE i.id = $1`,
         [id],
       )

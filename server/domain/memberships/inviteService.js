@@ -7,9 +7,20 @@ import { ApiError } from '../http/errors.js'
 import { can } from '../permissions/can.js'
 import { INVITABLE_ROLES, workspaceTypeForRole } from '../permissions/roles.js'
 import { CAMPUS_DISCLOSURE_COPY_VERSION } from '../sharing/copyVersions.js'
+import { isEnabled } from '../flags/index.js'
+import { employerJoinDisclosure, EMPLOYER_DISCLOSURE_COPY_VERSION } from '../employer/copy.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 export const INVITE_TTL_DAYS = 14
+
+// PROD-READY Phase 9: an EMPLOYER organization's invitation exists only while
+// PRISM_EMPLOYER_LND is on (off = "not valid", like a withdrawn invite), and
+// it records the employer disclosure, never the campus one.
+const isEmployer = (invite) => invite?.organizationType === 'EMPLOYER'
+const employerUsable = (invite) => !isEmployer(invite) || isEnabled('PRISM_EMPLOYER_LND')
+const disclosureFor = (invite) => (isEmployer(invite)
+  ? { consentType: 'EMPLOYER_DEVELOPMENT_DISCLOSURE', copyVersion: EMPLOYER_DISCLOSURE_COPY_VERSION }
+  : { consentType: 'CAMPUS_SPONSORSHIP_DISCLOSURE', copyVersion: CAMPUS_DISCLOSURE_COPY_VERSION })
 export const hashToken = (token) => createHash('sha256').update(String(token)).digest('hex')
 const defaultToken = () => randomBytes(32).toString('base64url')
 
@@ -67,7 +78,7 @@ export function createInviteService({
   }
 
   function assertUsable(invite, user) {
-    if (!invite || invite.status === 'REVOKED' || invite.organizationStatus !== 'ACTIVE') throw new ApiError('NOT_FOUND', 'This invitation is not valid.')
+    if (!invite || invite.status === 'REVOKED' || invite.organizationStatus !== 'ACTIVE' || !employerUsable(invite)) throw new ApiError('NOT_FOUND', 'This invitation is not valid.')
     if (invite.status === 'ACCEPTED') {
       if (invite.acceptedBy === user.id) return 'ALREADY_ACCEPTED'
       throw new ApiError('CONFLICT', 'This invitation has already been used.')
@@ -90,6 +101,7 @@ export function createInviteService({
     async createInvites({ actor, orgId, role, emails, cohortId = null, departmentId = null, delivery = 'SEND' }) {
       const org = await repos.organizations.getOrganization(orgId)
       if (!org || org.status !== 'ACTIVE') throw new ApiError('NOT_FOUND', 'Not found')
+      if (org.organizationType === 'EMPLOYER' && !isEnabled('PRISM_EMPLOYER_LND')) throw new ApiError('NOT_FOUND', 'Not found')
       const cohort = cohortId ? await repos.organizations.getCohort(cohortId) : null
       if (cohortId && (!cohort || cohort.organizationId !== orgId)) throw new ApiError('VALIDATION_FAILED', 'Unknown cohort.')
       if (departmentId) {
@@ -150,7 +162,21 @@ export function createInviteService({
 
     async getInvite(token) {
       const invite = await loadInvite(token)
-      if (!invite || invite.status === 'REVOKED' || invite.organizationStatus !== 'ACTIVE') return null
+      if (!invite || invite.status === 'REVOKED' || invite.organizationStatus !== 'ACTIVE' || !employerUsable(invite)) return null
+      if (isEmployer(invite)) {
+        return {
+          organizationId: invite.organizationId,
+          organizationName: invite.organizationName,
+          organizationType: 'EMPLOYER',
+          role: invite.role,
+          status: invite.status,
+          expired: new Date(invite.expiresAt) <= clock(),
+          expiresAt: invite.expiresAt,
+          emailHint: maskEmail(invite.email),
+          disclosureVersion: EMPLOYER_DISCLOSURE_COPY_VERSION,
+          disclosure: employerJoinDisclosure(invite.organizationName),
+        }
+      }
       return {
         organizationId: invite.organizationId,
         organizationName: invite.organizationName,
@@ -166,7 +192,7 @@ export function createInviteService({
     async acceptInvite({ token, user, acknowledged }) {
       const invite = await loadInvite(token)
       const state = assertUsable(invite, user)
-      const type = workspaceTypeForRole(invite.role)
+      const type = workspaceTypeForRole(invite.role, invite.organizationType)
       if (state === 'ALREADY_ACCEPTED') {
         const workspace = await repos.workspaces.upsertWorkspace({ type, ownerUserId: user.id, organizationId: invite.organizationId, name: invite.organizationName })
         return { workspaceId: workspace.id, workspaceType: type, organizationId: invite.organizationId, role: invite.role, alreadyAccepted: true }
@@ -192,13 +218,14 @@ export function createInviteService({
         }
         // Consent first: an ACTIVE sponsor membership never exists without
         // the disclosure the student acknowledged (once per copy version).
+        const { consentType, copyVersion } = disclosureFor(invite)
         const prior = (await tx.sharing.listConsents(user.id)).some((c) =>
-          c.organizationId === invite.organizationId && c.consentType === 'CAMPUS_SPONSORSHIP_DISCLOSURE'
-          && c.copyVersion === CAMPUS_DISCLOSURE_COPY_VERSION && !c.withdrawnAt)
+          c.organizationId === invite.organizationId && c.consentType === consentType
+          && c.copyVersion === copyVersion && !c.withdrawnAt)
         if (!prior) {
           await tx.sharing.recordConsent({
-            userId: user.id, organizationId: invite.organizationId, consentType: 'CAMPUS_SPONSORSHIP_DISCLOSURE',
-            copyVersion: CAMPUS_DISCLOSURE_COPY_VERSION, grantedAt: clock().toISOString(),
+            userId: user.id, organizationId: invite.organizationId, consentType,
+            copyVersion, grantedAt: clock().toISOString(),
           })
         }
         // A staff invite adds its cohort to any cohorts already assigned.

@@ -28,7 +28,11 @@ export function isRole(role) {
   return ROLES.includes(role)
 }
 
-// Which workspace a membership opens (spec §4.2).
-export function workspaceTypeForRole(role) {
-  return role === 'STUDENT' ? 'CAMPUS_STUDENT' : 'CAMPUS_ADMIN'
+// Which workspace a membership opens (spec §4.2). PROD-READY Phase 9: staff
+// of an EMPLOYER organization open the employer development workspace; its
+// employees (role STUDENT) use the sponsored learner workspace, whose
+// visibility is aggregate-only for an employer (see workspaces/service.js).
+export function workspaceTypeForRole(role, organizationType = null) {
+  if (role === 'STUDENT') return 'CAMPUS_STUDENT'
+  return organizationType === 'EMPLOYER' ? 'EMPLOYER' : 'CAMPUS_ADMIN'
 }

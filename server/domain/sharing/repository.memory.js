@@ -28,6 +28,13 @@ export function createSharingRepoMemory(db) {
           resources: db.shareGrantResources.filter((r) => r.shareGrantId === g.id).map(({ shareGrantId: _s, ...r }) => clone(r)),
         }))
     },
+    async listActiveOrgGrants(organizationId, at) {
+      return [...db.shareGrants.values()]
+        .filter((g) => g.recipientType === 'ORGANIZATION' && g.recipientOrganizationId === organizationId && !g.revokedAt && new Date(g.expiresAt) > new Date(at))
+        .flatMap((g) => db.shareGrantResources.filter((r) => r.shareGrantId === g.id && r.resourceType === 'ASSESSMENT_REPORT')
+          .map((r) => ({ id: g.id, ownerUserId: g.ownerUserId, sessionId: r.resourceId, disclosureLevel: r.disclosureLevel, expiresAt: g.expiresAt, createdAt: g.createdAt })))
+        .sort((a, b) => String(a.ownerUserId).localeCompare(String(b.ownerUserId)) || String(a.createdAt).localeCompare(String(b.createdAt)) || String(a.id).localeCompare(String(b.id)))
+    },
     async revokeShareGrant(id, ownerUserId, revokedAt) {
       const row = db.shareGrants.get(id)
       if (!row || row.ownerUserId !== ownerUserId) return null

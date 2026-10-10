@@ -138,6 +138,25 @@ export async function seedOrganization({ databaseUrl, ownerUserId }) {
   return { organizationId: org.id, organizationName: org.name }
 }
 
+// PROD-READY Phase 9: a synthetic EMPLOYER organization with the given owner,
+// one group of new colleagues and the given employees in it. Organizations
+// are created by operators (no route creates one), so the fixture writes it
+// straight into the throwaway e2e database.
+export async function seedEmployerOrganization({ databaseUrl, ownerUserId, employeeUserIds = [] }) {
+  const repos = await reposFor(databaseUrl)
+  const suffix = randomUUID().slice(0, 8)
+  const org = await repos.organizations.createOrganization({
+    name: `Synthetic Employer ${suffix}`, slug: `synthetic-employer-${suffix}`, organizationType: 'EMPLOYER', status: 'ACTIVE',
+  })
+  await repos.memberships.upsertMembership({ organizationId: org.id, userId: ownerUserId, role: 'ORG_OWNER', status: 'ACTIVE' })
+  const cohort = await repos.organizations.createCohort({ organizationId: org.id, name: 'Synthetic fresher group', tags: ['job-family:graduate-business-operations'] })
+  for (const userId of employeeUserIds) {
+    await repos.memberships.upsertMembership({ organizationId: org.id, userId, role: 'STUDENT', status: 'ACTIVE' })
+    await repos.organizations.addCohortMember({ cohortId: cohort.id, userId, addedBy: ownerUserId })
+  }
+  return { organizationId: org.id, organizationName: org.name, cohortId: cohort.id }
+}
+
 // PROD-READY Phase 8: a synthetic DEMO organization (is_demo, 0061) with the
 // given account registered as a demo account and a student of it. Only in the
 // throwaway e2e database. The 0061 triggers require the demo-account marker

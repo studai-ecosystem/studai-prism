@@ -33,7 +33,7 @@ export function StudentShell({ children }) {
   return (
     <AppShell navLabel="Primary" items={items} footerItems={footer} bottomItems={bottom}>
       <PreferencesEffect />
-      {organizationId && active.type === 'CAMPUS_STUDENT' && <SponsoredByCard organizationName={active.organizationName || active.name} />}
+      {organizationId && active.type === 'CAMPUS_STUDENT' && <SponsoredByCard organizationName={active.organizationName || active.name} organizationType={active.organizationType || null} />}
       {switching ? <Skeleton label="Switching to your personal workspace" /> : (children || <Outlet />)}
     </AppShell>
   )

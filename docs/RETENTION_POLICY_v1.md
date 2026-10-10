@@ -109,3 +109,12 @@ PROVISIONAL like the rest of this policy (HA-003). Nothing above is changed.
   - **VERIFIED and WITHDRAWN records** are the consent record of the learner's account. They are deleted with the account by the erasure cascade.
 - **Demo accounts marker** (`demo_accounts`, 0061) lists the synthetic accounts the demo seed created. It is deleted with the account. Demo data lives in a separate demo database, which is dropped as a whole; no timer applies.
 - **Pilot technical report exports** leave only an `admin_exports` ledger row with the organization id, format, term and purpose (RETENTION_POLICY §4). The report itself is aggregates only and is not stored.
+
+## Addendum 2026-10-11 — PROD-READY Phase 9 (employer development-use workspace)
+
+PROVISIONAL like the rest of this policy (HA-003). Nothing above is changed. No table or column was added (migration 0063 changes a check constraint and adds two triggers).
+
+- **Employer consent records** are rows of `consent_records` with the new types `EMPLOYER_DEVELOPMENT_DISCLOSURE` (joining an employer) and `EMPLOYER_ASSESSMENT_DISCLOSURE` (before an employer-sponsored assessment). They follow the existing `consent_records` rule: deleted with the account by the erasure cascade (`personalDataRegistry.js`, `consent_records.user_id` DELETE). They exist only once a human turns on `PRISM_EMPLOYER_LND`.
+- **Employer reads of a shared report** are recorded in `data_access_audit_events` like every sponsor read (append-only; actor pseudonymised on erasure, RETENTION_POLICY §4 and the Phase 2 addendum).
+- **Employer aggregate exports** are CSV files of group summaries returned to the caller; only the organization audit event is kept. No individual result is exported.
+- **StudAI Hire evidence hand-off**: nothing is stored or sent (the interface answers 501). A connected implementation must add its consent type and ledger to the erasure cascade and to this policy in the same change (HIRE_HANDOFF_INTERFACE.md §6).

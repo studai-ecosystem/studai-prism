@@ -274,6 +274,12 @@ const BriefingSchema = z.object({
     disclosureCopyVersion: z.string().nullable(),
     acknowledged: z.boolean(),
     acknowledgedAt: z.string().nullable(),
+    // PROD-READY Phase 9: an employer-sponsored assessment carries the
+    // employer disclosure from the server (DRAFT, HA-005/HA-004).
+    sponsorType: z.literal('EMPLOYER').optional(),
+    disclosure: z.object({
+      heading: z.string(), lines: z.array(z.string()), prohibitedUses: z.array(z.string()), acknowledge: z.string(), draftNotice: z.string(),
+    }).passthrough().optional(),
   }),
   start: z.object({ allowed: z.boolean(), reason: z.string(), to: z.string().nullable(), mode: z.enum(['V3', 'LEGACY']).optional() }),
 })

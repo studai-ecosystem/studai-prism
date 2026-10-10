@@ -106,3 +106,65 @@ test('work materials render only server data: no sample scenario content, fake c
   }
   assert.deepEqual(hits, [])
 })
+
+// PROD-READY Phase 9 — employer development-use surfaces. Every string
+// literal on an employer surface (pages, shell, API layer, client and server
+// copy) is free of selection wording: hire / fit / suitable / recommend for
+// role / rank / shortlist / pass-fail / cut-off / top performer / predict.
+// The governed prohibited-use lines (PROHIBITED_USES_POLICY_v1 restated for an
+// employer) necessarily name ranking and cut-offs; each is a negation ("may
+// not", "no ranking") and they live only in the two copy modules. Rendered
+// pages are checked the same way in src/features/employer/employer.test.jsx.
+const { SELECTION_WORDING } = await import('../domain/employer/prohibitedUse.js')
+const EMPLOYER_SURFACES = [
+  ...walk(join(SRC, 'features', 'employer')),
+  join(SRC, 'layouts', 'EmployerShell.jsx'),
+  join(SRC, 'api', 'employer.js'),
+  join(SRC, 'lib', 'copy', 'employer.js'),
+  join(SRC, 'lib', 'copy', 'employerPages.js'),
+  join(REPO, 'server', 'domain', 'employer', 'copy.js'),
+  join(REPO, 'server', 'routes', 'v1', 'employer.js'),
+]
+const GOVERNED_NEGATION = /\bmay not\b|\bno ranking\b/
+const COPY_MODULES = new Set(['src/lib/copy/employer.js', 'server/domain/employer/copy.js'])
+
+function stringLiterals(source) {
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '')
+  const out = []
+  const re = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g
+  let m
+  while ((m = re.exec(code))) out.push(m[1] ?? m[2] ?? m[3])
+  // JSX text between tags.
+  for (const t of code.matchAll(/>([^<>{}\n]*[A-Za-z][^<>{}\n]*)</g)) out.push(t[1])
+  return out
+}
+
+test('employer surfaces carry no selection wording; prohibited-use lines are governed negations', () => {
+  const hits = []
+  let scanned = 0
+  for (const f of EMPLOYER_SURFACES) {
+    const r = rel(f)
+    for (const s of stringLiterals(readFileSync(f, 'utf8'))) {
+      scanned += 1
+      if (GOVERNED_NEGATION.test(s)) {
+        if (!COPY_MODULES.has(r)) hits.push(`${r}: governed prohibited-use line outside the copy modules: ${s.slice(0, 80)}`)
+        continue
+      }
+      for (const re of SELECTION_WORDING) if (re.test(s)) hits.push(`${r}: "${s.slice(0, 100)}" matches ${re}`)
+    }
+  }
+  assert.ok(scanned > 300, `sanity: scanned ${scanned} employer strings`)
+  assert.deepEqual(hits, [])
+})
+
+test('employer surfaces render no sortable column, bulk selection or individual export', () => {
+  const hits = []
+  for (const f of EMPLOYER_SURFACES.filter((x) => /\.jsx$/.test(x))) {
+    const src = readFileSync(f, 'utf8')
+    if (/\bsortable\s*:|onSortChange|\bselectable\b|onSelectedChange/.test(src)) hits.push(`${rel(f)}: sort or bulk selection`)
+    if (/students\/export|people\/export|exportStudents|exportPeople/.test(src)) hits.push(`${rel(f)}: individual export`)
+  }
+  const api = readFileSync(join(SRC, 'api', 'employer.js'), 'utf8')
+  assert.doesNotMatch(api, /\b(sort|orderBy|minLevel|threshold|rank)\b\s*[:=]/, 'the API layer sends no ordering or threshold parameter')
+  assert.deepEqual(hits, [])
+})

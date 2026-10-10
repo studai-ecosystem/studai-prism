@@ -13,6 +13,7 @@ import { PageHeader, Button, Checkbox, Callout, Skeleton, LinkButton, useToast }
 import { ErrorState } from '../../../components/states/index.js'
 import { ConsentScopePanel } from '../../../components/campus/ConsentScopePanel.jsx'
 import { ROLE_LABELS } from '../../../lib/copy/privacy.js'
+import { EMPLOYER_ROLE_LABELS } from '../../../lib/copy/employer.js'
 import { homePathFor, workspaceLabel } from '../workspacePaths.js'
 import { track } from '../../../lib/telemetry.js'
 
@@ -66,21 +67,32 @@ export default function CampusInvitePage() {
     const inv = invite.data
     const org = inv.organizationName
     const closed = inv.expired || inv.status === 'DECLINED'
+    // PROD-READY Phase 9: an employer invitation shows the server's employer
+    // disclosure (DRAFT) and employer role names.
+    const employer = inv.organizationType === 'EMPLOYER' && inv.disclosure
+    const roleLabel = (employer ? EMPLOYER_ROLE_LABELS[inv.role] : ROLE_LABELS[inv.role]) || inv.role
     body = (
       <div className="space-y-6">
         <PageHeader
           title={`Join ${org} on Prism`}
-          description={`You have been invited as: ${ROLE_LABELS[inv.role] || inv.role}. You will use your existing Prism account${user?.email ? ` (${user.email})` : ''} — no new account is created.`}
+          description={`You have been invited as: ${roleLabel}. You will use your existing Prism account${user?.email ? ` (${user.email})` : ''} — no new account is created.`}
         />
+        {employer && (
+          <div className="space-y-1">
+            <p className="font-medium text-prism-ink">{inv.disclosure.heading}</p>
+            <p className="text-sm text-prism-ink-muted">{inv.disclosure.purpose}</p>
+          </div>
+        )}
         {inv.expired && <Callout tone="partial" title="This invitation has expired">Ask your institution to send a new one.</Callout>}
         {inv.emailHint && <p className="text-sm text-prism-ink-muted">This invitation was sent to {inv.emailHint}.</p>}
-        <ConsentScopePanel organizationName={org} />
-        <p className="text-sm text-prism-ink-muted">You can see and revoke anything you choose to share from Sharing in your personal workspace.</p>
+        <ConsentScopePanel organizationName={org} disclosure={employer ? inv.disclosure : null} />
+        <p className="text-sm text-prism-ink-muted">{employer ? inv.disclosure.revoke : 'You can see and revoke anything you choose to share from Sharing in your personal workspace.'}</p>
+        {employer && <p className="text-sm text-prism-ink-muted">{inv.disclosure.draftNotice}</p>}
         {!closed && (
           <>
             <Checkbox
               id="ack"
-              label={`I have read what ${org} can and cannot see`}
+              label={employer ? inv.disclosure.acknowledge : `I have read what ${org} can and cannot see`}
               checked={acknowledged}
               onChange={(e) => setAcknowledged(e.target.checked)}
             />

@@ -50,6 +50,23 @@ export function createSharingRepoPg({ query, getPool }) {
         resources: res.filter((x) => x.share_grant_id === r.id).map((x) => ({ resourceType: x.resource_type, resourceId: x.resource_id, disclosureLevel: x.disclosure_level })),
       }))
     },
+    // PROD-READY Phase 9: every unexpired, unrevoked report share TO one
+    // organization (the employer's "shared with us" list). Ordered by owner
+    // and creation time only — never by anything in the report.
+    async listActiveOrgGrants(organizationId, at) {
+      const { rows } = await query(
+        `SELECT g.id, g.owner_user_id, g.expires_at, g.created_at, r.resource_id, r.disclosure_level
+         FROM share_grants g JOIN share_grant_resources r ON r.share_grant_id = g.id
+         WHERE g.recipient_type = 'ORGANIZATION' AND g.recipient_organization_id = $1
+           AND g.revoked_at IS NULL AND g.expires_at > $2 AND r.resource_type = 'ASSESSMENT_REPORT'
+         ORDER BY g.owner_user_id, g.created_at, g.id`,
+        [organizationId, at],
+      )
+      return rows.map((r) => ({
+        id: r.id, ownerUserId: r.owner_user_id, sessionId: r.resource_id, disclosureLevel: r.disclosure_level,
+        expiresAt: r.expires_at?.toISOString?.() ?? r.expires_at, createdAt: r.created_at?.toISOString?.() ?? r.created_at,
+      }))
+    },
     async revokeShareGrant(id, ownerUserId, revokedAt) {
       const { rows } = await query(
         'UPDATE share_grants SET revoked_at = COALESCE(revoked_at, $3) WHERE id = $1 AND owner_user_id = $2 RETURNING *',

@@ -6,6 +6,7 @@ import { useToast } from '../../../components/ui/Toast.jsx'
 import { useDismiss } from '../../../hooks/useFocusTrap.js'
 import { cx } from '../../../lib/cx.js'
 import { homePathFor, scopeText, workspaceLabel } from '../workspacePaths.js'
+import { EMPLOYER_SPONSORED_NOTE } from '../../../lib/copy/employer.js'
 
 // Workspace selector (spec §7.2). Listbox pattern: arrow keys move, Enter
 // selects, Esc closes. Switching drops the previous workspace's cached data
@@ -91,7 +92,7 @@ export function WorkspaceSwitcher() {
               >
                 <span className="min-w-0">
                   <span className="block truncate font-medium">{workspaceLabel(w)}</span>
-                  <span className="block text-xs text-prism-ink-subtle">{w.type === 'PERSONAL' ? 'Private to you. Your institution never sees it.' : w.type === 'CAMPUS_ADMIN' ? 'Institution administration' : `Sponsored by ${w.organizationName || w.name}. Your own results stay private.`}</span>
+                  <span className="block text-xs text-prism-ink-subtle">{w.type === 'PERSONAL' ? 'Private to you. Your institution never sees it.' : w.type === 'CAMPUS_ADMIN' ? 'Institution administration' : w.type === 'EMPLOYER' ? 'Employer development workspace' : w.organizationType === 'EMPLOYER' ? EMPLOYER_SPONSORED_NOTE(w.organizationName || w.name) : `Sponsored by ${w.organizationName || w.name}. Your own results stay private.`}</span>
                 </span>
                 {selected && <Check size={16} aria-hidden="true" className="shrink-0 text-prism-accent" />}
               </li>

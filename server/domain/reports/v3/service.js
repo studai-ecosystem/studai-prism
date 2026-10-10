@@ -20,6 +20,7 @@ import { buildStudentReportV3, reportContentHash, projectDisclosure, REPORT_V3_B
 import { assertReportSafe } from './schema.js'
 import { REVIEW_DECISIONS } from './repository.js'
 import { behaviourGaps } from '../../development/recommendations.js'
+import { isEnabled } from '../../flags/index.js'
 
 export const MAX_SHARE_DAYS = 180
 export const REVIEW_REASON_MIN = 10
@@ -280,7 +281,10 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
         version: { ...versionView(version), publicationNote: version.publicationNote ?? null },
         audience: 'OWNER',
         privacy: {
-          visibility: report.header.scope === 'SPONSORED' ? 'OWNER_AND_SPONSOR' : 'OWNER_ONLY',
+          // PROD-READY Phase 9: an employer-sponsored report is aggregate-only
+          // for the sponsor; it is seen individually only through a share.
+          visibility: report.header.scope !== 'SPONSORED' ? 'OWNER_ONLY'
+            : loaded.scope?.visibilityPolicy === 'OWNER_AND_SPONSOR_AGGREGATE_ONLY' ? 'OWNER_AND_SPONSOR_AGGREGATE_ONLY' : 'OWNER_AND_SPONSOR',
           activeShares: await activeShares(user.id, sessionId, clock()),
           canShare: true,
         },
@@ -431,7 +435,10 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
       }
       if (recipientType === 'ORGANIZATION') {
         const memberships = await repos.memberships.listMembershipsForUser(user.id)
-        if (!memberships.some((m) => m.organizationId === recipientOrganizationId && m.status === 'ACTIVE' && m.role === 'STUDENT')) {
+        const member = memberships.find((m) => m.organizationId === recipientOrganizationId && m.status === 'ACTIVE' && m.role === 'STUDENT')
+        // PROD-READY Phase 9: an employer can receive a share only while the
+        // employer workspace exists (PRISM_EMPLOYER_LND on).
+        if (!member || (member.organizationType === 'EMPLOYER' && !isEnabled('PRISM_EMPLOYER_LND'))) {
           throw new ApiError('VALIDATION_FAILED', 'You can only share with an institution you belong to.')
         }
       }

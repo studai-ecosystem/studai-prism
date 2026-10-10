@@ -11,11 +11,17 @@ export const OrgInviteSchema = z.object({
   expiresAt: z.string(),
   emailHint: z.string().nullable(),
   disclosureVersion: z.string(),
+  // PROD-READY Phase 9: an employer invitation carries its own disclosure.
+  organizationType: z.literal('EMPLOYER').optional(),
+  disclosure: z.object({
+    heading: z.string(), purpose: z.string(), canSee: z.array(z.string()), cannotSee: z.array(z.string()),
+    prohibitedUses: z.array(z.string()), revoke: z.string(), acknowledge: z.string(), draftNotice: z.string(),
+  }).passthrough().optional(),
 })
 
 const AcceptSchema = z.object({
   workspaceId: z.string(),
-  workspaceType: z.enum(['CAMPUS_STUDENT', 'CAMPUS_ADMIN']),
+  workspaceType: z.enum(['CAMPUS_STUDENT', 'CAMPUS_ADMIN', 'EMPLOYER']),
   organizationId: z.string(),
   role: z.string(),
   alreadyAccepted: z.boolean(),

@@ -11,6 +11,7 @@ import { FlagRoute, LegacyAlias, V3Route, ParamRedirect } from './routing.jsx'
 import { RouteErrorBoundary, lazyWithRetry } from './RouteErrorBoundary.jsx'
 import { StudentShell } from '../layouts/StudentShell.jsx'
 import { CampusShell } from '../layouts/CampusShell.jsx'
+import { EmployerShell } from '../layouts/EmployerShell.jsx'
 import { LinkButton } from '../components/ui/Button.jsx'
 import { DocumentTitle } from '../components/ui/DocumentTitle.jsx'
 import { ErrorState } from '../components/states/ErrorState.jsx'
@@ -132,6 +133,16 @@ const MissionPlayerPage = lazy(() => import('../features/development/pages/Missi
 const CampusInvitePage = lazy(() => import('../features/workspaces/pages/CampusInvitePage.jsx'))
 const StudentReportPage = lazy(() => import('../features/reports/pages/StudentReportPage.jsx'))
 const SharedReportPage = lazy(() => import('../features/reports/pages/SharedReportPage.jsx'))
+// PROD-READY Phase 9: employer development-use workspace (server-dark: PRISM_EMPLOYER_LND).
+const EmployerOverviewPage = lazy(() => import('../features/employer/pages/EmployerOverviewPage.jsx'))
+const EmployerPeoplePage = lazy(() => import('../features/employer/pages/EmployerPeoplePage.jsx'))
+const EmployerPersonPage = lazy(() => import('../features/employer/pages/EmployerPersonPage.jsx'))
+const EmployerSharedReportsPage = lazy(() => import('../features/employer/pages/EmployerSharedReportsPage.jsx'))
+const EmployerReportPage = lazy(() => import('../features/employer/pages/EmployerReportPage.jsx'))
+const EmployerAssessmentsPage = lazy(() => import('../features/employer/pages/EmployerAssessmentsPage.jsx'))
+const EmployerDevelopmentPage = lazy(() => import('../features/employer/pages/EmployerDevelopmentPage.jsx'))
+const EmployerInsightsPage = lazy(() => import('../features/employer/pages/EmployerInsightsPage.jsx'))
+const EmployerNotAvailablePage = lazy(() => import('../features/employer/pages/EmployerNotAvailablePage.jsx'))
 // PROD-READY Phase 8: under-18 guardian consent (server-dark: PRISM_UNDER18_PATH).
 const GuardianConsentPage = lazy(() => import('../features/guardian/GuardianConsentPage.jsx'))
 // P8.3 free first experience (public).
@@ -189,6 +200,12 @@ function StudentPortalUnavailable() {
 
 function CampusGate({ children }) {
   return <FlagRoute flag="PRISM_CAMPUS_ENABLED" onError="error" on={children} off={<Navigate to="/" replace />} />
+}
+
+// PROD-READY Phase 9: the employer workspace exists only while the server
+// flag is on (and the campus it is built on).
+function EmployerGate({ children }) {
+  return <CampusGate><FlagRoute flag="PRISM_EMPLOYER_LND" onError="error" on={children} off={<Navigate to="/" replace />} /></CampusGate>
 }
 
 const studentShell = (
@@ -350,6 +367,23 @@ export default function AppRouter() {
             <Route path="integrations" element={<CampusIntegrationsPage />} />
             <Route path="billing" element={<CampusBillingPage />} />
             <Route path="*" element={<ParamRedirect to="/campus/:organizationId/overview" />} />
+          </Route>
+
+          {/* Employer development-use workspace (PROD-READY Phase 9, dark). */}
+          <Route
+            path="/employer/:organizationId"
+            element={<EmployerGate><AuthGuard><WorkspaceGuard type="EMPLOYER"><EmployerShell /></WorkspaceGuard></AuthGuard></EmployerGate>}
+          >
+            <Route index element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<EmployerOverviewPage />} />
+            <Route path="people" element={<EmployerPeoplePage />} />
+            <Route path="people/:userId" element={<EmployerPersonPage />} />
+            <Route path="shared-reports" element={<EmployerSharedReportsPage />} />
+            <Route path="shared-reports/:sessionId" element={<FlagRoute flag="PRISM_STUDENT_REPORT_V3" onError="error" on={<EmployerReportPage />} off={<ParamRedirect to="/employer/:organizationId/shared-reports" />} />} />
+            <Route path="assessments" element={<EmployerAssessmentsPage />} />
+            <Route path="development" element={<FlagRoute flag="PRISM_DEVELOPMENT_V2" onError="error" on={<EmployerDevelopmentPage />} off={<EmployerNotAvailablePage title="Development" />} />} />
+            <Route path="insights" element={<FlagRoute flag="PRISM_CAMPUS_ANALYTICS" onError="error" on={<EmployerInsightsPage />} off={<EmployerNotAvailablePage title="Group summaries" />} />} />
+            <Route path="*" element={<ParamRedirect to="/employer/:organizationId/overview" />} />
           </Route>
 
           <Route path="/invite/:token" element={<InviteRedeem />} />

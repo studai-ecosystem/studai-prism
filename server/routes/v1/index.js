@@ -23,6 +23,9 @@ import { createBillingRouter } from './billing.js'
 import { createPreparationRouter } from './preparation.js'
 import { createPreviewRouter } from './preview.js'
 import { createSupportRouter } from './support.js'
+import { createEmployerRouter } from './employer.js'
+import { createEvidenceHandoffRouter } from './evidenceHandoff.js'
+import { createEmployerSeparation } from '../../domain/employer/separation.js'
 
 export function createV1Router(deps = {}) {
   const requireUser = deps.requireUser || defaultRequireUser
@@ -36,6 +39,9 @@ export function createV1Router(deps = {}) {
   })
 
   router.get('/health', (_req, res) => ok(res, { status: 'ok' }))
+  // PROD-READY Phase 9: campus organization routes never serve an EMPLOYER
+  // organization (404); employers use /employer/* (dark: PRISM_EMPLOYER_LND).
+  router.use('/organizations/:orgId', createEmployerSeparation({ campus }))
   router.use(createMeRouter({ requireUser, campus }))
   router.use(createWorkspacesRouter({ requireUser, campus }))
   router.use(createEntitlementsRouter({ requireUser, campus }))
@@ -54,6 +60,10 @@ export function createV1Router(deps = {}) {
   router.use(createReportsRouter({ requireUser, campus }))
   // PROD-READY Phase 4: V3 support routes (dark behind PRISM_V3_SUPPORT_ROUTES).
   router.use(createSupportRouter({ requireUser, campus }))
+  // PROD-READY Phase 9: employer development-use workspace + StudAI Hire
+  // evidence hand-off interface (dark behind PRISM_EMPLOYER_LND).
+  router.use(createEmployerRouter({ requireUser, campus }))
+  router.use(createEvidenceHandoffRouter({ requireUser }))
 
   router.use(notFound)
   router.use(createErrorHandler(logger))

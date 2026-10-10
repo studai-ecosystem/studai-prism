@@ -4,7 +4,8 @@ import { request } from './client.js'
 
 export const WorkspaceSchema = z.object({
   id: z.string(),
-  type: z.enum(['PERSONAL', 'CAMPUS_STUDENT', 'CAMPUS_ADMIN']),
+  // EMPLOYER: PROD-READY Phase 9 employer development workspace (server-dark).
+  type: z.enum(['PERSONAL', 'CAMPUS_STUDENT', 'CAMPUS_ADMIN', 'EMPLOYER']),
   name: z.string(),
   organizationId: z.string().nullable(),
   organizationName: z.string().nullable().optional(),

@@ -92,6 +92,8 @@ export const REPORT_COPY = {
     OWNER_ONLY: 'Only you can see this report unless you share it.',
     OWNER_AND_SPONSOR: (sponsor) => `${sponsor} can see this sponsored report. Your personal Prism results stay private.`,
     SHARED_BY_STUDENT: 'The student chose to share this report with your institution.',
+    // PROD-READY Phase 9: an employer-sponsored report (aggregate-only sponsor).
+    OWNER_AND_SPONSOR_AGGREGATE_ONLY: (sponsor) => `${sponsor} sees only group summaries. It sees this report only if you share it with them.`,
   },
   // Charter §9 identity-assurance levels (server lib/sharedConstants ASSURANCE_LEVELS).
   identity: {
@@ -106,6 +108,7 @@ export const REPORT_COPY = {
     recipient: 'Who can see it',
     link: 'Anyone with a private link',
     organization: 'An institution I belong to',
+    employer: 'My employer, for a development conversation',
     disclosure: 'What they can see',
     summary: 'Summary only — capability levels and evidence status, no quotes',
     full: 'Full report — including evidence, your quotes and development priorities',
