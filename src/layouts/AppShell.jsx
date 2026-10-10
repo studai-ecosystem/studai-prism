@@ -41,7 +41,10 @@ export function useRouteFocus(pathname) {
     let raf = 0
     const attempt = () => {
       const h = document.getElementById('page-title')
-      if (h) h.focus({ preventScroll: false })
+      // ScrollToTop already reset the page on this route change; a late focus
+      // (heading rendered after a lazy chunk) must not yank a page the person
+      // has since scrolled (PROD-READY P110).
+      if (h) h.focus({ preventScroll: true })
       else if (tries++ < 40) raf = requestAnimationFrame(attempt)
     }
     raf = requestAnimationFrame(attempt)
