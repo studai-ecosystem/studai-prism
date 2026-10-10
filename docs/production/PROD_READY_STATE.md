@@ -113,7 +113,7 @@ Findings N1–N15 of the 2026-10-10 audit, each confirmed in code first: [SECURI
 ## Phase 2 — Account erasure cascade (S8)
 Status: COMPLETE
 Branch: `prod/p02-erasure-cascade` (from `prod/p01s-security-hotfix` @ `bf6accc`)
-Commit: see the commit recorded below this section (single phase commit)
+Commit: `78f904a` (code, tests, docs) + follow-up commit recording this hash
 Gates: see table
 
 One service erases a person everywhere and both erasure paths use it (P23). Registry of every personal-data column, append-only pseudonymisation through a narrowly scoped guard (P25), resumable ledger (P28), import-row retention purge and intervention exit hooks (P29). The frozen legacy router is untouched; security fix of an existing route, ships on (P23); no new route, so no new flag; no flag flipped, nothing deployed.
