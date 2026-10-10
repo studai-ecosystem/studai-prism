@@ -378,3 +378,36 @@ the 0060 schema with the JSON store must be rehearsed in staging first
 §8 still holds. A secret change takes effect only after a restart
 (`kubectl rollout restart deployment/prism -n prism`); with `Recreate` that is
 a brief outage — schedule it.
+
+## Addendum 2026-10-11 — PROD-READY Phase 10 (runbook currency check)
+
+Appended by PROD-READY Phase 10; the sections above are unchanged records.
+Review: [RUNBOOK_CURRENCY_REVIEW.md](./production/human-actions/RUNBOOK_CURRENCY_REVIEW.md).
+The Phase 7 addendum (§A–§I) stays correct for the overlays, the operator
+Jobs, build gating, the OIDC trust-policy ordering (§C: switch the `sub` to
+`…:environment:production` **before** the new `build-image.yml` reaches
+`main`), `/api/ready` and the PostgreSQL coupling. Corrections after Phases 8
+and 9:
+
+1. **Migration head is `0063_employer_lnd`.** The release applies 0021–0063
+   (43 migrations; RELEASE_TEMPLATE_PROD_READY Phase 10 addendum). Where §G
+   says the old image must be rehearsed "on the 0060 schema", read **the 0063
+   schema**: 0061 adds isolation triggers on memberships, cohort members and
+   roster rows, and 0063 adds triggers on `organizations` and
+   `assessment_session_scopes` and widens the `consent_records` type check.
+   The old image `2b84e13c07f2` writes none of the guarded rows, but this has
+   not been rehearsed.
+2. **Phase 8/9 flags** (`PRISM_PILOT_REPORT_EXPORT`, `PRISM_DEMO_MODE`,
+   `PRISM_UNDER18_PATH` behaviour, `PRISM_EMPLOYER_LND`) need no manifest
+   change: they are runtime-secret values, default OFF, and the smoke battery
+   asserts each is dark.
+3. **Demo data never touches production.** `PRISM_DEMO_MODE`,
+   `PRISM_DEMO_DATABASE_URL` and `PRISM_DEMO_PASSWORD` must not be in the
+   production or staging secret. No overlay or Job runs the demo seed; a demo
+   environment, if the business wants one, is a separate deployment with its
+   own database (not designed here).
+4. **Secret split (HA-022).** The base Deployment sets the single
+   `AWS_SECRETS_MANAGER_SECRET_ID` (overlays patch the value). Executing
+   SECRET-SPLIT-DESIGN needs an overlay patch that sets
+   `AWS_SECRETS_MANAGER_SECRET_IDS` instead — a reviewed manifest change in
+   the same window (SECRET-SPLIT-DESIGN Phase 10 addendum).

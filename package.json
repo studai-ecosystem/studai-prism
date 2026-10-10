@@ -18,6 +18,7 @@
     "rehearse:rollback": "node scripts/rehearse-rollback.mjs",
     "validate:p10": "node scripts/check-change-ledger.mjs && node scripts/check-route-inventory.mjs && node scripts/check-p10-route-manifest.mjs && node scripts/check-programme-validation.mjs && node scripts/check-final-handover.mjs",
     "audit:static": "node scripts/prism-audit.mjs",
+    "export:consent-packet": "node scripts/export-consent-strings.mjs",
     "audit:flow-flags": "node scripts/check-student-flow-flags.mjs",
     "audit:all": "npm --prefix server test && python -m pytest calibration/tests -q && npm run build && npm run audit:static && npm run test:e2e",
     "postinstall": "cd server && npm install --omit=dev",

@@ -71,3 +71,39 @@ Bedrock/Polly/KMS statements unchanged.
 5. Rollback = restore the single `AWS_SECRETS_MANAGER_SECRET_ID` env and restart.
 6. After 7 quiet days: scope IRSA to exact ARNs, then empty (do not delete) the legacy
    secret; delete after 30 days.
+
+## Addendum 2026-10-11 — PROD-READY Phase 10 (keys added since this design)
+
+Appended by PROD-READY Phase 10; the design above is an unchanged record.
+Review: [RUNBOOK_CURRENCY_REVIEW.md](../production/human-actions/RUNBOOK_CURRENCY_REVIEW.md).
+The loader (`AWS_SECRETS_MANAGER_SECRET_IDS`, duplicate-key boot refusal) is
+shipped. The "35 keys" count is from 2026-08-04; count the live secret's
+**key names** (never values) before the split. Category for every key the
+programme added (Phases 1S–9):
+
+| Category secret | Add |
+| --- | --- |
+| `database` | `PGSSLROOTCERT` (path to the mounted CA bundle), `PG_POOL_MAX`, `PG_SESSION_LOCK_POOL_MAX`, `REDIS_URL` (only when more than one replica runs) |
+| `payments` | `RAZORPAY_WEBHOOK_SECRET` (set only after the HA-001 rotation) |
+| `auth` | `PRISM_ERASURE_PSEUDONYM_KEY` (≥ 32 characters; erasure answers 503 without it), and name explicitly the existing `PRISM_ADMIN_MFA_KEY`, `PRISM_PREVIEW_TOKEN_SECRET`, `PRISM_TELEMETRY_KEY` if present |
+| new: `ecosystem` (or `auth`) | `ECOSYSTEM_SECRET` (shared with StudAI Hire), with non-secret `HIRE_BASE_URL`, `CAREER_BASE_URL`, `HIRE_API_URL` in `app-config` |
+| `app-config` | `PUBLIC_APP_URL`, `PRISM_RELEASE_STAGE`, `PRISM_JOB_CONCURRENCY`, `PRISM_JOB_POLL_MS`, `PRISM_JOB_LEASE_MS`, `PROCTOR_SOCKET_RATE_PER_MIN`, `PROCTOR_CORS_ORIGIN`, and the flags `PRISM_V3_SUPPORT_ROUTES`, `PRISM_JOB_WORKER`, `PRISM_ANALYTICS_DECISION_CACHE`, `PRISM_PILOT_REPORT_EXPORT`, `PRISM_UNDER18_PATH`, `PRISM_EMPLOYER_LND` (all OFF) |
+| **never** | `PRISM_DEMO_MODE`, `PRISM_DEMO_DATABASE_URL`, `PRISM_DEMO_PASSWORD` (demo seed only) |
+
+Corrections to §4–§6:
+
+- Database rotation verification: `/api/ready` now runs `SELECT 1` with a
+  timeout (`server/lib/readiness.js`), so a 200 from `/api/ready` after the
+  restart verifies the database connection; the "admin login 401" workaround
+  is no longer needed.
+- Rotation notes: `PRISM_ERASURE_PSEUDONYM_KEY` — do not rotate without a
+  governance decision (pseudonyms already written to ledgers are computed
+  with it); `ECOSYSTEM_SECRET` — coordinate with the StudAI Hire owner (both
+  sides must change together); `RAZORPAY_WEBHOOK_SECRET` — regenerate in the
+  Razorpay webhook settings, then update the secret and restart.
+- Staging has its own role `studai-prism-staging-runtime` and secret
+  `/studai/prism/aws-staging/runtime` (DEPLOYMENT_RUNBOOK §H); split staging
+  the same way, first.
+- The manifest sets `AWS_SECRETS_MANAGER_SECRET_ID`; the cutover needs an
+  overlay patch to `AWS_SECRETS_MANAGER_SECRET_IDS` (DEPLOYMENT_RUNBOOK
+  Phase 10 addendum item 4). Rollback = the single id again.

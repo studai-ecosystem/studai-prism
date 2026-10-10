@@ -217,3 +217,23 @@ Decisions P71, P75, P77 in [PROD_READY_STATE.md](production/PROD_READY_STATE.md)
    and deleted afterwards (it contains personal data — a privacy decision for
    the operator; synthetic data is the default). So far only empty and
    synthetic databases have run 0021–0060 and the copy.
+
+## Addendum 2026-10-11 — PROD-READY Phase 10 (runbook currency check)
+
+Appended by PROD-READY Phase 10; the sections above are unchanged records.
+Review: [RUNBOOK_CURRENCY_REVIEW.md](./production/human-actions/RUNBOOK_CURRENCY_REVIEW.md).
+
+- Counts: the branch now carries migrations **0040–0063**; the release applies
+  **0021–0063 (43)** and the Job `migrate-up` ends at `0063_employer_lnd`.
+  Read "0040–0057", "57 migrations" and "0021–0060" above as historical
+  measurements at the time of writing. Phases 8 and 9 re-ran
+  `rehearse:migrations` (0040–0063 down and up, idempotent) on scratch
+  databases only; production-shaped data has still not run them.
+- Post-cutover checks to add to §4 (read-only):
+  `SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname IN
+  ('organizations_employer_type_immutable','assessment_session_scopes_employer_visibility')`
+  returns both; `SELECT count(*) FROM organizations WHERE is_demo` is 0 in
+  production; `guardian_consents` exists and is empty.
+- TLS: the cutover Jobs mount the `prism-rds-ca` ConfigMap; set
+  `PGSSLMODE=verify-full` and `PGSSLROOTCERT` to the mounted bundle path in
+  staging first (GO_LIVE B7). Without it the app logs `pg_tls_unverified`.

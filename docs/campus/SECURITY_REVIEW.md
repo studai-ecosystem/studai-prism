@@ -137,3 +137,26 @@ Appended by PROD-READY Phase 3 (branch `prod/p03-multi-instance`); the sections 
 | S6 | Advisory locks for multi-instance assessment sessions are not in place | Medium | **Fixed in code.** Every V3 session operation (start, begin, message, artifact save, finish) runs under a PostgreSQL advisory lock keyed on a stable 64-bit hash of the session (`server/domain/assessments/sessionLocks.js`; try-lock with bounded polling on a dedicated lock pool, then the existing retryable `503` "This assessment is busy"; in-memory lock only when no database is configured, and production without a lock store refuses; P32). An artifact save now appends its version row **before** the engine sees it; the row's primary key is a second, lock-independent fence, and an engine failure withdraws the reserved version (P33). Proof with two application instances (own pools, own repositories) on one database: the same client event id runs exactly one engine turn, and with per-process locks the same race runs it twice (control); two equal-If-Match saves reach the engine once, even without the shared lock (`server/test/multiInstance.db.test.js`). Related multi-writes are now single repository transactions with fault-injection tests: invite acceptance (consent, membership, workspace, cohort, roster sync, invite status; the invite row is locked), campus role change and member removal (organization row locked, so two owners cannot demote each other to zero owners), rating queue (item row `FOR UPDATE` plus a database trigger: never a third rating) (P34, P35). Migration 0057 adds database guards: a form-equivalence pair cannot become APPROVED without a matching APPROVED decision row, and a growth snapshot cannot be written on a PENDING or REJECTED pair (P36). **Running more than one replica still needs** the PostgreSQL cutover (HA-023), a shared session cache (`REDIS_URL`) or sticky routing for the legacy engine's per-turn cache, sticky sessions for the proctor socket, and the manifest change — see the PG_MIGRATION_RUNBOOK addendum (P41) |
 
 Also in this phase: the erasure pseudonym key fails closed in production (`PRISM_ERASURE_PSEUDONYM_KEY` missing or weaker than 32 characters: erasure answers `503 ERASURE_NOT_CONFIGURED` before touching anything, the admin path consumes no approval, startup logs `erasure_pseudonym_key_missing`; the service itself keeps running; P39). `PRISM_RATING_REF_SALT` keeps its fixed default (K101: rating references are pseudonymous, not secret); noted, not changed (P39). The assessment form id is persisted with the session (0057) so a future bank version bump cannot remap old sessions (P37).
+
+## Addendum 2026-10-11 — PROD-READY Phase 10 (scope for the independent review, HA-C012)
+
+Appended by PROD-READY Phase 10; the sections above are unchanged records.
+No new finding is asserted here and no review has been performed: this is
+the list of surfaces added after the Phase 3 addendum that the independent
+production security review / DAST (HA-C012, S5 DAST part still open) must
+cover, on staging, with every flag in the state it will have at launch and
+again with the flag on.
+
+| Phase | Surface | Notes for the reviewer |
+| --- | --- | --- |
+| 4 | V3 support routes: human review requests, accommodation requests, identity check (`PRISM_V3_SUPPORT_ROUTES`) | Owner checks, staff permissions `reports:review` / `accommodations:manage`, idempotency |
+| 5 | Job queue and worker (`PRISM_JOB_WORKER`), admin job-queue plane | Dead letters, at-least-once email (P53), lease handling |
+| 6 | Analytics decision cache (`PRISM_ANALYTICS_DECISION_CACHE`) | Cache keyed per session; invalidation fingerprint |
+| 7 | Hardened pod (non-root, read-only root, `/api/ready`), operator Jobs, `build-image.yml` gating, optional admission policy | Never run on a cluster yet |
+| 8 | Pilot report export (`POST /api/admin/organizations/:orgId/pilot-report`, `PRISM_PILOT_REPORT_EXPORT`); demo seed refusals and 0061 isolation triggers; under-18 guardian routes `/api/guardian-consent/:token` (unauthenticated, link token is the credential, `guardianLinkLimiter`) and `/api/auth/guardian-consent` (`PRISM_UNDER18_PATH`) | Token entropy and hashing, rate limits, link expiry (14 days), no guardian address returned to the learner |
+| 9 | Employer workspace `/api/v1/employer/organizations/:orgId/*` (`PRISM_EMPLOYER_LND`): no ranking / sort / cut-off parameters (422 `PROHIBITED_USE`), aggregate-only exports, campus routes 404 for EMPLOYER organizations, 0063 visibility trigger; Hire hand-off interface `/api/v1/integrations/hire/handoff` (501, no network code) | Try to obtain an individual result as an employer by any route |
+
+Registry coverage: the personal-data registry now covers migrations through
+0063 (0061 `demo_accounts`, 0062 `guardian_consents`; 0063 adds no
+personal-data column), not "0001–0056" as stated in the Phase 2 addendum at
+the time. Review list and materials: [RUNBOOK_CURRENCY_REVIEW.md](../production/human-actions/RUNBOOK_CURRENCY_REVIEW.md).

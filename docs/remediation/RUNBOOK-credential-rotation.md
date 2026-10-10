@@ -76,3 +76,26 @@ current key names — `SMTP_*`), then `kubectl rollout restart deployment/prism 
 - Update [HUMAN_ACTION_REGISTER.md](./HUMAN_ACTION_REGISTER.md) HA-001/HA-002 with evidence links.
 - Update the incident record §4 table; incident closes only when steps 1–3 have provider-side evidence.
 - Schedule the §4.2 [secret split](./SECRET-SPLIT-DESIGN.md) (Phase 4) so the next exposure has category-level blast radius.
+
+## Addendum 2026-10-11 — PROD-READY Phase 10
+
+Appended by PROD-READY Phase 10; the runbook above is an unchanged record.
+As of this date the repository holds no evidence that §A or §B has been
+executed. Record the evidence in
+[HA-001-002_CREDENTIAL_ROTATION_EVIDENCE.md](../production/human-actions/HA-001-002_CREDENTIAL_ROTATION_EVIDENCE.md).
+Changes since this runbook was written:
+
+- **Webhook secret (A4, new).** Since Phase 1S the app refuses to boot in
+  production with a purchasable offer and no `RAZORPAY_WEBHOOK_SECRET`
+  (decision P13). After the key rotation, regenerate the webhook secret in
+  the Razorpay webhook settings and store it the same way as A2 (local file,
+  merged without echo).
+- **Verify readiness.** After each restart, `GET /api/ready` must return 200
+  (it checks the database); `/api/payment/config` then shows the new key id.
+- **Downtime.** The deployment runs one replica with strategy `Recreate`, so
+  each restart is a brief outage; combine A3 and B2 into one restart if both
+  rotations happen together.
+- **Secret location.** If HA-022 (secret split) has been executed, update
+  `/studai/prism/aws-prod/payments` and `/studai/prism/aws-prod/email`
+  instead of the monolithic secret. The split is still pending ("Phase 4" in
+  §D refers to the 2026-08 remediation programme).

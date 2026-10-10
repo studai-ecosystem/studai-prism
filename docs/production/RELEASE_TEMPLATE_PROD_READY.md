@@ -212,3 +212,26 @@ If this release is cut from the Phase 9 branch or later, it carries one more mig
 - `0063_employer_lnd`: `consent_records.consent_type` accepts `EMPLOYER_DEVELOPMENT_DISCLOSURE` and `EMPLOYER_ASSESSMENT_DISCLOSURE`; a trigger refuses an individual-visibility session scope for an EMPLOYER sponsor; `organizations.organization_type` cannot change to or from `EMPLOYER`. No table or column is added. The down refuses (and stops the rollback) while any employer consent record exists, so employee consent evidence is never deleted by a rollback.
 
 One more dark flag must read OFF in the smoke battery: `PRISM_EMPLOYER_LND` (dark checks `employer-lnd` and `hire-handoff`).
+
+## Addendum 2026-10-11 — PROD-READY Phase 10 (consolidated counts)
+
+The release candidate is `main` after every `prod/p0x-*` branch is merged
+(HA-C007), so the Phase 8 and Phase 9 addenda apply unconditionally. Read the
+body above with these values (the body is kept as written):
+
+- Migration head after the release: **`0063_employer_lnd`**; migrations to
+  apply: **0021–0063 (43)** — the §2 table plus 0061 `0061_demo_organizations`,
+  0062 `0062_guardian_consents`, 0063 `0063_employer_lnd`. The record line in
+  the template becomes "0021_entitlement_ownership … 0063_employer_lnd (43)".
+- Rehearsals in §2 run 0021–0063, and the rollback rehearsal starts the old
+  image against a **0063** schema with `PRISM_PG_STORE=false`.
+- §3 "Must **not** be present in production" also includes
+  `PRISM_DEMO_MODE`, `PRISM_DEMO_DATABASE_URL` and `PRISM_DEMO_PASSWORD`.
+- §3 optional: `PROCTOR_SOCKET_RATE_PER_MIN` (default 60 per minute per
+  socket, Phase 1S).
+- §4/§5: the flag list and smoke checks include the Phase 8/9 rows
+  (`PRISM_PILOT_REPORT_EXPORT`, `PRISM_DEMO_MODE`, `PRISM_UNDER18_PATH`,
+  `PRISM_EMPLOYER_LND`; dark checks `under18-guardian`, `employer-lnd`,
+  `hire-handoff`) — all OFF/dark at release.
+
+Review: [RUNBOOK_CURRENCY_REVIEW.md](./human-actions/RUNBOOK_CURRENCY_REVIEW.md).

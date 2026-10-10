@@ -34,3 +34,28 @@ mark them done.
 | M6 | Windows high-contrast / forced-colors mode | Edge | PENDING |
 | M7 | Voice control (select links and radios by label) on the rater page and consent screens | Voice Access / Voice Control | PENDING |
 | M8 | Usability session with students who use assistive technology (accommodations policy) | moderated | PENDING |
+
+## Addendum 2026-10-11 — PROD-READY Phase 10 (surfaces added in Phases 4–9, HA-C013)
+
+Appended by PROD-READY Phase 10; the tables above are unchanged. Automated
+evidence recorded in [PROD_READY_STATE.md](../production/PROD_READY_STATE.md)
+(not re-run here):
+
+| # | Check | Scope | Evidence | Status |
+| --- | --- | --- | --- | --- |
+| A12 | Support paths render and work flag-on | review request, adjustment request, identity check | `tests/e2e/prod-p04-support-routes.spec.js` (chromium), vitest `support.test.jsx` | PASS (Phase 4) |
+| A13 | Demo banner: axe, no overflow at 360/768/1280 | app shells | `tests/e2e/prod-p08-demo-banner.spec.js` (chromium, mobile-chromium) | PASS (Phase 8) |
+| A14 | Campus P3 UX items: axe 0 serious/critical, no overflow at 360/768/1280 | analytics tabs, missions, data tables | `tests/e2e/prod-p08-ux-polish.spec.js` | PASS (Phase 8) |
+| A15 | Employer workspace journey: axe 0 serious/critical, no overflow | employer pages, employee consent | `tests/e2e/prod-p09-employer-lnd.spec.js` (chromium) | PASS (Phase 9) |
+
+Manual rows to add to section 2 (PENDING, human — HA-C013):
+
+| # | Check | How | Status |
+| --- | --- | --- | --- |
+| M9 | Screen reader: report review request, adjustment request and identity check | NVDA + Firefox, VoiceOver + Safari | PENDING |
+| M10 | Screen reader and keyboard: guardian consent page `/guardian-consent/:token` (agree, decline, withdraw) — only if HA-006 chooses guardian consent | NVDA + Chrome, VoiceOver iOS | PENDING |
+| M11 | Demo banner announced once and not repeated on every navigation | NVDA + Chrome | PENDING |
+| M12 | Employer staff pages (overview, people, shared reports, group summaries) with a screen reader and at 400% zoom | NVDA + Chrome | PENDING |
+| M13 | Employee joining an employer workspace: disclosure, prohibited-use list and acknowledgement with a screen reader and voice control | NVDA + Firefox, Voice Access | PENDING |
+
+Materials: [RUNBOOK_CURRENCY_REVIEW.md](../production/human-actions/RUNBOOK_CURRENCY_REVIEW.md).
