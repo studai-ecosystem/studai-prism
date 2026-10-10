@@ -603,7 +603,7 @@ One migration was added (0063). One flag was registered OFF (`PRISM_EMPLOYER_LND
 ## Phase 10 — Human-action preparation pack
 Status: COMPLETE (materials prepared; no human action closed, no flag flipped, nothing deployed)
 Branch: `prod/p10-human-actions` (from `prod/p09-employer-lnd` @ `44267fa`)
-Commit: see `git log prod/p10-human-actions` (`docs(prod-p10): …`) + follow-up commit recording this hash
+Commit: `8c8c7eb` (pack, script, test, addenda, registers) + follow-up commit recording this hash
 Gates: see table
 
 Phase 10 prepares materials so humans can close their items quickly. Everything is in `docs/production/human-actions/` and is linked from a GO_LIVE_CHECKLIST addendum. Register statuses moved to `PREPARED (materials ready)` only where materials now exist; **nothing was marked CLOSED**, and no study result, approval, rater, customer, price, cost or incident conclusion was invented (P101). No migration and no flag were added.
