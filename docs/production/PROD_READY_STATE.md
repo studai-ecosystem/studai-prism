@@ -316,7 +316,7 @@ The app gets a PostgreSQL-backed job queue (table `jobs`, migration 0059) and a 
 ## Phase 6 — Performance for real cohort sizes
 Status: COMPLETE
 Branch: `prod/p06-performance` (from `prod/p05-job-runner` @ `bd59fc0`)
-Commit: see the commit that adds this section (code, tests, docs) + follow-up commit recording its hash
+Commit: `9b98727` (code, tests, docs) + follow-up commit recording this hash
 Gates: see table
 
 Campus admin lists are now filtered, sorted and paged in PostgreSQL. Account names come from a batched user-directory read. The O(students × assignments) service loops are gone (P61–P63). Per-session sufficiency decisions can be materialised (migration 0060). The cache is invalidated in the writer's own transaction by triggers and by a fingerprint of the rules, labels, code and catalog. It is dark behind the new flag `PRISM_ANALYTICS_DECISION_CACHE` (registered OFF) and erased with the session (P64). A campus load profile with 2,000 synthetic students on real PostgreSQL measures every list endpoint at p95 ≤ 131 ms (target < 500 ms met on the workstation) and records the gaps for analytics and the lock pool (P65). It found a pool-starvation defect in nested V3 locks, now fixed (P66). The bundle needs no further split (P67). The vitest load flakes in the named tests were root-caused and fixed without raising a timeout (P69). No flag was flipped and nothing was deployed.
