@@ -350,7 +350,7 @@ Campus admin lists are now filtered, sorted and paged in PostgreSQL. Account nam
 ## Phase 7 — Deployment consolidation and release preparation
 Status: COMPLETE (prepared; nothing deployed, no workflow run, no cluster or AWS command, no flag flipped)
 Branch: `prod/p07-deployment` (from `prod/p06-performance` @ `bf9384c`)
-Commit: see the follow-up commit recording this hash
+Commit: `41ab7a7` (manifests, workflows, scripts, tests, docs) + follow-up commit recording this hash
 Gates: see table
 
 One deployment path (EKS) with the legacy ECS and Azure workflows removed (P70). The EKS manifest is now a kustomize tree with production and staging overlays, an image-tag placeholder that cannot roll an environment back, operator Jobs that work on the distroless image, and hardening: readiness on `/api/ready`, non-root, read-only root filesystem, a grace period above the shutdown budget (P71–P75). `build-image.yml` builds production images from `main` only, after a green CI run, in a protected environment (P76). The release of this line is prepared: 40 migrations (0021–0060), the PostgreSQL cutover in the same window, a complete secrets table, the dark-flag list, a read-only post-deploy smoke battery and a release-record template (P77, P78). One go-live checklist orders every remaining human action and flag flip (P79). No migration was added (head stays `0060_session_decision_cache`) and no flag was added.
