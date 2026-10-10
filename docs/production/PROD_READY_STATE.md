@@ -245,7 +245,7 @@ V3 sessions get `/api/v1` routes for the three support rights the frozen legacy 
 ## Phase 5 — Background job runner
 Status: COMPLETE
 Branch: `prod/p05-job-runner` (from `prod/p04-v3-support-routes` @ `975d397`)
-Commit: see the follow-up commit recording this hash
+Commit: `53965c9` (code, tests, docs) + follow-up commit recording this hash
 Gates: see table
 
 The app gets a PostgreSQL-backed job queue (table `jobs`, migration 0059) and a worker that runs in the API container, one per replica, only when `PRISM_JOB_WORKER` is on (registered OFF, P54). PostgreSQL is enough; there is no Redis (P52). Claims use `FOR UPDATE SKIP LOCKED` with fenced leases, failures retry with exponential backoff and jitter, repeated failures become dead letters, and an expired lease is recovered (P53). Four workloads moved onto it: CSV-import invite emails (P55), assignment reminder emails per the stored reminder policy (P56), release of RESERVED seats after an assignment window passes (P57), and the retention passes, including a new purge of unstarted pre-start accommodation requests; the retention passes are scheduled only under `PRISM_RETENTION_ENFORCEMENT` (P58). Operators get an audited dead-letter view in the admin console (P60). With the flag off, nothing is queued or scheduled and CSV-import invites are still sent inside the request. The frozen legacy router and every committed migration are untouched. No flag was flipped and nothing was deployed.
