@@ -418,6 +418,20 @@ describe('System check (§11 item 9)', () => {
     expect(await screen.findByText('Prism can be reached.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Begin assessment' })).toHaveAttribute('href', '/briefing?session=sess-x')
   })
+  it('every check row is on the page while the connection check is still waiting, so nothing below it moves (P107)', async () => {
+    render(<SystemCheckPage />, {
+      path: '/app/assessments/:assignmentId/system-check',
+      route: '/app/assessments/a-1/system-check',
+      routes: { '/api/v1/assessment-assignments/': briefing(), '/api/v1/health': () => new Promise(() => {}) },
+    })
+    expect(await screen.findByText('Browser')).toBeInTheDocument()
+    expect(screen.getByText('Connection')).toBeInTheDocument()
+    expect(screen.getByText('Checking that Prism can be reached…')).toBeInTheDocument()
+    expect(screen.getByText('Checking')).toBeInTheDocument()
+    expect(screen.getByText('Screen size')).toBeInTheDocument()
+    // The start step is already rendered and is not blocked by a pending check.
+    expect(screen.getByRole('link', { name: 'Begin assessment' })).not.toHaveAttribute('aria-disabled')
+  })
   it('device check helpers', async () => {
     expect(checkScreen(1280).status).toBe('PASS')
     expect(checkScreen(400, { needsLargeScreen: true }).status).toBe('WARN')

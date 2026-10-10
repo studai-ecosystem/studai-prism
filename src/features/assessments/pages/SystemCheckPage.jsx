@@ -22,8 +22,11 @@ import { useAccommodation, useSupportRoutesEnabled } from '../../support/hooks.j
 import { START_REASON_COPY } from '../../../lib/copy/student.js'
 import { assignmentBase, assignmentsListPath } from './BriefingPage.jsx'
 
-const TONE = { PASS: 'positive', WARN: 'partial', FAIL: 'blocked' }
-const STATUS_LABEL = { PASS: 'Ready', WARN: 'Check', FAIL: 'Needs attention' }
+const TONE = { PASS: 'positive', WARN: 'partial', FAIL: 'blocked', CHECKING: 'neutral' }
+const STATUS_LABEL = { PASS: 'Ready', WARN: 'Check', FAIL: 'Needs attention', CHECKING: 'Checking' }
+// Only the connection check waits on the network; its row is on the page from
+// the first render so the consent card below never moves (PROD-READY P107).
+const CONNECTION_PENDING = { id: 'connection', label: 'Connection', status: 'CHECKING', message: 'Checking that Prism can be reached…' }
 
 const START_ERROR_COPY = {
   AGE_CONFIRMATION_REQUIRED: 'Please confirm you are 18 or older in your profile before you start.',
@@ -84,7 +87,7 @@ export default function SystemCheckPage() {
   const { assignmentId } = useParams()
   const { active } = useWorkspace()
   const briefing = useAssignmentBriefing(assignmentId)
-  const [results, setResults] = useState(null)
+  const [connection, setConnection] = useState(null)
   const [mic, setMic] = useState(null)
   const hasArtifacts = briefing.data?.definition.hasArtifacts
   // PROD-READY Phase 4: an approved "no camera check" adjustment drops the
@@ -99,15 +102,10 @@ export default function SystemCheckPage() {
   const spokenInput = briefing.data?.start?.mode !== 'V3'
 
   const run = useCallback(async () => {
-    setResults(null)
+    setConnection(null)
     const reachable = await checkApiHealth()
-    setResults([
-      checkBrowser(),
-      checkConnection(navigator.onLine !== false, reachable),
-      checkScreen(window.innerWidth, { needsLargeScreen: Boolean(hasArtifacts) }),
-      ...checkMediaSupport(navigator.mediaDevices, { needsCamera: proctored, spokenInput }),
-    ])
-  }, [hasArtifacts, proctored, spokenInput])
+    setConnection(checkConnection(navigator.onLine !== false, reachable))
+  }, [])
 
   useEffect(() => {
     if (briefing.data) run()
@@ -123,7 +121,13 @@ export default function SystemCheckPage() {
     )
   }
   const { definition: d, start } = briefing.data
-  const overall = results ? summarise(results) : null
+  const results = [
+    checkBrowser(),
+    connection || CONNECTION_PENDING,
+    checkScreen(window.innerWidth, { needsLargeScreen: Boolean(hasArtifacts) }),
+    ...checkMediaSupport(navigator.mediaDevices, { needsCamera: proctored, spokenInput }),
+  ]
+  const overall = connection ? summarise(results) : null
   const base = assignmentBase(active, assignmentId)
   const resume = start.reason === 'RESUME'
 
@@ -140,21 +144,18 @@ export default function SystemCheckPage() {
         <a href="#begin" className="inline-block text-sm font-medium text-prism-accent underline underline-offset-2">Go to consent and start</a>
       )}
       <Card className="space-y-4 p-6">
-        {!results ? (
-          <p role="status" className="text-sm text-prism-ink-muted">Checking your device…</p>
-        ) : (
-          <ul className="space-y-3" aria-live="polite">
-            {results.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-start justify-between gap-3 border-b border-prism-border pb-3 last:border-0">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-prism-ink">{r.label}</p>
-                  <p className="text-sm text-prism-ink-muted">{r.id === 'microphone' && mic ? mic.message : r.message}</p>
-                </div>
-                <StatusChip tone={TONE[r.id === 'microphone' && mic ? mic.status : r.status]} label={STATUS_LABEL[r.id === 'microphone' && mic ? mic.status : r.status]} />
-              </li>
-            ))}
-          </ul>
-        )}
+        {!connection && <p role="status" className="sr-only">Checking your device…</p>}
+        <ul className="space-y-3" aria-live="polite">
+          {results.map((r) => (
+            <li key={r.id} className="flex flex-wrap items-start justify-between gap-3 border-b border-prism-border pb-3 last:border-0">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-prism-ink">{r.label}</p>
+                <p className="text-sm text-prism-ink-muted">{r.id === 'microphone' && mic ? mic.message : r.message}</p>
+              </div>
+              <StatusChip tone={TONE[r.id === 'microphone' && mic ? mic.status : r.status]} label={STATUS_LABEL[r.id === 'microphone' && mic ? mic.status : r.status]} />
+            </li>
+          ))}
+        </ul>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={run}>Run the check again</Button>
           {spokenInput && <Button variant="ghost" onClick={async () => setMic(await testMicrophone(navigator.mediaDevices))}>Test microphone</Button>}

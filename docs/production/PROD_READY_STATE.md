@@ -633,6 +633,12 @@ Phase 10 prepares materials so humans can close their items quickly. Everything 
 | `npm audit --omit=dev` | unchanged (no dependency change) |
 
 
+## Phase 10S — System-check layout stability (orchestrator fix)
+Status: COMPLETE
+Branch: `prod/p10s-consent-layout`
+
+- [x] P10S.01 Root cause of the intermittent WebKit `@critical` failures in the Phase 8 and Phase 9 gates (`campus-journey-a.spec.js:172` Journey D, then `cr05-returning-loop.spec.js:61`, both failing both attempts with "Clicking the checkbox did not change its state … element is not stable / outside of the viewport" on the consent checkbox) fixed in the page, not the test — evidence: P107; `src/features/assessments/pages/SystemCheckPage.jsx`; new Vitest `studentPages.test.jsx` "every check row is on the page while the connection check is still waiting…" fails on the previous page and passes on the fix
+
 ## Phase 11 — Final gates and report
 Status: NOT_STARTED
 
@@ -748,6 +754,7 @@ Format: date · id · decision · reason · charter § · reversible.
 | 2026-10-11 | P104 | The pricing sheet uses only the implemented `/admin/margin` method and links the existing PROVISIONAL package; it proposes no price and repeats no indicative figure. `docs/finops/EXECUTIVE_SUMMARY.md`, `PROFITABILITY_REPORT.md` and `PRICING_STRATEGY.md` (July 2026, $10 price, no UNKNOWN convention) are flagged in the sheet as not to be used; they are records and were not edited | No invented prices or costs; §23 methodology | Law 2 | Yes |
 | 2026-10-11 | P105 | Runbook currency: the core procedures (Phase 7 addenda) were correct; counts and pre-programme key lists were not. Corrections are dated addenda appended to DEPLOYMENT_RUNBOOK_v1, PG_MIGRATION_RUNBOOK_v1, SECRET-SPLIT-DESIGN, RUNBOOK-credential-rotation, RELEASE_TEMPLATE_PROD_READY, SECURITY_REVIEW and A11Y_MANUAL_CHECKLIST; GO_LIVE_CHECKLIST gets an addendum (pack links, B2 before B1, 0063). Nothing above any addendum was changed. The SECURITY_REVIEW addendum lists review scope only and asserts no finding; the A11Y addendum records existing automated evidence and adds PENDING manual rows | Records get addenda, never rewrites; HA-022/023/024/C012/C013 | Phase 10 | Yes |
 | 2026-10-11 | P106 | Findings recorded for humans, not fixed in this phase: the Terms of Service say "at least 18 years old, or have the consent of a guardian" while the product is 18+ only (HA-006, HA-005, HA-003); the campus sponsored-assessment disclosure has two wordings (client briefing vs `consentPreviewFor`) under one version id `campus-assessment-disclosure.v1-draft` (HA-C005). Both are legal or consent copy, so engineering waits for counsel's text and then changes both under a new version id | Legal copy is a human decision (charter §2) | Phase 10 | Yes |
+| 2026-10-11 | P107 | The system-check page rendered a one-line "Checking your device…" placeholder until the asynchronous API-health call returned, then replaced it with a 4–5 row list, pushing the consent card down while a person (or WebKit under load) was clicking its first checkbox; "Run the check again" also reset the list to empty and re-expanded it. Only the connection check is asynchronous, so the browser, screen and media rows now render immediately and the connection row shows "Checking" until the health call returns; the page no longer changes height, and a screen-reader status still announces the check. The start step is unchanged: it is not blocked while the check is pending, exactly as before (`overall` stays null until the connection result). Same mechanism as K105 (5), which had been worked around in the test; this removes the shift itself. No test weakened; one Vitest test added | A real layout shift on slow devices and the cause of two consecutive intermittent `@critical` failures (Phase 8 and Phase 9 gates; the Phase 8 rerun passed 222/0) | Law 4 (fix root causes) | Yes |
 
 ## Risks
 
