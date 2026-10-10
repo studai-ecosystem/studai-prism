@@ -6,17 +6,23 @@
 // origin — no separate ws://host:3001 link that would be blocked as mixed
 // content. In production the same-origin reverse proxy handles it identically.
 import { io } from 'socket.io-client'
+import { getToken } from './session.js'
 
 export function proctorSocketUrl() {
   if (import.meta.env.VITE_PROCTOR_URL) return import.meta.env.VITE_PROCTOR_URL
   return window.location.origin
 }
 
+// The desktop presents the signed-in owner's token; the server accepts it only
+// for the owner of the paired session. The phone is not signed in: the issued,
+// unexpired pairing code is its only credential.
 export function connectProctor({ pairCode, role, sessionId }) {
+  const token = role === 'desktop' ? getToken() : null
   return io(proctorSocketUrl(), {
     path: '/proctor-socket',
     transports: ['websocket', 'polling'],
     query: { pairCode, role, sessionId: sessionId || '' },
+    auth: token ? { token } : {},
     reconnection: true,
     reconnectionDelay: 1000,
   })

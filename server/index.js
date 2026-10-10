@@ -20,6 +20,10 @@ async function start() {
   }
   const { default: logger } = await import('./lib/logger.js')
   const { assertProductionSecrets } = await import('./lib/security.js')
+  const { installProcessHandlers, createGracefulShutdown, shutdownTimeoutMs } = await import('./lib/gracefulShutdown.js')
+  // Phase 1S (N10): log unhandled rejections instead of crashing; exit on an
+  // uncaught exception so the orchestrator restarts a process in a known state.
+  installProcessHandlers({ logger })
 
   if (secretStatus.enabled) {
     logger.info('runtime_secrets_loaded', {
@@ -34,6 +38,10 @@ async function start() {
   // well-known signing secret.
   try {
     assertProductionSecrets()
+    // Phase 1S (N3): a purchasable paid offer needs the Razorpay secrets.
+    const { assertPaymentConfiguration } = await import('./lib/security.js')
+    const { anyPaidOfferPurchasable } = await import('./domain/commerce/index.js')
+    assertPaymentConfiguration({ paidOfferEnabled: anyPaidOfferPurchasable() })
   } catch (err) {
     logger.error('startup_check_failed', { detail: err.message })
     process.exit(1)
@@ -70,9 +78,26 @@ async function start() {
 
   // Attach the phone-proctor signalling socket (degrades gracefully if socket.io
   // isn't installed).
+  let proctorIo = null
   attachProctorSocket(server)
-    .then((io) => { if (io) logger.info('proctor_socket_ready', { path: '/proctor-socket' }) })
+    .then((io) => { proctorIo = io; if (io) logger.info('proctor_socket_ready', { path: '/proctor-socket' }) })
     .catch((err) => logger.captureException(err, { msg: 'proctor_socket_failed' }))
+
+  // Phase 1S (N11): graceful shutdown on SIGTERM/SIGINT — stop accepting,
+  // report "draining" on /api/ready, close the proctor socket, let in-flight
+  // requests finish within PRISM_SHUTDOWN_TIMEOUT_MS, then close the worker
+  // and the PostgreSQL pools.
+  const { closePool } = await import('./db/pool.js')
+  const shutdown = createGracefulShutdown({
+    server,
+    getIo: () => proctorIo,
+    onDrain: () => { app.locals.draining = true },
+    cleanups: [() => worker.stop(), () => closePool()],
+    logger,
+    timeoutMs: shutdownTimeoutMs(),
+  })
+  process.once('SIGTERM', () => { void shutdown('SIGTERM') })
+  process.once('SIGINT', () => { void shutdown('SIGINT') })
 
   // Control Centre Phase 3: OPTIONAL prompt-registry runtime (default OFF —
   // prompts stay file-based). When PRISM_ADMIN_PROMPT_REGISTRY=true, prime the

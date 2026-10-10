@@ -5,6 +5,9 @@
 
 import express from 'express'
 import cors from 'cors'
+import multer from 'multer'
+// Phase 1S (N10): async handler rejections reach the error handler (Express 4).
+import './lib/asyncRouteErrors.js'
 import helmet from 'helmet'
 import { existsSync, readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
@@ -17,7 +20,12 @@ import {
   createCampusSessionLock, createCampusReportGate, campusSessionStatusFrom, CAMPUS_LOCKED_BODY_ROUTES, CAMPUS_LOCKED_PARAM_ROUTES,
 } from './lib/legacyReportGuard.js'
 import { createDefaultCampusContext } from './domain/campusStore/defaultContext.js'
-import { getSession as storeGetSession, getReport as storeGetReport } from './lib/store.js'
+import { getSession as storeGetSession, getReport as storeGetReport, getEntitlement as storeGetEntitlement } from './lib/store.js'
+import {
+  legacySessionOwnerFrom, createLegacyErasureGuard, createLegacyOwnerBinding, createRevokedTokenGate,
+  createTranscribeGuard, isAudioUpload,
+} from './lib/legacyOwnerLock.js'
+import { createReadinessHandler } from './lib/readiness.js'
 import authRouter from './routes/auth.js'
 import deviceRouter from './routes/device.js'
 import contentRouter from './routes/content.js'
@@ -47,6 +55,41 @@ import {
 } from './lib/security.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+
+// Session-keyed legacy write routes bound to the session's recorded owner
+// (Phase 1S, N6). Their pages send the owner's bearer token.
+export const LEGACY_OWNER_BOUND_ROUTES = Object.freeze([
+  '/api/assessment/consent', '/api/assessment/verify-identity', '/api/assessment/accommodation',
+  '/api/assessment/dispute', '/api/assessment/artifacts/:sessionId',
+])
+
+// The voice-answer upload is parsed here, before the frozen router, so the
+// session can be checked first (N8). Same memory storage and size cap as the
+// router; only audio is accepted. After parsing, the request's content type is
+// marked so the router's own multer instance does not try to read the
+// already-consumed stream (its type check skips non-multipart requests);
+// req.file and req.body are left for the router exactly as multer sets them.
+const audioOnlyUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1, fields: 10 },
+  fileFilter: (_req, file, cb) => {
+    if (isAudioUpload(file)) return cb(null, true)
+    return cb(Object.assign(new Error('Only audio uploads are accepted.'), { code: 'UNSUPPORTED_MEDIA' }))
+  },
+}).single('audio')
+
+function transcribeUpload(req, res, next) {
+  const multipart = Boolean(req.is('multipart'))
+  audioOnlyUpload(req, res, (err) => {
+    if (err) {
+      if (err.code === 'UNSUPPORTED_MEDIA') return res.status(415).json({ error: 'Only audio uploads are accepted.', code: 'UNSUPPORTED_MEDIA' })
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'The recording is too large.', code: 'PAYLOAD_TOO_LARGE' })
+      return res.status(400).json({ error: 'Invalid upload.', code: 'INVALID_UPLOAD' })
+    }
+    if (multipart) req.headers['content-type'] = 'application/x-prism-parsed-multipart'
+    return next()
+  })
+}
 
 export function buildApp(v1Deps = {}) {
   const app = express()
@@ -145,6 +188,9 @@ export function buildApp(v1Deps = {}) {
   // may read them (Campus Phase 12, S7). The legacy router is unchanged.
   const campus = v1Deps.campus || createDefaultCampusContext()
   app.locals.campus = campus
+  // Phase 1S (N9): a revoked token or a suspended account's token is refused
+  // before the frozen legacy router, which checks only the JWT signature.
+  app.use('/api/assessment', createRevokedTokenGate())
   const ownerOf = sessionOwnerFrom({ getSession: storeGetSession, getReport: storeGetReport })
   app.get(
     ['/api/assessment/report/:sessionId', '/api/assessment/report/:sessionId/v2', '/api/assessment/report/:sessionId/employee'],
@@ -157,6 +203,15 @@ export function buildApp(v1Deps = {}) {
   app.post(CAMPUS_LOCKED_BODY_ROUTES, campusSessionLock)
   app.all(CAMPUS_LOCKED_PARAM_ROUTES, campusSessionLock)
   app.get('/api/assessment/report/:sessionId', createCampusReportGate({ classify, ownerOf }))
+  // Phase 1S (audit 2026-10-10): owner checks for personal legacy sessions.
+  // N1: erasure by session id is signed-in-owner-only (same 404 otherwise).
+  // N6: the session-keyed write routes are bound to the recorded owner.
+  // N8: speech-to-text needs an existing session (its owner when it has one)
+  //     and accepts audio uploads only.
+  const legacyOwner = legacySessionOwnerFrom({ getSession: storeGetSession, getEntitlement: storeGetEntitlement, getReport: storeGetReport })
+  app.delete('/api/assessment/data/:sessionId', createLegacyErasureGuard({ lookup: legacyOwner }))
+  app.post(LEGACY_OWNER_BOUND_ROUTES, createLegacyOwnerBinding({ lookup: legacyOwner }))
+  app.post('/api/assessment/transcribe', transcribeUpload, createTranscribeGuard({ lookup: legacyOwner }))
   app.use('/api/assessment', assessmentRouter)
   app.use('/api/device', deviceRouter)
   app.use('/api/content', contentRouter)
@@ -193,7 +248,10 @@ export function buildApp(v1Deps = {}) {
   checkModelDriftAtBoot()
 
   // ── Health check ─────────────────────────────────────────────────────────
+  // Liveness only (Kubernetes livenessProbe). Readiness, with a database
+  // check and the draining state, is /api/ready (Phase 1S, N12).
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
+  app.get('/api/ready', createReadinessHandler({ draining: () => Boolean(app.locals.draining) }))
 
   // ── Static frontend (production single-origin deploys) ──────────────────
   if (SERVE_FRONTEND) {
@@ -237,8 +295,10 @@ export function buildApp(v1Deps = {}) {
   // ── Global error handler ─────────────────────────────────────────────────
   // Errors raised before the v1 router (e.g. malformed JSON) keep the v1 envelope.
   app.use('/api/v1', v1ErrorHandler)
-  app.use((err, _req, res, _next) => {
+  app.use((err, _req, res, next) => {
     logger.captureException(err, { msg: 'unhandled_error' })
+    // A response already on the wire cannot become a 500; express closes it.
+    if (res.headersSent) return next(err)
     res.status(500).json({ error: 'Internal server error' })
   })
 

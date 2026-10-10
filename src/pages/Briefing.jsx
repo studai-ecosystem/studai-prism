@@ -183,7 +183,7 @@ export default function Briefing() {
       // (best-effort) before entering the closed assessment surface.
       const consentRes = await fetch('/api/assessment/consent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
         body: JSON.stringify({
           sessionId,
           scopes: CONSENT_ITEMS.map((c) => c.scope),
@@ -616,7 +616,7 @@ export default function Briefing() {
                           try {
                             const r = await fetch('/api/assessment/accommodation', {
                               method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
+                              headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
                               body: JSON.stringify({ sessionId, needs: accomNeeds.trim() }),
                             })
                             const d = await r.json().catch(() => ({}))

@@ -5,6 +5,7 @@ import { Smartphone, Loader2, Check, Wifi, ShieldCheck, RefreshCw } from 'lucide
 import QRCode from 'qrcode'
 import { startProctorSession, subscribeProctor, rememberPairCode, endProctorSession, clearRememberedPair } from '../lib/proctorLink.js'
 import PrismLogo from '../components/ui/PrismLogo.jsx'
+import { getToken } from '../lib/session.js'
 
 // Step 2 of the proctored flow: link a phone as a second camera.
 // The laptop shows a QR code → the phone opens /m/:pairCode → the phone's
@@ -38,9 +39,10 @@ export default function LinkPhone() {
     setLoading(true)
     setError('')
     try {
+      const token = getToken()
       const pairRes = await fetch('/api/device/pair', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ sessionId }),
       })
       if (!pairRes.ok) {

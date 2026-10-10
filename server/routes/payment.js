@@ -1,11 +1,10 @@
 import express, { Router } from 'express'
 import Razorpay from 'razorpay'
 import crypto from 'node:crypto'
-import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
 import logger from '../lib/logger.js'
-import { createEntitlement, getReportsByUser, getSessionIdsByUser, getReport, getSession } from '../lib/store.js'
-import { getJwtSecret } from '../lib/security.js'
+import { createEntitlement, getReportsByUser, getSessionIdsByUser, getReport, getSession, redeemPayment, getPaymentRedemption } from '../lib/store.js'
+import { authenticate } from '../domain/auth/requireUser.js'
 import { getCommerceService, liveOfferView, PRODUCT_CODES } from '../domain/commerce/index.js'
 
 const router = Router()
@@ -74,6 +73,34 @@ function getRazorpay() {
   return razorpay
 }
 
+// The provider calls /verify depends on (Phase 1S, N2). Tests install a fake;
+// production reads the order from Razorpay with the server's credentials.
+let gatewayOverride = null
+export function setPaymentGatewayForTests(fake) {
+  gatewayOverride = fake || null
+}
+function gateway() {
+  return gatewayOverride || { fetchOrder: (orderId) => getRazorpay().orders.fetch(orderId) }
+}
+
+const paymentsConfigured = () => Boolean(keyId() && keySecret())
+const notConfigured = (res) => res.status(503).json({ error: 'Payments are temporarily unavailable. Please try again later or contact support.', code: 'PAYMENTS_NOT_CONFIGURED' })
+
+// Provider ids are short opaque tokens (order_..., pay_...); the signature is
+// a hex HMAC-SHA256. Anything else is refused before any crypto or lookup.
+const PROVIDER_ID = /^[A-Za-z0-9_]{1,64}$/
+const SIGNATURE = /^[a-f0-9]{64}$/i
+
+// Signed-in, current account (token version and account state checked; a
+// revoked token, a suspended or a deleted account is refused — N9).
+async function signedIn(req, res, message) {
+  const { user, reason } = await authenticate(req)
+  if (user) return user
+  if (reason === 'suspended') res.status(403).json({ error: 'This account is suspended.', code: 'ACCOUNT_SUSPENDED' })
+  else res.status(401).json({ error: message })
+  return null
+}
+
 // ── GET /api/payment/config ──────────────────────────────────────────────────
 // Public, non-secret config the checkout page needs to decide which flow to use.
 // Exposes ONLY the publishable key id (never the secret) and whether live
@@ -104,14 +131,15 @@ router.get('/config', (_req, res) => {
 
 // ── POST /api/payment/create-order ───────────────────────────────────────────
 router.post('/create-order', async (req, res) => {
-  const authUser = getAuthUser(req)
-  if (!authUser) return res.status(401).json({ error: 'Sign in before starting checkout.' })
+  const authUser = await signedIn(req, res, 'Sign in before starting checkout.')
+  if (!authUser) return
   // P8.6: no order for a bundle whose reviewed content or price approval is
   // missing — the blockers are the same ones the checkout page shows.
   const offer = liveOfferView(PURCHASE_PRODUCT)
   if (!offer.purchasable) {
     return res.status(409).json({ error: 'This package is not available for purchase yet.', code: 'OFFER_NOT_PURCHASABLE', blockers: offer.availability?.blockers || [] })
   }
+  if (!paymentsConfigured()) return notConfigured(res)
   try {
     const order = await getRazorpay().orders.create({
       amount: PRICE_PAISE, // always use server-side amount
@@ -142,55 +170,97 @@ router.post('/create-order', async (req, res) => {
 })
 
 // ── POST /api/payment/verify ─────────────────────────────────────────────────
+// Phase 1S (audit 2026-10-10, N2/N3): the checkout's signed result is
+// redeemed AT MOST ONCE per provider payment id. The first verify records the
+// redemption and the paid entitlement together (store redeemPayment; PG table
+// v1_payment_redemptions, migration 0055); a repeat by the same account
+// returns the SAME sessionId and grant, so client retries are safe; anyone
+// else is refused. The order is read back from the provider before the first
+// redemption: it must have been created by /create-order for THIS account
+// (order notes), for this product at the server price, and be paid
+// (captured). The offer's purchasability is enforced where money is taken —
+// /create-order refuses an unpurchasable offer, and /verify only redeems
+// orders /create-order made — so a payment the provider already captured is
+// never refused service because the offer closed afterwards.
 router.post('/verify', async (req, res) => {
-  const authUser = getAuthUser(req)
-  if (!authUser) return res.status(401).json({ error: 'Sign in before verifying payment.' })
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body
+  const authUser = await signedIn(req, res, 'Sign in before verifying payment.')
+  if (!authUser) return
+  // Never verify with an empty or missing key: an HMAC under '' is forgeable.
+  if (!keySecret()) return notConfigured(res)
+  const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body || {}
 
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+  if (!orderId || !paymentId || !signature) {
     return res.status(400).json({ error: 'Missing payment fields' })
   }
-
-  const body = `${razorpay_order_id}|${razorpay_payment_id}`
-  const expectedSig = crypto
-    .createHmac('sha256', keySecret() || '')
-    .update(body)
-    .digest('hex')
-
-  // Length-guard before timingSafeEqual (it throws on mismatched buffer sizes).
-  const expected = Buffer.from(expectedSig, 'hex')
-  let provided
-  try {
-    provided = Buffer.from(razorpay_signature, 'hex')
-  } catch {
+  if (![orderId, paymentId].every((v) => typeof v === 'string' && PROVIDER_ID.test(v)) || typeof signature !== 'string' || !SIGNATURE.test(signature)) {
     return res.status(400).json({ error: 'Invalid payment signature' })
   }
+
+  const expected = crypto.createHmac('sha256', keySecret()).update(`${orderId}|${paymentId}`).digest()
+  const provided = Buffer.from(signature, 'hex')
   if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
     return res.status(400).json({ error: 'Invalid payment signature' })
   }
 
-  // Payment verified — mint a session token and a durable entitlement that
-  // authorises starting exactly one assessment.
-  const sessionId = uuidv4()
+  const respond = async (redemption) => {
+    // P8.5: the package grant, idempotent on the provider payment id — the
+    // webhook for the same payment returns this same grant.
+    const granted = await grantAfterPayment({ userId: authUser.id, providerEventKey: `razorpay:payment:${paymentId}`, purchaseRef: orderId, fundingSource: 'PAID', requestId: req.requestId })
+    return res.json({ success: true, sessionId: redemption.sessionId, grantId: granted?.grant?.id || null, ...(redemption.created ? {} : { alreadyRedeemed: true }) })
+  }
+  const refuseRedeemed = (redemption) => {
+    if (redemption.userId && redemption.userId === String(authUser.id) && redemption.sessionId) return null
+    if (redemption.orderId && redemption.orderId !== orderId) return res.status(409).json({ error: 'This payment does not belong to this order.', code: 'ORDER_MISMATCH' })
+    if (!redemption.userId || !redemption.sessionId) {
+      return res.status(409).json({ error: 'This payment has already been used, and the assessment it paid for was deleted. Contact support if this is unexpected.', code: 'PAYMENT_ALREADY_REDEEMED' })
+    }
+    return res.status(403).json({ error: 'This payment belongs to a different account.', code: 'PAYMENT_NOT_YOURS' })
+  }
+
   try {
-    await createEntitlement({
-      sessionId,
-      paymentId: razorpay_payment_id,
-      orderId: razorpay_order_id,
+    // A retry after a lost response: answered from the ledger, no provider call.
+    const prior = await getPaymentRedemption(paymentId)
+    if (prior) return refuseRedeemed(prior) || await respond({ ...prior, created: false })
+
+    let order
+    try {
+      order = await gateway().fetchOrder(orderId)
+    } catch (err) {
+      logger.captureException(err, { msg: 'payment_verify_order_fetch_failed', requestId: req.requestId, rzpStatus: err?.statusCode })
+      return res.status(503).json({ error: 'We could not confirm your payment with the payment provider yet. Please try again in a moment; you will not be charged twice.', code: 'PAYMENT_PROVIDER_UNAVAILABLE', retryable: true })
+    }
+    if (!order || order.id !== orderId || String(order.notes?.userId || '') !== String(authUser.id)) {
+      logger.warn('payment_verify_order_not_owned', { requestId: req.requestId })
+      return res.status(403).json({ error: 'This payment belongs to a different account.', code: 'PAYMENT_NOT_YOURS' })
+    }
+    if (order.notes?.productCode !== PURCHASE_PRODUCT || Number(order.amount) !== PRICE_PAISE || order.currency !== PRICE_CURRENCY) {
+      logger.warn('payment_verify_order_mismatch', { requestId: req.requestId })
+      return res.status(409).json({ error: 'This payment is not for this package.', code: 'ORDER_MISMATCH' })
+    }
+    if (order.status !== 'paid') {
+      // Authorised but not yet captured (or not paid at all). Captured
+      // payments are granted; the client retries shortly.
+      return res.status(409).json({ error: 'Your payment is still being confirmed. Please wait a moment.', code: 'PAYMENT_NOT_CAPTURED', retryable: true })
+    }
+
+    const redemption = await redeemPayment({
+      paymentId,
+      orderId,
+      sessionId: uuidv4(),
       amount: PRICE_PAISE,
-      mode: 'paid',
       userId: authUser.id,
       userEmail: authUser.email,
     })
+    if (!redemption.created) {
+      const refused = refuseRedeemed(redemption)
+      if (refused) return refused
+    }
+    if (redemption.created) logger.info('payment_redeemed', { requestId: req.requestId })
+    return await respond(redemption)
   } catch (err) {
     logger.captureException(err, { msg: 'payment_verify_entitlement_failed', requestId: req.requestId })
     return res.status(500).json({ error: 'Failed to register payment' })
   }
-  // P8.5: the package grant, idempotent on the provider payment id — the
-  // webhook for the same payment returns this same grant.
-  const granted = await grantAfterPayment({ userId: authUser.id, providerEventKey: `razorpay:payment:${razorpay_payment_id}`, purchaseRef: razorpay_order_id, fundingSource: 'PAID', requestId: req.requestId })
-
-  res.json({ success: true, sessionId, grantId: granted?.grant?.id || null })
 })
 
 // ── POST /api/payment/webhook ────────────────────────────────────────────────
@@ -217,10 +287,22 @@ router.post('/webhook', express.raw({ type: '*/*', limit: '1mb' }), async (req, 
   try { event = JSON.parse(raw.toString('utf8')) } catch { return res.status(400).json({ error: 'Invalid webhook body' }) }
   const payment = event?.payload?.payment?.entity
   if (!payment?.id) return res.status(200).json({ received: true, ignored: 'no payment entity' })
-  if (!['payment.captured', 'payment.authorized', 'order.paid'].includes(event.event)) {
+  // Phase 1S (N2): only money that was actually captured grants anything.
+  // `payment.authorized` is an authorisation hold that Razorpay refunds if it
+  // is never captured; it is acknowledged and ignored. The grant is keyed on
+  // the provider payment id, the same key /verify uses, so a payment redeemed
+  // through /verify and reported here (or the reverse, in any order, any
+  // number of times) ends with exactly one grant. The webhook never mints a
+  // legacy session entitlement; only /verify (single-use per payment) does.
+  if (!['payment.captured', 'order.paid'].includes(event.event)) {
     return res.status(200).json({ received: true, ignored: event.event || 'unknown event' })
   }
-  const userId = payment.notes?.userId
+  if (event.event === 'payment.captured' && payment.status && payment.status !== 'captured') {
+    return res.status(200).json({ received: true, ignored: 'payment not captured' })
+  }
+  // Order notes carry the account id set by /create-order; a payment entity
+  // carries them only when the checkout passed notes too.
+  const userId = payment.notes?.userId || event?.payload?.order?.entity?.notes?.userId
   if (!userId || typeof userId !== 'string' || userId.length > 80) return res.status(200).json({ received: true, ignored: 'no user attribution' })
   const granted = await grantAfterPayment({ userId, providerEventKey: `razorpay:payment:${payment.id}`, purchaseRef: payment.order_id || null, fundingSource: 'PAID', requestId: req.requestId })
   // Payment ids and event ids never reach the log line; only outcome flags do.
@@ -233,8 +315,8 @@ router.post('/webhook', express.raw({ type: '*/*', limit: '1mb' }), async (req, 
 // production when PRISM_DUMMY_PAYMENTS=true (checkout bypass while the
 // payment gateway is not live). Dummy sessions are marked mode='dummy'.
 router.post('/dev-session', async (req, res) => {
-  const authUser = getAuthUser(req)
-  if (!authUser) return res.status(401).json({ error: 'Sign in before creating an assessment session.' })
+  const authUser = await signedIn(req, res, 'Sign in before creating an assessment session.')
+  if (!authUser) return
   const dummy = isDummyPayments()
   if (process.env.NODE_ENV === 'production' && !dummy) {
     return res.status(403).json({ error: 'Not available in production' })
@@ -254,8 +336,8 @@ router.post('/dev-session', async (req, res) => {
 // returns the SAME session. Mode 'invite' entitlements are REAL candidates
 // (college cohorts), so their sessions are not synthetic-flagged.
 router.post('/invite/redeem', async (req, res) => {
-  const authUser = getAuthUser(req)
-  if (!authUser) return res.status(401).json({ error: 'Sign in to use an invite link.' })
+  const authUser = await signedIn(req, res, 'Sign in to use an invite link.')
+  if (!authUser) return
   const { token } = req.body || {}
   if (!token || typeof token !== 'string' || token.length > 128) {
     return res.status(400).json({ error: 'Invalid invite link.' })
@@ -293,21 +375,9 @@ router.post('/invite/redeem', async (req, res) => {
 //   · pendingSessionId = a session they started but never completed (resume)
 //   · completed        = number of finished assessments (their history)
 //   · canPurchase      = whether checkout can mint a new session right now
-function getAuthUser(req) {
-  const header = req.headers.authorization || ''
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null
-  if (!token) return null
-  try {
-    const payload = jwt.verify(token, getJwtSecret())
-    return { id: payload.sub, email: payload.email }
-  } catch {
-    return null
-  }
-}
-
 router.get('/licence', async (req, res) => {
-  const authUser = getAuthUser(req)
-  if (!authUser) return res.status(401).json({ error: 'Not authenticated.' })
+  const authUser = await signedIn(req, res, 'Not authenticated.')
+  if (!authUser) return
   try {
     const [reports, sessionIds] = await Promise.all([
       getReportsByUser(authUser.id),

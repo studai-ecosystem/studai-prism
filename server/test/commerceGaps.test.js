@@ -66,14 +66,25 @@ async function appWorld({ env = {} } = {}) {
   await new Promise((r) => server.once('listening', r))
   const base = `http://127.0.0.1:${server.address().port}`
   const jwt = (await import('jsonwebtoken')).default
-  const token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET)
+  // Phase 1S (N9): payment routes check the account behind the token (token
+  // version, state, existence), so the buyer is a real stored account.
+  const { createUser } = await import('../lib/db.js')
+  const account = await createUser({ email: `gap-${Math.random().toString(16).slice(2)}@test.local`, name: 'Synthetic Buyer', passwordHash: 'x' })
+  const uid = account.id
+  const token = jwt.sign({ sub: uid, email: account.email, tv: 0 }, process.env.JWT_SECRET)
+  // Phase 1S (N2): /verify reads the order back from the provider; this fake
+  // provider knows the paid orders the scenarios use, created for this buyer.
+  const { setPaymentGatewayForTests } = await import('../routes/payment.js')
+  const paid = (id) => ({ id, amount: 49900, currency: 'INR', status: 'paid', notes: { userId: uid, productCode: 'PERSONAL_DEVELOPMENT_SPRINT' } })
+  setPaymentGatewayForTests({ fetchOrder: async (id) => { if (['order_ok', 'order_delay', 'order_lost'].includes(id)) return paid(id); throw new Error('unknown order') } })
   const close = () => {
+    setPaymentGatewayForTests(null)
     setCommerceServiceForTests(null)
     server.close()
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]
     Object.assign(process.env, saved)
   }
-  return { w, base, token, close }
+  return { w, base, token, uid, close }
 }
 
 // ── P8.6 bundle availability ────────────────────────────────────────────────
@@ -160,23 +171,29 @@ test('P8.6/T53: create-order refuses an unpurchasable bundle with 409 and the sa
 
 // ── P8.5 / T53 / T54 / T55 payment and allowance scenarios ───────────────────
 
+// Phase 1S (N2): a provider payment id is redeemed once and the JSON store
+// outlives a test run, so every run uses fresh payment ids.
+const RUN = crypto.randomUUID().slice(0, 8)
+const PAY_OK = `pay_ok_${RUN}`
+const PAY_DELAY = `pay_delay_${RUN}`
+
 test('T53: client success is not a grant — a forged verify is refused and leaves no grant; an abandoned checkout grants nothing', async () => {
-  const { w, base, token, close } = await appWorld({ env: { RAZORPAY_KEY_SECRET: 'rzp_test_secret_fixture', RAZORPAY_KEY_ID: 'rzp_test_id_fixture' } })
+  const { w, base, token, uid, close } = await appWorld({ env: { RAZORPAY_KEY_SECRET: 'rzp_test_secret_fixture', RAZORPAY_KEY_ID: 'rzp_test_id_fixture' } })
   try {
     const forged = await fetch(`${base}/api/payment/verify`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ razorpay_order_id: 'order_abandoned', razorpay_payment_id: 'pay_forged', razorpay_signature: 'ab'.repeat(32) }),
     })
     assert.equal(forged.status, 400)
-    assert.equal((await w.commerce.listForUser(user.id)).length, 0, 'no grant from a client-side "success"')
+    assert.equal((await w.commerce.listForUser(uid)).length, 0, 'no grant from a client-side "success"')
     assert.equal((await fetch(`${base}/api/payment/verify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 401)
     // Abandoned checkout: nothing was verified, nothing is granted.
-    assert.equal((await w.commerce.listForUser(user.id)).length, 0)
+    assert.equal((await w.commerce.listForUser(uid)).length, 0)
     // A correctly signed verify (the provider's signature over order|payment) grants exactly once.
-    const sig = crypto.createHmac('sha256', 'rzp_test_secret_fixture').update('order_ok|pay_ok').digest('hex')
+    const sig = crypto.createHmac('sha256', 'rzp_test_secret_fixture').update(`order_ok|${PAY_OK}`).digest('hex')
     const ok = await fetch(`${base}/api/payment/verify`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ razorpay_order_id: 'order_ok', razorpay_payment_id: 'pay_ok', razorpay_signature: sig }),
+      body: JSON.stringify({ razorpay_order_id: 'order_ok', razorpay_payment_id: PAY_OK, razorpay_signature: sig }),
     })
     assert.equal(ok.status, 200)
     const okBody = await ok.json()
@@ -184,35 +201,35 @@ test('T53: client success is not a grant — a forged verify is refused and leav
     // Network loss after payment → the client retries verify: same grant, not a second one.
     const again = await (await fetch(`${base}/api/payment/verify`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ razorpay_order_id: 'order_ok', razorpay_payment_id: 'pay_ok', razorpay_signature: sig }),
+      body: JSON.stringify({ razorpay_order_id: 'order_ok', razorpay_payment_id: PAY_OK, razorpay_signature: sig }),
     })).json()
     assert.equal(again.grantId, okBody.grantId)
-    assert.equal((await w.commerce.listForUser(user.id)).length, 1)
+    assert.equal((await w.commerce.listForUser(uid)).length, 1)
   } finally {
     close()
   }
 })
 
 test('T53: provider delay (webhook before verify) and network loss (webhook only) both end with exactly one grant', async () => {
-  const { w, base, token, close } = await appWorld({ env: { RAZORPAY_KEY_SECRET: 'rzp_test_secret_fixture', RAZORPAY_KEY_ID: 'rzp_test_id_fixture', RAZORPAY_WEBHOOK_SECRET: 'whsec_fixture' } })
+  const { w, base, token, uid, close } = await appWorld({ env: { RAZORPAY_KEY_SECRET: 'rzp_test_secret_fixture', RAZORPAY_KEY_ID: 'rzp_test_id_fixture', RAZORPAY_WEBHOOK_SECRET: 'whsec_fixture' } })
   try {
-    const hook = (paymentId, orderId) => JSON.stringify({ event: 'payment.captured', payload: { payment: { entity: { id: paymentId, order_id: orderId, notes: { userId: user.id } } } } })
+    const hook = (paymentId, orderId) => JSON.stringify({ event: 'payment.captured', payload: { payment: { entity: { id: paymentId, order_id: orderId, notes: { userId: uid } } } } })
     const send = (raw) => fetch(`${base}/api/payment/webhook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-razorpay-signature': crypto.createHmac('sha256', 'whsec_fixture').update(raw).digest('hex') }, body: raw })
     // Provider delay: the webhook lands first.
-    assert.equal((await send(hook('pay_delay', 'order_delay'))).status, 200)
-    const sig = crypto.createHmac('sha256', 'rzp_test_secret_fixture').update('order_delay|pay_delay').digest('hex')
+    assert.equal((await send(hook(PAY_DELAY, 'order_delay'))).status, 200)
+    const sig = crypto.createHmac('sha256', 'rzp_test_secret_fixture').update(`order_delay|${PAY_DELAY}`).digest('hex')
     const verify = await (await fetch(`${base}/api/payment/verify`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ razorpay_order_id: 'order_delay', razorpay_payment_id: 'pay_delay', razorpay_signature: sig }),
+      body: JSON.stringify({ razorpay_order_id: 'order_delay', razorpay_payment_id: PAY_DELAY, razorpay_signature: sig }),
     })).json()
-    const grants = await w.commerce.listForUser(user.id)
+    const grants = await w.commerce.listForUser(uid)
     assert.equal(grants.length, 1)
     assert.equal(verify.grantId, grants[0].id, 'verify returns the grant the webhook created')
     // Network loss after payment: only the webhook ever arrives (twice).
     assert.equal((await send(hook('pay_lost', 'order_lost'))).status, 200)
     assert.equal((await (await send(hook('pay_lost', 'order_lost'))).json()).duplicate, true)
-    assert.equal((await w.commerce.listForUser(user.id)).length, 2)
-    const lost = (await w.commerce.listForUser(user.id)).find((g) => g.purchaseRef === 'order_lost')
+    assert.equal((await w.commerce.listForUser(uid)).length, 2)
+    const lost = (await w.commerce.listForUser(uid)).find((g) => g.purchaseRef === 'order_lost')
     assert.equal(lost.fundingSource, 'PAID')
     assert.equal(lost.productVersion, '0.1')
     assert.equal(lost.policyVersion, 'offer-policy.v0.1-proposed')

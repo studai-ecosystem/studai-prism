@@ -11,17 +11,46 @@
 //   PGSSLMODE=require   set when the provider needs TLS (e.g. Azure Postgres)
 
 import pg from 'pg'
+import { readFileSync } from 'fs'
 import logger from '../lib/logger.js'
 
 let _pool = null
 let _initialised = false
 let _sessionLockPool = null
+let _tlsWarned = false
+
+// TLS to PostgreSQL (PROD-READY Phase 1S, audit 2026-10-10, N13), following
+// libpq's sslmode semantics (PGSSLMODE; a `sslmode=require` in DATABASE_URL
+// counts as before):
+//   verify-full  certificate chain and host name verified — against the CA
+//                bundle in PGSSLROOTCERT, or Node's public trust store
+//   verify-ca    certificate chain verified, host name not checked
+//   require      encrypted; verified like verify-ca when PGSSLROOTCERT names a
+//                CA bundle (libpq does the same). Without a bundle it is NOT
+//                verified — the previous behaviour, kept so an existing
+//                deployment keeps connecting — and a warning is logged.
+// For Amazon RDS the bundle is AWS's public RDS CA bundle: the operator
+// supplies the file, sets PGSSLROOTCERT, then PGSSLMODE=verify-full.
+export function sslOptions(env = process.env, readCa = (path) => readFileSync(path, 'utf8')) {
+  const envMode = String(env.PGSSLMODE || '').toLowerCase()
+  const mode = envMode || (/\bsslmode=require\b/.test(env.DATABASE_URL || '') ? 'require' : '')
+  if (!['require', 'verify-ca', 'verify-full'].includes(mode)) return { ssl: undefined, verified: false, mode: mode || 'default' }
+  const caPath = env.PGSSLROOTCERT || ''
+  const ssl = { rejectUnauthorized: true }
+  if (caPath) ssl.ca = readCa(caPath)
+  else if (mode === 'require') return { ssl: { rejectUnauthorized: false }, verified: false, mode }
+  if (mode !== 'verify-full') ssl.checkServerIdentity = () => undefined
+  return { ssl, verified: true, mode }
+}
 
 function connectionOptions() {
-  const ssl =
-    process.env.PGSSLMODE === 'require' || /\bsslmode=require\b/.test(process.env.DATABASE_URL || '')
-      ? { rejectUnauthorized: false }
-      : undefined
+  const { ssl, verified, mode } = sslOptions()
+  if (ssl && !verified && !_tlsWarned) {
+    _tlsWarned = true
+    logger.warn('pg_tls_unverified', {
+      detail: `PGSSLMODE=${mode} without PGSSLROOTCERT: the connection is encrypted but the server certificate is not verified. Supply the CA bundle (PGSSLROOTCERT) and set PGSSLMODE=verify-full.`,
+    })
+  }
   return {
     connectionString: process.env.DATABASE_URL,
     idleTimeoutMillis: 30000,

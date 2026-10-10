@@ -512,7 +512,10 @@ test('PRISM-E2E-45 @critical candidate A cannot access Candidate B session', asy
     method: 'POST', token: other.token,
     body: { sessionId: owner.sessionId, scopes: consentScopes, consentVersion: 'audit-e2e' },
   })
-  expect(result.status).toBe(403)
+  // PROD-READY Phase 1S (P11/P22): the owner binding in app.js refuses another
+  // account before the legacy router with the same 404 an unknown session
+  // gets (K103), instead of the router's 403 that confirmed the session exists.
+  expect(result.status).toBe(404)
 })
 
 test('PRISM-E2E-46 admin assessment version change preserves history', async ({ page }) => {

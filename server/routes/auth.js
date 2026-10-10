@@ -117,6 +117,14 @@ router.post('/confirm-age', async (req, res) => {
   }
 })
 
+// A bcrypt hash of a random value at the same cost as real password hashes
+// (10), computed once; no password can match it.
+let dummyHash = null
+function timingDummyHash() {
+  if (!dummyHash) dummyHash = bcrypt.hash(`timing-${Math.random()}-${Date.now()}`, 10)
+  return dummyHash
+}
+
 // ── POST /api/auth/login ─────────────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
@@ -127,12 +135,11 @@ router.post('/login', async (req, res) => {
     }
 
     const user = await findUserByEmail(email)
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password.' })
-    }
-
-    const ok = await bcrypt.compare(String(password), user.passwordHash)
-    if (!ok) {
+    // Phase 1S (N15): an unknown email costs the same bcrypt work as a wrong
+    // password, so response time does not reveal which emails have accounts.
+    const hash = typeof user?.passwordHash === 'string' && user.passwordHash ? user.passwordHash : await timingDummyHash()
+    const ok = await bcrypt.compare(String(password), hash)
+    if (!user || !ok) {
       return res.status(401).json({ error: 'Invalid email or password.' })
     }
 

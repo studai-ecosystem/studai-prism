@@ -33,9 +33,19 @@ test('ecosystem aligned-jobs returns curated opportunities with target construct
 })
 
 test('ecosystem handover endpoint mints single-use 60s authorization code without browser tokens in URLs', async () => {
+  // Phase 1S (N5): the hand-over is for a signed-in candidate only (it hands
+  // over that account's identity); signed out it is refused.
+  const { createUser } = await import('../lib/db.js')
+  const jwt = (await import('jsonwebtoken')).default
+  const account = await createUser({ email: 'eco-handover@test.local', name: 'Synthetic Candidate', passwordHash: 'x' })
+  const token = jwt.sign({ sub: account.id, email: account.email, tv: 0 }, process.env.JWT_SECRET)
+  const signedOut = await fetch(`${base}/api/ecosystem/handover-token`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ destination: 'hire' }),
+  })
+  assert.equal(signedOut.status, 401)
   const resp = await fetch(`${base}/api/ecosystem/handover-token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({
       destination: 'hire',
       targetJobRef: 'job_test_123',

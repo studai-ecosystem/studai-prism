@@ -435,7 +435,7 @@ export default function ScoreReport() {
     try {
       const res = await fetch('/api/assessment/dispute', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
         body: JSON.stringify({ sessionId, reason: disputeReason }),
       })
       const data = await res.json().catch(() => ({}))
@@ -459,14 +459,27 @@ export default function ScoreReport() {
     if (!confirmed) return
     setErasing(true)
     try {
-      await fetch(`/api/assessment/data/${sessionId}`, { method: 'DELETE' })
+      // Only the signed-in owner can erase a session (Phase 1S); the response
+      // decides what is shown — never a success that did not happen.
+      const token = getToken()
+      const res = await fetch(`/api/assessment/data/${encodeURIComponent(sessionId)}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data?.ok !== true) throw Object.assign(new Error('erase failed'), { status: res.status })
       localStorage.removeItem('prismUserName')
       localStorage.removeItem('prismCharacter')
       setNotice({ kind: 'ok', text: 'Your data has been permanently deleted.' })
       setTimeout(() => navigate('/'), 2500)
-    } catch {
+    } catch (err) {
       setErasing(false)
-      setNotice({ kind: 'error', text: 'We could not delete your data right now. Please try again.' })
+      setNotice({
+        kind: 'error',
+        text: [401, 403, 404].includes(err?.status)
+          ? 'Nothing was deleted. Sign in with the account that took this assessment to delete it, or delete all your assessment data from Settings.'
+          : 'We could not confirm that your data was deleted. Please try again.',
+      })
     }
   }
 

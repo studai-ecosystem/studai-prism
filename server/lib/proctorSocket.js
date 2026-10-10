@@ -8,11 +8,107 @@
 //
 // socket.io is loaded lazily so the app still boots if it isn't installed (the
 // phone-link step then degrades to "skip", like the server STT fallback).
+//
+// PROD-READY Phase 1S (audit 2026-10-10, N4): the handshake is checked before
+// a socket joins a room.
+//  - The pairing code must have been issued by POST /api/device/pair and be
+//    unexpired; unknown codes are refused and never create a device-link row.
+//  - The desktop must present its signed-in owner's token (`auth.token`); when
+//    the paired session has a recorded owner, it must be that account.
+//  - The phone holds only the pairing code (it is opened from the QR code on
+//    another device and is not signed in); the code is the capability.
+//  - Production accepts browser origins from the app's own origin and the
+//    CORS_ORIGIN allow-list (or PROCTOR_CORS_ORIGIN when set) — never any
+//    origin. Development keeps reflecting the origin so LAN phones work.
+//  - New connections are rate-limited per client IP.
 
 import logger from './logger.js'
-import { recordDeviceLink } from './store.js'
+import { recordDeviceLink, getDeviceLink as storeGetDeviceLink, getSession, getEntitlement, getReport } from './store.js'
+import { authenticate as defaultAuthenticate } from '../domain/auth/requireUser.js'
+import { legacySessionOwnerFrom } from './legacyOwnerLock.js'
+import { PAIR_CODE_PATTERN, isPairCodeUsable } from './pairCodes.js'
 
-export async function attachProctorSocket(httpServer) {
+const isProduction = () => process.env.NODE_ENV === 'production'
+
+// Origins a browser may open the socket from, or null for "any" (development).
+export function proctorOriginPolicy(env = process.env) {
+  if (env.NODE_ENV !== 'production') return null
+  const list = (env.PROCTOR_CORS_ORIGIN || env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean)
+  return new Set(list)
+}
+
+export function isAllowedProctorOrigin({ origin, host }, allowed) {
+  if (!allowed) return true
+  if (!origin) return true // not a browser request; the pair code and auth still apply
+  if (allowed.has(origin)) return true
+  try {
+    return new URL(origin).host === String(host || '')
+  } catch {
+    return false
+  }
+}
+
+// Same client-IP rule as the HTTP rate limits (one trusted proxy hop: the
+// last X-Forwarded-For entry; port suffixes stripped).
+export function handshakeIp(handshake) {
+  const xff = String(handshake?.headers?.['x-forwarded-for'] || '').split(',').map((s) => s.trim()).filter(Boolean)
+  const raw = xff.length ? xff[xff.length - 1] : String(handshake?.address || 'unknown')
+  const v4 = raw.match(/^(?:::ffff:)?(\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?$/)
+  return v4 ? v4[1] : raw
+}
+
+export function createConnectionRateLimiter({ limit = 60, windowMs = 60 * 1000, now = () => Date.now() } = {}) {
+  const buckets = new Map()
+  return function allow(key) {
+    const t = now()
+    const bucket = buckets.get(key)
+    if (!bucket || t - bucket.start >= windowMs) {
+      buckets.set(key, { start: t, count: 1 })
+      if (buckets.size > 10000) {
+        for (const [k, b] of buckets) if (t - b.start >= windowMs) buckets.delete(k)
+      }
+      return true
+    }
+    bucket.count += 1
+    return bucket.count <= limit
+  }
+}
+
+// Decides whether a handshake may join a pairing room. Resolves to
+// { pairCode, role, sessionId } or throws an Error whose message the client
+// receives as `connect_error`.
+export function createProctorHandshakeGuard({
+  getDeviceLink = storeGetDeviceLink,
+  lookup = legacySessionOwnerFrom({ getSession, getEntitlement, getReport }),
+  authenticate = defaultAuthenticate,
+  production = isProduction,
+  now = () => Date.now(),
+} = {}) {
+  return async function checkHandshake(handshake) {
+    const query = handshake?.query || {}
+    const pairCode = typeof query.pairCode === 'string' ? query.pairCode : ''
+    const role = query.role
+    if (!PAIR_CODE_PATTERN.test(pairCode) || (role !== 'desktop' && role !== 'phone')) {
+      throw new Error('Missing pairCode or role.')
+    }
+    const link = await getDeviceLink(pairCode)
+    if (!isPairCodeUsable(link, now())) throw new Error('Unknown or expired pairing code.')
+    const sessionId = link.sessionId || ''
+    if (role === 'desktop') {
+      const token = typeof handshake.auth?.token === 'string' ? handshake.auth.token : ''
+      const { user } = await authenticate({ headers: { authorization: token ? `Bearer ${token}` : '' } })
+      const { owner } = await lookup(sessionId)
+      if (owner) {
+        if (!user || String(user.id) !== owner) throw new Error('Not authorized for this pairing code.')
+      } else if (production() || !user) {
+        throw new Error('Not authorized for this pairing code.')
+      }
+    }
+    return { pairCode, role, sessionId }
+  }
+}
+
+export async function attachProctorSocket(httpServer, deps = {}) {
   let Server
   try {
     ({ Server } = await import('socket.io'))
@@ -23,15 +119,39 @@ export async function attachProctorSocket(httpServer) {
     return null
   }
 
+  const allowedOrigins = deps.allowedOrigins === undefined ? proctorOriginPolicy() : deps.allowedOrigins
+  const checkHandshake = deps.checkHandshake || createProctorHandshakeGuard(deps)
+  const allowConnection = deps.rateLimiter || createConnectionRateLimiter({
+    limit: Number(process.env.PROCTOR_SOCKET_RATE_PER_MIN) || 60,
+  })
+
   const io = new Server(httpServer, {
     path: '/proctor-socket',
     cors: {
-      // Phones join from the LAN origin (http://<lan-ip>:5173), which differs
-      // from CORS_ORIGIN. Reflect the request origin in dev; lock down in prod.
-      origin: process.env.PROCTOR_CORS_ORIGIN || true,
+      // Phones join from the LAN origin (http://<lan-ip>:5173) in development,
+      // so the origin is reflected there; production uses the allow-list.
+      origin: allowedOrigins ? [...allowedOrigins] : true,
       methods: ['GET', 'POST'],
     },
+    // Applies to every transport (CORS does not cover WebSockets).
+    allowRequest: (req, callback) => {
+      callback(null, isAllowedProctorOrigin({ origin: req.headers.origin, host: req.headers.host }, allowedOrigins))
+    },
     maxHttpBufferSize: 5e6, // 5 MB — comfortably fits a single JPEG frame
+  })
+
+  io.use((socket, next) => {
+    if (!allowConnection(handshakeIp(socket.handshake))) {
+      return next(new Error('Too many connection attempts. Please wait a minute and try again.'))
+    }
+    checkHandshake(socket.handshake)
+      .then((granted) => {
+        socket.data.pairCode = granted.pairCode
+        socket.data.role = granted.role
+        socket.data.sessionId = granted.sessionId
+        next()
+      })
+      .catch((err) => next(new Error(err?.message || 'Not authorized.')))
   })
 
   // Count how many of each role are currently in a room. Used to tell the phone
@@ -53,26 +173,19 @@ export async function attachProctorSocket(httpServer) {
   }
 
   io.on('connection', (socket) => {
-    const { pairCode, role } = socket.handshake.query || {}
-
-    if (!pairCode || (role !== 'desktop' && role !== 'phone')) {
-      socket.emit('proctor:error', { message: 'Missing pairCode or role.' })
-      socket.disconnect(true)
-      return
-    }
+    const { pairCode, role, sessionId } = socket.data
 
     const room = `pair:${pairCode}`
     socket.join(room)
-    socket.data.pairCode = pairCode
-    socket.data.role = role
 
     if (role === 'phone') {
-      // Tell the desktop a phone has linked.
+      // Tell the desktop a phone has linked. The link row already exists
+      // (issued by /api/device/pair); only its status changes.
       socket.to(room).emit('proctor:phone-status', { status: 'linked' })
       recordDeviceLink(pairCode, {
-        sessionId: socket.handshake.query.sessionId || '',
+        sessionId,
         status: 'linked',
-        phoneUserAgent: socket.handshake.headers['user-agent'] || '',
+        phoneUserAgent: String(socket.handshake.headers['user-agent'] || '').slice(0, 512),
       }).catch((err) => logger.captureException(err, { msg: 'device_link_persist_failed' }))
     } else {
       // A desktop (re)connected — ask any phone already in the room to announce.

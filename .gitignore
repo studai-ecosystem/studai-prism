@@ -15,6 +15,9 @@ server/.env
 # content.json is seed content (blog/careers) and IS committed.
 server/data/users.json
 server/data/assessments.json
+# A server started from the repository root writes its JSON store here
+# (DATA_DIR default resolves relative to the process); never commit it.
+/data/
 
 # Logs
 *.log

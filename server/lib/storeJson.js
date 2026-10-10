@@ -14,7 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.DATA_DIR || join(__dirname, '..', 'data')
 const DB_FILE = join(DATA_DIR, 'assessments.json')
 
-const EMPTY = { sessions: {}, payments: {}, reports: {}, events: [], calibrations: {}, consents: {}, disputes: {}, verifications: {}, deviceLinks: {}, items: [], accommodations: {} }
+const EMPTY = { sessions: {}, payments: {}, reports: {}, events: [], calibrations: {}, consents: {}, disputes: {}, verifications: {}, deviceLinks: {}, items: [], accommodations: {}, paymentRedemptions: {} }
 
 // Serialize writes so concurrent calls don't clobber each other.
 let writeChain = Promise.resolve()
@@ -73,6 +73,7 @@ async function readDB() {
       deviceLinks: parsed.deviceLinks || {},
       items: Array.isArray(parsed.items) ? parsed.items : [],
       accommodations: parsed.accommodations || {},
+      paymentRedemptions: parsed.paymentRedemptions || {},
     }
   } catch {
     return { ...EMPTY }
@@ -100,6 +101,46 @@ export async function createEntitlement({ sessionId, paymentId, orderId, amount,
 export async function getEntitlement(sessionId) {
   const db = await readDB()
   return db.payments[sessionId] || null
+}
+
+// ── Payment redemptions (PROD-READY Phase 1S, N2) ───────────────────────────
+// A provider payment id is redeemed once: the first call records the
+// redemption and creates the paid entitlement in the same file write; every
+// later call (a client retry, a replay, a concurrent request) gets the first
+// redemption back and creates nothing. Calls are serialised in-process.
+let redeemChain = Promise.resolve()
+
+export async function getPaymentRedemption(paymentId) {
+  if (!paymentId) return null
+  const db = await readDB()
+  return db.paymentRedemptions[paymentId] || null
+}
+
+export function redeemPayment({ paymentId, orderId, sessionId, amount, userId, userEmail }) {
+  if (!paymentId || !sessionId) return Promise.reject(new Error('paymentId and sessionId are required'))
+  const run = redeemChain.then(async () => {
+    const db = await readDB()
+    const existing = db.paymentRedemptions[paymentId]
+    if (existing) return { created: false, ...existing }
+    const redeemedAt = new Date().toISOString()
+    const redemption = { paymentId, orderId: orderId || null, sessionId, userId: userId || null, redeemedAt }
+    db.paymentRedemptions[paymentId] = redemption
+    db.payments[sessionId] = {
+      sessionId,
+      paymentId,
+      orderId: orderId || null,
+      amount: amount ?? null,
+      mode: 'paid',
+      userId: userId || null,
+      userEmail: userEmail || null,
+      consumed: false,
+      createdAt: redeemedAt,
+    }
+    await writeDB(db)
+    return { created: true, ...redemption }
+  })
+  redeemChain = run.catch(() => {})
+  return run
 }
 
 // ── Sessions ─────────────────────────────────────────────────────────────────
@@ -425,6 +466,15 @@ export async function eraseSession(sessionId) {
   const itemsBefore = db.items.length
   db.items = db.items.filter((it) => it.sessionId !== sessionId)
   if (db.items.length !== itemsBefore) removed = true
+  // A redeemed payment stays redeemed after erasure, detached from the
+  // person and the session (Phase 1S, N2): a replay cannot mint a new session.
+  for (const r of Object.values(db.paymentRedemptions)) {
+    if (r && r.sessionId === sessionId) {
+      r.sessionId = null
+      r.userId = null
+      removed = true
+    }
+  }
   await writeDB(db)
   return removed
 }

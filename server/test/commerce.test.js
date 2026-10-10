@@ -216,10 +216,13 @@ test('P8.5/T53: webhook replay and reordering produce one grant; bad signatures 
     const r2 = await send(first, sig(first))
     assert.equal(r2.status, 200)
     assert.equal((await r2.json()).duplicate, true)
+    // Phase 1S (N2): an authorisation is not captured money — it is
+    // acknowledged and ignored (never a grant), so the reordered event
+    // cannot add one either.
     const reordered = body('evt_0', 'payment.authorized')
     const r3 = await send(reordered, sig(reordered))
     assert.equal(r3.status, 200)
-    assert.equal((await r3.json()).duplicate, true)
+    assert.equal((await r3.json()).ignored, 'payment.authorized')
     assert.equal((await w.commerce.listForUser(user.id)).length, 1, 'exactly one grant')
     // Unrelated events acknowledge without granting.
     const refund = JSON.stringify({ event: 'refund.created', payload: { payment: { entity: { id: 'pay_fixture_2', notes: { userId: user.id } } } } })

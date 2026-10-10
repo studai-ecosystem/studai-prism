@@ -6,7 +6,7 @@
 // Returned objects intentionally match the JSON store byte-for-byte (timestamps,
 // null defaults, field names) so callers and the frontend see no difference.
 
-import { query } from '../db/pool.js'
+import { query, getPool } from '../db/pool.js'
 
 // ── Payments ────────────────────────────────────────────────────────────────
 export async function createEntitlement({ sessionId, paymentId, orderId, amount, mode, userId, userEmail }) {
@@ -21,16 +21,74 @@ export async function createEntitlement({ sessionId, paymentId, orderId, amount,
     consumed: false,
     createdAt: new Date().toISOString(),
   }
-  await query(
-    `INSERT INTO v1_payments (session_id, payment_id, order_id, amount, mode, consumed, created_at, user_id, user_email)
+  await query(UPSERT_ENTITLEMENT_SQL, entitlementParams(rec))
+  return rec
+}
+
+const UPSERT_ENTITLEMENT_SQL = `INSERT INTO v1_payments (session_id, payment_id, order_id, amount, mode, consumed, created_at, user_id, user_email)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      ON CONFLICT (session_id) DO UPDATE SET
        payment_id = EXCLUDED.payment_id, order_id = EXCLUDED.order_id,
        amount = EXCLUDED.amount, mode = EXCLUDED.mode, consumed = EXCLUDED.consumed,
-       user_id = EXCLUDED.user_id, user_email = EXCLUDED.user_email`,
-    [sessionId, rec.paymentId, rec.orderId, rec.amount, rec.mode, rec.consumed, rec.createdAt, rec.userId, rec.userEmail],
-  )
-  return rec
+       user_id = EXCLUDED.user_id, user_email = EXCLUDED.user_email`
+const entitlementParams = (rec) => [rec.sessionId, rec.paymentId, rec.orderId, rec.amount, rec.mode, rec.consumed, rec.createdAt, rec.userId, rec.userEmail]
+
+// ── Payment redemptions (PROD-READY Phase 1S, N2; migration 0055) ───────────
+// One redemption per provider payment id (PRIMARY KEY). The redemption row
+// and the paid entitlement are written in one transaction; a repeat or a
+// concurrent call (whose INSERT waits on the first one's key, then does
+// nothing) returns the first redemption and writes nothing.
+function rowToRedemption(row) {
+  if (!row) return null
+  return {
+    paymentId: row.payment_id,
+    orderId: row.order_id,
+    sessionId: row.session_id,
+    userId: row.user_id,
+    redeemedAt: row.redeemed_at instanceof Date ? row.redeemed_at.toISOString() : row.redeemed_at,
+  }
+}
+
+export async function getPaymentRedemption(paymentId) {
+  if (!paymentId) return null
+  const r = await query('SELECT * FROM v1_payment_redemptions WHERE payment_id = $1', [paymentId])
+  return rowToRedemption(r?.rows?.[0])
+}
+
+export async function redeemPayment({ paymentId, orderId, sessionId, amount, userId, userEmail }) {
+  if (!paymentId || !sessionId) throw new Error('paymentId and sessionId are required')
+  const pool = getPool()
+  if (!pool) throw new Error('DATABASE_URL not configured')
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const redeemedAt = new Date().toISOString()
+    const ins = await client.query(
+      `INSERT INTO v1_payment_redemptions (payment_id, order_id, session_id, user_id, redeemed_at)
+       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (payment_id) DO NOTHING RETURNING *`,
+      [paymentId, orderId || null, sessionId, userId || null, redeemedAt],
+    )
+    if (ins.rowCount === 1) {
+      await client.query(UPSERT_ENTITLEMENT_SQL, entitlementParams({
+        sessionId, paymentId, orderId: orderId || null, amount: amount ?? null, mode: 'paid',
+        consumed: false, createdAt: redeemedAt, userId: userId || null, userEmail: userEmail || null,
+      }))
+      await client.query('COMMIT')
+      return { created: true, ...rowToRedemption(ins.rows[0]) }
+    }
+    await client.query('ROLLBACK')
+    // Read on the same connection: holding one client while waiting for a
+    // second from the pool would deadlock under concurrency.
+    const r = await client.query('SELECT * FROM v1_payment_redemptions WHERE payment_id = $1', [paymentId])
+    const existing = rowToRedemption(r.rows[0])
+    if (!existing) throw new Error('payment redemption vanished')
+    return { created: false, ...existing }
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw err
+  } finally {
+    client.release()
+  }
 }
 
 export async function getEntitlement(sessionId) {
@@ -459,6 +517,10 @@ export async function eraseSession(sessionId) {
   }
   const dl = await query('DELETE FROM v1_device_links WHERE session_id = $1', [sessionId])
   if ((dl?.rowCount || 0) > 0) removed = true
+  // A redeemed payment stays redeemed after erasure, detached from the
+  // person and the session (Phase 1S, N2): a replay cannot mint a new session.
+  const pr = await query('UPDATE v1_payment_redemptions SET session_id = NULL, user_id = NULL WHERE session_id = $1', [sessionId])
+  if ((pr?.rowCount || 0) > 0) removed = true
   return removed
 }
 

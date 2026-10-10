@@ -34,6 +34,9 @@ function loadRazorpayScript() {
   })
 }
 
+const VERIFY_ATTEMPTS = 6
+const VERIFY_RETRY_MS = 2000
+
 // Open the Razorpay modal and, on success, verify server-side. Resolves with the
 // minted sessionId. The amount is always enforced server-side.
 function openRazorpayCheckout({ cfg, order, user, token }) {
@@ -49,13 +52,23 @@ function openRazorpayCheckout({ cfg, order, user, token }) {
       theme: { color: 'var(--prism-signal)' },
       handler: async (response) => {
         try {
-          const verifyRes = await fetch('/api/payment/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify(response),
-          })
-          if (!verifyRes.ok) throw new Error('Payment could not be verified. If you were charged, contact support.')
-          const { sessionId } = await verifyRes.json()
+          // The server redeems a payment once and answers every repeat with
+          // the same session, so retrying while it confirms capture (or the
+          // provider is briefly unreachable) can never charge or grant twice.
+          let verifyRes = null
+          let body = {}
+          for (let attempt = 0; attempt < VERIFY_ATTEMPTS; attempt += 1) {
+            if (attempt) await new Promise((r) => setTimeout(r, VERIFY_RETRY_MS))
+            verifyRes = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify(response),
+            })
+            body = await verifyRes.json().catch(() => ({}))
+            if (verifyRes.ok || !body?.retryable) break
+          }
+          if (!verifyRes?.ok || !body?.sessionId) throw new Error('Payment could not be verified. If you were charged, contact support.')
+          const { sessionId } = body
           resolve(sessionId)
         } catch (err) {
           reject(err)

@@ -57,6 +57,7 @@ export async function readJsonSnapshot() {
     verifications: store.verifications || {},
     deviceLinks: store.deviceLinks || {},
     accommodations: store.accommodations || {},
+    paymentRedemptions: store.paymentRedemptions || {},
   }
 }
 
@@ -106,6 +107,35 @@ async function copyPayments(payments, apply) {
     )
   }
   return copied
+}
+
+// PROD-READY Phase 1S (N2, migration 0055): the JSON store's redemption
+// ledger is copied as is (detached rows included); a paid entitlement that
+// predates the ledger becomes the redemption of its payment id when it is the
+// earliest one for that id. Existing PG redemptions are never overwritten.
+async function copyPaymentRedemptions(redemptions, payments, apply) {
+  const rows = new Map()
+  for (const r of Object.values(redemptions)) {
+    if (r?.paymentId) rows.set(r.paymentId, r)
+  }
+  const byAge = Object.values(payments)
+    .filter((p) => p?.sessionId && p.paymentId)
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
+  for (const p of byAge) {
+    if (!rows.has(p.paymentId)) {
+      rows.set(p.paymentId, { paymentId: p.paymentId, orderId: p.orderId ?? null, sessionId: p.sessionId, userId: p.userId ?? null, redeemedAt: p.createdAt })
+    }
+  }
+  if (apply) {
+    for (const r of rows.values()) {
+      await query(
+        `INSERT INTO v1_payment_redemptions (payment_id, order_id, session_id, user_id, redeemed_at)
+         VALUES ($1,$2,$3,$4,$5) ON CONFLICT (payment_id) DO NOTHING`,
+        [r.paymentId, r.orderId ?? null, r.sessionId ?? null, r.userId ?? null, r.redeemedAt || new Date().toISOString()],
+      )
+    }
+  }
+  return rows.size
 }
 
 async function copySessions(sessions, apply) {
@@ -197,6 +227,7 @@ export async function migrateJsonStoreToPg({ dryRun = true } = {}) {
 
   buckets.users = { jsonCount: snap.users.length, copied: await copyUsers(snap.users, apply) }
   buckets.payments = { jsonCount: Object.keys(snap.payments).length, copied: await copyPayments(snap.payments, apply) }
+  buckets.paymentRedemptions = { jsonCount: Object.keys(snap.paymentRedemptions).length, copied: await copyPaymentRedemptions(snap.paymentRedemptions, snap.payments, apply) }
   buckets.sessions = { jsonCount: Object.keys(snap.sessions).length, copied: await copySessions(snap.sessions, apply) }
   buckets.reports = { jsonCount: Object.keys(snap.reports).length, copied: await copyReports(snap.reports, apply) }
 

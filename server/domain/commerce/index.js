@@ -6,7 +6,7 @@ import { isDbConfigured, query } from '../../db/pool.js'
 import { createMemoryDb } from '../campusStore/memoryDb.js'
 import { createCommerceRepoMemory, createCommerceRepoPg } from './repository.js'
 import { createGrantService } from './grants.js'
-import { offerAvailability, offerView } from './products.js'
+import { offerAvailability, offerView, PRODUCT_CODES } from './products.js'
 import { MISSION_LIBRARY } from '../development/missionLibrary.js'
 import { contentRegistry } from '../content/versions.js'
 
@@ -48,4 +48,10 @@ export function liveOfferAvailability(code, { priceApproved, taxTreatment } = {}
 
 export function liveOfferView(code, options = {}) {
   return offerView(code, { ...options, availability: liveOfferAvailability(code, options) })
+}
+
+// Phase 1S (N3): true when any product can be bought right now (the startup
+// check then requires the payment provider secrets in production).
+export function anyPaidOfferPurchasable() {
+  return PRODUCT_CODES.some((code) => Boolean(liveOfferView(code)?.purchasable))
 }

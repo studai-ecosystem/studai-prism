@@ -97,6 +97,24 @@ export function assertProductionSecrets() {
   }
 }
 
+// ── Payment configuration (PROD-READY Phase 1S, N3) ─────────────────────────
+// When any paid offer is purchasable, production must hold the Razorpay key
+// id, key secret and webhook secret: without the key secret, /verify would
+// have no key to check the checkout signature against (it refuses with 503,
+// never verifies against an empty key), and without the webhook secret the
+// webhook is closed. A deliberately payments-off production (no purchasable
+// offer: the price, content or terms are not approved) needs none of them.
+// Dummy payments are already refused in production (DEF-02).
+export const RAZORPAY_REQUIRED_KEYS = Object.freeze(['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET'])
+
+export function assertPaymentConfiguration({ paidOfferEnabled, env = process.env } = {}) {
+  if (env.NODE_ENV !== 'production' || !paidOfferEnabled) return
+  const missing = RAZORPAY_REQUIRED_KEYS.filter((key) => !env[key])
+  if (missing.length) {
+    throw new Error(`Refusing to start in production: a paid offer is purchasable but ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not set.`)
+  }
+}
+
 // ── Rate limiters (C7) ───────────────────────────────────────────────────────
 // req.ip is proxy-aware because index.js sets `trust proxy` (Azure App Service
 // fronts the app with one proxy hop). Azure ARR appends the SOURCE PORT to
