@@ -54,6 +54,10 @@ export const CAMPUS_CASCADE = Object.freeze([
   ['admin_notes', 'entity_id'],
   // PROD-READY Phase 4 (0058): the pre-start accommodation request linked to the session.
   ['assessment_accommodation_requests', 'session_id'],
+  // PROD-READY Phase 6 (0060): materialised decisions and their version
+  // counter — last, after every delete above has fired the counter triggers.
+  ['session_decision_cache', 'session_id'],
+  ['session_decision_inputs', 'session_id'],
 ])
 
 export const sessionRef = (sessionId) => createHash('sha256')
@@ -181,6 +185,10 @@ const SESSION_STATEMENTS = [
   ['integrity_reviews', (run, sid) => run('DELETE FROM integrity_reviews WHERE session_id = $1', [sid])],
   ['admin_notes', (run, sid) => run(`DELETE FROM admin_notes WHERE entity_type = 'session' AND entity_id = $1`, [sid])],
   ['assessment_accommodation_requests', (run, sid) => run('DELETE FROM assessment_accommodation_requests WHERE session_id = $1', [sid])],
+  // PROD-READY Phase 6 (0060): derived decisions and the version counter go
+  // last, so no trigger fired by the deletes above re-creates a row.
+  ['session_decision_cache', (run, sid) => run('DELETE FROM session_decision_cache WHERE session_id = $1', [sid])],
+  ['session_decision_inputs', (run, sid) => run('DELETE FROM session_decision_inputs WHERE session_id = $1', [sid])],
 ]
 
 export async function eraseCampusSessionData(sessionId) {

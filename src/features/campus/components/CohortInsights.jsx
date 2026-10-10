@@ -21,7 +21,7 @@ function useCohortCapabilities(cohortId) {
 }
 
 export function CohortOverview({ d, onOpen }) {
-  const pending = d.pendingInvites.length
+  const pending = d.pendingInvitesTotal ?? d.pendingInvites.length
   return (
     <Panel title="At a glance">
       <dl className="grid gap-4 text-sm sm:grid-cols-3">

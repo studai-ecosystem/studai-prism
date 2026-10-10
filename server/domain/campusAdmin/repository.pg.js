@@ -144,6 +144,12 @@ export function createCampusAdminRepoPg({ query, getPool }) {
       const { rows } = await query('SELECT * FROM organization_memberships WHERE organization_id = $1 ORDER BY created_at, id', [organizationId])
       return rows.map(membership)
     },
+    // Staff (non-student, not removed) memberships only (PROD-READY Phase 6):
+    // the team list no longer reads every student membership.
+    async listStaffMemberships(organizationId) {
+      const { rows } = await query("SELECT * FROM organization_memberships WHERE organization_id = $1 AND role <> 'STUDENT' AND status <> 'REMOVED' ORDER BY created_at, id", [organizationId])
+      return rows.map(membership)
+    },
     // Serialises team changes of one organization inside a repository
     // transaction (PROD-READY Phase 3: the last-owner check cannot race).
     async lockOrganization(organizationId) {
@@ -234,6 +240,206 @@ export function createCampusAdminRepoPg({ query, getPool }) {
       const { rows } = await query('SELECT * FROM assessment_assignment_students WHERE assignment_id = $1 ORDER BY created_at, user_id', [assignmentId])
       return rows.map(student)
     },
+    // ── Batched reads for admin lists (PROD-READY Phase 6) ────────────────
+    // One query instead of one per assignment (and per student).
+    async listOrgRosterRows(organizationId, { userId = null, completedOnly = false } = {}) {
+      const { rows } = await query(
+        `SELECT a.id AS assignment_id, a.definition_id, a.status AS assignment_status, s.user_id, s.status, s.session_id, s.started_at, s.completed_at
+           FROM assessment_assignments a JOIN assessment_assignment_students s ON s.assignment_id = a.id
+          WHERE a.organization_id = $1 AND a.sponsor_type = 'INSTITUTION' AND ($2::text IS NULL OR s.user_id = $2)
+            AND (NOT $3::boolean OR (s.status = 'COMPLETED' AND s.session_id IS NOT NULL))
+          ORDER BY a.created_at, a.id, s.created_at, s.user_id`,
+        [organizationId, userId, Boolean(completedOnly)],
+      )
+      return rows.map((r) => ({
+        assignmentId: r.assignment_id, definitionId: r.definition_id, assignmentStatus: r.assignment_status, userId: r.user_id, status: r.status,
+        sessionId: r.session_id, startedAt: iso(r.started_at), completedAt: iso(r.completed_at),
+      }))
+    },
+    // Analytics reads (PROD-READY Phase 6): only what the views use.
+    async listActiveStudentIds(organizationId) {
+      const { rows } = await query("SELECT user_id FROM organization_memberships WHERE organization_id = $1 AND role = 'STUDENT' AND status = 'ACTIVE'", [organizationId])
+      return rows.map((r) => r.user_id)
+    },
+    // Each student's latest COMPLETED sponsored session (ties: the earlier
+    // assignment, as the in-process scan keeps the first one it meets).
+    async latestCompletedSessions(organizationId, { from = null, to = null } = {}) {
+      const { rows } = await query(
+        `SELECT DISTINCT ON (s.user_id) s.user_id, s.session_id, s.completed_at
+           FROM assessment_assignments a JOIN assessment_assignment_students s ON s.assignment_id = a.id
+          WHERE a.organization_id = $1 AND a.sponsor_type = 'INSTITUTION' AND s.status = 'COMPLETED' AND s.session_id IS NOT NULL
+            AND ($2::timestamptz IS NULL OR (s.completed_at IS NOT NULL AND s.completed_at >= $2::timestamptz))
+            AND ($3::timestamptz IS NULL OR (s.completed_at IS NOT NULL AND s.completed_at <= $3::timestamptz))
+          ORDER BY s.user_id, s.completed_at DESC NULLS LAST, a.created_at, a.id, s.created_at`,
+        [organizationId, from ? new Date(from).toISOString() : null, to ? new Date(to).toISOString() : null],
+      )
+      return rows.map((r) => ({ userId: r.user_id, sessionId: r.session_id, completedAt: iso(r.completed_at) }))
+    },
+    async countRosterStatuses(assignmentIds, userIds) {
+      if (!assignmentIds.length || !userIds.length) return {}
+      const { rows } = await query(
+        'SELECT status, count(*)::int AS n FROM assessment_assignment_students WHERE assignment_id = ANY($1::text[]) AND user_id = ANY($2::text[]) GROUP BY status',
+        [assignmentIds, userIds],
+      )
+      return Object.fromEntries(rows.map((r) => [r.status, r.n]))
+    },
+    async countAssignmentRoster(assignmentIds) {
+      const out = new Map((assignmentIds || []).map((id) => [id, { total: 0 }]))
+      if (!out.size) return out
+      const { rows } = await query(
+        'SELECT assignment_id, status, count(*)::int AS n FROM assessment_assignment_students WHERE assignment_id = ANY($1::text[]) GROUP BY assignment_id, status',
+        [[...out.keys()]],
+      )
+      for (const r of rows) {
+        const c = out.get(r.assignment_id)
+        c.total += r.n
+        c[r.status] = r.n
+      }
+      return out
+    },
+    async listAssignmentStudentsPage(assignmentId, { userIds = null, offset = 0, limit = 50 } = {}) {
+      const params = [assignmentId, userIds]
+      const where = 'assignment_id = $1 AND ($2::text[] IS NULL OR user_id = ANY($2::text[]))'
+      const [page, counts] = await Promise.all([
+        query(`SELECT * FROM assessment_assignment_students WHERE ${where} ORDER BY created_at, user_id OFFSET $3 LIMIT $4`, [...params, offset, limit]),
+        query(`SELECT status, count(*)::int AS n FROM assessment_assignment_students WHERE ${where} GROUP BY status`, params),
+      ])
+      const byStatus = Object.fromEntries(counts.rows.map((r) => [r.status, r.n]))
+      return { rows: page.rows.map(student), total: counts.rows.reduce((t, r) => t + r.n, 0), counts: byStatus }
+    },
+    async listCohortMembersPage(cohortId, { offset = 0, limit = 50 } = {}) {
+      const [page, total] = await Promise.all([
+        query("SELECT * FROM cohort_members WHERE cohort_id = $1 AND status = 'ACTIVE' ORDER BY added_at, user_id OFFSET $2 LIMIT $3", [cohortId, offset, limit]),
+        query("SELECT count(*)::int AS n FROM cohort_members WHERE cohort_id = $1 AND status = 'ACTIVE'", [cohortId]),
+      ])
+      return { rows: page.rows.map(member), total: total.rows[0].n }
+    },
+    async listPendingInvites(organizationId, { now, role = null, notRole = null, cohortId = null } = {}) {
+      const { rows } = await query(
+        `SELECT * FROM organization_invites
+          WHERE organization_id = $1 AND status = 'PENDING' AND expires_at > $2::timestamptz
+            AND ($3::text IS NULL OR role = $3) AND ($4::text IS NULL OR role <> $4) AND ($5::uuid IS NULL OR cohort_id = $5)
+          ORDER BY created_at, id`,
+        [organizationId, new Date(now).toISOString(), role, notRole, cohortId],
+      )
+      return rows.map(invite)
+    },
+    // Overview counts (§20) in one statement (PROD-READY Phase 6), with the
+    // same scope rules as the in-process path (service.visibleStudents).
+    async overviewCounts(organizationId, { scopeMode, scopeCohortIds = [], departmentId = null, now }) {
+      const { rows: [r] } = await query(
+        `WITH org_cohorts AS (
+           SELECT id, department_id, status FROM cohorts WHERE organization_id = $1
+         ), scope_cohorts AS (
+           SELECT id FROM org_cohorts
+            WHERE $2 = 'FULL' OR ($2 = 'ASSIGNED' AND id::text = ANY($3::text[]))
+               OR ($2 = 'DEPARTMENT' AND department_id IS NOT NULL AND department_id::text = $4)
+         ), students AS (
+           SELECT m.user_id, m.status FROM organization_memberships m
+            WHERE m.organization_id = $1 AND m.role = 'STUDENT' AND m.status IN ('ACTIVE', 'SUSPENDED')
+              AND ($2 = 'FULL' OR EXISTS (
+                SELECT 1 FROM cohort_members cm JOIN scope_cohorts sc ON sc.id = cm.cohort_id
+                 WHERE cm.user_id = m.user_id AND cm.status = 'ACTIVE'))
+         )
+         SELECT
+           (SELECT count(*) FROM students WHERE status = 'ACTIVE')::int AS enrolled,
+           (SELECT count(*) FROM organization_invites i
+             WHERE i.organization_id = $1 AND i.role = 'STUDENT' AND i.status = 'PENDING' AND i.expires_at > $5::timestamptz
+               AND ($2 = 'FULL' OR i.cohort_id IN (SELECT id FROM scope_cohorts)))::int AS invited,
+           (SELECT count(*) FROM org_cohorts c WHERE c.status = 'ACTIVE' AND c.id IN (SELECT id FROM scope_cohorts))::int AS cohorts,
+           (SELECT count(*) FROM assessment_assignment_students s JOIN assessment_assignments a ON a.id = s.assignment_id
+             WHERE a.organization_id = $1 AND a.sponsor_type = 'INSTITUTION' AND a.status NOT IN ('CANCELLED', 'DRAFT')
+               AND s.user_id IN (SELECT user_id FROM students))::int AS assigned,
+           (SELECT count(*) FROM assessment_assignment_students s JOIN assessment_assignments a ON a.id = s.assignment_id
+             WHERE a.organization_id = $1 AND a.sponsor_type = 'INSTITUTION' AND a.status NOT IN ('CANCELLED', 'DRAFT')
+               AND s.status = 'COMPLETED' AND s.user_id IN (SELECT user_id FROM students))::int AS completed`,
+        [organizationId, scopeMode, scopeCohortIds.map(String), departmentId == null ? null : String(departmentId), new Date(now).toISOString()],
+      )
+      return { enrolled: r.enrolled, invited: r.invited, cohorts: r.cohorts, assigned: r.assigned, completed: r.completed }
+    },
+    // Student directory (§21) filtered, sorted and paged in SQL. Used only
+    // when accounts live in this database (v1_users under PRISM_PG_STORE);
+    // the service keeps an equivalent in-process path for every other store
+    // and a DB test proves both return the same pages.
+    // scopeMode: FULL | ASSIGNED (scopeCohortIds) | DEPARTMENT (departmentId) | NONE.
+    async queryStudentDirectory(organizationId, { scopeMode, scopeCohortIds = [], departmentId = null, now, q = '', cohortId = null, status = null, assessment = null, offset = 0, limit = null }) {
+      const params = [organizationId, scopeMode, scopeCohortIds.map(String), departmentId == null ? null : String(departmentId), new Date(now).toISOString(),
+        String(q || '').trim().toLowerCase(), status, cohortId, assessment, offset, limit]
+      // The page is chosen from names alone; cohorts and the latest
+      // assessment are looked up for the rows of the page only — unless the
+      // assessment filter needs them for every row.
+      const latest = (alias) => `SELECT s.status, s.assignment_id FROM assessment_assignment_students s JOIN assessment_assignments a ON a.id = s.assignment_id
+              WHERE s.user_id = ${alias}.user_id AND a.organization_id = $1 AND a.sponsor_type = 'INSTITUTION' AND a.status NOT IN ('CANCELLED', 'DRAFT')
+              ORDER BY a.created_at DESC, a.id DESC LIMIT 1`
+      const { rows } = await query(
+        `WITH org_cohorts AS (
+           SELECT id, name, department_id, created_at FROM cohorts WHERE organization_id = $1
+         ), scope_cohorts AS (
+           SELECT id FROM org_cohorts
+            WHERE ($2 = 'ASSIGNED' AND id::text = ANY($3::text[]))
+               OR ($2 = 'DEPARTMENT' AND department_id IS NOT NULL AND department_id::text = $4)
+         ), base AS (
+           SELECT 'MEMBER' AS kind, m.user_id, NULL::text AS invite_id, NULLIF(u.name, '') AS name, NULLIF(u.email, '') AS email, m.status,
+                  m.user_id AS row_key, NULL::uuid AS invite_cohort
+             FROM organization_memberships m
+             LEFT JOIN v1_users u ON u.id = m.user_id
+            WHERE m.organization_id = $1 AND m.role = 'STUDENT' AND m.status IN ('ACTIVE', 'SUSPENDED')
+              AND ($2 = 'FULL' OR EXISTS (SELECT 1 FROM cohort_members cm JOIN scope_cohorts sc ON sc.id = cm.cohort_id WHERE cm.user_id = m.user_id AND cm.status = 'ACTIVE'))
+              AND ($8::uuid IS NULL OR EXISTS (SELECT 1 FROM cohort_members cm JOIN org_cohorts c ON c.id = cm.cohort_id WHERE cm.user_id = m.user_id AND cm.status = 'ACTIVE' AND cm.cohort_id = $8::uuid))
+           UNION ALL
+           SELECT 'INVITE', NULL, i.id::text, NULL, i.email, 'INVITED', i.id::text, c.id
+             FROM organization_invites i
+             LEFT JOIN org_cohorts c ON c.id = i.cohort_id
+            WHERE i.organization_id = $1 AND i.role = 'STUDENT' AND i.status = 'PENDING' AND i.expires_at > $5::timestamptz
+              AND ($2 = 'FULL' OR i.cohort_id IN (SELECT id FROM scope_cohorts))
+              AND ($8::uuid IS NULL OR c.id = $8::uuid)
+         ), filtered AS (
+           SELECT b.* FROM base b
+            WHERE ($6 = '' OR strpos(lower(b.name), $6) > 0 OR strpos(lower(b.email), $6) > 0)
+              AND ($7::text IS NULL OR b.status = $7)
+              AND ($9::text IS NULL OR (CASE WHEN b.kind = 'MEMBER' THEN COALESCE((SELECT x.status FROM (${latest('b')}) x), 'NONE') ELSE 'NONE' END) = $9)
+         ), paged AS (
+           SELECT f.*, count(*) OVER () AS total FROM filtered f
+            ORDER BY lower(COALESCE(f.name, f.email, 'null')) COLLATE "C", COALESCE(f.name, f.email, 'null') COLLATE "C",
+                     CASE f.kind WHEN 'MEMBER' THEN 0 ELSE 1 END, f.row_key COLLATE "C"
+            OFFSET $10 LIMIT $11
+         )
+         SELECT p.*, l.status AS assessment_status, l.assignment_id,
+                CASE WHEN p.kind = 'MEMBER' THEN
+                  (SELECT COALESCE(json_agg(json_build_object('id', c.id, 'name', c.name) ORDER BY c.created_at, c.id), '[]'::json)
+                     FROM cohort_members cm JOIN org_cohorts c ON c.id = cm.cohort_id WHERE cm.user_id = p.user_id AND cm.status = 'ACTIVE')
+                ELSE (SELECT COALESCE(json_agg(json_build_object('id', c.id, 'name', c.name)), '[]'::json) FROM org_cohorts c WHERE c.id = p.invite_cohort) END AS cohorts,
+                CASE WHEN p.kind = 'MEMBER' THEN
+                  (SELECT c.department_id::text FROM cohort_members cm JOIN org_cohorts c ON c.id = cm.cohort_id WHERE cm.user_id = p.user_id AND cm.status = 'ACTIVE' ORDER BY c.created_at, c.id LIMIT 1)
+                ELSE (SELECT c.department_id::text FROM org_cohorts c WHERE c.id = p.invite_cohort) END AS department_id
+           FROM paged p
+           LEFT JOIN LATERAL (${latest('p')}) l ON p.kind = 'MEMBER'
+          ORDER BY lower(COALESCE(p.name, p.email, 'null')) COLLATE "C", COALESCE(p.name, p.email, 'null') COLLATE "C",
+                   CASE p.kind WHEN 'MEMBER' THEN 0 ELSE 1 END, p.row_key COLLATE "C"`,
+        params,
+      )
+      const items = rows.map((r) => (r.kind === 'MEMBER'
+        ? { kind: 'MEMBER', userId: r.user_id, name: r.name, email: r.email, status: r.status, cohorts: r.cohorts, departmentId: r.department_id || null, assessment: { status: r.assessment_status || 'NONE', assignmentId: r.assignment_id || null } }
+        : { kind: 'INVITE', inviteId: r.invite_id, userId: null, name: null, email: r.email, status: 'INVITED', cohorts: r.cohorts, departmentId: r.department_id || null, assessment: { status: 'NONE', assignmentId: null } }))
+      // A page past the end carries no row with the window count.
+      let total = rows.length ? Number(rows[0].total) : 0
+      if (!rows.length && offset > 0) total = (await this.queryStudentDirectory(organizationId, { scopeMode, scopeCohortIds, departmentId, now, q, cohortId, status, assessment, offset: 0, limit: 1 })).total
+      return { items, total }
+    },
+    // One student's membership and cohorts in this organization (cohort
+    // order), for the student detail scope check (PROD-READY Phase 6).
+    async getStudentInOrg(organizationId, userId) {
+      const [m, c] = await Promise.all([
+        query("SELECT * FROM organization_memberships WHERE organization_id = $1 AND user_id = $2 AND role = 'STUDENT' AND status IN ('ACTIVE', 'SUSPENDED') ORDER BY created_at, id LIMIT 1", [organizationId, userId]),
+        query(
+          `SELECT c.*, NULL AS member_count FROM cohort_members cm JOIN cohorts c ON c.id = cm.cohort_id
+            WHERE c.organization_id = $1 AND cm.user_id = $2 AND cm.status = 'ACTIVE' ORDER BY c.created_at, c.id`,
+          [organizationId, userId],
+        ),
+      ])
+      if (!m.rows[0]) return null
+      return { membership: membership(m.rows[0]), cohorts: c.rows.map(cohort) }
+    },
     async setAssignmentStatus(id, status) {
       const { rows } = await run(() => query('UPDATE assessment_assignments SET status = $2, updated_at = now() WHERE id = $1 RETURNING *', [id, status]))
       return assignment(rows[0]) || null
@@ -261,6 +467,13 @@ export function createCampusAdminRepoPg({ query, getPool }) {
     async listImportRows(jobId) {
       const { rows } = await query('SELECT * FROM student_import_rows WHERE job_id = $1 ORDER BY row_number', [jobId])
       return rows.map(importRow)
+    },
+    async listImportRowsPage(jobId, { offset = 0, limit = 2000 } = {}) {
+      const [page, total] = await Promise.all([
+        query('SELECT * FROM student_import_rows WHERE job_id = $1 ORDER BY row_number OFFSET $2 LIMIT $3', [jobId, offset, limit]),
+        query('SELECT count(*)::int AS n FROM student_import_rows WHERE job_id = $1', [jobId]),
+      ])
+      return { rows: page.rows.map(importRow), total: total.rows[0].n }
     },
     async claimImportCommit(id, commitKey) {
       const { rows } = await query(

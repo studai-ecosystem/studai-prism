@@ -56,3 +56,12 @@ export function renderApp(ui, { route = '/' } = {}) {
     ),
   }
 }
+
+// PROD-READY Phase 6 (P69): the campus charts are a React.lazy chunk. A test
+// that renders one paid for loading it inside its own time budget, and React
+// held the surrounding content back until it arrived (the overview insight,
+// a cohort heading). Files that render campus pages load the chunk once in
+// beforeAll, so tests measure rendering, not module loading.
+export function preloadCampusCharts() {
+  return import('../features/campus/analytics/charts.jsx')
+}

@@ -9,7 +9,7 @@ import { assuranceForSession } from '../../lib/identityAssurance.js'
 import { legacySupportSources } from '../support/legacySources.js'
 import { buildCatalog, formForSession } from '../assessments/catalog.js'
 import { isMailEnabled, sendOrgInviteEmail, sendCampusAssignmentEmail, sendCampusAssignmentReminderEmail } from '../../lib/mailer.js'
-import { findUserById, findUserByEmail } from '../../lib/db.js'
+import { findUserById, findUserByEmail, findUsersByIds, findUsersByEmails, USER_STORE_BACKEND } from '../../lib/db.js'
 import evidenceGraph from '../../lib/evidenceGraph.js'
 import roleAffinityEngine from '../../lib/roleAffinityEngine.js'
 import { PRE_APPROVED_SCENARIOS } from '../../lib/scenarioBank.js'
@@ -84,6 +84,12 @@ export function createDefaultCampusContext({ complete = completeViaGateway } = {
     users: {
       findById: async (id) => { const u = await findUserById(id); return u ? { id: u.id, name: u.name || null, email: u.email || null } : null },
       findByEmail: async (email) => { const u = await findUserByEmail(email); return u ? { id: u.id, name: u.name || null, email: u.email || null } : null },
+      // PROD-READY Phase 6: batched lookups (one query or one file read per
+      // list) and whether accounts share the campus database, so the student
+      // directory can be filtered and paged in SQL.
+      findManyByIds: async (ids) => new Map((await findUsersByIds(ids)).map((u) => [u.id, { id: u.id, name: u.name || null, email: u.email || null }])),
+      findManyByEmails: async (emails) => new Map((await findUsersByEmails(emails)).map((u) => [u.email, { id: u.id, name: u.name || null, email: u.email || null }])),
+      inDatabase: USER_STORE_BACKEND === 'pg' && isDbConfigured(),
     },
     sessionOwner: async (sessionId) => (await getSession(sessionId).catch(() => null))?.userId || null,
     legacy: {
@@ -118,5 +124,8 @@ export function createDefaultCampusContext({ complete = completeViaGateway } = {
     missionEvaluator: createMissionEvaluator({ complete }),
     sliceEvaluator: createSliceEvaluator({ complete, recordUnit: (unit, tx) => evidenceGraph.recordEvidenceUnit(unit, tx) }),
     preparationComplete: complete,
+    // Sessions and reports are in PostgreSQL exactly when accounts are
+    // (lib/db.js and lib/store.js use the same PRISM_PG_STORE rule).
+    legacyStoreInDatabase: USER_STORE_BACKEND === 'pg' && isDbConfigured(),
   })
 }

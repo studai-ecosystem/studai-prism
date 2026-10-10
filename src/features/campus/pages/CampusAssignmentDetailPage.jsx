@@ -3,24 +3,27 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Panel, StatCard } from '../../../components/ui/Card.jsx'
-import { DataTable } from '../../../components/ui/DataTable.jsx'
+import { DataTable, Pagination } from '../../../components/ui/DataTable.jsx'
 import { Button } from '../../../components/ui/Button.jsx'
 import { useToast } from '../../../components/ui/Toast.jsx'
 import { formatDate } from '../../student/QueryState.jsx'
 import { CampusPage, AssessmentStatus, ConfirmDialog, crumbs } from '../components/CampusPage.jsx'
 import { AssignmentStatus } from './CampusAssessmentsPage.jsx'
-import { useCampusOrg, useCompletion, useSetAssignmentStatus } from '../hooks.js'
+import { useCampusOrg, useCompletion, useSetAssignmentStatus, useCursorPages } from '../hooks.js'
 
 export default function CampusAssignmentDetailPage() {
   const { assignmentId } = useParams()
   const { orgId, can } = useCampusOrg()
   const toast = useToast()
-  const query = useCompletion(assignmentId)
+  const pages = useCursorPages()
+  const query = useCompletion(assignmentId, { cursor: pages.cursor })
   const setStatus = useSetAssignmentStatus(assignmentId)
   const [closing, setClosing] = useState(null)
   const d = query.data
   const title = d?.assignment.title || 'Assessment'
-  const count = (s) => d.students.filter((x) => x.status === s).length
+  // The server counts every student you can see (the table shows one page).
+  const count = (s) => (d.statusCounts ? d.statusCounts[s] || 0 : d.students.filter((x) => x.status === s).length)
+  const assigned = d ? (d.total ?? d.students.length) : 0
   const live = d && ['ACTIVE', 'SCHEDULED'].includes(d.assignment.status)
   return (
     <CampusPage
@@ -41,7 +44,7 @@ export default function CampusAssignmentDetailPage() {
           <section aria-labelledby="completion-heading">
             <h2 id="completion-heading" className="mb-3 text-base font-semibold text-prism-ink">Completion</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Assigned" value={d.students.length} provenance="Students you can see" />
+              <StatCard label="Assigned" value={assigned} provenance="Students you can see" />
               <StatCard label="Not started" value={count('ASSIGNED') + count('ACKNOWLEDGED')} />
               <StatCard label="In progress" value={count('IN_PROGRESS')} />
               <StatCard label="Completed" value={count('COMPLETED')} />
@@ -60,6 +63,15 @@ export default function CampusAssignmentDetailPage() {
                 { key: 'report', header: 'Report', render: (s) => (s.reportAvailable ? <Link className="text-prism-accent-strong hover:underline" to={`/campus/${orgId}/reports/${encodeURIComponent(s.sessionId)}`}>Open report</Link> : <span className="text-prism-ink-muted">Not available</span>) },
               ]}
             />
+            {(pages.hasPrevious || d.nextCursor) && (
+              <Pagination
+                summary={`Page ${pages.page} · ${assigned} ${assigned === 1 ? 'student' : 'students'}`}
+                hasPrevious={pages.hasPrevious}
+                hasNext={Boolean(d.nextCursor)}
+                onPrevious={pages.previous}
+                onNext={() => pages.next(d.nextCursor)}
+              />
+            )}
           </Panel>
         </div>
       )}

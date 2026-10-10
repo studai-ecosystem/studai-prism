@@ -90,6 +90,9 @@ export function createCampusAdminRepoMemory(db) {
     async listOrgMemberships(organizationId) {
       return [...db.memberships.values()].filter((m) => m.organizationId === organizationId).map(clone)
     },
+    async listStaffMemberships(organizationId) {
+      return [...db.memberships.values()].filter((m) => m.organizationId === organizationId && m.role !== 'STUDENT' && m.status !== 'REMOVED').map(clone)
+    },
     async lockOrganization() {},
     async getMembership(id) {
       return clone(db.memberships.get(id) || null)
@@ -166,6 +169,57 @@ export function createCampusAdminRepoMemory(db) {
     async listAssignmentStudents(assignmentId) {
       return [...db.assignmentStudents.values()].filter((s) => s.assignmentId === assignmentId).map(clone)
     },
+    // ── Batched reads for admin lists (PROD-READY Phase 6) ────────────────
+    // Every roster row of the organization's institution assignments (all
+    // statuses; callers filter), in assignment order then roster order.
+    async listOrgRosterRows(organizationId, { userId = null, completedOnly = false } = {}) {
+      const assignments = [...db.assignments.values()].filter((a) => a.organizationId === organizationId && a.sponsorType === 'INSTITUTION')
+      const byAssignment = new Map(assignments.map((a) => [a.id, []]))
+      for (const s of db.assignmentStudents.values()) {
+        if (userId && s.userId !== userId) continue
+        if (completedOnly && !(s.status === 'COMPLETED' && s.sessionId)) continue
+        byAssignment.get(s.assignmentId)?.push(s)
+      }
+      const out = []
+      for (const a of assignments) {
+        for (const s of byAssignment.get(a.id)) {
+          out.push({ assignmentId: a.id, definitionId: a.definitionId, assignmentStatus: a.status, userId: s.userId, status: s.status, sessionId: s.sessionId, startedAt: s.startedAt, completedAt: s.completedAt })
+        }
+      }
+      return out
+    },
+    // Roster counts per assignment: Map id → { total, <STATUS>: n }.
+    async countAssignmentRoster(assignmentIds) {
+      const out = new Map((assignmentIds || []).map((id) => [id, { total: 0 }]))
+      for (const s of db.assignmentStudents.values()) {
+        const c = out.get(s.assignmentId)
+        if (!c) continue
+        c.total += 1
+        c[s.status] = (c[s.status] || 0) + 1
+      }
+      return out
+    },
+    // One page of an assignment roster (roster order), optionally narrowed to
+    // `userIds`; `counts` are per status over the whole narrowed roster.
+    async listAssignmentStudentsPage(assignmentId, { userIds = null, offset = 0, limit = 50 } = {}) {
+      const allowed = userIds ? new Set(userIds) : null
+      const all = [...db.assignmentStudents.values()].filter((s) => s.assignmentId === assignmentId && (!allowed || allowed.has(s.userId)))
+      const counts = {}
+      for (const s of all) counts[s.status] = (counts[s.status] || 0) + 1
+      return { rows: all.slice(offset, offset + limit).map(clone), total: all.length, counts }
+    },
+    async listCohortMembersPage(cohortId, { offset = 0, limit = 50 } = {}) {
+      const all = [...db.cohortMembers.values()].filter((m) => m.cohortId === cohortId && m.status === 'ACTIVE')
+      return { rows: all.slice(offset, offset + limit).map(clone), total: all.length }
+    },
+    // PENDING, unexpired invites of the organization, oldest first.
+    async listPendingInvites(organizationId, { now, role = null, notRole = null, cohortId = null } = {}) {
+      const at = new Date(now).getTime()
+      return [...db.invites.values()]
+        .filter((i) => i.organizationId === organizationId && i.status === 'PENDING' && new Date(i.expiresAt).getTime() > at
+          && (!role || i.role === role) && (!notRole || i.role !== notRole) && (!cohortId || i.cohortId === cohortId))
+        .map(clone)
+    },
     async setAssignmentStatus(id, status) {
       const row = db.assignments.get(id)
       if (!row) return null
@@ -185,6 +239,10 @@ export function createCampusAdminRepoMemory(db) {
     },
     async listImportRows(jobId) {
       return db.importRows.filter((r) => r.jobId === jobId).sort((a, b) => a.rowNumber - b.rowNumber).map(clone)
+    },
+    async listImportRowsPage(jobId, { offset = 0, limit = 2000 } = {}) {
+      const all = db.importRows.filter((r) => r.jobId === jobId).sort((a, b) => a.rowNumber - b.rowNumber)
+      return { rows: all.slice(offset, offset + limit).map(clone), total: all.length }
     },
     // Moves PREVIEW → COMMITTED once; a second call with the same key replays.
     async commitImportJob(id, { commitKey, totals, outcomes }) {

@@ -1,6 +1,7 @@
 // React Query hooks for campus administration. Keys start with
 // ['ws', workspaceId, 'campus', orgId] so switching workspace or organization
 // never shows another context's data.
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import { useWorkspace, wsKey } from '../../app/providers/WorkspaceProvider.jsx'
@@ -37,6 +38,21 @@ function useCampusMutation(fn, invalidate = []) {
   })
 }
 
+// PROD-READY Phase 6: server cursor pages. The stack keeps the cursors of
+// the pages already visited, so "Previous" returns to exactly what was shown.
+export function useCursorPages() {
+  const [stack, setStack] = useState([null])
+  return {
+    cursor: stack[stack.length - 1],
+    page: stack.length,
+    hasPrevious: stack.length > 1,
+    next: (cursor) => { if (cursor) setStack((s) => [...s, cursor]) },
+    previous: () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)),
+    reset: () => setStack([null]),
+  }
+}
+const pageQuery = (params) => Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
+
 export const useOverview = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['overview'], () => api.overview(orgId)) }
 export function useStudents(filters) {
   const { orgId } = useCampusOrg()
@@ -45,14 +61,26 @@ export function useStudents(filters) {
 export const useStudent = (userId) => { const { orgId } = useCampusOrg(); return useCampusQuery(['student', userId], () => api.student(orgId, userId)) }
 export const useStructure = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['structure'], () => api.structure(orgId)) }
 export const useCohorts = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['cohorts'], () => api.cohorts(orgId)) }
-export const useCohort = (id) => { const { orgId } = useCampusOrg(); return useCampusQuery(['cohort', id], () => api.cohort(orgId, id)) }
+export function useCohort(id, { cursor = null, invitesCursor = null } = {}) {
+  const { orgId } = useCampusOrg()
+  const params = pageQuery({ cursor, invitesCursor })
+  return useCampusQuery(['cohort', id, params], () => api.cohort(orgId, id, params), { placeholderData: (prev) => prev })
+}
 export const usePrograms = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['programs'], () => api.programs(orgId)) }
 export const useProgram = (id) => { const { orgId } = useCampusOrg(); return useCampusQuery(['program', id], () => api.program(orgId, id)) }
 export const useCatalog = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['catalog'], () => api.catalog(orgId), { staleTime: 5 * 60 * 1000 }) }
 export const useConsentPreview = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['consent-preview'], () => api.consentPreview(orgId), { staleTime: 5 * 60 * 1000 }) }
 export const useAssignments = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['assignments'], () => api.assignments(orgId)) }
-export const useCompletion = (id) => { const { orgId } = useCampusOrg(); return useCampusQuery(['completion', id], () => api.completion(orgId, id)) }
-export const useMembers = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['members'], () => api.members(orgId)) }
+export function useCompletion(id, { cursor = null } = {}) {
+  const { orgId } = useCampusOrg()
+  const params = pageQuery({ cursor })
+  return useCampusQuery(['completion', id, params], () => api.completion(orgId, id, params), { placeholderData: (prev) => prev })
+}
+export function useMembers({ cursor = null } = {}) {
+  const { orgId } = useCampusOrg()
+  const params = pageQuery({ cursor })
+  return useCampusQuery(['members', params], () => api.members(orgId, params), { placeholderData: (prev) => prev })
+}
 export const useAuditLog = () => { const { orgId } = useCampusOrg(); return useCampusQuery(['audit'], () => api.audit(orgId, { limit: 50 })) }
 export const useOnboarding = (options = {}) => { const { orgId } = useCampusOrg(); return useCampusQuery(['onboarding'], () => api.onboarding(orgId), options) }
 export const useSponsorReport = (sessionId, { version = null } = {}) => { const { orgId } = useCampusOrg(); return useCampusQuery(['report', sessionId, version], () => fetchSponsorReport(orgId, sessionId, { version })) }

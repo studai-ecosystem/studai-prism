@@ -44,10 +44,17 @@ const Cohort = z.object({
   id: z.string(), name: z.string(), status: z.string(), semester: nullableStr.optional(), departmentId: nullableStr.optional(),
   campusId: nullableStr.optional(), academicProgramId: nullableStr.optional(), batchId: nullableStr.optional(), tags: z.array(z.string()).optional(), memberCount: z.number().optional(),
 })
+// PROD-READY Phase 6: long lists are paged on the server. Totals and next
+// cursors are optional so an older server's full lists still parse.
+const pageFields = { nextCursor: nullableStr.optional() }
 const CohortDetail = z.object({
   cohort: Cohort,
   members: z.array(z.object({ id: z.string(), name: nullableStr, email: nullableStr, addedAt: nullableStr.optional() })),
+  membersTotal: z.number().optional(),
+  ...pageFields,
   pendingInvites: z.array(z.object({ id: z.string(), email: z.string(), expiresAt: z.string() })),
+  pendingInvitesTotal: z.number().optional(),
+  nextInvitesCursor: nullableStr.optional(),
 })
 const Named = z.object({ id: z.string(), name: z.string() })
 const Structure = z.object({
@@ -89,9 +96,14 @@ const ConsentPreview = z.object({ copyVersion: z.string(), heading: z.string(), 
 const Completion = z.object({
   assignment: AssignmentSummary,
   students: z.array(z.object({ userId: z.string(), name: nullableStr, email: nullableStr, status: z.string(), startedAt: nullableStr, completedAt: nullableStr, reportAvailable: z.boolean(), sessionId: nullableStr })),
+  total: z.number().optional(),
+  statusCounts: z.record(z.number()).optional(),
+  ...pageFields,
 })
 const Members = z.object({
   members: z.array(z.object({ membershipId: z.string(), id: z.string(), name: nullableStr, email: nullableStr, role: z.string(), status: z.string(), departmentId: nullableStr, cohortIds: z.array(z.string()), joinedAt: nullableStr, isSelf: z.boolean() })),
+  total: z.number().optional(),
+  ...pageFields,
   pendingInvites: z.array(z.object({ id: z.string(), email: z.string(), role: z.string(), expiresAt: z.string() })),
   viewer: z.object({ canInvite: z.boolean(), canManageRoles: z.boolean() }),
 })
@@ -115,7 +127,7 @@ export const campusAdminApi = {
   structure: (orgId) => get(`${base(orgId)}/structure`, Structure),
   createStructure: (orgId, kind, body) => send('POST', `${base(orgId)}/structure/${kind}`, body, Named),
   cohorts: (orgId) => get(`${base(orgId)}/cohorts`, items(Cohort)).then((d) => d.items),
-  cohort: (orgId, id) => get(`${base(orgId)}/cohorts/${encodeURIComponent(id)}`, CohortDetail),
+  cohort: (orgId, id, query) => get(`${base(orgId)}/cohorts/${encodeURIComponent(id)}`, CohortDetail, { query }),
   createCohort: (orgId, body) => send('POST', `${base(orgId)}/cohorts`, body, Cohort),
   updateCohort: (orgId, id, body) => send('PATCH', `${base(orgId)}/cohorts/${encodeURIComponent(id)}`, body, Cohort),
   removeFromCohort: (orgId, id, userId) => send('DELETE', `${base(orgId)}/cohorts/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, undefined, z.object({ removed: z.boolean() })),
@@ -130,9 +142,9 @@ export const campusAdminApi = {
   consentPreview: (orgId) => get(`${base(orgId)}/consent-preview`, ConsentPreview),
   assignments: (orgId) => get(`${base(orgId)}/assignments`, items(AssignmentSummary)).then((d) => d.items),
   createAssignment: (orgId, body) => send('POST', `${base(orgId)}/assignments`, body, AssignmentSummary.extend({ rostered: z.number() }), { defaultErrorMessage: 'The assessment could not be assigned.' }),
-  completion: (orgId, id) => get(`${base(orgId)}/assignments/${encodeURIComponent(id)}`, Completion),
+  completion: (orgId, id, query) => get(`${base(orgId)}/assignments/${encodeURIComponent(id)}`, Completion, { query }),
   setAssignmentStatus: (orgId, id, status) => send('POST', `${base(orgId)}/assignments/${encodeURIComponent(id)}/status`, { status }, z.object({ id: z.string(), status: z.string() })),
-  members: (orgId) => get(`${base(orgId)}/members`, Members),
+  members: (orgId, query) => get(`${base(orgId)}/members`, Members, { query }),
   changeRole: (orgId, membershipId, role) => send('PATCH', `${base(orgId)}/members/${encodeURIComponent(membershipId)}`, { role }, z.object({ membershipId: z.string(), role: z.string() })),
   removeMember: (orgId, membershipId) => send('DELETE', `${base(orgId)}/members/${encodeURIComponent(membershipId)}`, undefined, z.object({ removed: z.boolean() })),
   invite: (orgId, body) => send('POST', `${base(orgId)}/invites`, body, z.array(z.object({ id: z.string(), email: z.string(), role: z.string(), delivery: z.string() })), { defaultErrorMessage: 'The invitation could not be sent.' }),

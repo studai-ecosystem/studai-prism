@@ -33,6 +33,22 @@ export async function findUserById(id) {
   return rowToUser(r?.rows?.[0])
 }
 
+// Batched lookups for admin directory views (PROD-READY Phase 6): one query
+// for any number of ids or addresses instead of one per row.
+export async function findUsersByIds(ids) {
+  const list = [...new Set((ids || []).map(String))]
+  if (!list.length) return []
+  const r = await query('SELECT * FROM v1_users WHERE id = ANY($1::text[])', [list])
+  return (r?.rows || []).map(rowToUser)
+}
+
+export async function findUsersByEmails(emails) {
+  const list = [...new Set((emails || []).map((e) => String(e).trim().toLowerCase()))]
+  if (!list.length) return []
+  const r = await query('SELECT * FROM v1_users WHERE email = ANY($1::text[])', [list])
+  return (r?.rows || []).map(rowToUser)
+}
+
 export async function createUser(user) {
   const normalized = String(user.email).trim().toLowerCase()
   const existing = await query('SELECT 1 FROM v1_users WHERE email = $1', [normalized])

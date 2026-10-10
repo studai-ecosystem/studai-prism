@@ -80,6 +80,10 @@ export function createAssessmentsRepoMemory(db) {
     async listTargets(assignmentId) {
       return db.assignmentTargets.filter((t) => t.assignmentId === assignmentId).map(clone)
     },
+    async listTargetsForAssignments(assignmentIds) {
+      const ids = new Set((assignmentIds || []).map(String))
+      return db.assignmentTargets.filter((t) => ids.has(String(t.assignmentId))).map(clone)
+    },
 
     async addStudent({ assignmentId, userId, status }) {
       if (!db.assignments.has(assignmentId)) throw new ApiError('NOT_FOUND', 'Not found')

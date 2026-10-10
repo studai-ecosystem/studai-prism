@@ -12,6 +12,7 @@ import { CAMPUS_ASSESSMENT_DISCLOSURE_COPY_VERSION } from '../sharing/copyVersio
 import { validateImport, IMPORT_LIMITS, csvCell } from './csv.js'
 import { csvRosterAdapter } from '../integrations/sis/index.js'
 import { contentRegistry } from '../content/versions.js'
+import { adminListWindow, nextOffsetCursor, offsetFromCursor } from '../http/pagination.js'
 
 export const ONBOARDING_STEPS = Object.freeze(['profile', 'structure', 'team', 'students', 'program', 'assessment', 'schedule', 'privacy', 'launch'])
 export const STAFF_ROLES = Object.freeze(ROLES.filter((r) => !['STUDENT', 'PRISM_REVIEWER', 'STUDAI_ADMIN'].includes(r)))
@@ -140,6 +141,67 @@ export function createCampusAdminService({
     const u = users ? await users.findById(userId).catch(() => null) : null
     return { id: userId, name: u?.name || null, email: u?.email || null }
   }
+  // Batched user-directory lookup (PROD-READY Phase 6): one directory read
+  // for a whole list instead of one per row. A directory without a batch
+  // method (test doubles) is read per id, a bounded number at a time.
+  // Map id → { id, name, email }; unknown ids get null name and email.
+  async function userCards(ids) {
+    const list = [...new Set((ids || []).filter((x) => x != null).map(String))]
+    const out = new Map()
+    if (!list.length) return out
+    let found = new Map()
+    if (users && typeof users.findManyByIds === 'function') {
+      found = await users.findManyByIds(list).catch(() => new Map())
+    } else if (users) {
+      for (let i = 0; i < list.length; i += 25) {
+        const chunk = list.slice(i, i + 25)
+        const rows = await Promise.all(chunk.map((id) => users.findById(id).catch(() => null)))
+        chunk.forEach((id, k) => { if (rows[k]) found.set(id, rows[k]) })
+      }
+    }
+    for (const id of list) {
+      const u = found.get(id)
+      out.set(id, { id, name: u?.name || null, email: u?.email || null })
+    }
+    return out
+  }
+  async function usersByEmail(emails) {
+    const list = [...new Set((emails || []).filter(Boolean).map((e) => String(e).trim().toLowerCase()))]
+    const out = new Map()
+    if (!list.length || !users) return out
+    if (typeof users.findManyByEmails === 'function') return users.findManyByEmails(list).catch(() => out)
+    for (const email of list) {
+      const u = await users.findByEmail(email).catch(() => null)
+      if (u) out.set(email, u)
+    }
+    return out
+  }
+  // Directory order for both the SQL and in-process paths: name (or email)
+  // compared lower-cased by code unit, then exact, members before invites,
+  // then id — deterministic, so pages never overlap.
+  const sortKey = (r) => String(r.name || r.email)
+  const directoryOrder = (a, b) => {
+    const ka = sortKey(a)
+    const kb = sortKey(b)
+    const la = ka.toLowerCase()
+    const lb = kb.toLowerCase()
+    if (la !== lb) return la < lb ? -1 : 1
+    if (ka !== kb) return ka < kb ? -1 : 1
+    if (a.kind !== b.kind) return a.kind === 'MEMBER' ? -1 : 1
+    const ia = String(a.userId || a.inviteId)
+    const ib = String(b.userId || b.inviteId)
+    return ia < ib ? -1 : ia > ib ? 1 : 0
+  }
+  const sqlDirectory = () => Boolean(users?.inDatabase) && typeof store().queryStudentDirectory === 'function'
+  const scopeModeOf = (decision) => {
+    if (decision.scope === 'ALL' || decision.scope === 'LIMITED') return 'FULL'
+    if (decision.scope === 'ASSIGNED' || decision.scope === 'DEPARTMENT') return decision.scope
+    return 'NONE'
+  }
+  const pendingInvites = async (organizationId, filter = {}) => (typeof store().listPendingInvites === 'function'
+    ? store().listPendingInvites(organizationId, { now: clock().toISOString(), ...filter })
+    : (await store().listOrgInvites(organizationId)).filter((i) => i.status === 'PENDING' && new Date(i.expiresAt) > clock()
+      && (!filter.role || i.role === filter.role) && (!filter.notRole || i.role !== filter.notRole) && (!filter.cohortId || i.cohortId === filter.cohortId)))
 
   // Students (ACTIVE memberships + pending invites) visible to `decision`.
   async function visibleStudents(organizationId, decision) {
@@ -147,9 +209,10 @@ export function createCampusAdminService({
       store().listOrgMemberships(organizationId),
       store().listCohortMembershipsForOrg(organizationId),
       store().listCohorts(organizationId),
-      store().listOrgInvites(organizationId),
+      pendingInvites(organizationId, { role: 'STUDENT' }),
     ])
     const cohortById = new Map(cohorts.map((c) => [c.id, c]))
+    const cohortRank = new Map(cohorts.map((c, i) => [c.id, i]))
     const cohortsOf = new Map()
     for (const r of cohortRows) {
       const c = cohortById.get(r.cohortId)
@@ -157,6 +220,8 @@ export function createCampusAdminService({
       if (!cohortsOf.has(r.userId)) cohortsOf.set(r.userId, [])
       cohortsOf.get(r.userId).push(c)
     }
+    // A student's cohorts in the organization's cohort order (created, id).
+    for (const list of cohortsOf.values()) list.sort((a, b) => cohortRank.get(a.id) - cohortRank.get(b.id))
     const full = decision.scope === 'ALL' || decision.scope === 'LIMITED'
     const students = memberships.filter((m) => m.role === 'STUDENT' && ['ACTIVE', 'SUSPENDED'].includes(m.status))
       .map((m) => ({ membership: m, userId: m.userId, cohorts: cohortsOf.get(m.userId) || [] }))
@@ -167,30 +232,59 @@ export function createCampusAdminService({
     return { students, pending, cohorts, cohortById }
   }
 
-  async function assignmentStatusByUser(organizationId) {
-    const out = new Map()
+  // Roster rows of the organization's assignments in one read (PROD-READY
+  // Phase 6), in assignment order then roster order. Stores without the
+  // batched read fall back to one read per assignment.
+  async function orgRosterRows(organizationId, { userId = null } = {}) {
+    if (typeof store().listOrgRosterRows === 'function') return store().listOrgRosterRows(organizationId, { userId })
+    const out = []
     for (const a of await store().listOrgAssignments(organizationId)) {
-      if (a.status === 'CANCELLED' || a.status === 'DRAFT') continue
       for (const s of await store().listAssignmentStudents(a.id)) {
-        if (!out.has(s.userId)) out.set(s.userId, [])
-        out.get(s.userId).push({ assignmentId: a.id, definitionId: a.definitionId, status: s.status, completedAt: s.completedAt })
+        if (userId && s.userId !== userId) continue
+        out.push({ assignmentId: a.id, definitionId: a.definitionId, assignmentStatus: a.status, userId: s.userId, status: s.status, sessionId: s.sessionId, startedAt: s.startedAt, completedAt: s.completedAt })
       }
     }
     return out
+  }
+
+  async function assignmentStatusByUser(organizationId, { userId = null } = {}) {
+    const out = new Map()
+    for (const r of await orgRosterRows(organizationId, { userId })) {
+      if (r.assignmentStatus === 'CANCELLED' || r.assignmentStatus === 'DRAFT') continue
+      if (!out.has(r.userId)) out.set(r.userId, [])
+      out.get(r.userId).push({ assignmentId: r.assignmentId, definitionId: r.definitionId, status: r.status, completedAt: r.completedAt })
+    }
+    return out
+  }
+
+  // Live assignments (ACTIVE/SCHEDULED) per target cohort, read once for a
+  // batch of roster syncs (an import, a move) instead of per student.
+  async function rosterPlan(organizationId, r = repos) {
+    const live = (await r.campusAdmin.listOrgAssignments(organizationId)).filter((a) => ['ACTIVE', 'SCHEDULED'].includes(a.status))
+    const targets = typeof r.assessments.listTargetsForAssignments === 'function'
+      ? await r.assessments.listTargetsForAssignments(live.map((a) => a.id))
+      : (await Promise.all(live.map((a) => r.assessments.listTargets(a.id)))).flat()
+    const byCohort = new Map()
+    const order = new Map(live.map((a, i) => [a.id, i]))
+    for (const t of targets) {
+      if (t.targetType !== 'COHORT' || !order.has(t.assignmentId)) continue
+      if (!byCohort.has(t.targetId)) byCohort.set(t.targetId, [])
+      byCohort.get(t.targetId).push(t.assignmentId)
+    }
+    for (const list of byCohort.values()) list.sort((a, b) => order.get(a) - order.get(b))
+    return byCohort
   }
 
   // Adds the student to every live assignment that targets `cohortId`.
   // `tx` (optional): repositories bound to the caller's open transaction
   // (invite acceptance, PROD-READY Phase 3), so the roster rows commit or
   // roll back with it.
-  async function syncRoster(organizationId, cohortId, userId, tx = null) {
+  // `plan` (optional): a rosterPlan() read once for many students.
+  async function syncRoster(organizationId, cohortId, userId, tx = null, plan = null) {
     const r = tx || repos
-    for (const a of await r.campusAdmin.listOrgAssignments(organizationId)) {
-      if (!['ACTIVE', 'SCHEDULED'].includes(a.status)) continue
-      const targets = await r.assessments.listTargets(a.id)
-      if (targets.some((t) => t.targetType === 'COHORT' && t.targetId === String(cohortId))) {
-        await r.assessments.addStudent({ assignmentId: a.id, userId, status: 'ASSIGNED' })
-      }
+    const byCohort = plan || await rosterPlan(organizationId, r)
+    for (const assignmentId of byCohort.get(String(cohortId)) || []) {
+      await r.assessments.addStudent({ assignmentId, userId, status: 'ASSIGNED' })
     }
     await onRosterSync(organizationId, cohortId, userId, tx)
   }
@@ -219,6 +313,19 @@ export function createCampusAdminService({
     return released
   }
 
+  function summaryOf(a, counts, targets, cat) {
+    // Effective status: windows open and close by time (K77).
+    const at = clock()
+    let status = a.status
+    if (status === 'SCHEDULED' && a.windowStart && new Date(a.windowStart) <= at) status = 'ACTIVE'
+    if (status === 'ACTIVE' && a.windowEnd && new Date(a.windowEnd) <= at) status = 'CLOSED'
+    return {
+      id: a.id, definitionId: a.definitionId, title: cat.definitions.find((d) => d.id === a.definitionId)?.title || null, status,
+      windowStart: a.windowStart, windowEnd: a.windowEnd, integrityPolicy: a.integrityPolicy, programId: a.programId || null,
+      cohortIds: targets.filter((t) => t.targetType === 'COHORT').map((t) => t.targetId), counts: { ...counts },
+    }
+  }
+
   async function runCommit(req, actor, organizationId, decision, job, commitKey) {
     const rows = await store().listImportRows(job.id)
     const outcomes = {}
@@ -230,16 +337,23 @@ export function createCampusAdminService({
       if (!byCohort.has(cohort.id)) byCohort.set(cohort.id, [])
       byCohort.get(cohort.id).push(r)
     }
+    // Read once for the whole file (PROD-READY Phase 6): the organization's
+    // cohorts, the accounts behind ALREADY_MEMBER rows and the live
+    // assignments per cohort — instead of per row.
+    const cohortById = new Map((await store().listCohorts(organizationId)).map((c) => [c.id, c]))
+    const existingByEmail = await usersByEmail(rows.filter((r) => r.action === 'ALREADY_MEMBER').map((r) => r.normalized.email))
+    let plan = null
     for (const r of rows) {
       if (r.action === 'ERROR') { outcomes[r.rowNumber] = 'SKIPPED'; continue }
-      const cohort = await repos.organizations.getCohort(r.normalized.cohortId)
+      const cohort = cohortById.get(r.normalized.cohortId)
       if (!cohort || cohort.organizationId !== organizationId || cohort.status !== 'ACTIVE' || !cohortInScope(decision, cohort)) { outcomes[r.rowNumber] = 'FAILED'; continue }
       if (r.action === 'ALREADY_MEMBER') {
         // One identity: an existing student is linked to the cohort, never duplicated.
-        const existing = users ? await users.findByEmail(r.normalized.email).catch(() => null) : null
+        const existing = existingByEmail.get(String(r.normalized.email).trim().toLowerCase()) || null
         if (existing && (!visible || visible.has(existing.id))) {
           await repos.organizations.addCohortMember({ cohortId: cohort.id, userId: existing.id, addedBy: actor.userId })
-          await syncRoster(organizationId, cohort.id, existing.id)
+          plan ||= await rosterPlan(organizationId)
+          await syncRoster(organizationId, cohort.id, existing.id, null, plan)
           outcomes[r.rowNumber] = 'SKIPPED'
         } else invite(cohort, r)
         continue
@@ -247,9 +361,8 @@ export function createCampusAdminService({
       invite(cohort, r)
     }
     // Only invites the uploader can reach are replaced; other teams' links stay.
-    const cohortById = new Map((await store().listCohorts(organizationId)).map((c) => [c.id, c]))
-    const before = (await store().listOrgInvites(organizationId))
-      .filter((i) => i.role === 'STUDENT' && i.status === 'PENDING' && new Date(i.expiresAt) > clock() && (decision.scope === 'ALL' || (i.cohortId && cohortInScope(decision, cohortById.get(i.cohortId)))))
+    const before = (await pendingInvites(organizationId, { role: 'STUDENT' }))
+      .filter((i) => decision.scope === 'ALL' || (i.cohortId && cohortInScope(decision, cohortById.get(i.cohortId))))
     const revoked = []
     for (const [cohortId, list] of byCohort) {
       const emails = list.map((r) => r.normalized.email)
@@ -275,6 +388,7 @@ export function createCampusAdminService({
 
   return {
     syncRoster,
+    rosterPlan,
     // Shared with other campus services (development interventions).
     cohortOf,
     orgAudit,
@@ -286,20 +400,44 @@ export function createCampusAdminService({
       const studentsDecision = decide(actor, organizationId, 'students.read')
       // Roles without student access see organization-level counts only.
       const decision = studentsDecision.allowed ? studentsDecision : { allowed: true, scope: 'NONE' }
+      // PROD-READY Phase 6: counted in SQL on PostgreSQL (one statement);
+      // the in-process path below is the reference (DB test: equal results).
+      if (typeof store().overviewCounts === 'function') {
+        const [counts, assignments, programs] = await Promise.all([
+          store().overviewCounts(organizationId, { scopeMode: scopeModeOf(decision), scopeCohortIds: decision.cohortIds || [], departmentId: decision.departmentId ?? null, now: clock().toISOString() }),
+          store().listOrgAssignments(organizationId),
+          store().listPrograms(organizationId),
+        ])
+        return {
+          enrolled: counts.enrolled,
+          invited: counts.invited,
+          cohorts: counts.cohorts,
+          activePrograms: programs.filter((p) => p.status === 'ACTIVE').length,
+          activeAssignments: assignments.filter((a) => (a.status === 'ACTIVE' || a.status === 'SCHEDULED') && !(a.windowEnd && new Date(a.windowEnd) <= clock())).length,
+          completion: { assigned: counts.assigned, completed: counts.completed },
+          missionsActive: null,
+          reassessmentsDue: null,
+          scope: decision.scope,
+        }
+      }
+      return this.overviewInProcess(organizationId, decision)
+    },
+    // The reference implementation (memory store, and the DB equivalence test).
+    async overviewInProcess(organizationId, decision) {
       const { students, pending, cohorts } = await visibleStudents(organizationId, decision)
       const visibleCohorts = cohorts.filter((c) => c.status === 'ACTIVE' && cohortInScope(decision, c))
       const visibleIds = new Set(students.map((s) => s.userId))
       let assigned = 0
       let completed = 0
       let activeAssignments = 0
-      for (const a of await store().listOrgAssignments(organizationId)) {
+      const [assignments, rosterRows] = await Promise.all([store().listOrgAssignments(organizationId), orgRosterRows(organizationId)])
+      for (const a of assignments) {
         if ((a.status === 'ACTIVE' || a.status === 'SCHEDULED') && !(a.windowEnd && new Date(a.windowEnd) <= clock())) activeAssignments += 1
-        if (a.status === 'CANCELLED' || a.status === 'DRAFT') continue
-        for (const s of await store().listAssignmentStudents(a.id)) {
-          if (!visibleIds.has(s.userId)) continue
-          assigned += 1
-          if (s.status === 'COMPLETED') completed += 1
-        }
+      }
+      for (const s of rosterRows) {
+        if (s.assignmentStatus === 'CANCELLED' || s.assignmentStatus === 'DRAFT' || !visibleIds.has(s.userId)) continue
+        assigned += 1
+        if (s.status === 'COMPLETED') completed += 1
       }
       const programs = (await store().listPrograms(organizationId)).filter((p) => p.status === 'ACTIVE').length
       return {
@@ -316,13 +454,27 @@ export function createCampusAdminService({
     },
 
     // ── Students (§21): server pagination + filters; no capability detail ──
-    async listStudents(actor, organizationId, decision, { page = 1, pageSize = 25, q = '', cohortId = null, status = null, assignmentStatus = null } = {}) {
+    // PROD-READY Phase 6: filtered, sorted and paged in SQL when accounts
+    // live in the campus database; otherwise one batched directory read and
+    // one roster read, then the same filters and order in process. `all`
+    // (export) returns every matching row.
+    async listStudents(actor, organizationId, decision, { page = 1, pageSize = 25, q = '', cohortId = null, status = null, assignmentStatus = null, all = false } = {}) {
       await getOrg(organizationId)
+      const size = Math.min(100, Math.max(1, pageSize))
+      const current = Math.max(1, page)
+      if (sqlDirectory()) {
+        const out = await store().queryStudentDirectory(organizationId, {
+          scopeMode: scopeModeOf(decision), scopeCohortIds: decision.cohortIds || [], departmentId: decision.departmentId ?? null, now: clock().toISOString(),
+          q, cohortId: cohortId || null, status: status || null, assessment: assignmentStatus || null,
+          offset: all ? 0 : (current - 1) * size, limit: all ? null : size,
+        })
+        return { items: out.items, total: out.total, page: all ? 1 : current, pageSize: all ? out.total : size }
+      }
       const { students, pending, cohortById } = await visibleStudents(organizationId, decision)
-      const statusByUser = await assignmentStatusByUser(organizationId)
+      const [statusByUser, cards] = await Promise.all([assignmentStatusByUser(organizationId), userCards(students.map((s) => s.userId))])
       const rows = []
       for (const s of students) {
-        const card = await userCard(s.userId)
+        const card = cards.get(String(s.userId))
         const assignments = statusByUser.get(s.userId) || []
         const latest = assignments[assignments.length - 1] || null
         rows.push({
@@ -345,16 +497,15 @@ export function createCampusAdminService({
         && (!cohortId || r.cohorts.some((c) => c.id === cohortId))
         && (!status || r.status === status)
         && (!assignmentStatus || r.assessment.status === assignmentStatus))
-        .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)))
-      const size = Math.min(100, Math.max(1, pageSize))
-      const start = (Math.max(1, page) - 1) * size
-      return { items: filtered.slice(start, start + size), total: filtered.length, page: Math.max(1, page), pageSize: size }
+        .sort(directoryOrder)
+      if (all) return { items: filtered, total: filtered.length, page: 1, pageSize: filtered.length }
+      const start = (current - 1) * size
+      return { items: filtered.slice(start, start + size), total: filtered.length, page: current, pageSize: size }
     },
 
     async exportStudents(req, actor, organizationId, decision, filters = {}) {
-      const out = await this.listStudents(actor, organizationId, decision, { ...filters, page: 1, pageSize: 100 })
-      let all = out.items
-      for (let p = 2; (p - 1) * 100 < out.total; p += 1) all = all.concat((await this.listStudents(actor, organizationId, decision, { ...filters, page: p, pageSize: 100 })).items)
+      // One read of the whole filtered directory (it was re-read per page).
+      const all = (await this.listStudents(actor, organizationId, decision, { ...filters, all: true })).items
       await orgAudit(req, organizationId, 'report.exported', 'STUDENT_DIRECTORY', null, { rows: all.length, fields: ['name', 'email', 'status', 'cohorts', 'assessment_status'] })
       const lines = [['name', 'email', 'status', 'cohorts', 'assessment_status'].join(',')]
       for (const r of all) lines.push([r.name, r.email, r.status, r.cohorts.map((c) => c.name).join('; '), r.assessment.status].map(csvCell).join(','))
@@ -364,22 +515,28 @@ export function createCampusAdminService({
     // ── Student detail (§22): sponsored data only ─────────────────────────
     async getStudent(req, actor, organizationId, decision, studentId) {
       await getOrg(organizationId)
-      const { students } = await visibleStudents(organizationId, decision)
-      const s = students.find((x) => x.userId === studentId)
+      // PROD-READY Phase 6: only this student's membership and cohorts are
+      // read for the scope check (the whole visible set was loaded before).
+      let s
+      if (typeof store().getStudentInOrg === 'function') {
+        const found = await store().getStudentInOrg(organizationId, studentId)
+        const full = decision.scope === 'ALL' || decision.scope === 'LIMITED'
+        s = found && (full || found.cohorts.some((c) => cohortInScope(decision, c))) ? { membership: found.membership, userId: studentId, cohorts: found.cohorts } : null
+      } else {
+        s = (await visibleStudents(organizationId, decision)).students.find((x) => x.userId === studentId)
+      }
       if (!s) throw new ApiError('NOT_FOUND', 'Not found')
       await repos.audit.recordDataAccess({ actorUserId: actor.userId, organizationId, subjectUserId: studentId, resourceType: 'CAMPUS_STUDENT', resourceId: studentId, action: 'READ', purpose: 'STUDENT_DETAIL', requestId: req.requestId || null })
       const card = await userCard(studentId)
-      const statusByUser = await assignmentStatusByUser(organizationId)
+      // This student's roster rows only, in one read (PROD-READY Phase 6).
+      const rows = await orgRosterRows(organizationId, { userId: studentId })
       const cat = await catalog.getCatalog()
-      const assignments = (statusByUser.get(studentId) || []).map((a) => ({
-        ...a,
-        title: cat.definitions.find((d) => d.id === a.definitionId)?.title || null,
+      const assignments = rows.filter((r) => r.assignmentStatus !== 'CANCELLED' && r.assignmentStatus !== 'DRAFT').map((r) => ({
+        assignmentId: r.assignmentId, definitionId: r.definitionId, status: r.status, completedAt: r.completedAt,
+        title: cat.definitions.find((d) => d.id === r.definitionId)?.title || null,
       }))
-      const sessions = []
-      for (const a of await store().listOrgAssignments(organizationId)) {
-        const row = (await store().listAssignmentStudents(a.id)).find((x) => x.userId === studentId)
-        if (row?.sessionId && row.status === 'COMPLETED') sessions.push({ assignmentId: a.id, sessionId: row.sessionId, reportPath: `/api/v1/organizations/${organizationId}/sessions/${row.sessionId}/report` })
-      }
+      const sessions = rows.filter((r) => r.sessionId && r.status === 'COMPLETED')
+        .map((r) => ({ assignmentId: r.assignmentId, sessionId: r.sessionId, reportPath: `/api/v1/organizations/${organizationId}/sessions/${r.sessionId}/report` }))
       const grants = (await repos.sharing.listShareGrantsForOwner(studentId))
         .filter((g) => g.recipientType === 'ORGANIZATION' && g.recipientOrganizationId === organizationId && !g.revokedAt && new Date(g.expiresAt) > clock())
         .map((g) => ({ id: g.id, expiresAt: g.expiresAt, resources: g.resources.map((r) => ({ resourceType: r.resourceType, disclosureLevel: r.disclosureLevel })) }))
@@ -425,14 +582,30 @@ export function createCampusAdminService({
       await orgAudit(req, organizationId, 'cohort.created', 'COHORT', row.id, { name: row.name })
       return row
     },
-    async getCohort(actor, organizationId, decision, cohortId) {
+    // PROD-READY Phase 6: members and pending invitations are paged
+    // (`cursor`/`limit` for members, `invitesCursor` for invitations; the same
+    // `limit`). Totals and next cursors are additive fields.
+    async getCohort(actor, organizationId, decision, cohortId, { cursor = null, invitesCursor = null, limit = null } = {}) {
       const c = await cohortOf(organizationId, cohortId)
       if (!cohortInScope(decision, c)) throw new ApiError('NOT_FOUND', 'Not found')
-      const members = await store().listCohortMembers(c.id)
-      const cards = []
-      for (const m of members) cards.push({ ...(await userCard(m.userId)), addedAt: m.addedAt })
-      const pending = (await store().listOrgInvites(organizationId)).filter((i) => i.cohortId === c.id && i.status === 'PENDING' && new Date(i.expiresAt) > clock())
-      return { cohort: { ...c, memberCount: members.length }, members: cards, pendingInvites: pending.map((i) => ({ id: i.id, email: i.email, expiresAt: i.expiresAt })) }
+      const win = adminListWindow({ cursor, limit })
+      const inv = adminListWindow({ cursor: invitesCursor, limit })
+      let members
+      if (typeof store().listCohortMembersPage === 'function') members = await store().listCohortMembersPage(c.id, win)
+      else {
+        const all = await store().listCohortMembers(c.id)
+        members = { rows: all.slice(win.offset, win.offset + win.limit), total: all.length }
+      }
+      const [cards, pending] = await Promise.all([userCards(members.rows.map((m) => m.userId)), pendingInvites(organizationId, { cohortId: c.id })])
+      return {
+        cohort: { ...c, memberCount: members.total },
+        members: members.rows.map((m) => ({ ...cards.get(String(m.userId)), addedAt: m.addedAt })),
+        membersTotal: members.total,
+        nextCursor: nextOffsetCursor(win.offset, win.limit, members.total),
+        pendingInvites: pending.slice(inv.offset, inv.offset + inv.limit).map((i) => ({ id: i.id, email: i.email, expiresAt: i.expiresAt })),
+        pendingInvitesTotal: pending.length,
+        nextInvitesCursor: nextOffsetCursor(inv.offset, inv.limit, pending.length),
+      }
     },
     async updateCohort(req, actor, organizationId, cohortId, patch) {
       const c = await cohortOf(organizationId, cohortId)
@@ -459,11 +632,12 @@ export function createCampusAdminService({
         ? new Set((await store().listOrgMemberships(organizationId)).filter((m) => m.role === 'STUDENT' && m.status === 'ACTIVE').map((m) => m.userId))
         : new Set((await visibleStudents(organizationId, decide(actor, organizationId, 'students.manage'))).students.filter((s) => s.membership.status === 'ACTIVE').map((s) => s.userId))
       const moved = []
+      const plan = await rosterPlan(organizationId)
       for (const userId of [...new Set(userIds)]) {
         if (!eligible.has(userId)) continue
         if (from) await store().removeCohortMember(from.id, userId)
         await repos.organizations.addCohortMember({ cohortId: to.id, userId, addedBy: actor.userId })
-        await syncRoster(organizationId, to.id, userId)
+        await syncRoster(organizationId, to.id, userId, null, plan)
         moved.push(userId)
       }
       await orgAudit(req, organizationId, 'cohort.members_moved', 'COHORT', to.id, { count: moved.length, fromCohortId: from?.id || null })
@@ -492,12 +666,9 @@ export function createCampusAdminService({
         ? (await store().listOrgMemberships(organizationId)).filter((x) => x.role === 'STUDENT' && x.status === 'ACTIVE').map((m) => m.userId)
         : (await visibleStudents(organizationId, decision)).students.filter((s) => s.membership.status === 'ACTIVE').map((s) => s.userId)
       const memberEmails = new Set()
-      for (const userId of known) {
-        const card = await userCard(userId)
-        if (card.email) memberEmails.add(card.email.toLowerCase())
-      }
+      for (const card of (await userCards(known)).values()) if (card.email) memberEmails.add(card.email.toLowerCase())
       const pendingEmails = new Set((decision.scope === 'ALL'
-        ? (await store().listOrgInvites(organizationId)).filter((i) => i.role === 'STUDENT' && i.status === 'PENDING' && new Date(i.expiresAt) > clock())
+        ? await pendingInvites(organizationId, { role: 'STUDENT' })
         : (await visibleStudents(organizationId, decision)).pending).map((i) => i.email))
       const result = validateImport(csvRosterAdapter.readRows(csv), { cohortsByName: new Map(cohorts.map((c) => [c.name.toLowerCase(), c])), defaultCohort, memberEmails, pendingEmails })
       if (result.error) {
@@ -508,9 +679,16 @@ export function createCampusAdminService({
       await orgAudit(req, organizationId, 'import.previewed', 'IMPORT_JOB', job.id, result.totals)
       return { job, rows: result.rows }
     },
-    async getImport(actor, organizationId, decision, jobId) {
+    // An import has at most IMPORT_LIMITS.maxRows rows, so by default every
+    // row is returned as before; `cursor`/`limit` page them (PROD-READY Phase 6).
+    async getImport(actor, organizationId, decision, jobId, { cursor = null, limit = null } = {}) {
       const job = await importJobFor(actor, organizationId, decision, jobId)
-      return { job, rows: await store().listImportRows(jobId) }
+      const offset = offsetFromCursor(cursor)
+      const size = Math.min(IMPORT_LIMITS.maxRows, Math.max(1, Number(limit) || IMPORT_LIMITS.maxRows))
+      const page = typeof store().listImportRowsPage === 'function'
+        ? await store().listImportRowsPage(jobId, { offset, limit: size })
+        : await store().listImportRows(jobId).then((all) => ({ rows: all.slice(offset, offset + size), total: all.length }))
+      return { job, rows: page.rows, rowsTotal: page.total, nextCursor: nextOffsetCursor(offset, size, page.total) }
     },
     async commitImport(req, actor, organizationId, decision, jobId, commitKey) {
       if (!commitKey) throw new ApiError('IDEMPOTENCY_KEY_REQUIRED', 'An Idempotency-Key is required.')
@@ -574,7 +752,7 @@ export function createCampusAdminService({
       if (!(decision.scope === 'ALL' || decision.scope === 'LIMITED') && !cohorts.some((c) => cohortInScope(decision, c))) throw new ApiError('NOT_FOUND', 'Not found')
       const assignmentIds = await store().listProgramAssignments(p.id)
       const assignments = (await store().listOrgAssignments(organizationId)).filter((a) => assignmentIds.includes(a.id))
-      return { program: p, cohorts: cohorts.map((c) => ({ id: c.id, name: c.name, memberCount: c.memberCount })), assignments: await Promise.all(assignments.map((a) => this.assignmentSummary(a))) }
+      return { program: p, cohorts: cohorts.map((c) => ({ id: c.id, name: c.name, memberCount: c.memberCount })), assignments: await this.assignmentSummaries(assignments) }
     },
     async updateProgram(req, actor, organizationId, programId, patch) {
       const d = requireDecision(actor, organizationId, 'programs.write')
@@ -610,31 +788,35 @@ export function createCampusAdminService({
     },
     consentPreview: consentPreviewFor,
     async assignmentSummary(a) {
-      const roster = await store().listAssignmentStudents(a.id)
-      const counts = { total: roster.length }
-      for (const s of roster) counts[s.status] = (counts[s.status] || 0) + 1
-      const cat = await catalog.getCatalog()
-      const targets = await repos.assessments.listTargets(a.id)
-      // Effective status: windows open and close by time (K77).
-      const at = clock()
-      let status = a.status
-      if (status === 'SCHEDULED' && a.windowStart && new Date(a.windowStart) <= at) status = 'ACTIVE'
-      if (status === 'ACTIVE' && a.windowEnd && new Date(a.windowEnd) <= at) status = 'CLOSED'
-      return {
-        id: a.id, definitionId: a.definitionId, title: cat.definitions.find((d) => d.id === a.definitionId)?.title || null, status,
-        windowStart: a.windowStart, windowEnd: a.windowEnd, integrityPolicy: a.integrityPolicy, programId: a.programId || null,
-        cohortIds: targets.filter((t) => t.targetType === 'COHORT').map((t) => t.targetId), counts,
-      }
+      return (await this.assignmentSummaries([a]))[0]
+    },
+    // Summaries of many assignments with one count query and one target
+    // query (PROD-READY Phase 6) instead of loading every roster.
+    async assignmentSummaries(list) {
+      if (!list.length) return []
+      const ids = list.map((a) => a.id)
+      const [countsById, targets, cat] = await Promise.all([
+        typeof store().countAssignmentRoster === 'function'
+          ? store().countAssignmentRoster(ids)
+          : Promise.all(list.map(async (a) => {
+            const roster = await store().listAssignmentStudents(a.id)
+            const c = { total: roster.length }
+            for (const s of roster) c[s.status] = (c[s.status] || 0) + 1
+            return [a.id, c]
+          })).then((pairs) => new Map(pairs)),
+        typeof repos.assessments.listTargetsForAssignments === 'function'
+          ? repos.assessments.listTargetsForAssignments(ids)
+          : Promise.all(list.map((a) => repos.assessments.listTargets(a.id))).then((x) => x.flat()),
+        catalog.getCatalog(),
+      ])
+      return list.map((a) => summaryOf(a, countsById.get(a.id) || { total: 0 }, targets.filter((t) => t.assignmentId === a.id), cat))
     },
     async listAssignments(actor, organizationId, decision) {
       await getOrg(organizationId)
-      const cohorts = await store().listCohorts(organizationId)
-      const out = []
-      for (const a of await store().listOrgAssignments(organizationId)) {
-        const summary = await this.assignmentSummary(a)
-        if (decision.scope === 'ALL' || decision.scope === 'LIMITED' || summary.cohortIds.some((id) => cohortInScope(decision, cohorts.find((c) => c.id === id)))) out.push(summary)
-      }
-      return out
+      const [cohorts, assignments] = await Promise.all([store().listCohorts(organizationId), store().listOrgAssignments(organizationId)])
+      const byId = new Map(cohorts.map((c) => [c.id, c]))
+      return (await this.assignmentSummaries(assignments))
+        .filter((summary) => decision.scope === 'ALL' || decision.scope === 'LIMITED' || summary.cohortIds.some((id) => cohortInScope(decision, byId.get(id))))
     },
     async createAssignment(req, actor, organizationId, input) {
       const org = await getOrg(organizationId)
@@ -681,36 +863,51 @@ export function createCampusAdminService({
       {
         const url = appUrl ? `${appUrl}/app/campus/${organizationId}/assignments` : null
         const notified = new Set()
-        for (const c of cohorts) {
-          for (const m of await store().listCohortMembers(c.id)) {
+        const memberLists = []
+        for (const c of cohorts) memberLists.push(await store().listCohortMembers(c.id))
+        const cards = url ? await userCards(memberLists.flat().map((m) => m.userId)) : new Map()
+        for (const members of memberLists) {
+          for (const m of members) {
             if (notified.has(m.userId)) continue
             await repos.assessments.addStudent({ assignmentId: a.id, userId: m.userId, status: 'ASSIGNED' })
             notified.add(m.userId)
             rostered += 1
             await notify({ userId: m.userId, organizationId, kind: 'ASSIGNMENT_LAUNCHED', payload: { assignmentId: a.id, title: def.title, organizationName: org.name, windowEnd: a.windowEnd } })
-            const card = await userCard(m.userId)
-            if (card.email && url) await sendAssignmentEmail({ to: card.email, organizationName: org.name, assessmentTitle: def.title, dueAt: a.windowEnd, url }).catch(() => false)
+            const card = cards.get(String(m.userId))
+            if (card?.email && url) await sendAssignmentEmail({ to: card.email, organizationName: org.name, assessmentTitle: def.title, dueAt: a.windowEnd, url }).catch(() => false)
           }
         }
       }
       await orgAudit(req, organizationId, 'assignment.launched', 'ASSIGNMENT', a.id, { definitionId: def.id, status, cohorts: cohorts.length, rostered })
       return { ...(await this.assignmentSummary(a)), rostered }
     },
-    async assignmentCompletion(actor, organizationId, decision, assignmentId) {
+    // PROD-READY Phase 6: the roster is paged (`cursor`, `limit`; roster
+    // order). `statusCounts` and `total` cover every student the caller can
+    // see, so completion figures no longer depend on the page.
+    async assignmentCompletion(actor, organizationId, decision, assignmentId, { cursor = null, limit = null } = {}) {
       const a = await repos.assessments.getAssignment(assignmentId)
       if (!a || a.organizationId !== organizationId || a.sponsorType !== 'INSTITUTION') throw new ApiError('NOT_FOUND', 'Not found')
+      const win = adminListWindow({ cursor, limit })
       const summary = await this.assignmentSummary(a)
       const cohorts = await store().listCohorts(organizationId)
       const full = decision.scope === 'ALL' || decision.scope === 'LIMITED'
       if (!full && !summary.cohortIds.some((id) => cohortInScope(decision, cohorts.find((c) => c.id === id)))) throw new ApiError('NOT_FOUND', 'Not found')
-      const visible = full ? null : new Set((await visibleStudents(organizationId, decision)).students.map((s) => s.userId))
-      const students = []
-      for (const s of await store().listAssignmentStudents(a.id)) {
-        if (visible && !visible.has(s.userId)) continue
-        const card = await userCard(s.userId)
-        students.push({ userId: s.userId, name: card.name, email: card.email, status: s.status, startedAt: s.startedAt, completedAt: s.completedAt, reportAvailable: s.status === 'COMPLETED' && Boolean(s.sessionId), sessionId: s.status === 'COMPLETED' ? s.sessionId : null })
+      const visible = full ? null : (await visibleStudents(organizationId, decision)).students.map((s) => s.userId)
+      let page
+      if (typeof store().listAssignmentStudentsPage === 'function') page = await store().listAssignmentStudentsPage(a.id, { userIds: visible, ...win })
+      else {
+        const allowed = visible ? new Set(visible) : null
+        const all = (await store().listAssignmentStudents(a.id)).filter((s) => !allowed || allowed.has(s.userId))
+        const counts = {}
+        for (const s of all) counts[s.status] = (counts[s.status] || 0) + 1
+        page = { rows: all.slice(win.offset, win.offset + win.limit), total: all.length, counts }
       }
-      return { assignment: summary, students }
+      const cards = await userCards(page.rows.map((s) => s.userId))
+      const students = page.rows.map((s) => {
+        const card = cards.get(String(s.userId))
+        return { userId: s.userId, name: card.name, email: card.email, status: s.status, startedAt: s.startedAt, completedAt: s.completedAt, reportAvailable: s.status === 'COMPLETED' && Boolean(s.sessionId), sessionId: s.status === 'COMPLETED' ? s.sessionId : null }
+      })
+      return { assignment: summary, students, total: page.total, statusCounts: page.counts, nextCursor: nextOffsetCursor(win.offset, win.limit, page.total) }
     },
     async closeAssignment(req, actor, organizationId, assignmentId, status) {
       const d = requireDecision(actor, organizationId, 'assignments.write')
@@ -816,15 +1013,23 @@ export function createCampusAdminService({
     },
 
     // ── Team (§29) ────────────────────────────────────────────────────────
-    async listMembers(actor, organizationId) {
+    // PROD-READY Phase 6: one directory read for the page of members
+    // (`cursor`/`limit`; `total` and `nextCursor` are additive).
+    async listMembers(actor, organizationId, { cursor = null, limit = null } = {}) {
       await getOrg(organizationId)
-      const rows = (await store().listOrgMemberships(organizationId)).filter((m) => m.role !== 'STUDENT' && m.status !== 'REMOVED')
-      const out = []
-      for (const m of rows) out.push({ membershipId: m.id, ...(await userCard(m.userId)), role: m.role, status: m.status, departmentId: m.departmentId, cohortIds: m.scope?.cohortIds || [], joinedAt: m.joinedAt, isSelf: m.userId === actor.userId })
-      const pending = (await store().listOrgInvites(organizationId)).filter((i) => i.role !== 'STUDENT' && i.status === 'PENDING' && new Date(i.expiresAt) > clock())
+      const win = adminListWindow({ cursor, limit })
+      const all = typeof store().listStaffMemberships === 'function'
+        ? await store().listStaffMemberships(organizationId)
+        : (await store().listOrgMemberships(organizationId)).filter((m) => m.role !== 'STUDENT' && m.status !== 'REMOVED')
+      const rows = all.slice(win.offset, win.offset + win.limit)
+      const cards = await userCards(rows.map((m) => m.userId))
+      const out = rows.map((m) => ({ membershipId: m.id, ...cards.get(String(m.userId)), role: m.role, status: m.status, departmentId: m.departmentId, cohortIds: m.scope?.cohortIds || [], joinedAt: m.joinedAt, isSelf: m.userId === actor.userId }))
+      const pending = await pendingInvites(organizationId, { notRole: 'STUDENT' })
       const team = decide(actor, organizationId, 'team.manage')
       return {
         members: out,
+        total: all.length,
+        nextCursor: nextOffsetCursor(win.offset, win.limit, all.length),
         pendingInvites: pending.map((i) => ({ id: i.id, email: i.email, role: i.role, expiresAt: i.expiresAt })),
         // UI visibility only; every change is re-checked on the server.
         viewer: { canInvite: team.allowed, canManageRoles: team.allowed && team.scope === 'ALL' },
@@ -900,9 +1105,10 @@ export function createCampusAdminService({
     async auditLog(organizationId, { limit = 50, before = null } = {}) {
       await getOrg(organizationId)
       const rows = await store().listOrgAudit(organizationId, { limit: Math.min(100, Math.max(1, limit)), before })
+      const cards = await userCards(rows.map((e) => e.actorUserId))
       const out = []
       for (const e of rows) {
-        const actorCard = await userCard(e.actorUserId)
+        const actorCard = cards.get(String(e.actorUserId)) || { name: null, email: null }
         out.push({ id: e.id, at: e.createdAt, actor: { name: actorCard.name, email: actorCard.email }, action: e.action, targetType: e.targetType, targetId: e.targetId, details: e.details })
       }
       return { items: out, nextBefore: rows.length ? rows[rows.length - 1].createdAt : null }

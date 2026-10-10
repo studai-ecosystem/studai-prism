@@ -2,11 +2,11 @@
 // the largest development opportunity and offers the next action; a cohort is
 // seen through sections; an intervention shows baseline to change; the data
 // boundary is stated; charts say what is empty or too small.
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest'
 import { render as rtlRender, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Routes, Route } from 'react-router-dom'
-import { renderApp, meBody, signIn, jsonResponse } from '../../test/utils.jsx'
+import { renderApp, meBody, signIn, jsonResponse, preloadCampusCharts } from '../../test/utils.jsx'
 import { WorkspaceGuard } from '../../app/guards/WorkspaceGuard.jsx'
 import CampusOverviewPage from './pages/CampusOverviewPage.jsx'
 import CampusCohortDetailPage from './pages/CampusCohortDetailPage.jsx'
@@ -58,6 +58,8 @@ function renderCampus(element, path, routes, permissions, { type = 'CAMPUS_ADMIN
 }
 
 afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); localStorage.clear() })
+// Load the lazy chart chunk before the tests, not inside one (P69).
+beforeAll(() => preloadCampusCharts())
 
 describe('Campus overview insight', () => {
   it('names the largest development opportunity and offers the next action only to someone who may take it', async () => {

@@ -57,23 +57,34 @@ export default function CampusImportPage() {
   const step = result ? 2 : preview.data ? 1 : 0
   const cohortOptions = (cohorts.data || []).filter((c) => c.status === 'ACTIVE').map((c) => ({ value: c.id, label: c.name }))
 
+  // The file is read asynchronously; "Check file" pressed while it is still
+  // being read waits for it instead of reporting that no file was chosen.
+  const reading = useRef(null)
+  const chosen = useRef(null)
+  const choose = (value) => { chosen.current = value; setFile(value) }
+
   async function onFile(e) {
     const f = e.target.files?.[0]
-    setFile(null)
+    choose(null)
     setFileError(null)
     if (!f) return
     if (!/\.csv$/i.test(f.name) && f.type !== 'text/csv') return setFileError('Choose a .csv file.')
     if (f.size > MAX_BYTES) return setFileError('This file is larger than 1 MB. Split it into smaller files.')
-    const text = await readText(f).catch(() => null)
+    const pending = readText(f).catch(() => null)
+    reading.current = pending
+    const text = await pending
+    if (reading.current === pending) reading.current = null
     if (text === null) return setFileError('This file could not be read. Try saving it again as CSV.')
-    return setFile({ name: f.name, text })
+    return choose({ name: f.name, text })
   }
 
-  function onCheck(e) {
+  async function onCheck(e) {
     e.preventDefault()
-    if (!file) { setFileError('Choose a CSV file first.'); return focusFirstInvalid() }
+    if (reading.current) await reading.current
+    const current = chosen.current
+    if (!current) { setFileError('Choose a CSV file first.'); return focusFirstInvalid() }
     commitKey.current = newIdempotencyKey('import')
-    return preview.mutate({ fileName: file.name, csv: file.text, ...(defaultCohortId ? { defaultCohortId } : {}) }, {
+    return preview.mutate({ fileName: current.name, csv: current.text, ...(defaultCohortId ? { defaultCohortId } : {}) }, {
       onSuccess: () => requestAnimationFrame(() => heading.current?.focus()),
     })
   }
@@ -93,7 +104,7 @@ export default function CampusImportPage() {
     preview.reset()
     commit.reset()
     setResult(null)
-    setFile(null)
+    choose(null)
     requestAnimationFrame(() => document.getElementById('import-file')?.focus())
   }
 

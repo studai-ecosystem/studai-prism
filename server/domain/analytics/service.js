@@ -28,7 +28,14 @@ export const NEEDS_METHOD = 'A student counts as needing further evidence or dev
 const bucketOf = (d) => (d && ADMISSIBLE.has(d.status) && d.level?.band && BUCKETS.includes(d.level.band) ? d.level.band : 'INSUFFICIENT')
 const emptyBuckets = () => Object.fromEntries(BUCKETS.map((b) => [b, 0]))
 
-export function createAnalyticsService({ repos, entryFor, growth = null }) {
+export function createAnalyticsService({ repos, entryFor = null, entriesFor = null, growth = null }) {
+  // Batched decision loader (PROD-READY Phase 6): the materialised cache when
+  // it is on, otherwise the per-session loader, a bounded number at a time.
+  const loadEntries = entriesFor || (async (refs) => {
+    const out = new Map()
+    for (const r of refs) out.set(String(r.sessionId), await entryFor(r.sessionId))
+    return out
+  })
   const ca = () => repos.campusAdmin
 
   async function minGroupSize(organizationId) {
@@ -56,7 +63,9 @@ export function createAnalyticsService({ repos, entryFor, growth = null }) {
       && (!filters.campusId || c.campusId === filters.campusId)
       && (!filters.batchId || c.batchId === filters.batchId)
       && (!programCohorts || programCohorts.has(c.id)))
-    const students = new Set((await ca().listOrgMemberships(organizationId)).filter((m) => m.role === 'STUDENT' && m.status === 'ACTIVE').map((m) => m.userId))
+    const students = new Set(typeof ca().listActiveStudentIds === 'function'
+      ? await ca().listActiveStudentIds(organizationId)
+      : (await ca().listOrgMemberships(organizationId)).filter((m) => m.role === 'STUDENT' && m.status === 'ACTIVE').map((m) => m.userId))
     const chosen = new Set(cohorts.map((c) => c.id))
     const cohortsOf = new Map()
     for (const m of await ca().listCohortMembershipsForOrg(organizationId)) {
@@ -74,8 +83,16 @@ export function createAnalyticsService({ repos, entryFor, growth = null }) {
     const from = filters.from ? new Date(`${filters.from}T00:00:00.000Z`) : null
     const to = filters.to ? new Date(`${filters.to}T23:59:59.999Z`) : null
     const latest = new Map()
-    for (const a of await ca().listOrgAssignments(organizationId)) {
-      for (const s of await ca().listAssignmentStudents(a.id)) {
+    if (typeof ca().latestCompletedSessions === 'function') {
+      // PostgreSQL picks each student's latest completed session (PROD-READY Phase 6).
+      for (const s of await ca().latestCompletedSessions(organizationId, { from, to })) if (userIds.has(s.userId)) latest.set(s.userId, s)
+    } else {
+      // One roster read for the organization (PROD-READY Phase 6), in the same
+      // assignment-then-roster order as the per-assignment reads it replaces.
+      const rows = typeof ca().listOrgRosterRows === 'function'
+        ? await ca().listOrgRosterRows(organizationId, { completedOnly: true })
+        : (await Promise.all((await ca().listOrgAssignments(organizationId)).map((a) => ca().listAssignmentStudents(a.id)))).flat()
+      for (const s of rows) {
         if (s.status !== 'COMPLETED' || !s.sessionId || !userIds.has(s.userId)) continue
         const at = s.completedAt ? new Date(s.completedAt) : null
         if ((from && (!at || at < from)) || (to && (!at || at > to))) continue
@@ -83,10 +100,11 @@ export function createAnalyticsService({ repos, entryFor, growth = null }) {
         if (!prev || String(s.completedAt || '') > String(prev.completedAt || '')) latest.set(s.userId, s)
       }
     }
+    const loaded = await loadEntries([...latest].map(([userId, s]) => ({ sessionId: s.sessionId, userId })), { view: 'analytics' })
     const entries = new Map()
     let underReview = 0
     for (const [userId, s] of latest) {
-      const e = await entryFor(s.sessionId)
+      const e = loaded.get(String(s.sessionId))
       if (e) entries.set(userId, e)
       else underReview += 1
     }
@@ -235,17 +253,33 @@ export function createAnalyticsService({ repos, entryFor, growth = null }) {
 
     // §27.1 assessment completion funnel (participation counts).
     async completion(actor, organizationId, filters = {}, { permission = 'analytics.read' } = {}) {
-      const { pop } = await base(actor, organizationId, filters, permission)
+      // Participation counts need the population only, not every student's
+      // decisions (PROD-READY Phase 6: this view loaded them and discarded them).
+      const pop = await population(actor, organizationId, filters, permission)
       const users = new Set(pop.cohortsOf.keys())
       const cohortIds = new Set(pop.cohorts.map((c) => c.id))
       const counts = { ASSIGNED: 0, ACKNOWLEDGED: 0, IN_PROGRESS: 0, COMPLETED: 0, EXPIRED: 0, WITHDRAWN: 0 }
       let assignments = 0
-      for (const a of await ca().listOrgAssignments(organizationId)) {
-        if (a.status === 'CANCELLED') continue
-        const targets = (await repos.assessments.listTargets(a.id)).filter((t) => t.targetType === 'COHORT').map((t) => t.targetId)
+      // Targets and rosters of every assignment in two reads (PROD-READY Phase 6).
+      const live = (await ca().listOrgAssignments(organizationId)).filter((a) => a.status !== 'CANCELLED')
+      const allTargets = typeof repos.assessments.listTargetsForAssignments === 'function'
+        ? await repos.assessments.listTargetsForAssignments(live.map((a) => a.id))
+        : (await Promise.all(live.map((a) => repos.assessments.listTargets(a.id)))).flat()
+      const counted = new Set()
+      for (const a of live) {
+        const targets = allTargets.filter((t) => t.assignmentId === a.id && t.targetType === 'COHORT').map((t) => t.targetId)
         if (!targets.some((t) => cohortIds.has(t))) continue
         assignments += 1
-        for (const s of await ca().listAssignmentStudents(a.id)) if (users.has(s.userId) && counts[s.status] !== undefined) counts[s.status] += 1
+        counted.add(a.id)
+      }
+      if (typeof ca().countRosterStatuses === 'function') {
+        const byStatus = await ca().countRosterStatuses([...counted], [...users])
+        for (const k of Object.keys(counts)) counts[k] = byStatus[k] || 0
+      } else {
+        const rosterRows = typeof ca().listOrgRosterRows === 'function'
+          ? await ca().listOrgRosterRows(organizationId)
+          : (await Promise.all(live.filter((a) => counted.has(a.id)).map(async (a) => (await ca().listAssignmentStudents(a.id)).map((s) => ({ ...s, assignmentId: a.id }))))).flat()
+        for (const s of rosterRows) if (counted.has(s.assignmentId) && users.has(s.userId) && counts[s.status] !== undefined) counts[s.status] += 1
       }
       const total = Object.values(counts).reduce((x, y) => x + y, 0)
       return {

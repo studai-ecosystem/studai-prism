@@ -58,6 +58,22 @@ export async function findUserById(id) {
   return db.users.find((u) => u.id === id) || null
 }
 
+// Batched lookups for admin directory views (PROD-READY Phase 6): one read of
+// the file for any number of ids or addresses instead of one per row.
+export async function findUsersByIds(ids) {
+  const wanted = new Set((ids || []).map(String))
+  if (!wanted.size) return []
+  const db = await readDB()
+  return db.users.filter((u) => wanted.has(u.id))
+}
+
+export async function findUsersByEmails(emails) {
+  const wanted = new Set((emails || []).map((e) => String(e).trim().toLowerCase()))
+  if (!wanted.size) return []
+  const db = await readDB()
+  return db.users.filter((u) => wanted.has(u.email))
+}
+
 export async function createUser(user) {
   const db = await readDB()
   const normalized = String(user.email).trim().toLowerCase()

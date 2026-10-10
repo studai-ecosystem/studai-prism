@@ -2,11 +2,11 @@
 // with sample sizes (never percentages), a table equivalent for every chart,
 // the §27.2 sentence for hidden groups, exports only with permission,
 // reports generated on request, and the privacy threshold with its floor.
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest'
 import { screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Routes, Route } from 'react-router-dom'
-import { renderApp, meBody, signIn, jsonResponse } from '../../test/utils.jsx'
+import { renderApp, meBody, signIn, jsonResponse, preloadCampusCharts } from '../../test/utils.jsx'
 import { WorkspaceGuard } from '../../app/guards/WorkspaceGuard.jsx'
 import CampusAnalyticsPage from './pages/CampusAnalyticsPage.jsx'
 import CampusReportsPage from './pages/CampusReportsPage.jsx'
@@ -68,6 +68,8 @@ function render(element, path, routes, permissions) {
 }
 
 afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); localStorage.clear() })
+// Load the lazy chart chunk before the tests, not inside one (P69).
+beforeAll(() => preloadCampusCharts())
 
 describe('Campus analytics', () => {
   it('capabilities: top needs as counts with the method, a table equivalent, hidden rows with the spec sentence', async () => {

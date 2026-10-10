@@ -15,6 +15,11 @@ const impl = usePg ? pgDb : jsonDb
 
 export const findUserByEmail = impl.findUserByEmail
 export const findUserById = impl.findUserById
+export const findUsersByIds = impl.findUsersByIds
+export const findUsersByEmails = impl.findUsersByEmails
+// Where accounts live, so campus directory reads can join them in SQL when
+// they are in the same database (PROD-READY Phase 6).
+export const USER_STORE_BACKEND = usePg ? 'pg' : 'json'
 export const createUser = impl.createUser
 export const updateUser = impl.updateUser
 export const publicUser = impl.publicUser

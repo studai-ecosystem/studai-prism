@@ -3,11 +3,11 @@
 // import wizard shows problems before sending and commits idempotently, the
 // assignment wizard validates and shows what students will be told, role
 // changes need confirmation, and onboarding resumes where it stopped.
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest'
 import { screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Routes, Route } from 'react-router-dom'
-import { renderApp, mockFetch, meBody, signIn, jsonResponse } from '../../test/utils.jsx'
+import { renderApp, mockFetch, meBody, signIn, jsonResponse, preloadCampusCharts } from '../../test/utils.jsx'
 import { WorkspaceGuard } from '../../app/guards/WorkspaceGuard.jsx'
 import CampusOverviewPage from './pages/CampusOverviewPage.jsx'
 import CampusStudentsPage from './pages/CampusStudentsPage.jsx'
@@ -16,6 +16,7 @@ import CampusImportPage from './pages/CampusImportPage.jsx'
 import CampusAssignWizardPage from './pages/CampusAssignWizardPage.jsx'
 import CampusMembersPage from './pages/CampusMembersPage.jsx'
 import CampusOnboardingPage from './pages/CampusOnboardingPage.jsx'
+import CampusAssignmentDetailPage from './pages/CampusAssignmentDetailPage.jsx'
 
 const ORG = '11111111-1111-4111-8111-111111111111'
 const COHORT = '22222222-2222-4222-8222-222222222222'
@@ -38,6 +39,8 @@ function render(path, element, routes, { permissions = OWNER_PERMS } = {}) {
 const callsTo = (spy, suffix, method = 'GET') => spy.mock.calls.filter(([u, init]) => String(u).includes(suffix) && (init?.method || 'GET') === method)
 
 afterEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); localStorage.clear() })
+// Load the lazy chart chunk before the tests, not inside one (P69).
+beforeAll(() => preloadCampusCharts())
 
 describe('Campus overview', () => {
   it('shows participation counts with meaning and never a percentage or ranking', async () => {
@@ -229,5 +232,56 @@ describe('Onboarding', () => {
     const body = JSON.parse(callsTo(spy, '/onboarding', 'PUT').at(-1)[1].body)
     expect(body.completedSteps).toEqual(['profile', 'team'])
     expect(body.data.lastStep).toBe('structure')
+  })
+})
+
+// PROD-READY Phase 6: long lists are paged on the server; figures come from
+// the server's whole-list counts, never from the rows of one page.
+describe('Paged lists', () => {
+  const summary = { id: 'x', definitionId: 'def', title: 'Prism Workplace Simulation', status: 'ACTIVE', windowStart: '2026-10-01T00:00:00.000Z', windowEnd: '2026-10-30T00:00:00.000Z', integrityPolicy: 'STANDARD', programId: null, cohortIds: [COHORT], counts: { total: 120, COMPLETED: 70, ASSIGNED: 50 } }
+  const student = (i, status) => ({ userId: `u${i}`, name: `Synthetic Student ${i}`, email: `s${i}@test.local`, status, startedAt: null, completedAt: null, reportAvailable: false, sessionId: null })
+
+  it('assignment roster: counts cover every student; next and previous pages follow the server cursor', async () => {
+    const { spy } = render('assessments/:assignmentId', <CampusAssignmentDetailPage />, {
+      [api('/assignments/x')]: (u) => jsonResponse(200, { data: new URL(u, 'http://t').searchParams.get('cursor') === 'c2'
+        ? { assignment: summary, students: [student(51, 'ASSIGNED')], total: 120, statusCounts: { COMPLETED: 70, ASSIGNED: 50 }, nextCursor: null }
+        : { assignment: summary, students: [student(1, 'COMPLETED'), student(2, 'ASSIGNED')], total: 120, statusCounts: { COMPLETED: 70, ASSIGNED: 50 }, nextCursor: 'c2' } }),
+    }, { permissions: [...OWNER_PERMS, 'assignments.read'] })
+    expect(await screen.findByText('Synthetic Student 1')).toBeInTheDocument()
+    const stats = () => within(screen.getByRole('region', { name: 'Completion' }))
+    expect(stats().getByText('Assigned').nextSibling).toHaveTextContent('120')
+    expect(stats().getByText('Completed').nextSibling).toHaveTextContent('70')
+    expect(stats().getByText('Not started').nextSibling).toHaveTextContent('50')
+    expect(screen.getByText('Page 1 · 120 students')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /next/i }))
+    expect(await screen.findByText('Synthetic Student 51')).toBeInTheDocument()
+    expect(callsTo(spy, '/assignments/x?cursor=c2')).toHaveLength(1)
+    expect(stats().getByText('Completed').nextSibling).toHaveTextContent('70')
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: /previous/i }))
+    expect(await screen.findByText('Synthetic Student 1')).toBeInTheDocument()
+  })
+
+  it('a roster on one page shows no page controls; an older server without totals still renders', async () => {
+    render('assessments/:assignmentId', <CampusAssignmentDetailPage />, {
+      [api('/assignments/x')]: { data: { assignment: summary, students: [student(1, 'COMPLETED'), student(2, 'ASSIGNED')] } },
+    }, { permissions: [...OWNER_PERMS, 'assignments.read'] })
+    expect(await screen.findByText('Synthetic Student 2')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Completion' })).getByText('Assigned').nextSibling).toHaveTextContent('2')
+    expect(screen.queryByRole('navigation', { name: 'Pagination' })).not.toBeInTheDocument()
+  })
+
+  it('team list pages through members with the server cursor', async () => {
+    const member = (i) => ({ membershipId: `m${i}`, id: `staff-${i}`, name: `Synthetic Staff ${i}`, email: `t${i}@test.local`, role: 'FACULTY_MENTOR', status: 'ACTIVE', departmentId: null, cohortIds: [], joinedAt: null, isSelf: false })
+    const { spy } = render('members', <CampusMembersPage />, {
+      [api('/members')]: (u) => jsonResponse(200, { data: new URL(u, 'http://t').searchParams.get('cursor') === 'n2'
+        ? { members: [member(51)], total: 51, nextCursor: null, pendingInvites: [], viewer: { canInvite: false, canManageRoles: false } }
+        : { members: [member(1)], total: 51, nextCursor: 'n2', pendingInvites: [], viewer: { canInvite: false, canManageRoles: false } } }),
+    })
+    expect(await screen.findByText('Synthetic Staff 1')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 · 51 team members')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /next/i }))
+    expect(await screen.findByText('Synthetic Staff 51')).toBeInTheDocument()
+    expect(callsTo(spy, '/members?cursor=n2')).toHaveLength(1)
   })
 })

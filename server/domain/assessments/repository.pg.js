@@ -122,6 +122,13 @@ export function createAssessmentsRepoPg({ query, getPool }) {
       const { rows } = await query('SELECT * FROM assessment_assignment_targets WHERE assignment_id = $1 ORDER BY target_type, target_id', [assignmentId])
       return rows.map((r) => ({ assignmentId: r.assignment_id, targetType: r.target_type, targetId: r.target_id }))
     },
+    // Targets of many assignments in one query (PROD-READY Phase 6).
+    async listTargetsForAssignments(assignmentIds) {
+      const ids = [...new Set((assignmentIds || []).map(String))]
+      if (!ids.length) return []
+      const { rows } = await query('SELECT * FROM assessment_assignment_targets WHERE assignment_id = ANY($1::text[]) ORDER BY assignment_id, target_type, target_id', [ids])
+      return rows.map((r) => ({ assignmentId: r.assignment_id, targetType: r.target_type, targetId: r.target_id }))
+    },
 
     async addStudent({ assignmentId, userId, status }) {
       try {

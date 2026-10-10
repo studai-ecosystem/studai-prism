@@ -141,3 +141,81 @@ test('failed unlock destroys the physical connection instead of pooling a held l
   assert.equal(db.clients[0].destroyed, true)
   assert.equal(db.holders.size, 0)
 })
+
+// PROD-READY Phase 6 (P66): nested locks share the enclosing connection.
+function limitedPg(max, { connectWaitMs = 60 } = {}) {
+  const db = fakePg()
+  const connect = db.pool.connect
+  let active = 0
+  let peak = 0
+  db.pool.connect = async () => {
+    const until = Date.now() + connectWaitMs
+    while (active >= max) {
+      if (Date.now() > until) throw Object.assign(new Error('timeout exceeded when trying to connect'), { code: 'POOL_TIMEOUT' })
+      await delay(2)
+    }
+    active += 1
+    peak = Math.max(peak, active)
+    const client = await connect()
+    const release = client.release
+    client.release = (destroy) => { active -= 1; release(destroy) }
+    return client
+  }
+  return { ...db, stats: () => ({ active, peak }) }
+}
+
+test('a lock taken inside another lock uses the enclosing connection, never a second one', async () => {
+  const db = limitedPg(1)
+  const locks = createPgSessionLocks({ getPool: () => db.pool, pollMs: 1 })
+  const out = await locks.withLock('assignment:a:u', () => locks.withLock('session-1', async () => 'started'))
+  assert.equal(out, 'started')
+  assert.equal(db.clients.length, 1, 'one pool connection for both locks')
+  assert.equal(db.holders.size, 0, 'both locks released')
+  assert.deepEqual(db.clients[0].calls.map((c) => c.sql.includes('unlock') ? 'unlock' : 'lock'), ['lock', 'lock', 'unlock', 'unlock'])
+  assert.equal(db.clients[0].released, true)
+})
+
+test('as many concurrent nested operations as the pool has connections all succeed (no pool starvation)', async () => {
+  const db = limitedPg(5)
+  const locks = createPgSessionLocks({ getPool: () => db.pool, pollMs: 1 })
+  const results = await Promise.allSettled(Array.from({ length: 5 }, (_, i) => locks.withLock(`assignment:${i}`, () => locks.withLock(`session-${i}`, async () => { await delay(20); return i }))))
+  assert.deepEqual(results.map((r) => r.status), Array(5).fill('fulfilled'))
+  assert.equal(db.stats().peak, 5)
+  assert.equal(db.holders.size, 0)
+})
+
+test('a resource an enclosing lock holds is re-entrant; concurrent branches of one operation still take a resource in turn', async () => {
+  const db = limitedPg(1)
+  const locks = createPgSessionLocks({ getPool: () => db.pool, pollMs: 1 })
+  assert.equal(await locks.withLock('same', () => locks.withLock('same', async () => 'inner')), 'inner')
+  let active = 0
+  let overlap = false
+  await locks.withLock('outer', () => Promise.all([1, 2].map(() => locks.withLock('shared-child', async () => {
+    active += 1
+    if (active > 1) overlap = true
+    await delay(5)
+    active -= 1
+  }))))
+  assert.equal(overlap, false)
+  assert.equal(db.holders.size, 0)
+  // Mutual exclusion across operations (other connections) is unchanged.
+  const quick = createPgSessionLocks({ getPool: () => db.pool, pollMs: 1, waitMs: 0 })
+  db.holders.set(sessionLockKey('held-elsewhere'), 'another-connection')
+  await assert.rejects(quick.withLock('outer-2', () => quick.withLock('held-elsewhere', async () => 'never')), { code: 'UPSTREAM_UNAVAILABLE' })
+  assert.equal(db.holders.get(sessionLockKey('held-elsewhere')), 'another-connection')
+})
+
+test('a nested lock still held by un-awaited work keeps the connection until it is released', async () => {
+  const db = limitedPg(2)
+  const locks = createPgSessionLocks({ getPool: () => db.pool, pollMs: 1 })
+  let background = null
+  let finished = false
+  await locks.withLock('outer', async () => {
+    background = locks.withLock('child', async () => { await delay(30); finished = true })
+  })
+  assert.equal(finished, true, 'the enclosing operation returned only after the nested hold ended')
+  await background
+  assert.equal(db.holders.size, 0)
+  assert.equal(db.clients.length, 1)
+  assert.equal(db.clients[0].released, true)
+})

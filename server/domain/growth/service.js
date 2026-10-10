@@ -27,7 +27,14 @@ const sessionRef = (e) => ({
   form: e.form ? { id: e.form.id, version: e.form.version, status: e.form.status || null } : null,
 })
 
-export function createGrowthService({ repos, catalog, clock = () => new Date(), audit = () => {}, entryFor, minGroupSize = MIN_GROUP_SIZE }) {
+export function createGrowthService({ repos, catalog, clock = () => new Date(), audit = () => {}, entryFor, entriesFor = null, minGroupSize = MIN_GROUP_SIZE }) {
+  // Batched decision loader for campus outcomes (PROD-READY Phase 6): the
+  // materialised cache when it is on, otherwise one entry at a time.
+  const loadEntries = entriesFor || (async (refs) => {
+    const out = new Map()
+    for (const r of refs) out.set(String(r.sessionId), await entryFor(r.sessionId))
+    return out
+  })
   const store = () => repos.growth
   let seeded = null
 
@@ -276,13 +283,25 @@ export function createGrowthService({ repos, catalog, clock = () => new Date(), 
         }
         const counts = { completedBoth: 0, comparable: 0, formsNotApproved: 0, underReviewOrMissing: 0 }
         const byCapability = new Map()
-        for (const r of await repos.campusAdmin.listAssignmentStudents(c.reassessmentAssignmentId)) {
+        // Both rosters in two reads and every decision in one batch
+        // (PROD-READY Phase 6) instead of two lookups per student.
+        const [reassessed, baselineRoster] = await Promise.all([
+          repos.campusAdmin.listAssignmentStudents(c.reassessmentAssignmentId),
+          repos.campusAdmin.listAssignmentStudents(c.baselineAssignmentId),
+        ])
+        const baselineOf = new Map(baselineRoster.map((s) => [s.userId, s]))
+        const pairs = []
+        for (const r of reassessed) {
           if (visible && !visible.has(r.userId)) continue
           if (r.status !== 'COMPLETED' || !r.sessionId) continue
-          const b = await repos.assessments.getAssignmentForUser(c.baselineAssignmentId, r.userId)
-          if (b?.student?.status !== 'COMPLETED' || !b.student.sessionId) continue
+          const b = baselineOf.get(r.userId)
+          if (b?.status !== 'COMPLETED' || !b.sessionId) continue
+          pairs.push({ userId: r.userId, baselineSessionId: b.sessionId, sessionId: r.sessionId })
+        }
+        const loaded = await loadEntries(pairs.flatMap((p) => [{ sessionId: p.baselineSessionId, userId: p.userId }, { sessionId: p.sessionId, userId: p.userId }]))
+        for (const p of pairs) {
           counts.completedBoth += 1
-          const [before, after] = [await entryFor(b.student.sessionId), await entryFor(r.sessionId)]
+          const [before, after] = [loaded.get(String(p.baselineSessionId)) ?? null, loaded.get(String(p.sessionId)) ?? null]
           if (!before?.form || !after?.form) { counts.underReviewOrMissing += 1; continue }
           if (!approved.has(pairKey(before.form.id, after.form.id))) { counts.formsNotApproved += 1; continue }
           // Aggregate only: staff views never write a student's snapshot (K89).

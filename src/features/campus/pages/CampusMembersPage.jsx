@@ -1,7 +1,7 @@
 // Team (spec §29): staff members and their roles, invitations, role changes
 // and removal. The server enforces who may do what; every change is audited.
 import { useState } from 'react'
-import { DataTable } from '../../../components/ui/DataTable.jsx'
+import { DataTable, Pagination } from '../../../components/ui/DataTable.jsx'
 import { Button } from '../../../components/ui/Button.jsx'
 import { Modal } from '../../../components/ui/Modal.jsx'
 import { Select, Textarea } from '../../../components/ui/FormControls.jsx'
@@ -11,7 +11,7 @@ import { formatDate } from '../../student/QueryState.jsx'
 import { ROLE_LABELS } from '../../../lib/copy/privacy.js'
 import { MEMBER_STATUS_LABELS } from '../../../lib/copy/campus.js'
 import { CampusPage, ConfirmDialog, MutationError, focusFirstInvalid, focusPageTitle } from '../components/CampusPage.jsx'
-import { useMembers, useChangeRole, useRemoveMember, useInvite, useResendInvite, useCohorts, useStructure } from '../hooks.js'
+import { useMembers, useChangeRole, useRemoveMember, useInvite, useResendInvite, useCohorts, useStructure, useCursorPages } from '../hooks.js'
 
 const STAFF_ROLES = ['ORG_OWNER', 'PLACEMENT_DIRECTOR', 'PLACEMENT_OFFICER', 'DEPARTMENT_COORDINATOR', 'FACULTY_MENTOR']
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -68,7 +68,8 @@ function InviteStaffDialog({ open, onClose, limited }) {
 
 export default function CampusMembersPage() {
   const toast = useToast()
-  const query = useMembers()
+  const pages = useCursorPages()
+  const query = useMembers({ cursor: pages.cursor })
   const change = useChangeRole()
   const remove = useRemoveMember()
   const resend = useResendInvite()
@@ -107,6 +108,15 @@ export default function CampusMembersPage() {
               ...(manage ? [{ key: 'actions', header: <span className="sr-only">Actions</span>, render: (m) => (m.isSelf ? null : <Button size="sm" variant="ghost" onClick={() => setRemoving(m)}>Remove<span className="sr-only"> {m.name || m.email}</span></Button>) }] : []),
             ]}
           />
+          {(pages.hasPrevious || d.nextCursor) && (
+            <Pagination
+              summary={`Page ${pages.page} · ${d.total ?? d.members.length} team ${(d.total ?? d.members.length) === 1 ? 'member' : 'members'}`}
+              hasPrevious={pages.hasPrevious}
+              hasNext={Boolean(d.nextCursor)}
+              onPrevious={pages.previous}
+              onNext={() => pages.next(d.nextCursor)}
+            />
+          )}
           <Panel title="Invitations waiting">
             <DataTable
               caption="Staff invitations waiting"

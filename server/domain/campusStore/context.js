@@ -25,6 +25,7 @@ import { resolveRecommendations } from '../development/recommendations.js'
 import { createGrowthService } from '../growth/service.js'
 import { createSessionEntryLoader } from '../growth/entries.js'
 import { createAnalyticsService } from '../analytics/service.js'
+import { createDecisionCache } from '../analytics/decisionCache.js'
 import { createBillingService } from '../billing/service.js'
 import { createValidationService } from '../validation/service.js'
 import { createPreparationService } from '../preparation/service.js'
@@ -37,9 +38,14 @@ import { contentRegistry } from '../content/versions.js'
 import { auditLog } from '../../lib/telemetry.js'
 
 // Account directory (read-only) for admin views: `{ id, name, email }` or null.
+// Optional: `findManyByIds(ids)` / `findManyByEmails(emails)` → Map (batched,
+// PROD-READY Phase 6) and `inDatabase` (accounts are in the campus database's
+// v1_users, so the student directory can be queried in SQL).
 export const EMPTY_USER_DIRECTORY = Object.freeze({
   findById: async () => null,
   findByEmail: async () => null,
+  findManyByIds: async () => new Map(),
+  findManyByEmails: async () => new Map(),
 })
 
 // Legacy sources the student read models consult (read-only). Tests inject
@@ -94,6 +100,12 @@ export function createCampusContext({
   // P7 private preparation: the AI gateway `complete` function (null → the
   // participant and card report themselves unavailable; nothing is guessed).
   preparationComplete = null,
+  // PROD-READY Phase 6: true when the v1 store (sessions, reports) is the same
+  // PostgreSQL database, so the 0060 triggers see every input of a decision.
+  // Only then may PRISM_ANALYTICS_DECISION_CACHE serve cached decisions.
+  legacyStoreInDatabase = false,
+  // Test hook: stands in for a changed sufficiency constant (new fingerprint).
+  decisionFingerprintSalt = () => '',
 } = {}) {
   const campusAvailable = () => isEnabled('PRISM_CAMPUS_ENABLED') && campusStoreAvailable()
   const workspaceService = createWorkspaceService({ repos, campusAvailable })
@@ -147,14 +159,24 @@ export function createCampusContext({
     queueImportInvites: () => isEnabled('PRISM_JOB_WORKER') && Boolean(liveRepos()?.jobs),
     onRosterSync: (organizationId, cohortId, userId, tx = null) => development.syncCohortMember(organizationId, cohortId, userId, tx),
   })
-  const growth = createGrowthService({ repos: storeView, catalog, clock, audit: auditWriter, entryFor: createSessionEntryLoader({ catalog, evidence, legacy, reportReviews: { listForSession: (id) => (storeView.reportReviews ? storeView.reportReviews.listForSession(id) : []) } }) })
+  // PROD-READY Phase 6: per-session decisions for analytics and growth
+  // outcomes, materialised (0060) only while PRISM_ANALYTICS_DECISION_CACHE is
+  // on and every input lives in PostgreSQL; computed per request otherwise.
+  const decisions = createDecisionCache({
+    entryFor: createSessionEntryLoader({ catalog, evidence, legacy }),
+    catalog,
+    repo: () => liveRepos()?.decisionCache || null,
+    enabled: () => isEnabled('PRISM_ANALYTICS_DECISION_CACHE') && Boolean(legacyStoreInDatabase),
+    fingerprintSalt: decisionFingerprintSalt,
+  })
+  const growth = createGrowthService({ repos: storeView, catalog, clock, audit: auditWriter, entryFor: createSessionEntryLoader({ catalog, evidence, legacy, reportReviews: { listForSession: (id) => (storeView.reportReviews ? storeView.reportReviews.listForSession(id) : []) } }), entriesFor: decisions.entriesFor })
   // P7: private preparation and SELF_REPORT check-ins (PERSONAL only). Its
   // repository is separate from development/evidence and never read by
   // analytics or reports.
   const preparation = createPreparationService({ repos: storeView, complete: preparationComplete, clock, audit: auditWriter })
   const preparationOn = () => isEnabled('PRISM_PREPARATION_V1') && Boolean(liveRepos())
   const growthOn = () => isEnabled('PRISM_GROWTH_ENABLED') && Boolean(liveRepos())
-  const analytics = createAnalyticsService({ repos: storeView, entryFor: createSessionEntryLoader({ catalog, evidence, legacy }), growth })
+  const analytics = createAnalyticsService({ repos: storeView, entriesFor: decisions.entriesFor, growth })
   // Overview cards that later phases fill (counts only; null while dark).
   const overviewExtras = async (organizationId) => ({
     missionsActive: developmentOn() ? (await liveRepos().development.listInterventions(organizationId)).filter((i) => i.status === 'ACTIVE').length : null,
@@ -245,6 +267,7 @@ export function createCampusContext({
     growth,
     preparation,
     analytics,
+    decisions,
     billing: createBillingService({ repos: storeView, clock }),
     validation,
     overviewExtras,

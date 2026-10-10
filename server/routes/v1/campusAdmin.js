@@ -60,6 +60,12 @@ const CreateAssignment = z.object({
   incentive: z.string().trim().min(1).max(200).nullable().optional(),
   programId: uuidOrNull,
 }).strict()
+// PROD-READY Phase 6: opaque offset cursors and a bounded page size for the
+// roster, cohort and team lists (defaults in domain/http/pagination.js).
+const cursor = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/).optional()
+const limit = z.coerce.number().int().min(1).max(100).optional()
+const ListPage = z.object({ cursor, limit }).strict()
+const CohortPage = z.object({ cursor, invitesCursor: cursor, limit }).strict()
 const Onboarding = z.object({
   completedSteps: z.array(z.string().max(40)).max(20),
   data: z.record(z.string().max(60), z.union([z.string().max(200), z.number(), z.boolean(), z.null()])).refine((d) => Object.keys(d).length <= 20, 'Too many fields').optional(),
@@ -120,7 +126,7 @@ export function createCampusAdminRouter({ requireUser, campus }) {
   )))
   router.get('/organizations/:orgId/cohorts/:cohortId', ...perm('cohorts.read'), asyncHandler(async (req, res) => {
     if (!UUID.test(req.params.cohortId)) throw new ApiError('NOT_FOUND', 'Not found')
-    return ok(res, await svc().getCohort(req.actor, org(req), req.permissionScope, req.params.cohortId))
+    return ok(res, await svc().getCohort(req.actor, org(req), req.permissionScope, req.params.cohortId, parse(CohortPage, req.query, 'Invalid page.')))
   }))
   router.patch('/organizations/:orgId/cohorts/:cohortId', ...perm('students.manage'), asyncHandler(async (req, res) => {
     if (!UUID.test(req.params.cohortId)) throw new ApiError('NOT_FOUND', 'Not found')
@@ -136,7 +142,8 @@ export function createCampusAdminRouter({ requireUser, campus }) {
   )))
   router.get('/organizations/:orgId/imports/:jobId', ...perm('students.manage'), asyncHandler(async (req, res) => {
     if (!UUID.test(req.params.jobId)) throw new ApiError('NOT_FOUND', 'Not found')
-    return ok(res, await svc().getImport(req.actor, org(req), req.permissionScope, req.params.jobId))
+    const page = parse(z.object({ cursor, limit: z.coerce.number().int().min(1).max(2000).optional() }).strict(), req.query, 'Invalid page.')
+    return ok(res, await svc().getImport(req.actor, org(req), req.permissionScope, req.params.jobId, page))
   }))
   router.post('/organizations/:orgId/imports/:jobId/commit', ...perm('students.manage'), asyncHandler(async (req, res) => {
     if (!UUID.test(req.params.jobId)) throw new ApiError('NOT_FOUND', 'Not found')
@@ -170,7 +177,7 @@ export function createCampusAdminRouter({ requireUser, campus }) {
   )))
   router.get('/organizations/:orgId/assignments/:assignmentId', ...perm('assignments.read'), asyncHandler(async (req, res) => {
     if (!UUID.test(req.params.assignmentId)) throw new ApiError('NOT_FOUND', 'Not found')
-    return ok(res, await svc().assignmentCompletion(req.actor, org(req), req.permissionScope, req.params.assignmentId))
+    return ok(res, await svc().assignmentCompletion(req.actor, org(req), req.permissionScope, req.params.assignmentId, parse(ListPage, req.query, 'Invalid page.')))
   }))
   router.post('/organizations/:orgId/assignments/:assignmentId/status', ...perm('assignments.write'), asyncHandler(async (req, res) => {
     if (!UUID.test(req.params.assignmentId)) throw new ApiError('NOT_FOUND', 'Not found')
@@ -178,7 +185,7 @@ export function createCampusAdminRouter({ requireUser, campus }) {
     return ok(res, await svc().closeAssignment(req, req.actor, org(req), req.params.assignmentId, status))
   }))
 
-  router.get('/organizations/:orgId/members', ...perm('team.read'), asyncHandler(async (req, res) => ok(res, await svc().listMembers(req.actor, org(req)))))
+  router.get('/organizations/:orgId/members', ...perm('team.read'), asyncHandler(async (req, res) => ok(res, await svc().listMembers(req.actor, org(req), parse(ListPage, req.query, 'Invalid page.')))))
   router.patch('/organizations/:orgId/members/:membershipId', ...perm('team.manage'), asyncHandler(async (req, res) => {
     if (!UUID.test(req.params.membershipId)) throw new ApiError('NOT_FOUND', 'Not found')
     const { role } = parse(z.object({ role: z.enum(STAFF_ROLES) }).strict(), req.body, 'Choose a role.')

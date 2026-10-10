@@ -6,13 +6,35 @@
 // Fires `concurrency` parallel workers that hammer the URL for `duration`
 // seconds, then reports throughput, latency percentiles, and error counts.
 // Read-only by default (GET) — point it at /api/health to test capacity safely.
+//
+// Campus profile (PROD-READY Phase 6):
+//
+//   node scripts/loadtest.mjs --profile campus --database-url postgres://…/scratch //        [--students 2000] [--assignments 5] [--cohorts 8] [--concurrency 10] [--duration 8] [--out results.json]
+//
+// Seeds ONE synthetic organization (2,000 students, 5 assignments by default)
+// into a scratch PostgreSQL and measures the campus list, analytics and
+// report endpoints in-process through the real /api/v1 handlers, plus the
+// assessment lock pool and the job worker. It writes synthetic rows, so it
+// refuses a non-loopback database unless --allow-remote is given. The work is
+// done by server/test-support/campusLoad.mjs (flags are enabled inside that
+// process only, never in an environment).
 
 import http from 'node:http'
 import https from 'node:https'
+import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
 function arg(name, def) {
   const i = process.argv.indexOf(`--${name}`)
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : def
+}
+
+if (arg('profile', null) === 'campus') {
+  const script = fileURLToPath(new URL('../server/test-support/campusLoad.mjs', import.meta.url))
+  const rest = process.argv.slice(2).filter((a, i, all) => a !== '--profile' && all[i - 1] !== '--profile')
+  const child = spawn(process.execPath, [script, ...rest], { stdio: 'inherit' })
+  child.on('exit', (code) => process.exit(code ?? 1))
+  await new Promise(() => {})
 }
 
 const URL_ = arg('url', 'http://localhost:3001/api/health')

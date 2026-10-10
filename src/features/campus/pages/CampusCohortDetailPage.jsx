@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Panel } from '../../../components/ui/Card.jsx'
-import { DataTable } from '../../../components/ui/DataTable.jsx'
+import { DataTable, Pagination } from '../../../components/ui/DataTable.jsx'
 import { Button, LinkButton } from '../../../components/ui/Button.jsx'
 import { Textarea } from '../../../components/ui/FormControls.jsx'
 import { Tabs } from '../../../components/ui/Tabs.jsx'
@@ -12,7 +12,7 @@ import { CohortOverview, CohortCapabilities, CohortNeeds, CohortInterventions, C
 import { useToast } from '../../../components/ui/Toast.jsx'
 import { formatDate } from '../../student/QueryState.jsx'
 import { CampusPage, ConfirmDialog, MutationError, crumbs, focusFirstInvalid } from '../components/CampusPage.jsx'
-import { useCampusOrg, useCohort, useInvite, useRemoveFromCohort, useUpdateCohort, useResendInvite } from '../hooks.js'
+import { useCampusOrg, useCohort, useInvite, useRemoveFromCohort, useUpdateCohort, useResendInvite, useCursorPages } from '../hooks.js'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -20,7 +20,9 @@ export default function CampusCohortDetailPage() {
   const { cohortId } = useParams()
   const { orgId, can } = useCampusOrg()
   const toast = useToast()
-  const query = useCohort(cohortId)
+  const memberPages = useCursorPages()
+  const invitePages = useCursorPages()
+  const query = useCohort(cohortId, { cursor: memberPages.cursor, invitesCursor: invitePages.cursor })
   const invite = useInvite()
   const remove = useRemoveFromCohort(cohortId)
   const update = useUpdateCohort(cohortId)
@@ -87,6 +89,15 @@ export default function CampusCohortDetailPage() {
                 ...(manage ? [{ key: 'actions', header: <span className="sr-only">Actions</span>, render: (m) => <Button size="sm" variant="ghost" onClick={() => setRemoving(m)}>Remove<span className="sr-only"> {m.name || m.email}</span></Button> }] : []),
               ]}
             />
+            {(memberPages.hasPrevious || d.nextCursor) && (
+              <Pagination
+                summary={`Page ${memberPages.page} · ${d.membersTotal ?? d.cohort.memberCount} ${(d.membersTotal ?? d.cohort.memberCount) === 1 ? 'student' : 'students'}`}
+                hasPrevious={memberPages.hasPrevious}
+                hasNext={Boolean(d.nextCursor)}
+                onPrevious={memberPages.previous}
+                onNext={() => memberPages.next(d.nextCursor)}
+              />
+            )}
           </Panel>
           <Panel title="Invitations waiting" description="Students who were invited but have not accepted yet.">
             <DataTable
@@ -99,6 +110,15 @@ export default function CampusCohortDetailPage() {
                 ...(manage ? [{ key: 'actions', header: <span className="sr-only">Actions</span>, render: (i) => <Button size="sm" variant="ghost" loading={resend.isPending && resend.variables === i.id} onClick={() => resend.mutate(i.id, { onSuccess: () => toast.show(`Invitation sent again to ${i.email}.`, { tone: 'positive' }) })}>Resend<span className="sr-only"> to {i.email}</span></Button> }] : []),
               ]}
             />
+            {(invitePages.hasPrevious || d.nextInvitesCursor) && (
+              <Pagination
+                summary={`Page ${invitePages.page} · ${d.pendingInvitesTotal ?? d.pendingInvites.length} waiting`}
+                hasPrevious={invitePages.hasPrevious}
+                hasNext={Boolean(d.nextInvitesCursor)}
+                onPrevious={invitePages.previous}
+                onNext={() => invitePages.next(d.nextInvitesCursor)}
+              />
+            )}
           </Panel>
           {manage && d.cohort.status === 'ACTIVE' && (
             <Panel title="Invite students" description="Each student gets a private link. They sign in with this email to accept.">

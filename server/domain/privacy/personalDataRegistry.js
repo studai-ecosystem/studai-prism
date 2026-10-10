@@ -335,6 +335,18 @@ export const PERSONAL_DATA_REGISTRY = Object.freeze({
     locked_by: R('Worker id (host:pid:random) of the replica holding the lease; not a person'),
   }, 'Background jobs; finished rows are pruned after 30 days by the jobs.prune job'),
 
+  // ── 0060 materialised sufficiency decisions (PROD-READY Phase 6) ──
+  // Derived data: recomputed from the session's evidence and report whenever
+  // needed, so erasure simply deletes it (per session and per account).
+  session_decision_cache: session({
+    session_id: D('Deleted by the per-session cascade (after the session data, so no trigger re-creates it)'),
+    entry: D('Derived decision entry (form, completion date, sufficiency decisions with evidence ids); no free text or quotes'),
+    summary: D('The analytics subset of the entry (definition id, status and level band per capability); deleted with the row'),
+  }, 'Materialised per-session sufficiency decisions for campus analytics and growth outcomes; kept only as long as the session'),
+  session_decision_inputs: session({
+    session_id: D('Per-session version counter for cache invalidation; deleted with the session'),
+  }, 'Version counter bumped by triggers on every write that can change a cached decision'),
+
   // ── 0056 erasure ledger (this phase) ──
   privacy_erasure_runs: none({
     subject_ref: R('Keyed one-way hash of the account id (no personal data); lets an operator prove completion'),
