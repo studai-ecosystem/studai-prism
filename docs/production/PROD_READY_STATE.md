@@ -14,8 +14,8 @@ Formats follow [CAMPUS_PROGRAM_STATE.md](../campus/CAMPUS_PROGRAM_STATE.md):
 - Status values: `NOT_STARTED` | `IN_PROGRESS` | `COMPLETE`.
 
 <!-- PROD-STATE:BEGIN
-active_phase: 10
-branch: prod/p10-human-actions
+active_phase: 11
+branch: prod/p11-final-report
 last_updated: 2026-10-11
 PROD-STATE:END -->
 
@@ -40,7 +40,7 @@ Gates: see table
 - [x] P0.02 State file created (checklist, decision log, risks, handoff) — evidence: this file
 - [x] P0.03 Production image and deployment status recorded — evidence: Baseline table
 - [x] P0.04 Baseline gate numbers recorded — evidence: table below (2026-10-10, `4e417a9`, Node 24.12 locally, throwaway embedded PostgreSQL 17)
-- [ ] P0.05 Full four-project Playwright baseline (running in a separate worktree; result recorded with Phase 1)
+- [x] P0.05 Full four-project Playwright baseline — evidence: orchestrator run @ `d71abf1` (`run-experience-baseline-tests.mjs browser-all`, isolated runner): 867 passed · 8 flaky (passed on retry) · 25 skipped · 0 failed (1.1 h); an earlier raw `npx playwright test` attempt was invalid (runner invocation error, not product). Recorded in Phase 11 from the orchestrator's gate notes
 
 | Gate | Baseline result |
 | --- | --- |
@@ -635,12 +635,19 @@ Phase 10 prepares materials so humans can close their items quickly. Everything 
 
 ## Phase 10S — System-check layout stability (orchestrator fix)
 Status: COMPLETE
-Branch: `prod/p10s-consent-layout`
+Branch: `prod/p10s-consent-layout` (from `prod/p10-human-actions` @ `ea65d3f`)
+Commit: `b59306d` (recorded in Phase 11)
 
 - [x] P10S.01 Root cause of the intermittent WebKit `@critical` failures in the Phase 8 and Phase 9 gates (`campus-journey-a.spec.js:172` Journey D, then `cr05-returning-loop.spec.js:61`, both failing both attempts with "Clicking the checkbox did not change its state … element is not stable / outside of the viewport" on the consent checkbox) fixed in the page, not the test — evidence: P107; `src/features/assessments/pages/SystemCheckPage.jsx`; new Vitest `studentPages.test.jsx` "every check row is on the page while the connection check is still waiting…" fails on the previous page and passes on the fix
 
 ## Phase 11 — Final gates and report
-Status: NOT_STARTED
+Status: IN_PROGRESS
+Branch: `prod/p11-final-report` (from `prod/p10s-consent-layout` @ `b59306d`)
+Gates: run by the orchestrator in a clean worktree (pending)
+
+- [ ] P11.01 Final gates: server (no DB), server DB suites, DB pipeline, Vitest, pytest, build, static audit, `npm audit --omit=dev` root/server, Playwright `@critical` and the full four-project suite — pending the orchestrator; exact counts go into the `{{FINAL_*}}` placeholders of the final report
+- [x] P11.02 Final report written — evidence: [PROD_READY_FINAL_REPORT.md](./PROD_READY_FINAL_REPORT.md) (phases/branches/commits, baseline→final gates incl. the per-phase orchestrator gate history and its flaky/failed items, S1–S9 + N1–N15 + later findings, dependency audit, pilot readiness and blockers, ordered open human actions, risks, flags, migrations 0055–0063, law-1/law-2 statement). No flag flipped, nothing deployed or pushed, no human action closed
+- [x] P11.03 Record catch-up from the orchestrator gate notes (no history rewritten): P0.05 ticked with the full-suite baseline; Phase 10S branch/commit lines added. Where agent-recorded numbers differ from the orchestrator's (Vitest load flakes in p01–p05; p07 DB suites and p09 pytest not run by the agent), the final report §2 uses the orchestrator's numbers and says so
 
 ## Decisions log
 
