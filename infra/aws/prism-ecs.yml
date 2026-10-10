@@ -1,3 +1,26 @@
+# DEPRECATED AS A DEPLOYMENT PATH — DO NOT DEPLOY (PROD-READY Phase 7,
+# 2026-10-10, decision P70 in docs/production/PROD_READY_STATE.md).
+#
+# Kept because the EKS deployment still depends on resources this template
+# defines: CloudFormation stack `studai-prism-prod` owns the EFS file system and
+# access point that infra/aws/eks/overlays/production/data-volume.yaml mounts
+# (fs-0ef078727a5ba4347 / fsap-044dc830bda9436c5, POSIX user 1000) and the RDS
+# security-group ingress. This file is the reference for that stack; never
+# delete or update the stack as part of a release (DEPLOYMENT_RUNBOOK_v1.md §0).
+#
+# The workflow that deployed it (.github/workflows/deploy-aws.yml) and
+# scripts/deploy-aws.ps1 were removed. Production runs on EKS; an ECS task
+# would be a second writer on the same EFS store before the PostgreSQL
+# cutover, and an image of the current code refuses to start without
+# PRISM_PG_STORE=true anyway.
+#
+# Known limit if the stack must ever be updated for its EFS/RDS resources:
+# the DesiredCount parameter has MinValue 1 / MaxValue 1, so this template
+# cannot express the desired count 0 the ECS service is kept at (that 0 was
+# set outside the template). Any `aws cloudformation deploy` of this file would
+# start one ECS task. Such an update needs its own reviewed change (for
+# example MinValue 0 and an explicit DesiredCount=0 parameter, inspected with
+# a change set) — never a plain re-deploy.
 AWSTemplateFormatVersion: '2010-09-09'
 Description: StudAI Prism production service on ECS Fargate with EFS and a dedicated ALB.
 

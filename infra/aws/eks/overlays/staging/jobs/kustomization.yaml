@@ -1,0 +1,23 @@
+# Staging operator Jobs (namespace prism-staging). No cutover Jobs: staging has
+# no JSON store.
+# Usage: see the header of infra/aws/eks/jobs/ops/jobs.yaml (render, substitute
+# the tag, `kubectl create -f ... -l prism.studai.one/job=<name>`; never
+# `kubectl apply -k`).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: prism-staging
+resources:
+  - ../../../jobs/ops
+images:
+  - name: prism-app
+    newName: 158346964832.dkr.ecr.ap-south-1.amazonaws.com/prod/prism
+    newTag: RELEASE_TAG_REQUIRED
+patches:
+  - target:
+      kind: Job
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/1
+        value:
+          name: AWS_SECRETS_MANAGER_SECRET_ID
+          value: /studai/prism/aws-staging/runtime

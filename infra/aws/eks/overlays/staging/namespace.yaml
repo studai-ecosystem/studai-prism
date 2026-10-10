@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prism-staging
+  labels:
+    app.kubernetes.io/part-of: studai-prism
+    studai.one/environment: staging

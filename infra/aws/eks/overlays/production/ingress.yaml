@@ -1,0 +1,39 @@
+# Shared production ALB (group studai-prod, wildcard *.studai.one
+# certificate). The target-group health check uses /api/ready (P19): a pod
+# that cannot reach PostgreSQL or is draining for shutdown is taken out of
+# rotation; the pod's liveness stays on /api/health.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prism
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: studai-prod
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:158346964832:certificate/eec35e1a-807c-4a03-8c9c-0e983b2caee2
+    alb.ingress.kubernetes.io/healthcheck-path: /api/ready
+spec:
+  rules:
+    - host: prism.studai.one
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prism
+                port:
+                  number: 80
+    - host: prismprodtesting.studai.one
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prism
+                port:
+                  number: 80

@@ -1,0 +1,32 @@
+# Staging gets its own ALB group so a staging ingress change can never
+# disturb the production ALB rules (group studai-prod). That creates one more
+# ALB (cost); joining studai-prod instead is an operator decision recorded in
+# GO_LIVE_CHECKLIST.md. Restrict who can reach staging with
+# alb.ingress.kubernetes.io/inbound-cidrs once the office/VPN ranges are known.
+# DNS: prism-staging.studai.one CNAME → the ALB (studai.one is hosted outside
+# Route 53; operator).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prism
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: studai-staging
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:158346964832:certificate/eec35e1a-807c-4a03-8c9c-0e983b2caee2
+    alb.ingress.kubernetes.io/healthcheck-path: /api/ready
+spec:
+  rules:
+    - host: prism-staging.studai.one
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prism
+                port:
+                  number: 80

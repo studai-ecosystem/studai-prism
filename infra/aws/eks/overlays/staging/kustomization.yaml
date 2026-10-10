@@ -1,0 +1,54 @@
+# STAGING overlay — ROLLOUT_PLAN stage A (internal QA with synthetic accounts).
+# PROD-READY Phase 7 (P73). Nothing here has been applied; creating the
+# environment is an operator action (GO_LIVE_CHECKLIST.md, HA-C007).
+#
+# Isolation from production:
+#   namespace        prism-staging (own Namespace object below)
+#   runtime secret   /studai/prism/aws-staging/runtime (its own DATABASE_URL:
+#                    a separate database and role — never the production RDS
+#                    database; JWT_SECRET, PRISM_ERASURE_PSEUDONYM_KEY and every
+#                    other key distinct from production; Razorpay TEST keys only)
+#   IAM              service account studai-prism in prism-staging, annotated
+#                    with its own IRSA role (serviceaccount.yaml) that can read
+#                    ONLY the staging secret
+#   data             emptyDir (base default): staging has no JSON store to
+#                    keep; PostgreSQL is the system of record (PRISM_PG_STORE)
+#   ingress          prism-staging.studai.one on its own ALB group
+#
+# NODE_ENV stays production so staging exercises the same startup refusals
+# (PRISM_PG_STORE, secrets, payments) as production.
+#
+# Render (never `kubectl apply -k`; the tag is a placeholder):
+#   kubectl kustomize infra/aws/eks/overlays/staging \
+#     | sed 's/:RELEASE_TAG_REQUIRED$/:<tag>/' > prism-staging.yaml
+#   grep -c RELEASE_TAG_REQUIRED prism-staging.yaml   # must print 0
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: prism-staging
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - ../../base
+  - ingress.yaml
+images:
+  - name: prism-app
+    newName: 158346964832.dkr.ecr.ap-south-1.amazonaws.com/prod/prism
+    newTag: RELEASE_TAG_REQUIRED
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: prism
+      spec:
+        template:
+          spec:
+            containers:
+              - name: prism
+                env:
+                  - name: AWS_SECRETS_MANAGER_SECRET_ID
+                    value: /studai/prism/aws-staging/runtime
+                  # Release gate stage (server/domain/release/config.js). The
+                  # code default LOCAL_CI is meant for disposable CI data.
+                  - name: PRISM_RELEASE_STAGE
+                    value: STAGING

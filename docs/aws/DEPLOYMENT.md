@@ -1,3 +1,12 @@
+> **DEPRECATED — superseded 2026-10-10 (PROD-READY Phase 7, decision P70).**
+> This page describes the retired ECS Fargate target. Production runs on EKS
+> (`StudAI-Prod-EKS-Cluster`, namespace `prism`); the ECS workflow
+> `deploy-aws.yml` and `scripts/deploy-aws.ps1` were removed (git history keeps
+> them). `infra/aws/prism-ecs.yml` stays, marked deprecated, only because stack
+> `studai-prism-prod` still owns the EFS and RDS ingress that EKS uses. The supported
+> path is [DEPLOYMENT_RUNBOOK_v1.md](../DEPLOYMENT_RUNBOOK_v1.md) and its
+> addendum 2026-10-10. The text below is kept unchanged as a record.
+
 # AWS Deployment
 
 Prism runs on a dedicated ECS Fargate cluster in the existing production VPC.

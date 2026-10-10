@@ -59,14 +59,13 @@ closed when retrieval or validation fails. Logs include only the loaded key
 count and secret version ID.
 
 The host retains runtime mode, temporary AWS identity configuration, and these
-bootstrap settings:
+bootstrap settings (on EKS they are set by the overlay in
+`infra/aws/eks/overlays/<environment>`):
 
 ```dotenv
-AWS_SECRETS_MANAGER_SECRET_ID=/studai/prism/prod/runtime
+AWS_SECRETS_MANAGER_SECRET_ID=/studai/prism/aws-prod/runtime
 AWS_SECRETS_MANAGER_REGION=ap-south-1
 AWS_SECRETS_MANAGER_REQUIRED=true
-AWS_AZURE_FEDERATED_ROLE_ARN=arn:aws:iam::123456789012:role/studai-prism-azure-aws-runtime
-AWS_AZURE_FEDERATED_AUDIENCE=api://00000000-0000-0000-0000-000000000000
 ```
 
 Do not put `NODE_ENV`, `PORT`, Azure managed-identity endpoint/header values,
@@ -77,12 +76,18 @@ credentials.
 The same hydration runs for `npm run migrate`, `npm run seed:items`, and
 `npm run seed:admin`.
 
-On Azure App Service, the server requests a managed-identity token for the
-configured audience and exchanges it with AWS STS using
-`AssumeRoleWithWebIdentity`. The returned one-hour credentials are cached and
-refreshed before expiry, then shared by Secrets Manager, Bedrock, and Polly.
-`IDENTITY_ENDPOINT` and `IDENTITY_HEADER` are supplied by App Service and must
-not be copied into the JSON secret.
+On EKS (production) the pod's AWS identity comes from IRSA: the
+`studai-prism` service account is annotated with an IAM role, and the AWS SDK's
+default credential chain picks up the web-identity token the cluster injects.
+No AWS key is stored anywhere.
+
+Azure federation (legacy, not used in production): the loader still supports
+running on Azure App Service, where the server exchanges an App Service
+managed-identity token for AWS credentials with `AssumeRoleWithWebIdentity`
+when `AWS_AZURE_FEDERATED_ROLE_ARN` and `AWS_AZURE_FEDERATED_AUDIENCE` are set
+together. Azure App Service is no longer a deployment target (PROD-READY
+Phase 7, P70): the `azure-webapp.yml` workflow was removed and the Azure
+scripts are marked deprecated. Do not set these two variables on EKS.
 
 ## Bedrock Configuration
 
@@ -189,23 +194,36 @@ verified scoring.
 
 ## Deployment
 
-The current public host remains Azure App Service until DNS cutover. A parallel
-AWS production target is defined in [docs/aws/DEPLOYMENT.md](docs/aws/DEPLOYMENT.md):
-ECS Fargate in private subnets, encrypted EFS persistence, the shared production
-ALB, AWS Secrets Manager, and task-role credentials. Deployment runs through a
-manual GitHub Actions workflow using repo-scoped OIDC; no long-lived AWS key is
-stored in GitHub or App Service.
+Production runs on AWS EKS (`StudAI-Prod-EKS-Cluster`, namespace `prism`,
+`ap-south-1`). There is one supported path, described in
+[docs/DEPLOYMENT_RUNBOOK_v1.md](docs/DEPLOYMENT_RUNBOOK_v1.md) and its addendum
+of 2026-10-10:
 
-For the existing Azure host, keep using its serial prebuilt-ZIP process. For AWS,
-dispatch `.github/workflows/deploy-aws.yml` with `scripts/deploy-aws.ps1`. Verify
-the health endpoint, startup secret metadata, admin Bedrock health panel, and one
-synthetic assessment. Do not enable paid/external scoring until the shadow
-agreement gate in [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md) passes.
+1. `build-image.yml` (manual dispatch, target `production`, `main` only, after
+   a green CI run and environment approval) builds the immutable
+   `prod/prism:<sha12>` image through repository-scoped OIDC and gates it on
+   the ECR scan. No long-lived AWS key is stored in GitHub.
+2. An operator renders `infra/aws/eks/overlays/production` (or `staging`) with
+   that tag, runs the migration Job from `overlays/<environment>/jobs`, reviews
+   `kubectl diff` and applies. The overlays carry the placeholder tag
+   `RELEASE_TAG_REQUIRED`; a committed concrete tag fails the test suite.
+3. `node scripts/post-deploy-smoke.mjs --base-url https://prism.studai.one`
+   verifies health, readiness, the bundle and that every dark feature is still
+   dark (read-only).
 
-For a future single-cloud topology, deploy the Node service to ECS Fargate behind
-an ALB with a task role, move the v1 store to PostgreSQL, and keep calibration
-jobs as separately scheduled containers. This avoids cross-cloud credentials
-and supports the existing WebSocket proctor channel.
+The image refuses to start in production unless the v1 store is PostgreSQL
+(`PRISM_PG_STORE=true`), so the next release includes the JSON→PostgreSQL
+cutover ([docs/PG_MIGRATION_RUNBOOK_v1.md](docs/PG_MIGRATION_RUNBOOK_v1.md)).
+Release inputs and the ordered human steps:
+[docs/production/RELEASE_TEMPLATE_PROD_READY.md](docs/production/RELEASE_TEMPLATE_PROD_READY.md),
+[docs/production/GO_LIVE_CHECKLIST.md](docs/production/GO_LIVE_CHECKLIST.md).
+
+Retired paths: the ECS workflow (`deploy-aws.yml`) and the Azure App Service
+workflow were removed; [docs/aws/DEPLOYMENT.md](docs/aws/DEPLOYMENT.md) and
+`infra/aws/prism-ecs.yml` are kept as deprecated records (the CloudFormation
+stack still owns the EFS file system and RDS ingress that EKS uses — never
+re-deploy it). Do not enable paid/external scoring until the shadow agreement
+gate in [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md) passes.
 
 ## Architecture Documents
 

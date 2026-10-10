@@ -15,6 +15,22 @@ for (const key of ['productionActivated', 'deployed', 'manualApprovalClaimed', '
   if (handover[key] !== false) failures.push(`${key} must be false`)
 }
 if (handover.migrationCount !== 54 || handover.migrationHead !== '0054_report_publication_note') failures.push('migration head/count')
+// PROD-READY Phase 7 (P80): the 54 above is the P10 handover RECORD (its head
+// when it was written) and stays pinned. The record must also still be true of
+// the repository: the recorded head exists, exactly the recorded number of
+// migrations lead up to it (none removed, renumbered or inserted before it),
+// and every later migration is reported, not silently ignored.
+const { readdir } = await import('node:fs/promises')
+const upMigrations = (await readdir(new URL('server/db/migrations/', root)))
+  .filter((name) => /^\d{4}_.+\.sql$/.test(name) && !name.endsWith('.down.sql'))
+  .map((name) => name.replace(/\.sql$/, ''))
+  .sort()
+const recordedIndex = upMigrations.indexOf(handover.migrationHead)
+if (recordedIndex === -1) failures.push('recorded migration head missing from server/db/migrations')
+else if (recordedIndex + 1 !== handover.migrationCount) failures.push(`migrations up to the recorded head: ${recordedIndex + 1}, record says ${handover.migrationCount}`)
+const numbers = upMigrations.map((name) => Number(name.slice(0, 4)))
+if (numbers.some((n, i) => n !== i + 1)) failures.push('migration numbering has a gap or duplicate')
+const migrationsAfterHandover = recordedIndex === -1 ? [] : upMigrations.slice(recordedIndex + 1)
 if (handover.checklist.map((row) => row.id).join(',') !== expectedChecklist.join(',')) failures.push('checklist ids')
 for (const row of handover.checklist) {
   if (!allowed.has(row.status)) failures.push(`${row.id} invalid status`)
@@ -39,6 +55,13 @@ console.log(JSON.stringify({
   state: handover.allowedState,
   checklist: Object.fromEntries(['PASS', 'BLOCKED', 'UNVERIFIED'].map((status) => [status, handover.checklist.filter((row) => row.status === status).length])),
   independentSignoffs: { OPEN: handover.independentSignoffs.filter((row) => row.status === 'OPEN').length },
+  migrations: {
+    recordedHead: handover.migrationHead,
+    recordedCount: handover.migrationCount,
+    repositoryHead: upMigrations.at(-1) || null,
+    repositoryCount: upMigrations.length,
+    afterHandover: migrationsAfterHandover,
+  },
   failures,
 }, null, 2))
 if (failures.length) process.exitCode = 1

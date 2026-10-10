@@ -1,0 +1,43 @@
+# PRODUCTION overlay — EKS StudAI-Prod-EKS-Cluster, namespace prism,
+# AWS account 158346964832, ap-south-1. Replaces infra/aws/prism-eks.yml
+# (PROD-READY Phase 7, P71).
+#
+# The image tag below is the placeholder RELEASE_TAG_REQUIRED, never a real
+# tag. Render, substitute and diff before applying (never `kubectl apply -k`):
+#
+#   kubectl kustomize infra/aws/eks/overlays/production \
+#     | sed 's/:RELEASE_TAG_REQUIRED$/:<sha12>/' > prism-production.yaml
+#   grep -c RELEASE_TAG_REQUIRED prism-production.yaml   # must print 0
+#   kubectl diff -f prism-production.yaml                # review, then apply
+#
+# Full procedure: docs/DEPLOYMENT_RUNBOOK_v1.md addendum 2026-10-10.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: prism
+resources:
+  - ../../base
+  - data-volume.yaml
+  - ingress.yaml
+images:
+  - name: prism-app
+    newName: 158346964832.dkr.ecr.ap-south-1.amazonaws.com/prod/prism
+    newTag: RELEASE_TAG_REQUIRED
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: prism
+      spec:
+        template:
+          spec:
+            containers:
+              - name: prism
+                env:
+                  - name: AWS_SECRETS_MANAGER_SECRET_ID
+                    value: /studai/prism/aws-prod/runtime
+            volumes:
+              - name: data
+                emptyDir: null
+                persistentVolumeClaim:
+                  claimName: prism-data

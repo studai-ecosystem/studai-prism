@@ -1,0 +1,5 @@
+# Production-only cutover Jobs (HA-023). See jobs.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - jobs.yaml

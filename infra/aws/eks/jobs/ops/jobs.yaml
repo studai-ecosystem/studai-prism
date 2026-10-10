@@ -1,0 +1,470 @@
+# One-off operator Jobs (PROD-READY Phase 7, P75). The runtime image is
+# distroless: there is no shell and no npm, so `kubectl exec deploy/prism --
+# npm run ...` cannot work. Each Job runs the image's node binary
+# (/nodejs/bin/node, WORKDIR /app) on the runtime-secrets wrapper, whose
+# allow-list takes paths relative to server/ (db/migrate.js, not
+# server/db/migrate.js). The label app.kubernetes.io/name: prism-ops keeps these
+# pods out of the prism Service (selector app: prism).
+#
+# Never `kubectl apply -k` a jobs overlay: that would start EVERY Job. Render,
+# substitute the release tag, and create exactly one Job by its label:
+#   kubectl kustomize infra/aws/eks/overlays/production/jobs \
+#     | sed 's/:RELEASE_TAG_REQUIRED$/:<sha12>/' > prism-jobs.yaml
+#   kubectl create -f prism-jobs.yaml -l prism.studai.one/job=migrate-status
+#   kubectl wait -n prism --for=condition=complete job/prism-migrate-status --timeout=600s
+#   kubectl logs -n prism job/prism-migrate-status        # keep as evidence
+# Fixed names make a second concurrent run fail with AlreadyExists; delete the
+# finished Job (after saving its log) before running it again.
+# Read-only: lists every migration as [x] applied / [ ] pending.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prism-migrate-status
+  labels:
+    app.kubernetes.io/name: prism-ops
+    prism.studai.one/job: migrate-status
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prism-ops
+        prism.studai.one/job: migrate-status
+    spec:
+      restartPolicy: Never
+      serviceAccountName: studai-prism
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ops
+          image: prism-app
+          imagePullPolicy: IfNotPresent
+          command:
+            - /nodejs/bin/node
+          args:
+            - server/config/runWithRuntimeSecrets.js
+            - db/migrate.js
+            - status
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: SET_BY_OVERLAY
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+            - name: DATA_DIR
+              value: /home/data/prism
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: rds-ca
+              mountPath: /etc/prism/rds-ca
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: rds-ca
+          configMap:
+            name: prism-rds-ca
+            optional: true
+---
+# Applies every pending migration in order (additive; each in its own transaction).
+# Run while the application is scaled to 0 inside the release window.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prism-migrate-up
+  labels:
+    app.kubernetes.io/name: prism-ops
+    prism.studai.one/job: migrate-up
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prism-ops
+        prism.studai.one/job: migrate-up
+    spec:
+      restartPolicy: Never
+      serviceAccountName: studai-prism
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ops
+          image: prism-app
+          imagePullPolicy: IfNotPresent
+          command:
+            - /nodejs/bin/node
+          args:
+            - server/config/runWithRuntimeSecrets.js
+            - db/migrate.js
+            - up
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: SET_BY_OVERLAY
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+            - name: DATA_DIR
+              value: /home/data/prism
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: rds-ca
+              mountPath: /etc/prism/rds-ca
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: rds-ca
+          configMap:
+            name: prism-rds-ca
+            optional: true
+---
+# Dry run of `npm run sessions:pin-forms` (P37): counts only.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prism-sessions-pin-forms-dry-run
+  labels:
+    app.kubernetes.io/name: prism-ops
+    prism.studai.one/job: sessions-pin-forms-dry-run
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prism-ops
+        prism.studai.one/job: sessions-pin-forms-dry-run
+    spec:
+      restartPolicy: Never
+      serviceAccountName: studai-prism
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ops
+          image: prism-app
+          imagePullPolicy: IfNotPresent
+          command:
+            - /nodejs/bin/node
+          args:
+            - server/config/runWithRuntimeSecrets.js
+            - db/pinSessionForms.js
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: SET_BY_OVERLAY
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+            - name: DATA_DIR
+              value: /home/data/prism
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: rds-ca
+              mountPath: /etc/prism/rds-ca
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: rds-ca
+          configMap:
+            name: prism-rds-ca
+            optional: true
+---
+# `npm run sessions:pin-forms -- --enforce`: records the form id of older
+# sessions (writes only NULL columns). After the cutover verification.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prism-sessions-pin-forms-enforce
+  labels:
+    app.kubernetes.io/name: prism-ops
+    prism.studai.one/job: sessions-pin-forms-enforce
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prism-ops
+        prism.studai.one/job: sessions-pin-forms-enforce
+    spec:
+      restartPolicy: Never
+      serviceAccountName: studai-prism
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ops
+          image: prism-app
+          imagePullPolicy: IfNotPresent
+          command:
+            - /nodejs/bin/node
+          args:
+            - server/config/runWithRuntimeSecrets.js
+            - db/pinSessionForms.js
+            - --enforce
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: SET_BY_OVERLAY
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+            - name: DATA_DIR
+              value: /home/data/prism
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: rds-ca
+              mountPath: /etc/prism/rds-ca
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: rds-ca
+          configMap:
+            name: prism-rds-ca
+            optional: true
+---
+# Dry run of `npm run retention:import-rows` (P29): counts + receipt only.
+# There is deliberately no enforce Job: the purge is a deliberate audited
+# run (or the job runner under PRISM_RETENTION_ENFORCEMENT, HA-003).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prism-import-rows-retention-dry-run
+  labels:
+    app.kubernetes.io/name: prism-ops
+    prism.studai.one/job: import-rows-retention-dry-run
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prism-ops
+        prism.studai.one/job: import-rows-retention-dry-run
+    spec:
+      restartPolicy: Never
+      serviceAccountName: studai-prism
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ops
+          image: prism-app
+          imagePullPolicy: IfNotPresent
+          command:
+            - /nodejs/bin/node
+          args:
+            - server/config/runWithRuntimeSecrets.js
+            - db/purgeImportRows.js
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: SET_BY_OVERLAY
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+            - name: DATA_DIR
+              value: /home/data/prism
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: rds-ca
+              mountPath: /etc/prism/rds-ca
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: rds-ca
+          configMap:
+            name: prism-rds-ca
+            optional: true
+---
+# Read-only: every RUNNING/FAILED erasure run (P28). A per-person read
+# (--user <id>) is not templated so no account id is ever committed or
+# left in a cluster object longer than needed.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prism-erasure-ledger-open
+  labels:
+    app.kubernetes.io/name: prism-ops
+    prism.studai.one/job: erasure-ledger-open
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prism-ops
+        prism.studai.one/job: erasure-ledger-open
+    spec:
+      restartPolicy: Never
+      serviceAccountName: studai-prism
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ops
+          image: prism-app
+          imagePullPolicy: IfNotPresent
+          command:
+            - /nodejs/bin/node
+          args:
+            - server/config/runWithRuntimeSecrets.js
+            - db/erasureLedger.js
+            - --open
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: SET_BY_OVERLAY
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+            - name: DATA_DIR
+              value: /home/data/prism
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: rds-ca
+              mountPath: /etc/prism/rds-ca
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: rds-ca
+          configMap:
+            name: prism-rds-ca
+            optional: true

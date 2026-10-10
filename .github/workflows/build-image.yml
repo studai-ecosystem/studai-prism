@@ -1,15 +1,43 @@
 name: Build Image
 
 # Build-only: pushes the immutable image to ECR and gates on the scan.
-# Deployment to EKS (kubectl set image) is a separate, deliberate step —
-# the legacy ECS stack must stay at desired-count 0.
+# Deployment to EKS is a separate, deliberate operator step
+# (docs/DEPLOYMENT_RUNBOOK_v1.md and its addendum 2026-10-10). This workflow
+# never touches the cluster.
+#
+# PROD-READY Phase 7 (P76) safety rails:
+#   * target "production" builds only from refs/heads/main into ECR repository
+#     prod/prism with role studai-prism-github-deploy; target "staging" may
+#     build any ref, but only into the separate repository staging/prism with
+#     its own role studai-prism-github-build-staging (both created by the
+#     operator; until then a staging build fails closed at AssumeRole). The
+#     cluster guard in infra/aws/eks/policies refuses staging/prism images in
+#     namespace prism. Tags are always the 12-character commit SHA;
+#   * a workflow_dispatch runs the workflow file of the dispatched ref, so the
+#     ref check below is a convenience: the binding controls are the
+#     production environment's deployment-branch policy (main only) and the
+#     role trust policy (sub = ...:environment:production) — HA-024;
+#   * the CI workflow (ci.yml) must have SUCCEEDED for this exact commit;
+#   * the AWS job runs in the GitHub environment named after the target, so it
+#     waits for the environment's required reviewers once HA-024 is configured,
+#     and its OIDC subject becomes
+#     repo:studai-ecosystem/studai-prism:environment:<target>;
+#   * workflow inputs reach shell scripts only through env, never inline.
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'production = main only, repo prod/prism; staging = any ref, repo staging/prism'
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - staging
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: studai-prism-image-build
@@ -17,14 +45,86 @@ concurrency:
 
 env:
   AWS_REGION: ap-south-1
-  ECR_REPOSITORY: prod/prism
-  DEPLOY_ROLE_ARN: arn:aws:iam::158346964832:role/studai-prism-github-deploy
+  PRODUCTION_REPOSITORY: prod/prism
+  PRODUCTION_ROLE_ARN: arn:aws:iam::158346964832:role/studai-prism-github-deploy
+  STAGING_REPOSITORY: staging/prism
+  STAGING_ROLE_ARN: arn:aws:iam::158346964832:role/studai-prism-github-build-staging
 
 jobs:
+  preflight:
+    name: Ref and CI gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      repository: ${{ steps.tag.outputs.repository }}
+      role: ${{ steps.tag.outputs.role }}
+    steps:
+      - name: Refuse production builds from any ref but main
+        shell: bash
+        env:
+          TARGET: ${{ inputs.target }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            production)
+              if [[ "$REF" != 'refs/heads/main' ]]; then
+                echo "::error::Production images are built from refs/heads/main only (got $REF). Use target=staging for other refs."
+                exit 1
+              fi
+              ;;
+            staging) ;;
+            *)
+              echo "::error::Unknown target: $TARGET"
+              exit 1
+              ;;
+          esac
+
+      - name: Require a successful CI run for this commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          count="$(gh api "repos/${REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${COMMIT}&status=success&per_page=1" --jq '.total_count')"
+          if [[ -z "$count" || "$count" -lt 1 ]]; then
+            echo "::error::No successful CI run (ci.yml) for ${COMMIT}. Wait for CI to pass on this commit, then dispatch again."
+            exit 1
+          fi
+          echo "CI succeeded for ${COMMIT} (${count} successful run(s))."
+
+      - name: Image tag, repository and role
+        id: tag
+        shell: bash
+        env:
+          TARGET: ${{ inputs.target }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          echo "tag=${COMMIT::12}" >> "$GITHUB_OUTPUT"
+          if [[ "$TARGET" == 'production' ]]; then
+            echo "repository=${PRODUCTION_REPOSITORY}" >> "$GITHUB_OUTPUT"
+            echo "role=${PRODUCTION_ROLE_ARN}" >> "$GITHUB_OUTPUT"
+          else
+            echo "repository=${STAGING_REPOSITORY}" >> "$GITHUB_OUTPUT"
+            echo "role=${STAGING_ROLE_ARN}" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build and push
+    needs: preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    environment: ${{ inputs.target }}
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out committed source
@@ -33,7 +133,7 @@ jobs:
       - name: Configure temporary AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ needs.preflight.outputs.role }}
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: prism-image-${{ github.run_id }}
 
@@ -44,23 +144,37 @@ jobs:
       - name: Build and push immutable image
         id: image
         shell: bash
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ needs.preflight.outputs.repository }}
+          IMAGE_TAG: ${{ needs.preflight.outputs.tag }}
+          # Optional digest-pinned base images (Dockerfile header, P74), set as
+          # repository variables; empty means the Dockerfile defaults.
+          BUILD_IMAGE_OVERRIDE: ${{ vars.PRISM_BUILD_IMAGE }}
+          RUNTIME_IMAGE_OVERRIDE: ${{ vars.PRISM_RUNTIME_IMAGE }}
         run: |
           set -euo pipefail
-          image_tag="${GITHUB_SHA::12}"
-          image_uri="${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY}:${image_tag}"
+          image_uri="${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          build_args=()
+          if [[ -n "${BUILD_IMAGE_OVERRIDE}" ]]; then build_args+=(--build-arg "BUILD_IMAGE=${BUILD_IMAGE_OVERRIDE}"); fi
+          if [[ -n "${RUNTIME_IMAGE_OVERRIDE}" ]]; then build_args+=(--build-arg "RUNTIME_IMAGE=${RUNTIME_IMAGE_OVERRIDE}"); fi
           if aws ecr describe-images \
             --repository-name "$ECR_REPOSITORY" \
-            --image-ids "imageTag=$image_tag" >/dev/null 2>&1; then
-            echo "Image already exists for $image_tag; reusing it."
+            --image-ids "imageTag=$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "Image already exists for $IMAGE_TAG; reusing it."
           else
-            docker build --pull --provenance=false --tag "$image_uri" .
+            docker build --pull --provenance=false "${build_args[@]}" --tag "$image_uri" .
             docker push "$image_uri"
           fi
           echo "uri=$image_uri" >> "$GITHUB_OUTPUT"
-          echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
+          echo "tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Enforce critical image scan gate
         shell: bash
+        env:
+          ECR_REPOSITORY: ${{ needs.preflight.outputs.repository }}
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
         run: |
           set -euo pipefail
           scan_json=''
@@ -68,7 +182,7 @@ jobs:
           for attempt in {1..36}; do
             if scan_json="$(aws ecr describe-image-scan-findings \
               --repository-name "$ECR_REPOSITORY" \
-              --image-id "imageTag=${{ steps.image.outputs.tag }}" \
+              --image-id "imageTag=${IMAGE_TAG}" \
               --output json 2>/dev/null)"; then
               scan_status="$(jq -r '.imageScanStatus.status // "PENDING"' <<< "$scan_json")"
               if [[ "$scan_status" == 'COMPLETE' ]]; then break; fi
@@ -88,4 +202,4 @@ jobs:
             echo "Refusing release: ECR found $critical critical vulnerabilities."
             exit 1
           fi
-          echo "Image ${{ steps.image.outputs.uri }} is clean."
+          echo "Image ${IMAGE_URI} is clean."

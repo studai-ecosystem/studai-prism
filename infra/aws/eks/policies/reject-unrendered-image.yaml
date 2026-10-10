@@ -1,0 +1,62 @@
+# Optional cluster guard (PROD-READY Phase 7, P71). Installed once by a cluster
+# administrator, separately from the overlays (cluster-scoped; requires
+# Kubernetes >= 1.30, where ValidatingAdmissionPolicy is GA).
+#
+# The overlays carry the image tag placeholder RELEASE_TAG_REQUIRED. If someone
+# runs `kubectl apply -k` on an overlay without rendering it first, this policy
+# makes the API server REFUSE the Deployment/Job, so the running pod is never
+# replaced by one that cannot pull (strategy Recreate would otherwise stop the
+# old pod first and cause an outage). It also refuses the `latest` tag, and
+# refuses staging/prism images (built from any ref) in the production namespace.
+#
+#   kubectl apply -f infra/aws/eks/policies/reject-unrendered-image.yaml
+#   # check: an unrendered apply must now fail with the message below
+#   kubectl apply -k infra/aws/eks/overlays/staging --dry-run=server
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: prism-reject-unrendered-image
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs"]
+  validations:
+    - expression: >-
+        object.spec.template.spec.containers.all(c,
+          !c.image.endsWith(':RELEASE_TAG_REQUIRED') &&
+          !c.image.endsWith(':latest') &&
+          c.image != 'prism-app')
+      message: >-
+        Unrendered Prism manifest: the image tag is the placeholder
+        RELEASE_TAG_REQUIRED (or latest). Render the overlay and substitute the
+        immutable release tag first (docs/DEPLOYMENT_RUNBOOK_v1.md addendum
+        2026-10-10).
+    - expression: >-
+        request.namespace != 'prism' ||
+        object.spec.template.spec.containers.all(c, !c.image.contains('/staging/prism:'))
+      message: >-
+        staging/prism images are built from unreviewed refs (build-image.yml
+        target=staging) and may run only in prism-staging. Production runs
+        prod/prism images built from main after environment approval.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: prism-reject-unrendered-image
+spec:
+  policyName: prism-reject-unrendered-image
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: ["prism", "prism-staging"]

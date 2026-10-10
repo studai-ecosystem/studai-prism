@@ -1,0 +1,136 @@
+# StudAI Prism API + SPA (one container). Environment-neutral base: the
+# overlays (overlays/production, overlays/staging) set the namespace, the
+# runtime secret id, the data volume, the ingress and the image.
+#
+# Storage (PROD-READY Phase 7, P72): since 63d320d production refuses to start
+# unless PRISM_PG_STORE=true (DEF-07), so PostgreSQL (RDS, DATABASE_URL from
+# the runtime secret) is the system of record for every v1, campus and admin
+# table. DATA_DIR still holds the JSON CMS file (content.json, used while
+# PRISM_CMS_DB is off) and, in production, the pre-cutover JSON store kept
+# read-only as the HA-023 rollback target.
+#
+# Replicas stay 1 with strategy Recreate until EVERY item of the multi-replica
+# checklist holds (PG_MIGRATION_RUNBOOK_v1.md addendum 2026-10-10: PG cutover
+# HA-023 verified, REDIS_URL or sticky routing for the frozen engine's per-turn
+# cache, sticky sessions for the proctor socket, per-replica state accepted,
+# PRISM_JOB_WORKER set on every replica, PG_SESSION_LOCK_POOL_MAX sized within
+# the RDS connection budget). server/test/platform.test.js pins this.
+#
+# Image: "prism-app" is a logical name. The overlays map it to the ECR
+# repository with the tag RELEASE_TAG_REQUIRED, which is NOT an image tag; the
+# release procedure (DEPLOYMENT_RUNBOOK_v1.md addendum 2026-10-10) renders the
+# overlay and substitutes the immutable 12-character commit tag. A committed
+# concrete tag fails platform.test.js, so re-applying the manifest can never
+# silently roll production back; policies/reject-unrendered-image.yaml makes
+# the API server refuse the placeholder itself.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prism
+  labels:
+    app: prism
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: prism
+  template:
+    metadata:
+      labels:
+        app: prism
+    spec:
+      serviceAccountName: studai-prism
+      # Graceful shutdown (Phase 1S, P16): SIGTERM → /api/ready answers 503
+      # draining, in-flight requests get PRISM_SHUTDOWN_TIMEOUT_MS (25 s), then
+      # the job worker gives its leases back (up to 3 s) and the pools close.
+      # 40 s leaves margin above that sequence before SIGKILL.
+      terminationGracePeriodSeconds: 40
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: prism
+          image: prism-app
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3001
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3001"
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: SET_BY_OVERLAY
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+            # The only runtime writes are under DATA_DIR (lib/content.js,
+            # lib/storeJson.js, lib/dbJson.js); uploads are parsed in memory
+            # (multer memoryStorage). A value in the runtime secret overrides
+            # this one; the release template asks the operator to confirm they
+            # agree.
+            - name: DATA_DIR
+              value: /home/data/prism
+            - name: PRISM_SHUTDOWN_TIMEOUT_MS
+              value: "25000"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          # Readiness depends on the database (Phase 1S N12, P19); liveness
+          # must not, or a database outage would restart the pod.
+          readinessProbe:
+            httpGet:
+              path: /api/ready
+              port: 3001
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /home/data/prism
+            - name: tmp
+              mountPath: /tmp
+            # RDS CA bundle for PGSSLMODE=verify-full (Phase 1S N13, P20).
+            # Optional: absent until the operator creates the ConfigMap
+            # prism-rds-ca (key global-bundle.pem) from AWS's public RDS bundle;
+            # only then set PGSSLROOTCERT=/etc/prism/rds-ca/global-bundle.pem
+            # and PGSSLMODE=verify-full in the runtime secret.
+            - name: rds-ca
+              mountPath: /etc/prism/rds-ca
+              readOnly: true
+      volumes:
+        # Replaced per overlay: the EFS claim in production, emptyDir in staging.
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: rds-ca
+          configMap:
+            name: prism-rds-ca
+            optional: true

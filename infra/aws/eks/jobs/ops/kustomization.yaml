@@ -1,0 +1,5 @@
+# Operator Jobs shared by every environment (see jobs.yaml for usage).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - jobs.yaml

@@ -1,0 +1,9 @@
+# Environment-neutral base for the Prism API on EKS. Never apply the base
+# directly: use overlays/production or overlays/staging (DEPLOYMENT_RUNBOOK_v1.md
+# addendum 2026-10-10). Do not add commonLabels here: the Deployment selector
+# (app: prism) is immutable on the live object.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml

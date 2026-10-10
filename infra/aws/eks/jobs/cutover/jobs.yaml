@@ -1,0 +1,168 @@
+# PostgreSQL cutover Jobs (HA-023; PG_MIGRATION_RUNBOOK_v1.md section 3 step 4
+# and its addenda). PRODUCTION ONLY: they mount the production EFS claim
+# prism-data that holds the JSON store. The CLI pins both JSON files read-only
+# for the reconciliation and never writes them (P38). Run only with the
+# application scaled to 0 (the JSON store must be quiescent), dry run first,
+# and keep both report lines (store_migration_report,
+# store_reconciliation_report) as HA-023 evidence. Flipping PRISM_PG_STORE is
+# a separate human secret change, never done by these Jobs.
+# `npm run migrate:store` (dry run): applies pending schema migrations, then
+# reports counts; copies nothing.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prism-store-migration-dry-run
+  labels:
+    app.kubernetes.io/name: prism-ops
+    prism.studai.one/job: store-migration-dry-run
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prism-ops
+        prism.studai.one/job: store-migration-dry-run
+    spec:
+      restartPolicy: Never
+      serviceAccountName: studai-prism
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ops
+          image: prism-app
+          imagePullPolicy: IfNotPresent
+          command:
+            - /nodejs/bin/node
+          args:
+            - server/config/runWithRuntimeSecrets.js
+            - db/migrateStore.js
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: SET_BY_OVERLAY
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+            - name: DATA_DIR
+              value: /home/data/prism
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /home/data/prism
+            - name: tmp
+              mountPath: /tmp
+            - name: rds-ca
+              mountPath: /etc/prism/rds-ca
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: prism-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: rds-ca
+          configMap:
+            name: prism-rds-ca
+            optional: true
+---
+# `npm run migrate:store -- --enforce`: copy + reconciliation; exits non-zero
+# unless the reconciliation is clean.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prism-store-migration-enforce
+  labels:
+    app.kubernetes.io/name: prism-ops
+    prism.studai.one/job: store-migration-enforce
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 7200
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prism-ops
+        prism.studai.one/job: store-migration-enforce
+    spec:
+      restartPolicy: Never
+      serviceAccountName: studai-prism
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ops
+          image: prism-app
+          imagePullPolicy: IfNotPresent
+          command:
+            - /nodejs/bin/node
+          args:
+            - server/config/runWithRuntimeSecrets.js
+            - db/migrateStore.js
+            - --enforce
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: AWS_SECRETS_MANAGER_SECRET_ID
+              value: SET_BY_OVERLAY
+            - name: AWS_SECRETS_MANAGER_REGION
+              value: ap-south-1
+            - name: AWS_SECRETS_MANAGER_REQUIRED
+              value: "true"
+            - name: DATA_DIR
+              value: /home/data/prism
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /home/data/prism
+            - name: tmp
+              mountPath: /tmp
+            - name: rds-ca
+              mountPath: /etc/prism/rds-ca
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: prism-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
+        - name: rds-ca
+          configMap:
+            name: prism-rds-ca
+            optional: true

@@ -52,6 +52,29 @@ jobs:
       - name: gitleaks (full history)
         run: '"$RUNNER_TEMP/gitleaks/gitleaks" git . --config .gitleaks.toml --redact --no-banner --exit-code 1'
 
+  eks-manifests:
+    # PROD-READY Phase 7 (P71): every EKS overlay must render offline (YAML and
+    # kustomize errors fail here) and still carry the image-tag placeholder, so
+    # no committed tag can roll an environment back. Client-side only: kubectl
+    # kustomize never contacts a cluster.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render overlays (offline)
+        run: |
+          set -euo pipefail
+          for overlay in production staging production/jobs staging/jobs; do
+            out="$RUNNER_TEMP/render-${overlay//\//-}.yaml"
+            kubectl kustomize "infra/aws/eks/overlays/${overlay}" > "$out"
+            images="$(grep -cE '^\s*image: ' "$out")"
+            placeholders="$(grep -cE '^\s*image: \S+:RELEASE_TAG_REQUIRED$' "$out")"
+            if [[ "$images" -eq 0 || "$images" -ne "$placeholders" ]]; then
+              echo "::error::${overlay}: ${images} images, ${placeholders} placeholders"
+              exit 1
+            fi
+            echo "${overlay}: ${images} image(s), all placeholders"
+          done
+
   test:
     runs-on: ubuntu-latest
     services:

@@ -178,3 +178,42 @@ Window planning: budget roughly 5 minutes for the final sync at this size on the
 4. **Proctor socket**: sticky sessions on the ALB (or a socket.io adapter) so the desktop and phone of one pairing land on the same replica.
 5. **Accepted per-replica state** (document or move): HTTP rate limits (`express-rate-limit` memory store, so limits multiply by replica count), the legacy `/evaluate` status map and speech budget in the frozen router, replay/teamfit live state.
 6. Then the §6 manifest change, updating `server/test/platform.test.js` in the same commit with the PROGRAM_STATE entry that records PG authority.
+
+---
+
+## Addendum 2026-10-10 — PROD-READY Phase 7 (cutover commands on the distroless image, release ordering)
+
+Appended by PROD-READY Phase 7; everything above is unchanged as a record.
+Decisions P71, P75, P77 in [PROD_READY_STATE.md](production/PROD_READY_STATE.md).
+**The cutover was NOT executed** (HA-023 stays with the operator).
+
+1. **§3 step 4 ("in a one-off pod/job … `npm run migrate:store`")** — the
+   runtime image is distroless (no shell, no `npm`). Use the prepared Jobs in
+   `infra/aws/eks/jobs/cutover/jobs.yaml` (production only; they mount the EFS
+   claim `prism-data`): render `infra/aws/eks/overlays/production/jobs` with the
+   release tag, then `kubectl create -f prism-jobs.yaml -l prism.studai.one/job=store-migration-dry-run`,
+   review the counts, then `…=store-migration-enforce`. Both run
+   `/nodejs/bin/node server/config/runWithRuntimeSecrets.js db/migrateStore.js [--enforce]`.
+   Keep both log lines (`store_migration_report`, `store_reconciliation_report`)
+   as evidence. Exact commands: DEPLOYMENT_RUNBOOK_v1.md addendum 2026-10-10 §D.
+2. **The cutover and the release are one window.** The image that contains
+   the copy tooling fixes (P38) is also the image that refuses to start
+   without `PRISM_PG_STORE=true`. Order: freeze → backups (IDs recorded) →
+   `kubectl scale deployment/prism -n prism --replicas=0` → Job
+   `migrate-status` → Job `migrate-up` (0021–0060) → Job
+   `store-migration-dry-run` → Job `store-migration-enforce` (`ok: true`) →
+   secret changes incl. `PRISM_PG_STORE=true` (human) → apply the rendered
+   production overlay (replicas 1) → §4 checklist + smoke battery → Jobs
+   `sessions-pin-forms-dry-run` / `-enforce`. Full sequence:
+   [GO_LIVE_CHECKLIST.md](production/GO_LIVE_CHECKLIST.md) section C.
+3. **§5 Rollback** additionally needs `kubectl rollout undo` (not
+   `kubectl set image`): the previous image has no `/api/ready`, which the new
+   manifest uses for readiness. See DEPLOYMENT_RUNBOOK addendum §G.
+4. **§6 replicas** — the guard test now pins `infra/aws/eks/base/deployment.yaml`
+   (the old single-file manifest is a tombstone); the multi-replica checklist
+   of the Phase 3 addendum still applies in full.
+5. **Rehearse once against production-shaped data before the window**, on an
+   isolated, access-controlled staging database restored from an RDS snapshot
+   and deleted afterwards (it contains personal data — a privacy decision for
+   the operator; synthetic data is the default). So far only empty and
+   synthetic databases have run 0021–0060 and the copy.

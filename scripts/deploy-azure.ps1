@@ -1,3 +1,9 @@
+# DEPRECATED (PROD-READY Phase 7, 2026-10-10, decision P70): production runs on
+# EKS in ap-south-1 (docs/remediation/RELEASE_RECORDS.md). Azure App Service is
+# not a supported deployment target; the azure-webapp.yml workflow was removed.
+# Kept only as history for the retired Azure host. Do not run it: an image of
+# this code also refuses to start in production without PRISM_PG_STORE=true.
+# Supported path: docs/DEPLOYMENT_RUNBOOK_v1.md (addendum 2026-10-10).
 # ============================================================================
 # Deploy StudAI Prism to Azure App Service (Linux, Node) - single-origin app.
 #

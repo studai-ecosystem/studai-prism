@@ -84,3 +84,29 @@ Appended by PROD-READY Phase 3; the plan above is unchanged as a record. Step 4 
 ## Addendum 2026-10-10 — PROD-READY Phase 4
 
 Appended by PROD-READY Phase 4; the plan above is unchanged as a record. Step 4 (`PRISM_ASSESSMENT_WORKSPACE_V3`) entry criterion "a human-review, accommodation and identity-check path for V3 sessions exists (the `/api/v1` routes, or a published support procedure until they are built)" is **met in code**: `/api/v1` routes for the one free human review per assessment (charter §11; decided by staff in the existing report review queue), an accommodation request before the start (ACCOMMODATIONS_POLICY_v1; decided by staff holding `accommodations:manage`) and the identity check (IDENTITY_ASSURANCE_SPEC_v1; Level 1 self-declaration, Level 2 by the institution, Level 3 not offered — HA-007) exist with UI entry points on the V3 report, briefing and settings pages (decisions P42–P51 in [PROD_READY_STATE.md](../production/PROD_READY_STATE.md)). They ship dark behind the new flag `PRISM_V3_SUPPORT_ROUTES` (registered OFF). For the criterion to hold in an environment, before or together with step 4: apply migration 0058 with the release, assign staff to the review queue (`reports:review`) and the accommodation queue (`accommodations:manage`), and have a human flip `PRISM_V3_SUPPORT_ROUTES` (HA-C001). Until that flag is on, the published support procedure remains the path. Rollback: flag off — the routes return 404 and the UI shows the previous contact link; stored requests stay in place and an approved accommodation already written for a started session is unaffected.
+
+## Addendum 2026-10-10 — PROD-READY Phase 7
+
+Appended by PROD-READY Phase 7; the plan above is unchanged as a record
+(decisions P73, P77 in [PROD_READY_STATE.md](../production/PROD_READY_STATE.md)).
+
+- **Stage A environment exists in code.** `infra/aws/eks/overlays/staging`
+  defines a separate namespace (`prism-staging`), runtime secret
+  (`/studai/prism/aws-staging/runtime`, with its own database and keys), IRSA
+  role, ALB group and host (`prism-staging.studai.one`), with
+  `PRISM_RELEASE_STAGE=STAGING`. Creating it is an operator action
+  (DEPLOYMENT_RUNBOOK addendum 2026-10-10 §H; GO_LIVE_CHECKLIST section B).
+  Stage A's flag flips happen in staging only, by a human (HA-C001).
+- **Prerequisite P1 is restated:** production's migration head is
+  `0020_commercial`, so the release applies **0021–0060** (40 migrations), not
+  only 0025–0039 (RELEASE_TEMPLATE_PROD_READY.md §2). Because the image
+  refuses to start without `PRISM_PG_STORE=true`, the PostgreSQL cutover
+  (HA-023) is part of the same release window, before any step of §3.
+- **Prerequisite P3** (`PUBLIC_APP_URL`, mail) is listed with every other
+  secret in RELEASE_TEMPLATE_PROD_READY.md §3; SMTP needs the HA-002
+  rotation first.
+- **Monitoring §5 / rollback drill §6** use the read-only smoke battery
+  `scripts/post-deploy-smoke.mjs` to confirm that a flag-off really returned
+  each route to 404.
+- The single ordered sequence of every remaining human action and flag flip
+  is [GO_LIVE_CHECKLIST.md](../production/GO_LIVE_CHECKLIST.md).
