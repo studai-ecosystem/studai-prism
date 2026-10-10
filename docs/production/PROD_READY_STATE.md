@@ -189,7 +189,7 @@ Rehearsal (2026-10-10; synthetic store of 5,000 users, 8,000 sessions, 8,000 ent
 ## Phase 4 — Missing V3 support routes
 Status: COMPLETE
 Branch: `prod/p04-v3-support-routes` (from `prod/p03-multi-instance` @ `9edbd33`)
-Commit: COMMIT_PLACEHOLDER (code, tests, docs) + follow-up commit recording this hash
+Commit: `462db44` (code, tests, docs) + follow-up commit recording this hash
 Gates: see table
 
 V3 sessions get `/api/v1` routes for the three support rights the frozen legacy router no longer serves them (K104): the one free human review per assessment (charter §11), an accommodation request before the start (ACCOMMODATIONS_POLICY_v1) and the identity check (IDENTITY_ASSURANCE_SPEC_v1). All ship dark behind the new flag `PRISM_V3_SUPPORT_ROUTES`, registered OFF (P42). They are built on machinery that already exists: the report review queue and its staff decisions (0045/0051), the session's `v1_accommodations` activation record that the engine already reads, and `v1_verifications` with the assurance rule (P43–P46). One migration: 0058 (P43, P44). The frozen legacy router and every committed migration are untouched. No flag was flipped, nothing was deployed, and HA-007 is untouched (Level 3 is not offered).
