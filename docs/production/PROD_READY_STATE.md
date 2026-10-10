@@ -86,7 +86,7 @@ Gates: see table
 ## Phase 1S — Security hotfix (operator-directed, P3)
 Status: COMPLETE (code and tests; operator actions in Risks)
 Branch: `prod/p01s-security-hotfix` (from `prod/p01-dependencies` @ `a500ed1`)
-Commit: see `git log prod/p01-dependencies..prod/p01s-security-hotfix`
+Commit: `26e4581` (fixes, tests, docs) + follow-up commit recording this hash
 Gates: see table
 
 Findings N1–N15 of the 2026-10-10 audit, each confirmed in code first: [SECURITY_REVIEW.md](../campus/SECURITY_REVIEW.md) § "Addendum 2026-10-10 — PROD-READY Phase 1S". Decisions P10–P22. The frozen legacy router is untouched (legacy fixes are middleware in `server/app.js`, `server/lib/legacyOwnerLock.js`). Security fixes of existing defects ship on (no new flag); no flag was flipped, nothing deployed.
