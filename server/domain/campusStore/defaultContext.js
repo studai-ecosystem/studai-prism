@@ -4,7 +4,9 @@
 import { isDbConfigured, query, getPool, getSessionLockPool } from '../../db/pool.js'
 import { createPgCampusRepos } from './index.js'
 import { createCampusContext, EMPTY_LEGACY_SOURCES } from './context.js'
-import { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport, getEntitlement, createEntitlement, createSession, updateSession, registerSessionFormResolver } from '../../lib/store.js'
+import * as v1Store from '../../lib/store.js'
+import { assuranceForSession } from '../../lib/identityAssurance.js'
+import { legacySupportSources } from '../support/legacySources.js'
 import { buildCatalog, formForSession } from '../assessments/catalog.js'
 import { isMailEnabled, sendOrgInviteEmail, sendCampusAssignmentEmail } from '../../lib/mailer.js'
 import { findUserById, findUserByEmail } from '../../lib/db.js'
@@ -15,6 +17,8 @@ import { createEngineAdapter, createRouterInvoker } from '../assessments/engine.
 import { createMissionEvaluator } from '../development/evaluator.js'
 import { createSliceEvaluator } from '../evidence/sliceEvaluator.js'
 import { draftBankScenarios } from '../assessments/draftSegments.js'
+
+const { listEntitlementsByUser, getSession, getSessionIdsByUser, getReport, getEntitlement, createEntitlement, createSession, updateSession, registerSessionFormResolver } = v1Store
 
 // The AI gateway, bound on first use (no provider SDK at module load).
 async function completeViaGateway(params, options) {
@@ -98,6 +102,9 @@ export function createDefaultCampusContext({ complete = completeViaGateway } = {
         const { rows } = await query('SELECT invalid, review_state FROM admin_session_states WHERE session_id = $1', [String(sessionId)])
         return rows[0] ? { invalid: rows[0].invalid, reviewState: rows[0].review_state } : null
       },
+      // PROD-READY Phase 4 support routes: identity-check records, the
+      // assurance level and the session's accommodation record.
+      ...legacySupportSources(v1Store, { assuranceFor: (sessionId) => assuranceForSession(sessionId) }),
       paths: legacyPaths,
     },
     // The frozen general pool lives with the legacy engine; loaded lazily so

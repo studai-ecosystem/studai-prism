@@ -51,8 +51,8 @@ try {
   const { steps } = parseArgs(process.argv.slice(2))
   const ups = await sortedUps()
   report.migrationCount = ups.length
-  // Pinned to the committed head; each new migration updates it (0055: PROD-READY Phase 1S; 0056: Phase 2 erasure cascade; 0057: Phase 3 integrity guards).
-  if (ups.length !== 57) throw new Error('REHEARSAL_EXPECTED_57_MIGRATIONS')
+  // Pinned to the committed head; each new migration updates it (0055: PROD-READY Phase 1S; 0056: Phase 2 erasure cascade; 0057: Phase 3 integrity guards; 0058: Phase 4 V3 support routes).
+  if (ups.length !== 58) throw new Error('REHEARSAL_EXPECTED_58_MIGRATIONS')
   const fresh = ups.filter((n) => /^00[4-9]\d_/.test(n))
   const down = await readdir(MIGRATIONS)
   report.newMigrations = fresh

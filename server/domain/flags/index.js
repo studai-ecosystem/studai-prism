@@ -13,6 +13,8 @@ export const CAMPUS_FLAGS = Object.freeze([
   'PRISM_GROWTH_ENABLED',
   'PRISM_ROLE_EXPLORATION_V2',
   'PRISM_PREPARATION_V1',
+  // PROD-READY Phase 4 (UI entry points shown only when the server flag is on).
+  'PRISM_V3_SUPPORT_ROUTES',
 ])
 
 export function isEnabled(key) {

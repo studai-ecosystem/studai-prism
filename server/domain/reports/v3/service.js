@@ -329,7 +329,7 @@ export function createReportService({ repos, legacy, catalog, evidence, sessionS
       requireStore()
       if (!repos.reportReviews || typeof repos.reportReviews.listOpen !== 'function') throw new ApiError('CAMPUS_STORE_UNAVAILABLE', 'Review requests are temporarily unavailable.')
       const items = await repos.reportReviews.listOpen()
-      return { items: items.map((r) => ({ id: r.id, sessionId: r.sessionId, version: r.version, category: r.category, momentId: r.momentId ?? null, reason: r.reason, state: r.state, createdAt: r.createdAt })) }
+      return { items: items.map((r) => ({ id: r.id, sessionId: r.sessionId, version: r.version, kind: r.kind || 'MOMENT', category: r.category, momentId: r.momentId ?? null, reason: r.reason, state: r.state, createdAt: r.createdAt })) }
     },
 
     // A reviewer decides an OPEN case (CH-29, T36). UPHOLD and REJECT record

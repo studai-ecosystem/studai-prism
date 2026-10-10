@@ -46,6 +46,14 @@ export const ERROR_STATUS = Object.freeze({
   RUN_NOT_ALLOCATABLE: 503,
   RUN_VERSION_UNSUPPORTED: 409,
   PINNED_METHOD_UNAVAILABLE: 409,
+  // PROD-READY Phase 4 V3 support routes: the one free human review is used;
+  // an adjustment is arranged only before the start; the institution has not
+  // switched requests on; an identity level the learner cannot record.
+  REVIEW_ALREADY_USED: 409,
+  ASSESSMENT_ALREADY_STARTED: 409,
+  ACCOMMODATION_ALREADY_DECIDED: 409,
+  ACCOMMODATIONS_NOT_REQUESTABLE: 409,
+  IDENTITY_LEVEL_NOT_AVAILABLE: 409,
   NOT_IMPLEMENTED: 501,
   INTERNAL: 500,
 })

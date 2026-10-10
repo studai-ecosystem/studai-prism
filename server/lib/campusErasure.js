@@ -52,6 +52,8 @@ export const CAMPUS_CASCADE = Object.freeze([
   ['report_admin_states', 'session_id'],
   ['integrity_reviews', 'session_id'],
   ['admin_notes', 'entity_id'],
+  // PROD-READY Phase 4 (0058): the pre-start accommodation request linked to the session.
+  ['assessment_accommodation_requests', 'session_id'],
 ])
 
 export const sessionRef = (sessionId) => createHash('sha256')
@@ -178,6 +180,7 @@ const SESSION_STATEMENTS = [
   ['report_admin_states', (run, sid) => run('DELETE FROM report_admin_states WHERE session_id = $1', [sid])],
   ['integrity_reviews', (run, sid) => run('DELETE FROM integrity_reviews WHERE session_id = $1', [sid])],
   ['admin_notes', (run, sid) => run(`DELETE FROM admin_notes WHERE entity_type = 'session' AND entity_id = $1`, [sid])],
+  ['assessment_accommodation_requests', (run, sid) => run('DELETE FROM assessment_accommodation_requests WHERE session_id = $1', [sid])],
 ]
 
 export async function eraseCampusSessionData(sessionId) {

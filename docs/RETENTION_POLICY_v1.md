@@ -75,3 +75,11 @@ PROVISIONAL like the rest of this policy (HA-003). Nothing above is changed.
 - **Proof of erasure**: `privacy_erasure_runs` / `privacy_erasure_steps` (never deleted; no account id or email stored).
 - **New registry entity** `student_import_rows_raw`: 30 days after an import is committed or cancelled, raw CSV cells are cleared (PROVISIONAL, `IMPORT_ROW_RAW_RETENTION_DAYS`). Deliberate operator runs only (dry-run first, receipt in `retention_runs`); scheduled enforcement arrives with the Phase 5 job runner, still dark behind `PRISM_RETENTION_ENFORCEMENT`.
 - **Legal holds** now also block self-service erasure (409), as §3.1 already required.
+
+## Addendum 2026-10-10 — PROD-READY Phase 4 (V3 support routes)
+
+PROVISIONAL like the rest of this policy (HA-003). Nothing above is changed.
+
+- **Pre-start accommodation requests** (`assessment_accommodation_requests`, migration 0058): the needs text may reference disability. Once the assessment starts, the request is linked to the session and is erased with it (per-session cascade) and with the account (account cascade); an approved decision is also written to the session's existing accommodation record (`v1_accommodations`), which the session erasure already covered. A request whose assessment never starts stays until account erasure: no timer-based purge exists yet (Phase 5 job runner; period to be set with HA-003).
+- **Human review requests** from the new route are rows of the existing report review queue (`report_review_requests`, kind `HUMAN_REVIEW`) and follow the "Human-review and dispute materials" category above (3 years, provisional) and its existing erasure handling (Phase 2).
+- **Identity self-declarations** are v1 store verification records (`v1_verifications`): the declared name and whether it matches the account name, nothing else; erased with the session as before.

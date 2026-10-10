@@ -60,6 +60,10 @@ export const FLAG_CATALOGUE = [
   { key: 'PRISM_GROWTH_ENABLED', risk: 'high', owner: 'psychometrics', description: 'Campus V1: reassessment cycles and growth comparison (approved-equivalent forms only).', dataGate: 'form equivalence approved (HA-C004) + operator flip (HA-C001)' },
   { key: 'PRISM_ROLE_EXPLORATION_V2', risk: 'medium', owner: 'product', description: 'Campus V1: Explore Roles V2 (self-reported vs demonstrated, no percentages).', dataGate: 'copy review + operator flip (HA-C001)' },
   { key: 'PRISM_PREPARATION_V1', risk: 'medium', owner: 'product', description: 'P7: private preparation (sanitized intent, untimed rehearsal, action card) and SELF_REPORT check-ins; PERSONAL workspace only, never formal evidence.', dataGate: 'DATABASE_URL + 0047 + participant/action-card prompt review + privacy review of retention copy + operator flip (HA-C001)' },
+  // PROD-READY Phase 4: /api/v1 human-review, pre-start accommodation and
+  // identity-check routes for V3 sessions (the legacy routes are closed for
+  // them, K104), their admin accommodation plane and UI entry points. Default OFF.
+  { key: 'PRISM_V3_SUPPORT_ROUTES', risk: 'medium', owner: 'product', description: 'V3 support routes: one free human review per assessment (§11), accommodation requests before the start (§13), Level 1 identity self-declaration (§9; Level 3 not offered).', dataGate: 'PRISM_APP_SHELL_V3 live + migration 0058 + staff assigned to the review and accommodation queues (reports:review, accommodations:manage) + draft copy reviewed by counsel (HA-005) + operator flip (HA-C001)' },
   // Campus Phase 12 validation tooling (not a product surface). Default OFF.
   { key: 'PRISM_V3_RATING_QUEUE', risk: 'medium', owner: 'psychometrics', description: 'Blinded human double-rating queue for V3 evidence units (/api/validation, /api/admin/validation, /rater/evidence).', dataGate: 'DATABASE_URL + 0039 + qualified raters + rating protocol approved by the psychometrics lead (HA-C008)' },
 ]

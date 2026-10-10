@@ -18,6 +18,7 @@ import { useAssignmentBriefing } from '../../student/hooks.js'
 import { queryStateView } from '../../student/QueryState.jsx'
 import { checkApiHealth } from '../../../api/system.js'
 import { checkBrowser, checkScreen, checkConnection, checkMediaSupport, testMicrophone, summarise } from '../../../lib/deviceCheck.js'
+import { useAccommodation, useSupportRoutesEnabled } from '../../support/hooks.js'
 import { START_REASON_COPY } from '../../../lib/copy/student.js'
 import { assignmentBase, assignmentsListPath } from './BriefingPage.jsx'
 
@@ -86,7 +87,13 @@ export default function SystemCheckPage() {
   const [results, setResults] = useState(null)
   const [mic, setMic] = useState(null)
   const hasArtifacts = briefing.data?.definition.hasArtifacts
-  const proctored = briefing.data?.assignment.integrityMode === 'PROCTORED'
+  // PROD-READY Phase 4: an approved "no camera check" adjustment drops the
+  // camera requirement (server flag only; nothing else about the run changes).
+  const supportOn = useSupportRoutesEnabled()
+  const integrityProctored = briefing.data?.assignment.integrityMode === 'PROCTORED'
+  const adjustment = useAccommodation(assignmentId, { enabled: supportOn && integrityProctored })
+  const noCameraApproved = adjustment.data?.request?.status === 'APPROVED' && Boolean(adjustment.data.request.modes?.noCamera)
+  const proctored = integrityProctored && !noCameraApproved
   // The V3 workspace is answered by typing and on the work material; spoken
   // input is a separately reviewed variant and is not offered here.
   const spokenInput = briefing.data?.start?.mode !== 'V3'

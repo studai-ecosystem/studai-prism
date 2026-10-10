@@ -172,6 +172,11 @@ test('T0 gate: research tables define no PII columns and never reference user_id
       // was funded and the provider keys that keep grants idempotent —
       // finance record retained under policy; never joins research tables.
       'product_grants',
+      // PROD-READY Phase 4 (0058): one account's own pre-start accommodation
+      // request on its assignment (WHO asked for WHICH adjustment) — identity
+      // plane like v1_accommodations, in the erasure cascade; never read by
+      // the evaluator or joined into research tables.
+      'assessment_accommodation_requests',
     ])
     const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)]
     for (const [, name, body] of tables) {

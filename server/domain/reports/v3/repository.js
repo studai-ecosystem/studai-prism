@@ -101,7 +101,10 @@ export function createReportVersionsRepoPg({ query, getPool }) {
 export const REVIEW_CATEGORIES = Object.freeze(['TRANSCRIPTION', 'ATTRIBUTION', 'SCENARIO_FACT', 'INTERPRETATION', 'OTHER'])
 export const REVIEW_DECISIONS = Object.freeze(['UPHOLD', 'CORRECT', 'REJECT'])
 
-const reviewView = (r) => r && ({ id: r.id, sessionId: r.sessionId, version: r.version, category: r.category, momentId: r.momentId ?? null, state: r.state, createdAt: r.createdAt })
+// PROD-READY Phase 4 (0058): MOMENT = the P5.7 per-moment request (default);
+// HUMAN_REVIEW = the charter §11 free human review (at most one per session).
+export const REVIEW_KINDS = Object.freeze(['MOMENT', 'HUMAN_REVIEW'])
+const reviewView = (r) => r && ({ id: r.id, sessionId: r.sessionId, version: r.version, kind: r.kind || 'MOMENT', category: r.category, momentId: r.momentId ?? null, state: r.state, createdAt: r.createdAt })
 // The reviewer's queue view: ids, category and the learner's stated reason —
 // never report content, quotes or the learner's identity.
 const queueView = (r) => r && ({ ...reviewView(r), reason: r.reason })
@@ -111,11 +114,22 @@ export function createReportReviewsRepoMemory(db) {
   db.reportReviewRequests ||= []
   db.reportReviewDecisions ||= []
   return {
-    async create({ sessionId, version, userId, category = 'INTERPRETATION', momentId = null, reason }) {
+    async create({ sessionId, version, userId, category = 'INTERPRETATION', momentId = null, reason, kind = 'MOMENT' }) {
       if (!db.reportVersions?.some((v) => v.sessionId === sessionId && v.version === version)) throw new ApiError('NOT_FOUND', 'That report version does not exist.')
-      const row = { id: db.id(), sessionId, version, userId, category, momentId, reason, state: 'OPEN', createdAt: db.clock().toISOString() }
+      // 0058 partial unique index twin: one HUMAN_REVIEW request per session.
+      if (kind === 'HUMAN_REVIEW' && db.reportReviewRequests.some((r) => r.sessionId === sessionId && r.kind === 'HUMAN_REVIEW')) {
+        throw new ApiError('CONFLICT', 'A human review was already requested for this assessment.', { details: { reason: 'HUMAN_REVIEW_EXISTS' } })
+      }
+      const row = { id: db.id(), sessionId, version, userId, kind, category, momentId, reason, state: 'OPEN', createdAt: db.clock().toISOString() }
       db.reportReviewRequests.push(row)
       return reviewView(clone(row))
+    },
+    // The session's charter §11 human review (0058), or null.
+    async findHumanReview(sessionId) {
+      return reviewView(clone(db.reportReviewRequests.find((r) => r.sessionId === sessionId && r.kind === 'HUMAN_REVIEW'))) || null
+    },
+    async listHumanReviewsForUser(userId) {
+      return db.reportReviewRequests.filter((r) => r.userId === userId && r.kind === 'HUMAN_REVIEW').sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((r) => reviewView(clone(r)))
     },
     async listForSession(sessionId) {
       return db.reportReviewRequests.filter((r) => r.sessionId === sessionId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((r) => reviewView(clone(r)))
@@ -146,20 +160,21 @@ export function createReportReviewsRepoMemory(db) {
   }
 }
 
-const reviewRow = (r) => r && ({ id: r.id, sessionId: r.session_id, version: r.version, category: r.category, momentId: r.moment_id ?? null, state: r.state, createdAt: iso(r.created_at), ...(r.reason !== undefined ? { reason: r.reason } : {}) })
+const reviewRow = (r) => r && ({ id: r.id, sessionId: r.session_id, version: r.version, kind: r.request_kind || 'MOMENT', category: r.category, momentId: r.moment_id ?? null, state: r.state, createdAt: iso(r.created_at), ...(r.reason !== undefined ? { reason: r.reason } : {}) })
 const decisionRow = (d) => d && ({ id: d.id, reviewId: d.review_id, reviewerId: d.reviewer_id, decision: d.decision, reason: d.reason, correction: d.correction_json ?? null, createdAt: iso(d.created_at) })
 
 export function createReportReviewsRepoPg({ query }) {
   return {
-    async create({ sessionId, version, userId, category = 'INTERPRETATION', momentId = null, reason }) {
+    async create({ sessionId, version, userId, category = 'INTERPRETATION', momentId = null, reason, kind = 'MOMENT' }) {
       try {
         const { rows } = await query(
-          `INSERT INTO report_review_requests (session_id, version, user_id, category, moment_id, reason)
-           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, session_id, version, category, moment_id, state, created_at`,
-          [sessionId, version, userId, category, momentId, reason],
+          `INSERT INTO report_review_requests (session_id, version, user_id, category, moment_id, reason, request_kind)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, session_id, version, request_kind, category, moment_id, state, created_at`,
+          [sessionId, version, userId, category, momentId, reason, kind],
         )
         return reviewRow(rows[0])
       } catch (err) {
+        if (err.code === '23505') throw new ApiError('CONFLICT', 'A human review was already requested for this assessment.', { details: { reason: 'HUMAN_REVIEW_EXISTS' } })
         if (err.code === '23503') throw new ApiError('NOT_FOUND', 'That report version does not exist.')
         if (err.code === '23514') throw new ApiError('VALIDATION_FAILED', 'Describe what you would like reviewed.')
         throw err
@@ -167,16 +182,28 @@ export function createReportReviewsRepoPg({ query }) {
     },
     async listForSession(sessionId) {
       const { rows } = await query(
-        'SELECT id, session_id, version, category, moment_id, state, created_at FROM report_review_requests WHERE session_id = $1 ORDER BY created_at ASC', [sessionId],
+        'SELECT id, session_id, version, request_kind, category, moment_id, state, created_at FROM report_review_requests WHERE session_id = $1 ORDER BY created_at ASC', [sessionId],
+      )
+      return rows.map(reviewRow)
+    },
+    async findHumanReview(sessionId) {
+      const { rows } = await query(
+        "SELECT id, session_id, version, request_kind, category, moment_id, state, created_at FROM report_review_requests WHERE session_id = $1 AND request_kind = 'HUMAN_REVIEW'", [sessionId],
+      )
+      return reviewRow(rows[0]) || null
+    },
+    async listHumanReviewsForUser(userId) {
+      const { rows } = await query(
+        "SELECT id, session_id, version, request_kind, category, moment_id, state, created_at FROM report_review_requests WHERE user_id = $1 AND request_kind = 'HUMAN_REVIEW' ORDER BY created_at DESC", [userId],
       )
       return rows.map(reviewRow)
     },
     async get(id) {
-      const { rows } = await query('SELECT id, session_id, version, category, moment_id, reason, state, created_at FROM report_review_requests WHERE id = $1', [id])
+      const { rows } = await query('SELECT id, session_id, version, request_kind, category, moment_id, reason, state, created_at FROM report_review_requests WHERE id = $1', [id])
       return reviewRow(rows[0]) || null
     },
     async listOpen() {
-      const { rows } = await query("SELECT id, session_id, version, category, moment_id, reason, state, created_at FROM report_review_requests WHERE state = 'OPEN' ORDER BY created_at ASC")
+      const { rows } = await query("SELECT id, session_id, version, request_kind, category, moment_id, reason, state, created_at FROM report_review_requests WHERE state = 'OPEN' ORDER BY created_at ASC")
       return rows.map(reviewRow)
     },
     async addDecision({ reviewId, reviewerId, decision, reason, correction = null }) {

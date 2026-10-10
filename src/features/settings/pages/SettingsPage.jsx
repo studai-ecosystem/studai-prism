@@ -23,6 +23,8 @@ import { CAMPUS_CAN_SEE, CAMPUS_CANNOT_SEE, PERSONAL_PRIVACY_NOTE } from '../../
 import { BRIEFING_COPY } from '../../../lib/copy/student.js'
 import { assignmentsListPath } from '../../assessments/pages/BriefingPage.jsx'
 import { AGE_DECLARATION_TEXT } from '../../../../server/lib/sharedConstants.js'
+import { useSupportRoutesEnabled } from '../../support/hooks.js'
+import { SupportSettingsSection } from '../../support/components/SupportSettingsSection.jsx'
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduated', 'Working Professional'].map((y) => ({ value: y, label: y }))
 
@@ -341,13 +343,16 @@ function SecuritySection() {
 export default function SettingsPage() {
   const { user } = useAuth()
   const { active } = useWorkspace()
+  // PROD-READY Phase 4: assessment support (server flag only, student workspaces).
+  const supportOn = useSupportRoutesEnabled() && ['PERSONAL', 'CAMPUS_STUDENT'].includes(active.type)
+  const sections = supportOn ? [...SECTIONS.slice(0, 6), ['support', 'Assessment support'], ...SECTIONS.slice(6)] : SECTIONS
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Your profile, account, privacy and accessibility." context={active} />
       <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
         <nav aria-label="Settings sections" className="lg:sticky lg:top-4 lg:self-start">
           <ul className="flex flex-wrap gap-2 lg:flex-col lg:gap-1">
-            {SECTIONS.map(([id, label]) => (
+            {sections.map(([id, label]) => (
               <li key={id}>
                 <a href={`#${id}`} className="block rounded-[var(--prism-radius-md)] px-3 py-1.5 text-sm text-prism-ink-muted hover:bg-prism-subtle hover:text-prism-ink">{label}</a>
               </li>
@@ -361,6 +366,7 @@ export default function SettingsPage() {
           <PrivacySection />
           <SharingSection />
           <AssessmentSection />
+          {supportOn && <SupportSettingsSection />}
           <AccessibilitySection />
           <SecuritySection />
         </div>

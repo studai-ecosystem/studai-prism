@@ -14,6 +14,8 @@ import { useWorkspace } from '../../../app/providers/WorkspaceProvider.jsx'
 import { useAssignmentBriefing, useAcknowledgeAssignment } from '../../student/hooks.js'
 import { queryStateView } from '../../student/QueryState.jsx'
 import { track } from '../../../lib/telemetry.js'
+import { useSupportRoutesEnabled } from '../../support/hooks.js'
+import { AccommodationRequestPanel } from '../../support/components/AccommodationRequestPanel.jsx'
 import {
   BRIEFING_COPY, INTEGRITY_COPY, NOT_MEASURED_COPY, SCOPE_LABEL, SPONSORED_DISCLOSURE, SPONSORED_DISCLOSURE_VERSION, START_REASON_COPY,
 } from '../../../lib/copy/student.js'
@@ -44,6 +46,8 @@ export default function BriefingPage() {
   const [checked, setChecked] = useState(false)
   const tracked = useRef(false)
   const confirmedRef = useRef(null)
+  // PROD-READY Phase 4: in-app adjustment requests (server flag only).
+  const supportOn = useSupportRoutesEnabled()
 
   // After confirming, the button is replaced: move focus to the confirmation
   // so keyboard and screen-reader users are not dropped on <body>.
@@ -109,8 +113,12 @@ export default function BriefingPage() {
           <ul className="list-disc space-y-1 pl-5">{integrity.requirements.map((t) => <li key={t}>{t}</li>)}</ul>
         </Section>
         <Section n={7} title="Accessibility and adjustments">
-          <p>{BRIEFING_COPY.accommodations}</p>
-          <Link to="/contact" className="mt-2 inline-flex min-h-6 items-center font-medium text-prism-accent-strong underline">Contact us about an adjustment</Link>
+          {supportOn ? <AccommodationRequestPanel assignmentId={assignmentId} idPrefix="briefing-adjustment" /> : (
+            <>
+              <p>{BRIEFING_COPY.accommodations}</p>
+              <Link to="/contact" className="mt-2 inline-flex min-h-6 items-center font-medium text-prism-accent-strong underline">Contact us about an adjustment</Link>
+            </>
+          )}
         </Section>
         <Section n={8} title="Who can see the result">
           {sponsored ? (

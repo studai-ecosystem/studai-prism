@@ -48,6 +48,12 @@ export function createAssessmentSessionService({
   // evidence applied ({ sessionId, requestId } → stored version). Reads never
   // publish; null → no Report V3 publication from this service.
   publishReport = null,
+  // PROD-READY Phase 4: called inside the session lock once a V3 start has its
+  // session id and BEFORE the engine is asked to start, so a pre-start
+  // accommodation request is linked to the session (and an approved decision
+  // is on the session's record when the engine reads it). A no-op while
+  // PRISM_V3_SUPPORT_ROUTES is off.
+  onSessionAllocated = null,
 }) {
   const localLocks = createMemorySessionLocks()
   const withLock = (resource, work) => {
@@ -569,6 +575,7 @@ export function createAssessmentSessionService({
       return withLock(sessionId, async () => {
         const existing = await repos.sessionIo.getClientEvent(sessionId, START_EVENT)
         if (existing && (await legacy.getSession(sessionId))) return { sessionId, resumed: true }
+        if (onSessionAllocated) await onSessionAllocated({ assignmentId, user, sessionId, requestId })
         await engine.recordConsent({ sessionId, scopes, consentVersion: consent?.consentVersion, authorization, client, requestId })
         if (!(await legacy.getSession(sessionId))) {
           if (draftSegmentFor(scenarioId)) await createDraftSession({ sessionId, scenarioId, user, scopes, consentVersion: consent?.consentVersion })

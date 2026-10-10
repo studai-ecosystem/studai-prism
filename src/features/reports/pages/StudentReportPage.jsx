@@ -21,6 +21,10 @@ import { ShareReportDialog } from '../components/ShareReportDialog.jsx'
 import { downloadReportPdf } from '../../../lib/reportPdf.js'
 import { track } from '../../../lib/telemetry.js'
 import { REPORT_COPY } from '../../../lib/copy/report.js'
+import { useAuth } from '../../../app/providers/AuthProvider.jsx'
+import { useSupportRoutesEnabled } from '../../support/hooks.js'
+import { HumanReviewCard } from '../../support/components/HumanReviewCard.jsx'
+import { IdentityCheckCard } from '../../support/components/IdentityCheckCard.jsx'
 
 function visibilityText(data) {
   const v = data.privacy?.visibility
@@ -100,6 +104,9 @@ export default function StudentReportPage() {
   const query = useStudentReport(sessionId, { enabled: aligned && !meLoading, version: params.get('version') })
   const [shareOpen, setShareOpen] = useState(false)
   const [pdfError, setPdfError] = useState(null)
+  // PROD-READY Phase 4: human review and identity check (server flag only).
+  const supportOn = useSupportRoutesEnabled()
+  const { user } = useAuth()
 
   useEffect(() => {
     if (query.data) track('report_viewed', { sessionId, scope: query.data.report.header.scope })
@@ -172,6 +179,12 @@ export default function StudentReportPage() {
         reviewState={data.review || null}
         recommendations={data.recommendations || []}
       />
+      {supportOn && data.audience === 'OWNER' && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <HumanReviewCard sessionId={sessionId} />
+          <IdentityCheckCard sessionId={sessionId} defaultName={user?.name || ''} />
+        </div>
+      )}
       {data.privacy?.canShare && <ActiveShares shares={data.privacy.activeShares} sessionId={sessionId} />}
       {data.privacy?.canShare && <ShareReportDialog open={shareOpen} onClose={() => setShareOpen(false)} sessionId={sessionId} organizations={organizations} />}
     </div>

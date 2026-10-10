@@ -30,6 +30,7 @@ import { createValidationService } from '../validation/service.js'
 import { createPreparationService } from '../preparation/service.js'
 import { createGrantService } from '../commerce/grants.js'
 import { createPreviewService } from '../commerce/preview.js'
+import { createSupportService } from '../support/service.js'
 import { createReleaseGate } from '../release/config.js'
 import { buildRunPin } from '../assessments/draftSegments.js'
 import { contentRegistry } from '../content/versions.js'
@@ -50,6 +51,11 @@ export const EMPTY_LEGACY_SOURCES = Object.freeze({
   getReport: async () => null,
   getEntitlement: async () => null,
   createEntitlement: async () => null,
+  // PROD-READY Phase 4 support routes (v1 store records keyed by session):
+  // identity-check records, the accommodation activation record and the
+  // identity-assurance level. Read-only/absent by default.
+  getVerification: async () => null,
+  assuranceFor: async () => ({ level: 'L1' }),
   paths: {
     purchase: '/payment',
     start: (sessionId) => `/briefing?session=${encodeURIComponent(sessionId)}`,
@@ -177,6 +183,10 @@ export function createCampusContext({
     if (!ratingQueueOn()) return { enqueued: 0, skipped: 'RATING_QUEUE_OFF' }
     return validation.enqueueSession(sessionId, { enqueuedBy: `system:${String(reason).toLowerCase()}` })
   }
+  // PROD-READY Phase 4: V3 support paths (human review, pre-start
+  // accommodation, identity check). Dark behind PRISM_V3_SUPPORT_ROUTES.
+  const supportOn = () => isEnabled('PRISM_V3_SUPPORT_ROUTES')
+  const support = createSupportService({ repos: storeView, assignments, legacy, audit: auditWriter, enabled: supportOn })
   const reports = createReportService({
     repos: storeView, legacy, catalog, evidence, sessionScopes, dataAccess, scenarioSource, audit: auditWriter, clock, ...(shareTokenFactory ? { tokenFactory: shareTokenFactory } : {}),
     // P5.6 read-time recommendations: honest PRACTICE_OFF while Development V2 is dark.
@@ -212,6 +222,9 @@ export function createCampusContext({
     sessions: engine
       ? createAssessmentSessionService({
         repos: storeView, assignments, catalog, scenarioSource, engine, legacy, resolver, ledger, sessionScopes, clock, limitMs, audit: auditWriter, sliceEvaluator, releaseGate, onHumanReviewRequired,
+        // Phase 4: a pre-start accommodation request is linked (and an approved
+        // decision recorded for the engine) before the engine starts.
+        onSessionAllocated: ({ assignmentId, user, sessionId, requestId }) => support.linkAccommodationAtStart({ assignmentId, user, sessionId, requestId }),
         onSponsoredCompleted: ({ organizationId, assignmentId }) => admin.checkCompletionThresholds(organizationId, assignmentId),
         // Explicit Report V3 publication once a run's evidence is applied.
         publishReport: ({ sessionId, requestId }) => reports.publish(sessionId, { reason: 'INITIAL', requestId }),
@@ -219,6 +232,7 @@ export function createCampusContext({
       : null,
     ledger,
     reports,
+    support,
     invites,
     admin,
     development,

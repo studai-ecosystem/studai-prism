@@ -194,6 +194,8 @@ export const USER_STATEMENTS = Object.freeze([
     const kept = await run('UPDATE report_review_requests SET user_id = $2, reason = $3, moment_id = NULL WHERE user_id = $1', [c.uid, c.pseudo, ERASED_TEXT])
     return { rowCount: rowCount(scrubbed) + rowCount(deleted) + rowCount(kept) }
   }],
+  // PROD-READY Phase 4 (0058): pre-start accommodation requests (needs text).
+  ['assessment_accommodation_requests', (run, c) => run('DELETE FROM assessment_accommodation_requests WHERE user_id = $1', [c.uid])],
   ['preparation_turns', (run, c) => run('DELETE FROM preparation_turns WHERE attempt_id IN (SELECT id FROM preparation_attempts WHERE user_id = $1)', [c.uid])],
   ['preparation_attempts', (run, c) => run('DELETE FROM preparation_attempts WHERE user_id = $1', [c.uid])],
   ['action_cards', (run, c) => run('DELETE FROM action_cards WHERE user_id = $1', [c.uid])],
@@ -285,6 +287,7 @@ export function eraseSessionFromMemoryDb(db, sessionId) {
   const plans = new Set([...(db.developmentPlans?.values() || [])].filter((p) => p.sourceSessionId === sid).map((p) => p.id))
   counts.development_plans = dropMap(db.developmentPlans, (p) => plans.has(p.id))
   dropFrom(db.planItems, (i) => plans.has(i.planId))
+  counts.assessment_accommodation_requests = dropMap(db.accommodationRequests, (r) => r.sessionId === sid)
   for (const g of db.shareGrants?.values() || []) {
     if (!g.revokedAt && !(db.shareGrantResources || []).some((r) => r.shareGrantId === g.id)) g.revokedAt = db.clock().toISOString()
   }
@@ -353,6 +356,7 @@ export function eraseUserFromMemoryDb(db, c) {
   const decided = new Set((db.reportReviewDecisions || []).map((d) => d.reviewId))
   counts.report_review_requests = dropFrom(db.reportReviewRequests, (r) => r.userId === uid && !decided.has(r.id))
     + rewrite(db.reportReviewRequests, (r) => r.userId === uid, () => ({ userId: pseudo, reason: ERASED_TEXT, momentId: null }))
+  counts.assessment_accommodation_requests = dropMap(db.accommodationRequests, (r) => r.userId === uid)
   const prep = new Set([...(db.preparationAttempts?.values() || [])].filter((a) => a.userId === uid).map((a) => a.id))
   counts.preparation_attempts = dropMap(db.preparationAttempts, (a) => prep.has(a.id))
   dropFrom(db.preparationTurns, (t) => prep.has(t.attemptId))
@@ -494,6 +498,7 @@ export function createErasureCascade({
         ['development_plans', 'SELECT source_session_id AS id FROM development_plans WHERE user_id = $1'],
         ['capability_growth_snapshots', 'SELECT baseline_session_id AS id FROM capability_growth_snapshots WHERE user_id = $1 UNION SELECT reassessment_session_id FROM capability_growth_snapshots WHERE user_id = $1'],
         ['report_review_requests', 'SELECT session_id AS id FROM report_review_requests WHERE user_id = $1'],
+        ['assessment_accommodation_requests', 'SELECT session_id AS id FROM assessment_accommodation_requests WHERE user_id = $1 AND session_id IS NOT NULL'],
         ['invite_redemptions', 'SELECT session_id AS id FROM invite_redemptions WHERE user_id = $1 AND session_id IS NOT NULL'],
         ['v1_payment_redemptions', 'SELECT session_id AS id FROM v1_payment_redemptions WHERE user_id = $1 AND session_id IS NOT NULL'],
       ]
@@ -508,6 +513,7 @@ export function createErasureCascade({
       for (const s of mem.assignmentStudents?.values() || []) if (s.userId === uid && s.sessionId) ids.add(String(s.sessionId))
       for (const x of mem.consumptions || []) if (x.userId === uid && x.sessionId) ids.add(String(x.sessionId))
       for (const r of mem.reportReviewRequests || []) if (r.userId === uid) ids.add(String(r.sessionId))
+      for (const r of mem.accommodationRequests?.values() || []) if (r.userId === uid && r.sessionId) ids.add(String(r.sessionId))
     }
     return [...ids].sort()
   }

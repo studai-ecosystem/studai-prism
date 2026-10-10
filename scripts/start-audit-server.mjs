@@ -40,6 +40,11 @@ if (process.env.PRISM_AUDIT_CAMPUS === 'true') {
   // nav inside this throwaway campus audit process. Never set in .env or
   // any real environment.
   if (process.env.PRISM_AUDIT_PREPARATION === 'true') process.env.PRISM_PREPARATION_V1 = 'true'
+  // PROD-READY Phase 4 journey (runner mode p04-support only): the V3
+  // support routes (human review, adjustment request, identity check) inside
+  // this throwaway campus audit process. Never set in .env or any real
+  // environment.
+  if (process.env.PRISM_AUDIT_SUPPORT_ROUTES === 'true') process.env.PRISM_V3_SUPPORT_ROUTES = 'true'
   // Campus store for org/membership e2e (Journey B): ONLY a throwaway test
   // database handed in by the runner (local PGlite / CI service container).
   if (process.env.PRISM_AUDIT_CAMPUS_DATABASE_URL) {

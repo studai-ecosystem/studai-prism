@@ -315,6 +315,14 @@ export const PERSONAL_DATA_REGISTRY = Object.freeze({
   }),
   v1_payment_redemptions: session({ session_id: X('Existing eraseSession behaviour (Phase 1S)'), user_id: X('Detached by session and by account id') }),
 
+  // ── 0058 V3 support routes (PROD-READY Phase 4) ──
+  // report_review_requests.request_kind is an enum (MOMENT / HUMAN_REVIEW), not personal data.
+  assessment_accommodation_requests: user({
+    user_id: D(), session_id: D('Deleted with the session (per-session cascade) and with the account'),
+    needs: D('Accommodation needs text — may reference disability (ACCOMMODATIONS_POLICY_v1 §3)'), modes: D(ROW_GONE),
+    decision_note: D('Staff decision note about the learner request'), decided_by: D(ROW_GONE),
+  }, 'Pre-start accommodation requests on V3 assignments; linked to the session at start'),
+
   // ── 0056 erasure ledger (this phase) ──
   privacy_erasure_runs: none({
     subject_ref: R('Keyed one-way hash of the account id (no personal data); lets an operator prove completion'),

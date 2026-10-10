@@ -1,5 +1,5 @@
 // PROD-READY Phase 2 (SECURITY_REVIEW S8): the account erasure cascade on a
-// real PostgreSQL (migrations 0001–0056). One subtest per table of the S8 risk
+// real PostgreSQL (migrations 0001–0056; 0058 accommodation requests added in PROD-READY Phase 4). One subtest per table of the S8 risk
 // row (and the other personal tables the registry erases), another student's
 // rows untouched, a rerun after a mid-way failure completes from the ledger,
 // the one-transaction guarantee of the account step, the narrowly scoped
@@ -153,6 +153,11 @@ async function seedPerson(p, s) {
   await query(`INSERT INTO admin_notes (note_id, entity_type, entity_id, author_id, body) VALUES ($1, 'user', $2, $3, 'called the student about their report')`, [randomUUID(), p.uid, s.admin])
   await query(`INSERT INTO admin_session_states (session_id, review_state, review_reason) VALUES ($1, 'held', 'student said something odd')`, [p.sid])
   await query(`INSERT INTO invite_redemptions (redemption_id, invite_id, user_id, user_email, session_id) VALUES ($1, $2, $3, $4, $5)`, [randomUUID(), s.invite, p.uid, p.email, p.sid])
+  // PROD-READY Phase 4 (0058): a pre-start accommodation request linked to the
+  // session at start, and one still waiting on a personal assignment.
+  await query(`INSERT INTO assessment_accommodation_requests (assignment_id, user_id, organization_id, session_id, needs, status, modes, decision_note, decided_by, decided_at, linked_at)
+               VALUES ($1, $2, $3, $4, 'I need a text-only administration because of my eyesight.', 'APPROVED', '{"textOnly": true}', 'Approved: text only.', $5, now(), now())`, [s.assignment, p.uid, s.org, p.sid, STAFF])
+  await query(`INSERT INTO assessment_accommodation_requests (assignment_id, user_id, needs) VALUES ($1, $2, 'Please let me answer without the camera check.')`, [p.personalAssignment, p.uid])
 }
 
 // Tables (and how many of their rows) whose row text mentions `needle`.
@@ -250,6 +255,7 @@ test('S8: the account erasure cascade on PostgreSQL', { skip }, async (t) => {
     invite_redemptions: ['SELECT count(*)::int AS n FROM invite_redemptions WHERE user_id = $1', [a.uid]],
     'v1_sessions / v1_reports / v1_payments': ['SELECT (SELECT count(*) FROM v1_sessions WHERE session_id = ANY($1)) + (SELECT count(*) FROM v1_reports WHERE session_id = ANY($1)) + (SELECT count(*) FROM v1_payments WHERE session_id = ANY($1))::int AS n', [[a.sid, a.sid2]]],
     'evidence_rating_items (unrated)': ['SELECT count(*)::int AS n FROM evidence_rating_items WHERE id = $1', [a.unratedItem]],
+    assessment_accommodation_requests: ['SELECT count(*)::int AS n FROM assessment_accommodation_requests WHERE user_id = $1 OR session_id = $2', [a.uid, a.sid]],
   }
   for (const [table, [sql, params]] of Object.entries(gone)) {
     await t.test(`${table}: the person's rows are deleted`, async () => assert.equal(await n(sql, params), 0))

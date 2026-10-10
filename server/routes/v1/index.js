@@ -22,6 +22,7 @@ import { createAnalyticsRouter } from './analytics.js'
 import { createBillingRouter } from './billing.js'
 import { createPreparationRouter } from './preparation.js'
 import { createPreviewRouter } from './preview.js'
+import { createSupportRouter } from './support.js'
 
 export function createV1Router(deps = {}) {
   const requireUser = deps.requireUser || defaultRequireUser
@@ -51,6 +52,8 @@ export function createV1Router(deps = {}) {
   router.use(createTelemetryRouter({ requireUser, campus }))
   router.use(createAssessmentSessionsRouter({ requireUser, campus }))
   router.use(createReportsRouter({ requireUser, campus }))
+  // PROD-READY Phase 4: V3 support routes (dark behind PRISM_V3_SUPPORT_ROUTES).
+  router.use(createSupportRouter({ requireUser, campus }))
 
   router.use(notFound)
   router.use(createErrorHandler(logger))

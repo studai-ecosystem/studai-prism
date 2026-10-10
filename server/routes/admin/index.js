@@ -53,6 +53,7 @@ import organizationsRouter from './organizations.js'
 import validationRouter from './validation.js'
 import qualityRouter from './quality.js'
 import reportReviewsRouter from './reportReviews.js'
+import accommodationRequestsRouter from './accommodationRequests.js'
 
 const router = Router()
 
@@ -145,5 +146,7 @@ router.use('/validation', validationRouter)
 router.use('/quality', qualityRouter)
 // P5.7 — report interpretation review decisions (append-only; corrections are new versions).
 router.use('/report-reviews', reportReviewsRouter)
+// PROD-READY Phase 4 — V3 pre-start accommodation requests (dark behind PRISM_V3_SUPPORT_ROUTES).
+router.use('/accommodation-requests', accommodationRequestsRouter)
 
 export default router

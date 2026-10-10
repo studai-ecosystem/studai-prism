@@ -9,8 +9,8 @@ import { spawn } from 'node:child_process'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const require = createRequire(new URL('../server/package.json', import.meta.url))
 const mode = process.argv[2] || 'database'
-if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'browser', 'browser-smoke', 'browser-critical', 'browser-all', 'browser-p1', 'browser-sync', 'browser-journey-a', 'browser-mobile-correction'].includes(mode) || process.argv.length > 3) {
-  throw new Error('Use database, p2, p3, p4, p5, p6, p7, p8, p9, p10, browser, browser-smoke, browser-critical, browser-all, browser-p1, browser-sync, browser-journey-a or browser-mobile-correction mode; connection strings are never arguments.')
+if (!['database', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'p04-support', 'browser', 'browser-smoke', 'browser-critical', 'browser-all', 'browser-p1', 'browser-sync', 'browser-journey-a', 'browser-mobile-correction'].includes(mode) || process.argv.length > 3) {
+  throw new Error('Use database, p2, p3, p4, p5, p6, p7, p8, p9, p10, p04-support, browser, browser-smoke, browser-critical, browser-all, browser-p1, browser-sync, browser-journey-a or browser-mobile-correction mode; connection strings are never arguments.')
 }
 
 function run(args, env) {
@@ -94,7 +94,7 @@ try {
   // The old audit provider expects pooled text, while correction practice
   // sends criterion-scoped structured artifacts. Use the existing controlled
   // adapter only in these disposable browser processes; runtime is untouched.
-  if (mode.startsWith('browser') || ['p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10'].includes(mode)) {
+  if (mode.startsWith('browser') || ['p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'p04-support'].includes(mode)) {
     const preload = new URL('../tests/fixtures/registerBrowserAuditProvider.mjs', import.meta.url).href
     env.NODE_OPTIONS = `${env.NODE_OPTIONS || ''} --import=${preload}`.trim()
   }
@@ -169,6 +169,15 @@ try {
       'campus-journey-a.spec.js',
       'campus-journey-c.spec.js',
       '--project=chromium')
+  }
+  // PROD-READY Phase 4: the V3 support routes journey (adjustment before the
+  // start, free human review, identity check) plus the report and settings
+  // specs it touches, desktop Chromium; the support flag and draft content on
+  // the 4174 audit server only.
+  if (mode === 'p04-support') {
+    env.PRISM_AUDIT_DRAFT_CONTENT = 'true'
+    env.PRISM_AUDIT_SUPPORT_ROUTES = 'true'
+    browserArgs.splice(2, browserArgs.length, 'prod-p04-support-routes.spec.js', '--project=chromium')
   }
   exitCode = await run(mode === 'database'
     ? ['--test', '--test-concurrency=1', 'server/test/experienceBaseline.db.test.js', 'server/test/p2Slice.db.test.js']
