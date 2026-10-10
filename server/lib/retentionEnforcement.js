@@ -37,7 +37,17 @@ export const RETENTION_DEFAULTS = [
   { entity: 'review_dispute_materials', retentionDays: 1095, basis: `${PROVISIONAL_BASIS} Human-review and dispute materials: 3 years.` },
   { entity: 'payment_records', retentionDays: 2920, basis: `${PROVISIONAL_BASIS} Statutory retention, provisionally configured around 8 years — NOT legally approved until counsel signs off.` },
   { entity: 'revoked_credential_tombstone', retentionDays: null, basis: 'Content-free tombstone retained indefinitely for verification integrity.' },
+  { entity: 'student_import_rows_raw', retentionDays: 30, basis: `${PROVISIONAL_BASIS} Raw CSV cells of student imports (emails, names, roll numbers): cleared 30 days after the import is committed or cancelled (PROD-READY Phase 2, SECURITY_REVIEW S8).` },
 ]
+
+// Governed constant (PROVISIONAL pending HA-003): days after an import job is
+// committed (or cancelled) before its raw CSV cells are cleared. The registry
+// row above seeds the same value; an operator decision or contract override
+// changes the effective period (longest wins, effectiveRetentionDays).
+// Purge: server/domain/privacy/importRowRetention.js (deliberate operator run
+// today; scheduling is PROD-READY Phase 5, dark behind PRISM_RETENTION_ENFORCEMENT).
+export const IMPORT_ROW_RAW_ENTITY = 'student_import_rows_raw'
+export const IMPORT_ROW_RAW_RETENTION_DAYS = 30
 
 // Idempotent seed of the charter categories into data_retention_rules,
 // labelled provisional. Existing operator-decided rows are never overwritten.

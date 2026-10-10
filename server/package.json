@@ -9,6 +9,8 @@
     "migrate:store": "node config/runWithRuntimeSecrets.js db/migrateStore.js",
     "seed:items": "node config/runWithRuntimeSecrets.js db/seedItems.js",
     "seed:admin": "node config/runWithRuntimeSecrets.js db/seedAdmin.js",
+    "retention:import-rows": "node config/runWithRuntimeSecrets.js db/purgeImportRows.js",
+    "erasure:ledger": "node config/runWithRuntimeSecrets.js db/erasureLedger.js",
     "test": "node --test"
   },
   "dependencies": {

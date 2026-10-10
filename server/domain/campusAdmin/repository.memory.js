@@ -70,10 +70,15 @@ export function createCampusAdminRepoMemory(db) {
     async listCohortMembers(cohortId) {
       return [...db.cohortMembers.values()].filter((m) => m.cohortId === cohortId && m.status === 'ACTIVE').map(clone)
     },
+    // Leaving a cohort also ends the student's membership of that cohort's
+    // interventions (PROD-READY Phase 2, S8).
     async removeCohortMember(cohortId, userId) {
       const row = db.cohortMembers.get(`${cohortId}:${userId}`)
       if (!row) return null
       row.status = 'REMOVED'
+      for (const [key, m] of [...(db.interventionMembers?.entries() || [])]) {
+        if (m.userId === userId && db.interventions?.get(m.interventionId)?.cohortId === cohortId) db.interventionMembers.delete(key)
+      }
       return clone(row)
     },
     async listCohortMembershipsForOrg(organizationId) {
@@ -92,6 +97,14 @@ export function createCampusAdminRepoMemory(db) {
       const row = db.memberships.get(id)
       if (!row) return null
       Object.assign(row, { status, updatedAt: now() })
+      // A student removed from the organization leaves its interventions
+      // (PROD-READY Phase 2, S8) unless another active student membership remains.
+      const stillStudent = [...db.memberships.values()].some((m) => m.organizationId === row.organizationId && m.userId === row.userId && m.role === 'STUDENT' && m.status !== 'REMOVED')
+      if (status === 'REMOVED' && row.role === 'STUDENT' && !stillStudent) {
+        for (const [key, m] of [...(db.interventionMembers?.entries() || [])]) {
+          if (m.userId === row.userId && db.interventions?.get(m.interventionId)?.organizationId === row.organizationId) db.interventionMembers.delete(key)
+        }
+      }
       return clone(row)
     },
     async listOrgInvites(organizationId) {

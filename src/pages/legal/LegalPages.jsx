@@ -62,7 +62,8 @@ export function PrivacyPolicy() {
       <p>
         Data is stored on AWS infrastructure in the Asia Pacific (Mumbai) region. Score credentials are
         valid for 12 months. You may request erasure at any time (below); erasure removes your sessions,
-        reports, credentials and associated telemetry.
+        reports, credentials, practice work, campus memberships and associated telemetry. Audit and billing
+        records keep the event under a pseudonym instead of your identity.
       </p>
       <H>Your rights</H>
       <ul className="list-disc pl-6 space-y-2">

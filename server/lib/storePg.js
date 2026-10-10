@@ -524,6 +524,13 @@ export async function eraseSession(sessionId) {
   return removed
 }
 
+// Account erasure (PROD-READY Phase 2): twin of storeJson.detachPaymentRedemptionsForUser.
+export async function detachPaymentRedemptionsForUser(userId) {
+  if (!userId) return 0
+  const r = await query('UPDATE v1_payment_redemptions SET session_id = NULL, user_id = NULL WHERE user_id = $1', [userId])
+  return r?.rowCount || 0
+}
+
 // ── Admin Control Centre list/search surface (Phase 2) ───────────────────────
 // Twin of the storeJson implementations: identical signatures and row shapes.
 

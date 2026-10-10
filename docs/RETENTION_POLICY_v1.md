@@ -65,3 +65,13 @@ pin zero-orphan behavior (track0 T0.4, governance suites).
 ---
 *Version history: v1 created 2026-08-04 (Phase 3 part 2). Provisional pending
 counsel (HA-003) — do not present any period as legally approved.*
+
+## Addendum 2026-10-10 — PROD-READY Phase 2 (account erasure cascade)
+
+PROVISIONAL like the rest of this policy (HA-003). Nothing above is changed.
+
+- **Campus-era rows**: candidate erasure now reaches every campus table through `server/domain/privacy/erasureCascade.js`; the per-column action (delete / pseudonymise / detach / retain with reason) is the registry `server/domain/privacy/personalDataRegistry.js`.
+- **Append-only ledgers and audit trails** keep the event and replace the person with a stable pseudonym (`erased:<hex>`, keyed by `PRISM_ERASURE_PSEUDONYM_KEY`); this is pseudonymisation, not anonymisation (§3.4 still applies). Finance records (`product_grants`, `entitlement_consumptions`, `v1_payment_redemptions`) are pseudonymised or detached, never deleted (payment records category).
+- **Proof of erasure**: `privacy_erasure_runs` / `privacy_erasure_steps` (never deleted; no account id or email stored).
+- **New registry entity** `student_import_rows_raw`: 30 days after an import is committed or cancelled, raw CSV cells are cleared (PROVISIONAL, `IMPORT_ROW_RAW_RETENTION_DAYS`). Deliberate operator runs only (dry-run first, receipt in `retention_runs`); scheduled enforcement arrives with the Phase 5 job runner, still dark behind `PRISM_RETENTION_ENFORCEMENT`.
+- **Legal holds** now also block self-service erasure (409), as §3.1 already required.

@@ -6,10 +6,10 @@
 //      covers), what would be revoked/destroyed (credentials), and what is
 //      PRESERVED (admin audit trail, append-only study aggregates, export
 //      ledger). Mutates nothing.
-//   2. executeErasure()     — runs the REAL cascade (store eraseSession +
-//      telemetry eraseTelemetry — the same code paths the candidate
-//      self-service right uses) and, for candidate-scope requests, deletes
-//      the account record. Returns the receipt.
+//   2. executeErasure()     — runs the REAL cascade (the account erasure
+//      cascade, server/domain/privacy/erasureCascade.js — the same service the
+//      candidate self-service right uses) and, for candidate-scope requests,
+//      deletes the account record. Returns the receipt.
 //
 // buildAccessPackage() assembles a candidate's own data for access/export
 // requests (their data, unmasked — it is theirs).
@@ -17,11 +17,9 @@
 import { query, isDbConfigured } from '../db/pool.js'
 import {
   getSessionIdsByUser, getSession, getReport, getEntitlement, getConsent,
-  getVerification, getDispute, getEvents, getItemsBySession, eraseSession,
+  getVerification, getDispute, getEvents, getItemsBySession,
 } from './store.js'
 import { findUserByEmail, findUserById, deleteUser, publicUser } from './db.js'
-import { eraseTelemetry } from './telemetry.js'
-import { eraseCampusSessionData } from './campusErasure.js'
 
 // Telemetry tables the cascade touches, with their session column — mirrors
 // lib/telemetry.js eraseTelemetry exactly (kept in lockstep by the Phase 6 test).
@@ -118,7 +116,7 @@ export async function buildErasurePlan(request) {
     ],
     notes: [
       'Signed credentials are DESTROYED (deletion is the one mutation the immutability trigger permits, exactly for this right); public verification links die with them.',
-      'The erasure uses the same cascade as the candidate self-service right (store eraseSession + telemetry eraseTelemetry).',
+      'The erasure uses the same cascade as the candidate self-service right (account erasure cascade: v1 store, telemetry, Campus/V3 and account-level campus rows; append-only ledgers are pseudonymised).',
       'Charter §16: an ACTIVE LEGAL HOLD on any in-scope session or the candidate blocks execution until released.',
       'Charter §15: candidate_demographics rows for the candidate are deleted; anonymized aggregates survive by construction.',
     ],
@@ -126,27 +124,12 @@ export async function buildErasurePlan(request) {
 }
 
 // ── Execution (the real cascade) ─────────────────────────────────────────────
-// eraseTelemetry is gated on PRISM_V2_TELEMETRY (a flag-off deployment writes
-// no telemetry, so the self-service path has nothing to erase). An ADMIN
-// erasure must be reliable regardless of flag state — historical rows may
-// predate a flag flip — so after the shared cascade we sweep the same table
-// list directly, gated only on the database being configured.
-async function eraseTelemetryUnconditionally(sessionId) {
-  if (!isDbConfigured() || !isUuid(sessionId)) return {}
-  const counts = {}
-  const votes = await query(
-    `DELETE FROM judge_votes WHERE response_id IN
-       (SELECT response_id FROM item_responses WHERE session_id = $1)`,
-    [sessionId],
-  ).catch(() => null)
-  counts.judge_votes = votes?.rowCount ?? 0
-  for (const [table, col] of TELEMETRY_CASCADE) {
-    const r = await query(`DELETE FROM ${table} WHERE ${col} = $1`, [sessionId]).catch(() => null)
-    counts[table] = r?.rowCount ?? 0
-  }
-  return counts
-}
-
+// PROD-READY Phase 2 (S8): execution goes through the account erasure
+// cascade (server/domain/privacy/erasureCascade.js) — the same service the
+// candidate self-service right uses. It erases every session (v1 store,
+// telemetry swept regardless of PRISM_V2_TELEMETRY, Campus/V3 store) and every
+// campus-era row of the person, records each step in the erasure ledger, and
+// for candidate-scope requests deletes the account record as its last step.
 export async function executeErasure(request) {
   const user = await resolveCandidate({
     candidateUserId: request.candidate_user_id, candidateEmail: request.candidate_email,
@@ -174,34 +157,41 @@ export async function executeErasure(request) {
     sessions: [],
     accountDeleted: false,
   }
-  for (const sid of sessionIds) {
-    const storeRemoved = await eraseSession(sid)
-    const campus = await eraseCampusSessionData(sid)
-    // Shared cascade first (keeps behavior identical to the candidate
-    // self-service right), then the unconditional sweep for flag-off gaps.
-    const viaFlag = await eraseTelemetry(sid)
-    const swept = await eraseTelemetryUnconditionally(sid)
-    const telemetry = {}
-    for (const k of new Set([...Object.keys(viaFlag), ...Object.keys(swept)])) {
-      telemetry[k] = (viaFlag[k] || 0) + (swept[k] || 0)
-    }
-    receipt.sessions.push({ sessionId: sid, storeRemoved, campus, telemetry })
-  }
+  const { defaultErasureCascade } = await import('../domain/privacy/erasureCascade.js')
+  const cascade = defaultErasureCascade()
+  const view = (r) => ({ sessionId: r.sessionId, storeRemoved: r.storeRemoved, campus: r.campus, telemetry: r.telemetry })
   if (request.scope === 'candidate' && user) {
-    // Charter §15: re-identifiable demographic records go through the same
-    // candidate-erasure flow (keyed by the pseudonymous candidate_id).
-    // Properly anonymized aggregates — calibration parameters, approved
-    // aggregate statistics, published findings — survive by construction
-    // (they carry no per-candidate rows).
-    if (isDbConfigured() && user.candidateId) {
-      const demo = await query(
-        'DELETE FROM candidate_demographics WHERE candidate_id = $1', [user.candidateId],
-      ).catch(() => null)
-      receipt.demographicsDeleted = demo?.rowCount ?? 0
-    }
-    await deleteUser(user.id)
-    receipt.accountDeleted = true
+    const run = await cascade.run({
+      userId: user.id,
+      email: user.email,
+      candidateId: user.candidateId || null,
+      initiatedBy: 'ADMIN_REQUEST',
+      scope: 'ACCOUNT',
+      // Charter §15: re-identifiable demographic records go through the same
+      // candidate-erasure flow (keyed by the pseudonymous candidate_id).
+      // Properly anonymized aggregates — calibration parameters, approved
+      // aggregate statistics, published findings — survive by construction
+      // (they carry no per-candidate rows).
+      accountStep: async () => {
+        let demographicsDeleted = 0
+        if (isDbConfigured() && user.candidateId) {
+          const demo = await query(
+            'DELETE FROM candidate_demographics WHERE candidate_id = $1', [user.candidateId],
+          ).catch(() => null)
+          demographicsDeleted = demo?.rowCount ?? 0
+        }
+        await deleteUser(user.id)
+        return { demographicsDeleted }
+      },
+    })
+    receipt.sessions = run.sessions.map(view)
+    receipt.campusUser = run.user
+    receipt.erasureRunId = run.runId
+    receipt.accountDeleted = run.accountDeleted
+    if (run.account) receipt.demographicsDeleted = run.account.demographicsDeleted
+    return receipt
   }
+  for (const sid of sessionIds) receipt.sessions.push(view(await cascade.eraseSessionEverywhere(sid)))
   return receipt
 }
 

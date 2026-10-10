@@ -7,6 +7,8 @@ const SERVER_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ALLOWED_TARGETS = new Set([
   'db/migrate.js',
   'db/migrateStore.js',
+  'db/purgeImportRows.js',
+  'db/erasureLedger.js',
   'db/seedAdmin.js',
   'db/seedItems.js',
 ])

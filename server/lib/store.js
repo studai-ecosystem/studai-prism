@@ -64,6 +64,7 @@ export const getVerification = impl.getVerification
 export const recordDeviceLink = impl.recordDeviceLink
 export const getDeviceLink = impl.getDeviceLink
 export const eraseSession = impl.eraseSession
+export const detachPaymentRedemptionsForUser = impl.detachPaymentRedemptionsForUser
 
 // Admin Control Centre (Phase 2): list/search projections + admin lifecycle
 // helpers. Same twin discipline — identical signatures both backends.

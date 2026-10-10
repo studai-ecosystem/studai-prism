@@ -72,3 +72,7 @@ validity (see `CAMPUS_CLAIMS_REGISTER.md`).
 2. Confirm `/campus/*` redirects, `/api/v1/organizations/*` returns 404, personal flows (Journey A) pass.
 3. Turn it back on; confirm organizations, seats and audit trails are intact.
 Record the drill in the operator log before the production flip.
+
+## Addendum 2026-10-10 — PROD-READY Phase 2
+
+Appended by PROD-READY Phase 2; the plan above is unchanged as a record. The step 5 (`PRISM_CAMPUS_ENABLED`) entry criterion "account erasure cascades to campus tables and the evidence rating queue (SECURITY_REVIEW S8 — open, blocking)" is **met in code**: S8 is Fixed (SECURITY_REVIEW addendum "PROD-READY Phase 2"; decisions P23 and P28 in [PROD_READY_STATE.md](../production/PROD_READY_STATE.md)). S8 is therefore no longer a step 5 blocker. The remaining step 5 criteria (steps 1–4 live, HA-C005 closed, P1–P4 done, one internal QA organization) are unchanged. Before step 5 the operator applies migration 0056 with the release and sets `PRISM_ERASURE_PSEUDONYM_KEY` (P25); the `student_import_rows.raw` purge period (30 days) stays PROVISIONAL pending HA-003.

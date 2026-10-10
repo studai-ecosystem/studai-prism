@@ -19,10 +19,12 @@ const store = skip ? {} : await import('../lib/storePg.js')
 test('0055: builds on a v1_payments table that already holds duplicate payment ids; the earliest entitlement becomes the redemption; down/up is clean', { skip }, async (t) => {
   t.after(async () => { await closePool() })
   await migrateUp()
-  // Roll back to just before 0055 (only if it is the head), seed duplicates, re-apply.
-  const head = (await query('SELECT name FROM schema_migrations ORDER BY name DESC LIMIT 1')).rows[0].name
-  assert.equal(head, '0055_payment_redemptions')
-  await migrateDown()
+  // Roll back to just before 0055 (later migrations first: 0056 PROD-READY
+  // Phase 2), seed duplicates, re-apply everything.
+  const applied = async () => (await query('SELECT name FROM schema_migrations ORDER BY name DESC')).rows.map((r) => r.name)
+  assert.ok((await applied()).includes('0055_payment_redemptions'))
+  while ((await applied())[0] >= '0055') await migrateDown()
+  assert.equal((await applied())[0], '0054_report_publication_note')
   assert.equal((await query("SELECT to_regclass('v1_payment_redemptions') AS t")).rows[0].t, null)
   const pay = `pay_dup_${randomUUID().slice(0, 8)}`
   const [early, late] = [randomUUID(), randomUUID()]

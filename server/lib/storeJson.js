@@ -479,6 +479,24 @@ export async function eraseSession(sessionId) {
   return removed
 }
 
+// Account erasure (PROD-READY Phase 2): any redemption still carrying the
+// account id (its session already erased or never started) is detached the
+// same way eraseSession detaches by session.
+export async function detachPaymentRedemptionsForUser(userId) {
+  if (!userId) return 0
+  const db = await readDB()
+  let n = 0
+  for (const r of Object.values(db.paymentRedemptions)) {
+    if (r && r.userId === userId) {
+      r.sessionId = null
+      r.userId = null
+      n += 1
+    }
+  }
+  if (n) await writeDB(db)
+  return n
+}
+
 // ── Admin Control Centre list/search surface (Phase 2) ───────────────────────
 // Read-only projections with server-side pagination. Same signatures as the
 // storePg twin. Page sizes are clamped by the admin routes (≤100); volumes at

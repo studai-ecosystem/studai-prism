@@ -306,7 +306,7 @@ function DeleteData() {
     <div className="mt-6 rounded-[var(--prism-radius-lg)] border border-prism-blocked-soft p-4">
       <h3 className="text-sm font-semibold text-prism-ink">Delete my assessment data</h3>
       <p className="mt-1 text-sm text-prism-ink-muted">
-        Permanently erase your assessments, reports, credentials and associated telemetry. Issued credentials stop verifying. This cannot be undone.
+        Permanently erase your assessments, reports, credentials, practice and preparation work, campus memberships and associated telemetry. Issued credentials stop verifying. Your sign-in stays so you can start again. This cannot be undone.
       </p>
       <Button className="mt-3" variant="danger" size="sm" onClick={() => setOpen(true)}>Delete my assessment data</Button>
       <Modal

@@ -120,9 +120,17 @@ export function createCampusAdminRepoPg({ query, getPool }) {
       const { rows } = await query("SELECT * FROM cohort_members WHERE cohort_id = $1 AND status = 'ACTIVE' ORDER BY added_at", [cohortId])
       return rows.map(member)
     },
+    // Leaving a cohort also ends the student's membership of that cohort's
+    // interventions, in the same transaction (PROD-READY Phase 2, S8): a
+    // former member no longer counts in the intervention's totals.
     async removeCohortMember(cohortId, userId) {
-      const { rows } = await query("UPDATE cohort_members SET status = 'REMOVED' WHERE cohort_id = $1 AND user_id = $2 RETURNING *", [cohortId, userId])
-      return member(rows[0]) || null
+      return withTransaction(getPool, async (client) => {
+        const { rows } = await client.query("UPDATE cohort_members SET status = 'REMOVED' WHERE cohort_id = $1 AND user_id = $2 RETURNING *", [cohortId, userId])
+        if (rows[0]) {
+          await client.query('DELETE FROM intervention_memberships WHERE user_id = $2 AND intervention_id IN (SELECT id FROM interventions WHERE cohort_id = $1)', [cohortId, userId])
+        }
+        return member(rows[0]) || null
+      })
     },
     async listCohortMembershipsForOrg(organizationId) {
       const { rows } = await query(
@@ -140,8 +148,23 @@ export function createCampusAdminRepoPg({ query, getPool }) {
       const { rows } = await query('SELECT * FROM organization_memberships WHERE id = $1', [id])
       return membership(rows[0]) || null
     },
+    // A student removed from the organization leaves its interventions in the
+    // same transaction (PROD-READY Phase 2, S8), unless another active
+    // student membership in that organization remains.
     async setMembershipStatus(id, status) {
-      const { rows } = await run(() => query('UPDATE organization_memberships SET status = $2, updated_at = now() WHERE id = $1 RETURNING *', [id, status]))
+      const { rows } = await run(() => withTransaction(getPool, async (client) => {
+        const out = await client.query('UPDATE organization_memberships SET status = $2, updated_at = now() WHERE id = $1 RETURNING *', [id, status])
+        const m = out.rows[0]
+        if (m && status === 'REMOVED' && m.role === 'STUDENT') {
+          await client.query(
+            `DELETE FROM intervention_memberships WHERE user_id = $2
+               AND intervention_id IN (SELECT id FROM interventions WHERE organization_id = $1)
+               AND NOT EXISTS (SELECT 1 FROM organization_memberships x WHERE x.organization_id = $1 AND x.user_id = $2 AND x.role = 'STUDENT' AND x.status <> 'REMOVED')`,
+            [m.organization_id, m.user_id],
+          )
+        }
+        return out
+      }))
       return membership(rows[0]) || null
     },
     async listOrgInvites(organizationId) {

@@ -26,6 +26,8 @@ import {
   createTranscribeGuard, isAudioUpload,
 } from './lib/legacyOwnerLock.js'
 import { createReadinessHandler } from './lib/readiness.js'
+import { createCandidateErasureHandler } from './domain/privacy/candidateErasureRoute.js'
+import { createErasureCascade } from './domain/privacy/erasureCascade.js'
 import authRouter from './routes/auth.js'
 import deviceRouter from './routes/device.js'
 import contentRouter from './routes/content.js'
@@ -212,6 +214,15 @@ export function buildApp(v1Deps = {}) {
   app.delete('/api/assessment/data/:sessionId', createLegacyErasureGuard({ lookup: legacyOwner }))
   app.post(LEGACY_OWNER_BOUND_ROUTES, createLegacyOwnerBinding({ lookup: legacyOwner }))
   app.post('/api/assessment/transcribe', transcribeUpload, createTranscribeGuard({ lookup: legacyOwner }))
+  // PROD-READY Phase 2 (SECURITY_REVIEW S8): self-service erasure runs the
+  // account erasure cascade (every v1, telemetry and campus-era row of the
+  // caller). It answers the route itself, so the frozen router's handler,
+  // which erased v1 sessions only, is no longer reached. Ships on (P23).
+  const erasureCascade = v1Deps.erasureCascade || createErasureCascade({
+    memoryDb: () => (campus.repos?.kind === 'memory' ? campus.repos.db : null),
+  })
+  app.locals.erasureCascade = erasureCascade
+  app.delete('/api/assessment/candidate-data', createCandidateErasureHandler({ cascade: erasureCascade }))
   app.use('/api/assessment', assessmentRouter)
   app.use('/api/device', deviceRouter)
   app.use('/api/content', contentRouter)
