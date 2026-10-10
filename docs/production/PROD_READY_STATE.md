@@ -387,7 +387,7 @@ One deployment path (EKS) with the legacy ECS and Azure workflows removed (P70).
 ## Phase 8 — Sales-readiness engineering
 Status: COMPLETE (dark; nothing deployed, no flag flipped, no human action closed)
 Branch: `prod/p08-sales-readiness` (from `prod/p07-deployment` @ `d42bb29`)
-Commit: see the follow-up commit recording this hash
+Commit: `11e9a7b` (code, tests, docs) + follow-up commit recording this hash
 Gates: see table
 
 Phase 8 delivered five pieces of work, all dark:
