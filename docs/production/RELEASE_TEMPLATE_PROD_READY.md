@@ -18,7 +18,7 @@ and its addenda.
 | --- | --- | --- |
 | Image | `prod/prism:2b84e13c07f2` (2026-08-05, [RELEASE_RECORDS.md](../remediation/RELEASE_RECORDS.md)) | `prod/prism:<sha12 of main>` built by `build-image.yml` (target `production`) |
 | v1 store | JSON files on EFS (`backend json` in the August boot log) | PostgreSQL — **mandatory**: since `63d320d` (2026-09-21) the server refuses to start in production unless `PRISM_PG_STORE=true` (DEF-07) |
-| Migration head | `0020_commercial` (`git ls-tree 2b84e13 server/db/migrations`; 0018–0020 applied in the August release) | `0060_session_decision_cache` |
+| Migration head | `0020_commercial` (`git ls-tree 2b84e13 server/db/migrations`; 0018–0020 applied in the August release) | `0063_employer_lnd` |
 | Manifest | applied from `infra/aws/prism-eks.yml` (image pin `69363a6e6b9a` in git, older than the running image) | `infra/aws/eks/overlays/production`, rendered with the release tag; readiness `/api/ready`, non-root, read-only root filesystem, 40 s grace |
 | Flags | every campus / V3 / programme flag absent (off) | still off — this release flips nothing |
 
@@ -30,7 +30,7 @@ store copy + reconciliation → secret changes (incl. `PRISM_PG_STORE=true`) →
 new manifest → verify. Rollback returns to the old image **and** the JSON store
 (§6). There is no order in which the new image runs on the JSON store.
 
-## 2. Migrations to apply (40)
+## 2. Migrations to apply (43)
 
 Everything after production's head `0020_commercial`, in order, each with a
 `.down.sql` (never run a `.down.sql` on real data — ROLLOUT_PLAN §1):
@@ -46,16 +46,19 @@ Everything after production's head `0020_commercial`, in order, each with a
 | 0058 | `0058_v3_support_routes` | Phase 4 (P43, P44) |
 | 0059 | `0059_job_queue` | Phase 5 (P52) |
 | 0060 | `0060_session_decision_cache` | Phase 6 (P64) |
+| 0061 | `0061_demo_organizations` | Phase 8 |
+| 0062 | `0062_guardian_consents` | Phase 8 |
+| 0063 | `0063_employer_lnd` | Phase 9 |
 
 Applied by the Job `prism-migrate-up` (`infra/aws/eks/jobs/ops/jobs.yaml`);
-`prism-store-migration-*` also run `migrateUp()` first, so the head is 0060
+`prism-store-migration-*` also run `migrateUp()` first, so the head is 0063
 before any copy. Evidence: the `prism-migrate-status` log before and after
 (every line `[x]`).
 
 Not rehearsed yet and therefore required in staging first (GO_LIVE_CHECKLIST
-B-steps): 0021–0060 on a database that holds production-shaped data (only
+B-steps): 0021–0063 on a database that holds production-shaped data (only
 empty and synthetic databases so far), and the previous image `2b84e13c07f2`
-starting against a 0060 schema with `PRISM_PG_STORE=false` (the rollback path).
+starting against a 0063 schema with `PRISM_PG_STORE=false` (the rollback path).
 
 ## 3. Environment and secrets
 
@@ -103,7 +106,7 @@ Must **not** be present in production: `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_
 Verified by the smoke battery (`admin-flags` check, with a read-only admin token):
 
 - Campus / V3: `PRISM_APP_SHELL_V3`, `PRISM_EVIDENCE_FAIL_CLOSED`, `PRISM_STUDENT_REPORT_V3`, `PRISM_ASSESSMENT_WORKSPACE_V3`, `PRISM_CAMPUS_ENABLED`, `PRISM_CAMPUS_ANALYTICS`, `PRISM_DEVELOPMENT_V2`, `PRISM_GROWTH_ENABLED`, `PRISM_ROLE_EXPLORATION_V2`, `PRISM_PREPARATION_V1`, `PRISM_V3_RATING_QUEUE`.
-- This programme: `PRISM_V3_SUPPORT_ROUTES` (Phase 4), `PRISM_JOB_WORKER` (Phase 5), `PRISM_ANALYTICS_DECISION_CACHE` (Phase 6).
+- This programme: `PRISM_V3_SUPPORT_ROUTES` (Phase 4), `PRISM_JOB_WORKER` (Phase 5), `PRISM_ANALYTICS_DECISION_CACHE` (Phase 6), `PRISM_PILOT_REPORT_EXPORT` and `PRISM_DEMO_MODE` (Phase 8), `PRISM_EMPLOYER_LND` (Phase 9; `PRISM_UNDER18_PATH` is listed under governance).
 - Governance / science: `PRISM_RETENTION_ENFORCEMENT`, `PRISM_IDENTITY_L3`, `PRISM_UNDER18_PATH`, `PRISM_PROCTOR_PHONE_CAM`, `PRISM_PROCTOR_GAZE`, `PRISM_DEMOGRAPHICS`, `PRISM_STANDARDIZED_CORE` (HA-021), `PRISM_V2_EXECUTIVE`, `PRISM_V2_DUAL_SCORER`, `PRISM_V2_EQUATING`, `PRISM_V2_EARLY_STOP`, `PRISM_PRESSURE`, `PRISM_LANG`, `PRISM_VELOCITY`, `PRISM_REPLAY`, `PRISM_TEAMFIT`, `PRISM_ADMIN_PROMPT_REGISTRY`, `PRISM_DRIFT_HARD`, `PRISM_STUDY_STEERING_AB`, `PRISM_DUMMY_PAYMENTS`.
 - ON: `PRISM_PG_STORE` only (required to boot).
 - Not asserted (existing operator settings this release does not change): `PRISM_V2_TELEMETRY`, `PRISM_GLASS_BOX`, `PRISM_ADMIN_CONSOLE`, `PRISM_CMS_DB`, `PRISM_TTS_NEURAL`, `PRISM_SKIP_VERIFICATION`.
@@ -182,7 +185,7 @@ rollbacks). Never paste an unfilled template; never edit an earlier entry.
 - staging: stage A run on prism-staging with image <sha12> on <date>; smoke battery <PASS/FAIL counts>; rollback rehearsal <result>
 - backups before deploy: RDS manual snapshot <id> (available); EFS recovery point <arn/id> (COMPLETED); JSON store copied out-of-pod <sizes, SHA-256>
 - freeze window: <start>–<end> UTC; announced to <who>
-- migrations applied: 0021_entitlement_ownership … 0060_session_decision_cache (40) via job prism-migrate-up; migrate-status before/after attached
+- migrations applied: 0021_entitlement_ownership … 0063_employer_lnd (43) via job prism-migrate-up; migrate-status before/after attached
 - store cutover (HA-023): store-migration dry run <counts>; enforce ok:true <bucket counts, hashes>; PRISM_PG_STORE=true set by <operator> at <time> (secret version <id>)
 - secrets changed (names only, never values): <e.g. PRISM_ERASURE_PSEUDONYM_KEY added, PUBLIC_APP_URL added, PGSSLMODE/PGSSLROOTCERT set>; secret version <old> → <new>
 - manifest: infra/aws/eks/overlays/production rendered at <commit>, `kubectl diff` reviewed by <operator>; cluster guard policy installed: yes/no
@@ -216,8 +219,10 @@ One more dark flag must read OFF in the smoke battery: `PRISM_EMPLOYER_LND` (dar
 ## Addendum 2026-10-11 — PROD-READY Phase 10 (consolidated counts)
 
 The release candidate is `main` after every `prod/p0x-*` branch is merged
-(HA-C007), so the Phase 8 and Phase 9 addenda apply unconditionally. Read the
-body above with these values (the body is kept as written):
+(HA-C007), so the Phase 8 and Phase 9 addenda apply unconditionally. The
+body above was brought in line with these values in place on 2026-10-11
+(PROD-READY P108: §1 head, §2 table and count, rehearsal ranges, §4 flag list,
+§7 record line):
 
 - Migration head after the release: **`0063_employer_lnd`**; migrations to
   apply: **0021–0063 (43)** — the §2 table plus 0061 `0061_demo_organizations`,
@@ -227,8 +232,10 @@ body above with these values (the body is kept as written):
   image against a **0063** schema with `PRISM_PG_STORE=false`.
 - §3 "Must **not** be present in production" also includes
   `PRISM_DEMO_MODE`, `PRISM_DEMO_DATABASE_URL` and `PRISM_DEMO_PASSWORD`.
-- §3 optional: `PROCTOR_SOCKET_RATE_PER_MIN` (default 60 per minute per
-  socket, Phase 1S).
+- §3 optional: `PROCTOR_SOCKET_RATE_PER_MIN` (default 60 new proctor-socket
+  connections per minute per client IP, Phase 1S N4/P14;
+  `server/lib/proctorSocket.js`). Per process, so the limit multiplies with
+  replicas.
 - §4/§5: the flag list and smoke checks include the Phase 8/9 rows
   (`PRISM_PILOT_REPORT_EXPORT`, `PRISM_DEMO_MODE`, `PRISM_UNDER18_PATH`,
   `PRISM_EMPLOYER_LND`; dark checks `under18-guardian`, `employer-lnd`,

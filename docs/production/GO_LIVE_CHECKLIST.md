@@ -22,15 +22,15 @@ materials named in each row; humans execute.
 
 | # | Step | Owner | Evidence required |
 | --- | --- | --- | --- |
-| B1 | **HA-C007** Push the stacked `prod/p0x-*` branches, open PRs, merge to `main` on green CI | Operator | PR links; green `ci.yml` run on the merge commit (`main` CI is red today — Risks) |
-| B2 | **HA-024** OIDC trust policy → `sub = repo:studai-ecosystem/studai-prism:environment:production` (confirm run 37365615065's denial cause first), environment `production` (required reviewers, prevent self-review, branch `main` only), branch protection on `main` — **before** B1 lands the new `build-image.yml` ([DEPLOYMENT_RUNBOOK addendum](../DEPLOYMENT_RUNBOOK_v1.md) §C) | Repo admin + IAM | Settings screenshots; trust-policy diff; a branch dispatch refused, a `main` dispatch waiting for approval |
+| B2 | **HA-024** OIDC trust policy → `sub = repo:studai-ecosystem/studai-prism:environment:production` (confirm run 37365615065's denial cause first), environment `production` (required reviewers, prevent self-review, branch `main` only), branch protection on `main` — **before** B1 lands the new `build-image.yml` (listed first for that reason) ([DEPLOYMENT_RUNBOOK addendum](../DEPLOYMENT_RUNBOOK_v1.md) §C) | Repo admin + IAM | Settings screenshots; trust-policy diff; a branch dispatch refused, a `main` dispatch waiting for approval |
+| B1 | **HA-C007** Push the stacked `prod/p0x-*` branches, open PRs, merge to `main` on green CI — only **after** B2 | Operator | PR links; green `ci.yml` run on the merge commit (`main` CI is red today — Risks) |
 | B3 | Pin base images by digest (Dockerfile header; repository variables `PRISM_RUNTIME_IMAGE` / `PRISM_BUILD_IMAGE`) | Engineering | Digests in the release record |
 | B4 | Build the release candidate: Build Image, target `production`, from `main` | Operator + reviewer | Run id, approval, ECR scan 0 critical, image `prod/prism:<sha12>` |
 | B5 | Create staging: secret `/studai/prism/aws-staging/runtime` (own database + keys), IRSA role `studai-prism-staging-runtime`, DNS `prism-staging.studai.one`, optional access restriction; decide ALB group (own `studai-staging` vs shared) ([addendum](../DEPLOYMENT_RUNBOOK_v1.md) §H) | Operator | Secret ARN (names only), role ARN, DNS record |
 | B6 | Optional cluster guard `infra/aws/eks/policies/reject-unrendered-image.yaml` (Kubernetes ≥ 1.30) | Cluster admin | `kubectl apply -k` of an overlay refused with the policy message |
 | B7 | ConfigMap `prism-rds-ca` from AWS's RDS CA bundle (both namespaces); `PGSSLMODE=verify-full` + `PGSSLROOTCERT` in staging first (P20) | Operator | Staging boot log without `pg_tls_unverified` |
-| B8 | Staging deploy of the B4 image: migrate Job (0021–0060), rendered overlay, smoke battery | Operator | Job logs, smoke report (0 FAIL) |
-| B9 | Staging rehearsals: JSON→PG copy on a synthetic store (or an isolated snapshot restore — privacy decision); old image `2b84e13c07f2` on the 0060 schema with `PRISM_PG_STORE=false`; the §G rollback; a pod with read-only root filesystem through a full assessment, admin CMS edit and CSV import | Operator + Engineering | Reconciliation `ok:true`; rollback timings; defects filed |
+| B8 | Staging deploy of the B4 image: migrate Job (0021–0063, 43 migrations), rendered overlay, smoke battery | Operator | Job logs, smoke report (0 FAIL) |
+| B9 | Staging rehearsals: JSON→PG copy on a synthetic store (or an isolated snapshot restore — privacy decision); old image `2b84e13c07f2` on the 0063 schema with `PRISM_PG_STORE=false`; the §G rollback; a pod with read-only root filesystem through a full assessment, admin CMS edit and CSV import | Operator + Engineering | Reconciliation `ok:true`; rollback timings; defects filed |
 | B10 | **HA-C012** Production security review before launch (DAST of `/api/v1`, admin console, rater plane) on staging | Security lead | Report; findings triaged |
 | B11 | **HA-C013** Manual accessibility audit with assistive technology on staging | Accessibility lead | Checklist M1–M8 results |
 
@@ -136,7 +136,7 @@ One flag was registered OFF in Phase 9. The tables above are unchanged; slot it 
 
 | # | Flag | Entry criteria (all) | Owner |
 | --- | --- | --- | --- |
-| F6d | `PRISM_EMPLOYER_LND` (employer development-use workspace; also exposes the StudAI Hire hand-off interface, which answers 501) | F5 (`PRISM_CAMPUS_ENABLED`) live; employer disclosure and consent copy approved by counsel (**HA-005**); employer prohibited-use terms approved (**HA-004**); the shared-report view needs F4 (`PRISM_STUDENT_REPORT_V3`), group summaries need F6 (`PRISM_CAMPUS_ANALYTICS`, **HA-C010**), development missions need F7 (`PRISM_DEVELOPMENT_V2`); the employer organization is created by an operator (`organization_type = 'EMPLOYER'`, no route creates one) | Governance + operator |
+| F6d | `PRISM_EMPLOYER_LND` (employer development-use workspace; also exposes the StudAI Hire hand-off interface, which answers 501) | F5 (`PRISM_CAMPUS_ENABLED`) live; employer disclosure and consent copy approved by counsel (**HA-005**); employer prohibited-use terms approved (**HA-004**); the shared-report view needs F3 (`PRISM_STUDENT_REPORT_V3`), group summaries need F6 (`PRISM_CAMPUS_ANALYTICS`, **HA-C010**), development missions need F7 (`PRISM_DEVELOPMENT_V2`); the employer organization is created by an operator (`organization_type = 'EMPLOYER'`, no route creates one) | Governance + operator |
 | — | StudAI Hire evidence hand-off (connection, not a flag) | Stays unconnected (501) until **HA-025** (written decision on Prism → Hire evidence sharing, ECOSYSTEM_SEPARATION_POLICY_v1 rule 2) is closed, with HA-005 and HA-004; then a separately reviewed change ([HIRE_HANDOFF_INTERFACE.md](./HIRE_HANDOFF_INTERFACE.md) §6) | Founder + science lead |
 
 Until F6d, the smoke battery asserts the dark checks `employer-lnd` and `hire-handoff`. Migration 0063 (`0063_employer_lnd`: two employer consent types, the employer-visibility trigger on session scopes, organization type immutable to/from EMPLOYER) joins the release after 0062. **HA-025** is a new register row (OPEN).
@@ -164,11 +164,12 @@ staging secret (B5).
 | B2, B8–B11, C, D2 | HA-022, HA-023, HA-024, HA-C012, HA-C013 | [RUNBOOK_CURRENCY_REVIEW.md](./human-actions/RUNBOOK_CURRENCY_REVIEW.md) — what changed, with dated addenda appended to DEPLOYMENT_RUNBOOK, PG_MIGRATION_RUNBOOK, SECRET-SPLIT-DESIGN, RUNBOOK-credential-rotation, RELEASE_TEMPLATE_PROD_READY, SECURITY_REVIEW and A11Y_MANUAL_CHECKLIST |
 | F6d (connection) | HA-025 | [HA-025_HIRE_EVIDENCE_SHARING_BRIEF.md](./human-actions/HA-025_HIRE_EVIDENCE_SHARING_BRIEF.md) |
 
-Corrections to the sequence above (records kept as written):
+Corrections to the sequence above (applied in place to the tables on
+2026-10-11, PROD-READY P108; step numbers unchanged):
 
 - **Do B2 before B1.** B2 (trust-policy `sub` → `…:environment:production`,
   environment protection) must be in place before B1 merges the new
-  `build-image.yml` to `main`; the table numbers them the other way round.
+  `build-image.yml` to `main`; table B now lists B2 first.
 - B8 and B9: the migrate Job runs **0021–0063** (43 migrations), and the old
   image is rehearsed on the **0063** schema (RELEASE_TEMPLATE Phase 10
   addendum).

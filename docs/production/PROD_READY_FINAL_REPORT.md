@@ -1,6 +1,6 @@
 # PROD-READY 2026-10 — Final report
 
-Charter [PROD_READY_CHARTER_2026-10.md](./PROD_READY_CHARTER_2026-10.md), Phase 11. Programme record and decision log: [PROD_READY_STATE.md](./PROD_READY_STATE.md) (P1–P107). Written 2026-10-11 on `prod/p11-final-report`, which branches from `prod/p10s-consent-layout` @ `b59306d`.
+Charter [PROD_READY_CHARTER_2026-10.md](./PROD_READY_CHARTER_2026-10.md), Phase 11. Programme record and decision log: [PROD_READY_STATE.md](./PROD_READY_STATE.md) (P1–P108). Written 2026-10-11 on `prod/p11-final-report`, which branches from `prod/p10s-consent-layout` @ `b59306d`.
 
 **Bottom line.** The engineering work in the charter is done in code. Everything is dark, nothing is deployed, and no human action is closed. A college pilot is still blocked by human and operator steps (§5, §6). The first of those is P0 credential-rotation evidence (HA-001/HA-002). The release itself needs the PostgreSQL cutover (HA-023) in the same change window. Final gate numbers are placeholders (`{{…}}`) that the orchestrator fills in from its clean-worktree run.
 
@@ -31,7 +31,6 @@ Deviations from the charter text, each recorded as a P-row:
 - New migrations start at 0055, not 0040 (P2).
 - Phase 1S was added, and it narrowed the S9 residual rather than leaving it unchanged (P3).
 - The release range is 0021–0063, not 0025–0039 (P77).
-- The full four-project Playwright run moved from Phase 10 to the Phase 11 orchestrator gate.
 
 ## 2. Test counts: baseline to final
 
@@ -48,6 +47,8 @@ Deviations from the charter text, each recorded as a P-row:
 | `npm audit --omit=dev` server | 5 (1 critical, 3 high, 1 moderate) | 0 | {{FINAL_AUDIT_SERVER}} |
 | Playwright `@critical` | 223 passed · 1 flaky · 0 failed | 223 passed · 1 failed (WebKit consent, fixed in p10s) | {{FINAL_E2E_CRITICAL}} |
 | Playwright full four-project (`browser-all`, isolated runner) | 867 passed · 8 flaky · 25 skipped · 0 failed (1.1 h) | — | {{FINAL_E2E_FULL}} |
+
+Full four-project run at Phase 10 tip (`ea65d3f`, orchestrator): {{P10_E2E_FULL}}
 
 ### Per-phase gate history (orchestrator, clean worktree)
 

@@ -160,3 +160,13 @@ Registry coverage: the personal-data registry now covers migrations through
 0063 (0061 `demo_accounts`, 0062 `guardian_consents`; 0063 adds no
 personal-data column), not "0001–0056" as stated in the Phase 2 addendum at
 the time. Review list and materials: [RUNBOOK_CURRENCY_REVIEW.md](../production/human-actions/RUNBOOK_CURRENCY_REVIEW.md).
+
+## Addendum 2026-10-11 — PROD-READY Phase 11 (consistency note)
+
+The S9 row in §3 says the issued-report route `GET /report/:id` "stays public
+for undisclosed personal sessions (verification links)". That statement is
+superseded (record kept as written): since `6c218ec` the K103 owner-only guard
+covers that route for every session, so no public report view exists; public
+verification uses `/api/credentials/:id/verify` (Phase 1S addendum, N7; P18).
+The remaining S9 residual is the non-destructive legacy session routes listed
+in the Phase 1S addendum (P10, P11). Recorded by P108.
