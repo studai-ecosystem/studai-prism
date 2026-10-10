@@ -88,8 +88,11 @@ test.describe('@campus @a11y PROD P08 UX polish — analytics, tables, mission j
         expect(await scrollsSideways(region), 'the interventions table does not scroll sideways at small widths').toBe(false)
         // Each value carries its column header as a visible label.
         const progress = table.locator('td[data-label="Progress"]').first()
-        const label = await progress.evaluate((el) => getComputedStyle(el, '::before').content)
-        expect(label).toContain('Progress')
+        const { content, dataLabel } = await progress.evaluate((el) => ({ content: getComputedStyle(el, '::before').content, dataLabel: el.dataset.label }))
+        // Chromium/WebKit return the resolved string; Gecko serialises attr()
+        // unresolved (P109). Either way the label must come from data-label.
+        expect(dataLabel).toBe('Progress')
+        expect(content.includes('Progress') || /^attr\(data-label\)/.test(content), `::before content was ${content}`).toBe(true)
         await expect(table.getByRole('columnheader', { name: 'Progress' })).toBeAttached()
       } else {
         await expect(table.getByRole('columnheader', { name: 'Progress' })).toBeVisible()
