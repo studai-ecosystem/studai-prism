@@ -1,8 +1,8 @@
 # PROD-READY 2026-10 — Final report
 
-Charter [PROD_READY_CHARTER_2026-10.md](./PROD_READY_CHARTER_2026-10.md), Phase 11. Programme record and decision log: [PROD_READY_STATE.md](./PROD_READY_STATE.md) (P1–P108). Written 2026-10-11 on `prod/p11-final-report`, which branches from `prod/p10s-consent-layout` @ `b59306d`.
+Charter [PROD_READY_CHARTER_2026-10.md](./PROD_READY_CHARTER_2026-10.md), Phase 11. Programme record and decision log: [PROD_READY_STATE.md](./PROD_READY_STATE.md) (P1–P110). Written 2026-10-11 on `prod/p11-final-report`, which branches from `prod/p10s-consent-layout` @ `b59306d`.
 
-**Bottom line.** The engineering work in the charter is done in code. Everything is dark, nothing is deployed, and no human action is closed. A college pilot is still blocked by human and operator steps (§5, §6). The first of those is P0 credential-rotation evidence (HA-001/HA-002). The release itself needs the PostgreSQL cutover (HA-023) in the same change window. Final gate numbers are placeholders (`{{…}}`) that the orchestrator fills in from its clean-worktree run.
+**Bottom line.** The engineering work in the charter is done in code. Everything is dark, nothing is deployed, and no human action is closed. A college pilot is still blocked by human and operator steps (§5, §6). The first of those is P0 credential-rotation evidence (HA-001/HA-002). The release itself needs the PostgreSQL cutover (HA-023) in the same change window. Final gates on `d6371b1` (clean worktree): every suite green, 0 failures; the full four-project Playwright run passed 902 with 0 failures.
 
 ## 1. Phases, branches and commits
 
@@ -23,7 +23,7 @@ All branches are **local, stacked and not pushed**. Pushing, opening PRs and mer
 | 9 Employer L&D | `prod/p09-employer-lnd` | `e85782b`, `44267fa` | Employer development-use workspace (dark) with prohibited-use enforcement. The Hire hand-off interface answers 501, and HA-025 was added. Migration 0063 |
 | 10 Human-action pack | `prod/p10-human-actions` | `8c8c7eb`, `ea65d3f` | Materials in `human-actions/`. Register rows moved to PREPARED at most, none CLOSED |
 | 10S Consent layout | `prod/p10s-consent-layout` | `b59306d` | Root-cause fix for the system-check layout shift behind the intermittent WebKit consent failures (P107) |
-| 11 Final report | `prod/p11-final-report` | this commit | This report. Final gates are run by the orchestrator |
+| 11 Final report | `prod/p11-final-report` | `cc09a30`, `0dd7bfc`, `dbe2747`, `d6371b1`, this commit | This report and a documentation consistency pass (P108); one Firefox-only test corrected (P109); second root cause of the consent-step flake fixed — route focus no longer scrolls the page (P110); final gates |
 
 Deviations from the charter text, each recorded as a P-row:
 
@@ -34,21 +34,23 @@ Deviations from the charter text, each recorded as a P-row:
 
 ## 2. Test counts: baseline to final
 
-| Gate | Baseline (`4e417a9`/`d71abf1`) | Last orchestrator gate before P11 (`44267fa`, p09) | Final |
+| Gate | Baseline (`4e417a9`/`d71abf1`) | Last orchestrator gate before P11 (`44267fa`, p09) | Final (`d6371b1`, orchestrator, clean worktree, 2026-10-11) |
 | --- | --- | --- | --- |
-| Server, no DB (`npm --prefix server test`; tests / pass / fail / skip) | 968 / 941 / 0 / 27 | 1154 / 1081 / 0 / 73 (p10 agent run: 1160 / 1087 / 0 / 73) | {{FINAL_SERVER}} |
-| Server DB suites (`*.db.test.js`, throwaway PG) | 39 / 36 / 0 / 3 | 160 / 157 / 0 / 3 | {{FINAL_DB}} |
-| DB pipeline (baseline db + p2, cr03, rehearse migrations and rollback) | PASS (27+21+1+1+18) | PASS (5 steps exit 0; rehearsal head 0063) | {{FINAL_PIPELINE}} |
-| Vitest | 521 pass | 580 / 580 (p10s adds 1 test) | {{FINAL_VITEST}} |
-| Pytest (calibration) | 64 | 69 | {{FINAL_PYTEST}} |
-| `npm run build` | PASS | PASS | {{FINAL_BUILD}} |
-| `npm run audit:static` | PASS | PASS | {{FINAL_STATIC}} |
-| `npm audit --omit=dev` root | 3 (1 critical, 2 low) | 0 | {{FINAL_AUDIT_ROOT}} |
-| `npm audit --omit=dev` server | 5 (1 critical, 3 high, 1 moderate) | 0 | {{FINAL_AUDIT_SERVER}} |
-| Playwright `@critical` | 223 passed · 1 flaky · 0 failed | 223 passed · 1 failed (WebKit consent, fixed in p10s) | {{FINAL_E2E_CRITICAL}} |
-| Playwright full four-project (`browser-all`, isolated runner) | 867 passed · 8 flaky · 25 skipped · 0 failed (1.1 h) | — | {{FINAL_E2E_FULL}} |
+| Server, no DB (`npm --prefix server test`; tests / pass / fail / skip) | 968 / 941 / 0 / 27 | 1154 / 1081 / 0 / 73 (p10 agent run: 1160 / 1087 / 0 / 73) | 1160 / 1087 / 0 / 73 |
+| Server DB suites (`*.db.test.js`, throwaway PG) | 39 / 36 / 0 / 3 | 160 / 157 / 0 / 3 | 160 / 157 / 0 / 3 |
+| DB pipeline (baseline db + p2, cr03, rehearse migrations and rollback) | PASS (27+21+1+1+18) | PASS (5 steps exit 0; rehearsal head 0063) | PASS (5 steps exit 0, 0 failing tests; rehearsal head 0063) |
+| Vitest | 521 pass | 580 / 580 (p10s adds 1 test) | 582 / 582 |
+| Pytest (calibration) | 64 | 69 | 69 |
+| `npm run build` | PASS | PASS | PASS |
+| `npm run audit:static` | PASS | PASS | PASS |
+| `npm audit --omit=dev` root | 3 (1 critical, 2 low) | 0 | 0 |
+| `npm audit --omit=dev` server | 5 (1 critical, 3 high, 1 moderate) | 0 | 0 |
+| Playwright `@critical` | 223 passed · 1 flaky · 0 failed | 223 passed · 1 failed (WebKit consent, fixed in p10s) | 222 passed · 2 flaky · 0 failed (18.8 min) |
+| Playwright full four-project (`browser-all`, isolated runner) | 867 passed · 8 flaky · 25 skipped · 0 failed (1.1 h) | — | 902 passed · 5 flaky · 33 skipped · 0 failed (56.7 min) |
 
-Full four-project run at Phase 10 tip (`ea65d3f`, orchestrator): {{P10_E2E_FULL}}
+Full four-project run at Phase 10 tip (`ea65d3f`, orchestrator): 900 passed · 6 flaky · 33 skipped · **1 failed** — Firefox `prod-p08-ux-polish.spec.js:27`: the test read the stacked-table label in a way only Chromium/WebKit report (Gecko serialises `attr()` unresolved); test corrected, not the product (P109). The same commit's `@critical` run had 220 passed · 3 flaky · 1 failed (WebKit consent step, before the P107 fix)
+
+Final-gate notes (`d6371b1`): the two remaining `@critical` retries were Firefox `prism-readiness.spec.js:122` and WebKit `campus-workspace.spec.js:74` (both passed on retry; the WebKit one was already intermittent in the p02 and p06 gates, before any UI change of this programme). The consent-step instability that failed hard in the p08, p09 and p10 gates had two root causes, both fixed in the product (P107 system-check layout shift, P110 route-focus scroll); the full four-project run on the final tip shows no occurrence of it.
 
 ### Per-phase gate history (orchestrator, clean worktree)
 
@@ -66,7 +68,9 @@ These are the authoritative numbers. Where an agent's state-file entry differs, 
 | p07 @ `d42bb29` | 1111/1053/0/58 | 145/142/0/3 | PASS | 546/546 | 64 | PASS / PASS / 0·0 | 222 passed, 2 flaky, 0 failed |
 | p08 @ `e38cfdd` | 1133/1066/0/67 | 154/151/0/3 | PASS | 566/566 | 69 | PASS / PASS / 0·0 | 1st run: 220 passed, 3 flaky, **1 failed**. Rerun: 222 passed, 2 flaky, 0 failed |
 | p09 @ `44267fa` | 1154/1081/0/73 | 160/157/0/3 | PASS | 580/580 | 69 | PASS / PASS / 0·0 | 223 passed, **1 failed** |
-| p10 @ `ea65d3f`, p10s @ `b59306d` | no separate orchestrator gate. The p10 agent ran server 1160/1087/0/73, vitest 580, build and static. p10s added one Vitest test | | | | | | covered by the final gate |
+| p10 @ `ea65d3f` | 1160/1087/0/73 | 160/157/0/3 | PASS | 580/580 | 69 | PASS / PASS / 0·0 | 220 passed, 3 flaky, **1 failed** (WebKit consent; before P107). Full four-project: 900 passed, 6 flaky, 33 skipped, **1 failed** (Firefox test, P109) |
+| p11 @ `dbe2747` (incl. p10s P107, P109) | 1160/1087/0/73 | 160/157/0/3 | PASS | 581/581 | 69 | PASS / PASS / 0·0 | 221 passed, 3 flaky, 0 failed (1 WebKit consent retry → P110). Full four-project: 900 passed, 7 flaky, 33 skipped, 0 failed |
+| **final @ `d6371b1`** (incl. P110) | **1160/1087/0/73** | **160/157/0/3** | **PASS** | **582/582** | **69** | **PASS / PASS / 0·0** | **222 passed, 2 flaky, 0 failed. Full four-project: 902 passed, 5 flaky, 33 skipped, 0 failed** |
 
 Flaky and failed items, and how each was resolved:
 

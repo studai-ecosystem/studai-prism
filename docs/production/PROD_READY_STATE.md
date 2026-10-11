@@ -14,7 +14,7 @@ Formats follow [CAMPUS_PROGRAM_STATE.md](../campus/CAMPUS_PROGRAM_STATE.md):
 - Status values: `NOT_STARTED` | `IN_PROGRESS` | `COMPLETE`.
 
 <!-- PROD-STATE:BEGIN
-active_phase: 11
+active_phase: 11 (COMPLETE)
 branch: prod/p11-final-report
 last_updated: 2026-10-11
 PROD-STATE:END -->
@@ -641,11 +641,11 @@ Commit: `b59306d` (recorded in Phase 11)
 - [x] P10S.01 Root cause of the intermittent WebKit `@critical` failures in the Phase 8 and Phase 9 gates (`campus-journey-a.spec.js:172` Journey D, then `cr05-returning-loop.spec.js:61`, both failing both attempts with "Clicking the checkbox did not change its state … element is not stable / outside of the viewport" on the consent checkbox) fixed in the page, not the test — evidence: P107; `src/features/assessments/pages/SystemCheckPage.jsx`; new Vitest `studentPages.test.jsx` "every check row is on the page while the connection check is still waiting…" fails on the previous page and passes on the fix
 
 ## Phase 11 — Final gates and report
-Status: IN_PROGRESS
+Status: COMPLETE
 Branch: `prod/p11-final-report` (from `prod/p10s-consent-layout` @ `b59306d`)
-Gates: run by the orchestrator in a clean worktree (pending)
+Gates: run by the orchestrator in a clean worktree at `d6371b1` (2026-10-11) — all green, see P11.01
 
-- [ ] P11.01 Final gates: server (no DB), server DB suites, DB pipeline, Vitest, pytest, build, static audit, `npm audit --omit=dev` root/server, Playwright `@critical` and the full four-project suite — pending the orchestrator; exact counts go into the `{{FINAL_*}}` placeholders of the final report
+- [x] P11.01 Final gates at `d6371b1` (clean worktree, throwaway PostgreSQL): server 1160 / 1087 pass / 0 fail / 73 skipped; DB suites 160 / 157 / 0 / 3; DB pipeline 5 steps PASS; Vitest 582/582; pytest 69; build PASS; static audit PASS; `npm audit --omit=dev` root 0, server 0; Playwright `@critical` 222 passed · 2 flaky · 0 failed; full four-project (`browser-all`) 902 passed · 5 flaky · 33 skipped · 0 failed — evidence: [PROD_READY_FINAL_REPORT.md](./PROD_READY_FINAL_REPORT.md) §2
 - [x] P11.02 Final report written — evidence: [PROD_READY_FINAL_REPORT.md](./PROD_READY_FINAL_REPORT.md) (phases/branches/commits, baseline→final gates incl. the per-phase orchestrator gate history and its flaky/failed items, S1–S9 + N1–N15 + later findings, dependency audit, pilot readiness and blockers, ordered open human actions, risks, flags, migrations 0055–0063, law-1/law-2 statement). No flag flipped, nothing deployed or pushed, no human action closed
 - [x] P11.03 Record catch-up from the orchestrator gate notes (no history rewritten): P0.05 ticked with the full-suite baseline; Phase 10S branch/commit lines added. Where agent-recorded numbers differ from the orchestrator's (Vitest load flakes in p01–p05; p07 DB suites and p09 pytest not run by the agent), the final report §2 uses the orchestrator's numbers and says so
 - [x] P11.04 Documentation consistency pass (P108): GO_LIVE_CHECKLIST, RELEASE_TEMPLATE_PROD_READY, PROD_READY_FINAL_REPORT and this file corrected in place to head 0063 / 43 migrations and B2-before-B1; register rows HA-C001, HA-C012, HA-023, HA-024 updated with dated notes (no status closed); SECURITY_REVIEW dated addendum on S9/N7
